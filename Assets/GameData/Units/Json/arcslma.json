@@ -2,21 +2,27 @@
   "id": 5503,
   "uintName": "arcslma",
   "skeletonData": "enemy_5503_arcslma_SkeletonData",
+  "Rarity": 4,
+  "cost": 12,
+
   "attackMethod": 1,
   "actionMethod": 1,
-  "Rarity": 1,
-  "cost": 2,
 
   "HP": 18000,
   "atk": 1100,
   "def": 0,
   "res": 0,
-  "moveSpeed": 0.2,
   "attackInterval": 4.0,
-  "LifeDeduct": 1,
+  "attackRadius": 0,
+
+  "moveSpeed": 0.2,
   "isBlock": true,
 
   "FixedAbility": [
     "SPLIT_THREE"
-  ]
+  ],
+
+  "LifeDeduct": 1,
+  "narrowTitle": 0,
+  "BlockRadius": 0.1
 }
