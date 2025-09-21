@@ -6,20 +6,25 @@ using UnityEngine;
 public partial class UnitTemplate : ScriptableObject
 {
     [Header("必须字段")]
-    public int id;                 // 主键
-    public string uintName;
-    public string attackMethod;    // 攻击方式
-    public string actionMethod;    // 行动方式
+    public int id = 1000;                 // 主键
+    public string uintName = "gopro";
+    public int attackMethod = 0b01;    // 攻击方式
+    public int actionMethod = 0b01;    // 行动方式
+    public int Rarity = 1;             //稀有度
+    public int cost = 2;               //部署费用
 
     [Header("战斗数值")]
-    public int maxHP;
-    public int atk;
-    public int taunt;              // 嘲讽等级
-    public float moveSpeed;
-    public float attackInterval;   // 攻击间隔
-    public float attackRadius;     // 攻击半径
-    public float BlockRadius;      // 接敌半径
-    public bool isBlock;           // 是否可阻挡
+    public int HP = 3000;
+    public int atk = 370;
+    public int def = 0;
+    public int res = 20;                //法抗
+    public float moveSpeed = 1.9f;
+    public int narrowTitle = 0;        // 基础嘲讽等级
+    public int LifeDeduct = 1;         // 目标价值
+    public float attackInterval = 1.4f;   // 攻击间隔
+    public float attackRadius = 0;     // 攻击半径
+    public float BlockRadius = 0.1f;      // 接敌半径
+    public bool isBlock = true;           // 是否可阻挡
 
     [Header("能力（可配置的名称清单）")]
     public List<string> FixedAbility = new();         // 填 tag

@@ -1,0 +1,17 @@
+{
+  "id": 1000,
+  "uintName": "gopro",
+  "skeletonData": "enemy_1000_gopro_3_SkeletonData",
+  "attackMethod": 1,
+  "actionMethod": 1,
+  "Rarity": 1,
+  "cost": 2,
+  "HP": 3000,
+  "atk": 370,
+  "def": 0,
+  "res": 20,
+  "moveSpeed": 1.9,
+  "LifeDeduct": 1,
+  "attackInterval": 1.4,
+  "isBlock": true
+}

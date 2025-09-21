@@ -9,11 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e5b796c2651b56b458fa45764f045f46, type: 3}
-  m_Name: Unit_Innate_Ability_Database
+  m_Script: {fileID: 11500000, guid: a6b194f808b1af6499c93410e504af42, type: 3}
+  m_Name: enemy_1000_gopro_3_Atlas
   m_EditorClassIdentifier: 
-  indexToName:
-  - SPLIT_THREE
-  ignoreCase: 0
-  trimWhitespace: 1
-  freezeAppend: 0
+  atlasFile: {fileID: 4900000, guid: 60b53cbd72aa8474e80c91d4861881f3, type: 3}
+  materials:
+  - {fileID: 2100000, guid: 9b0f92bb5789aad459396b2deada2ba4, type: 2}

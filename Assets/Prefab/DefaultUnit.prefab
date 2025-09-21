@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 2392398927054637304}
   - component: {fileID: 8714933595646148001}
   m_Layer: 0
-  m_Name: DefaultPrefab
+  m_Name: DefaultUnit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -96,7 +96,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d247ba06193faa74d9335f5481b2b56c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  skeletonDataAsset: {fileID: 11400000, guid: b8a676afdef56e245bea006744fc3956, type: 2}
+  skeletonDataAsset: {fileID: 11400000, guid: b094588371d82e340ab307c73b51c078, type: 2}
   initialSkinName: 
   initialFlipX: 0
   initialFlipY: 0
