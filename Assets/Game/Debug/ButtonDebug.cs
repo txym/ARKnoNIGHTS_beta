@@ -5,7 +5,9 @@ using UnityEngine.UIElements;
 
 public class ButtonDebug : MonoBehaviour
 {
-    public List<GameObject> gameObjects;
+    public List<GameObject> units = new List<GameObject>();
+    public Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
+
     public void CreateAllUnits(List<GameObject> unitPrefabs)
     {
         if (unitPrefabs == null || unitPrefabs.Count == 0)
@@ -53,7 +55,12 @@ public class ButtonDebug : MonoBehaviour
     }
     public void Debugbutton()
     {
-        CreateAllUnits(gameObjects);
+        units = UnitFactory.SpawnAll(
+            parent: this.transform,   // 全部挂到当前物体下面
+            setInactive: false,       // 若想先隐藏，改成 true，等布置好再 SetActive(true)
+            out idMap
+        );
+        CreateAllUnits(units);
     }
 
 

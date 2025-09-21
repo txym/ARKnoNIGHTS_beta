@@ -58,8 +58,11 @@ public static class UnitFactory
             if (setInactive) go.SetActive(false);
             go.name = string.IsNullOrEmpty(tpl.uintName) ? $"Unit_{tpl.id}" : $"{tpl.uintName}_{tpl.id}";
 
+            var refCmp = go.GetComponent<UnitTemplateReference>();
+            if (refCmp == null) refCmp = go.AddComponent<UnitTemplateReference>();
+            refCmp.SetTemplate(tpl);
             // ---- 不再调用 UnitView.ApplySkeleton；这里直接改 SkeletonAnimation ----
-            
+
 
             var skel = go.GetComponent<SkeletonAnimation>();
             if (!skel)
@@ -105,7 +108,9 @@ public static class UnitFactory
         if (string.IsNullOrEmpty(file)) return null;
         string u = (unitName ?? string.Empty).Trim().Replace('\\', '/').Trim('/');
         string f = file.Trim().Replace('\\', '/').Trim('/');
-        return string.IsNullOrEmpty(u) ? f : $"{u}/{f}";
+        return string.IsNullOrEmpty(u) 
+            ? $"Characters/{f}"
+            : $"Characters/{u}/{f}";
     }
 
     // 原样拷贝（不做数值兜底）

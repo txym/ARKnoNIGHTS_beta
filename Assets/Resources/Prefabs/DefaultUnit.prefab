@@ -118,6 +118,6 @@ MonoBehaviour:
     materialsInsideMask: []
     materialsOutsideMask: []
   disableRenderingOnOverride: 1
-  _animationName: Attack
+  _animationName: 
   loop: 1
   timeScale: 1
