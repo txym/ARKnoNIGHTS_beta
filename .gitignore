@@ -1,4 +1,3 @@
-# Unity generated folders
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -7,22 +6,19 @@
 [Ll]ogs/
 [Uu]serSettings/
 MemoryCaptures/
-
-# Rider / VS / VSCode
 .vs/
 .vscode/
-*.csproj
-*.unityproj
-*.sln
 *.suo
-*.tmp
 *.user
 *.userprefs
-
-# Unity auto-generated
 *.pidb
 *.booproj
 *.svd
-
-# Other
+*.tmp
+*.csproj
+*.sln
+*.unityproj
+.DS_Store
+Thumbs.db
 *.tar.7z
+*.zip
