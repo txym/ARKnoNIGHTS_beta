@@ -1,0 +1,60 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+public class ButtonDebug : MonoBehaviour
+{
+    public List<GameObject> gameObjects;
+    public void CreateAllUnits(List<GameObject> unitPrefabs)
+    {
+        if (unitPrefabs == null || unitPrefabs.Count == 0)
+        {
+            Debug.LogWarning("Unit prefabs list is null or empty");
+            return;
+        }
+
+        int spawnedCount = 0;
+        int maxUnits = unitPrefabs.Count;
+
+        for (int x = 1; x <= 9; x++)
+        {
+            for (int y = 1; y <= 8; y++)
+            {
+                // 跳过特定位置
+                if (x == 5 && (y == 1 || y == 8))
+                    continue;
+
+                // 检查是否已生成所有单位
+                if (spawnedCount >= maxUnits)
+                    return;
+
+                string positionName = $"Block({x},{y})";
+                GameObject positionMarker = GameObject.Find(positionName);
+
+                if (positionMarker == null)
+                {
+                    Debug.LogWarning($"Position marker not found: {positionName}");
+                    continue;
+                }
+
+                // 实例化单位
+                Instantiate(unitPrefabs[spawnedCount], positionMarker.transform.position + new Vector3(0, 50, 0), unitPrefabs[spawnedCount].transform.rotation);
+                spawnedCount++;
+
+                Debug.Log($"生成单位 #{spawnedCount} 在坐标: ({x},{y})");
+            }
+        }
+
+        if (spawnedCount < maxUnits)
+        {
+            Debug.LogWarning($"只有 {spawnedCount} 个单位被生成，但提供了 {maxUnits} 个预设体");
+        }
+    }
+    public void Debugbutton()
+    {
+        CreateAllUnits(gameObjects);
+    }
+
+
+}
