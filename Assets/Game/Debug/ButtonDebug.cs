@@ -6,8 +6,8 @@ using UnityEngine.UIElements;
 public class ButtonDebug : MonoBehaviour
 {
     public List<GameObject> units = new List<GameObject>();
-    public Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
-
+    private Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
+    private Dictionary<int, UnitTemplate> UnitSOMap = new Dictionary<int, UnitTemplate>();
     public void CreateAllUnits(List<GameObject> unitPrefabs)
     {
         if (unitPrefabs == null || unitPrefabs.Count == 0)
