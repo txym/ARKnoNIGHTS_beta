@@ -2,6 +2,7 @@
   "id": 1000,
   "uintName": "gopro",
   "skeletonData": "enemy_1000_gopro_3_SkeletonData",
+  "ProfilePicture":"UIImage_gopro",
   "Rarity": 1,
   "cost": 2,
 

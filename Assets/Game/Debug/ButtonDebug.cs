@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -7,6 +8,16 @@ public class ButtonDebug : MonoBehaviour
 {
     public List<GameObject> units = new List<GameObject>();
     public Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
+    //public GameObject test;
+    public VirtualSlotPanel virtualSlotPanel;
+    public void Start()
+    {
+        for(int i=0;i<12;i++)
+        {
+            //GameObject newgameobject = Instantiate(test);
+            virtualSlotPanel.PlaceObjectInSlot(i);
+        }
+    }
 
     public void CreateAllUnits(List<GameObject> unitPrefabs)
     {
@@ -42,6 +53,7 @@ public class ButtonDebug : MonoBehaviour
 
                 // 实例化单位
                 Instantiate(unitPrefabs[spawnedCount], positionMarker.transform.position + new Vector3(0, 50, 0), unitPrefabs[spawnedCount].transform.rotation);
+
                 spawnedCount++;
 
                 Debug.Log($"生成单位 #{spawnedCount} 在坐标: ({x},{y})");
@@ -53,6 +65,19 @@ public class ButtonDebug : MonoBehaviour
             Debug.LogWarning($"只有 {spawnedCount} 个单位被生成，但提供了 {maxUnits} 个预设体");
         }
     }
+    public static void DeploymentUnit(GameObject unit,(int,int) position)
+    {
+        int x = position.Item1;
+        int z = position.Item2;
+        if ((x == 5 && (z == 1 || z == 8)) || x < 1 || x > 9 || z < 1 || z > 8)
+        {
+            Destroy(unit); 
+            return;
+        }
+        string positionName = $"Block({x},{z})";
+        GameObject positionMarker = GameObject.Find(positionName);
+        unit.transform.position = positionMarker.transform.position + new Vector3(0, 50, 0);
+    }
     public void Debugbutton()
     {
         units = UnitFactory.SpawnAll(
@@ -62,6 +87,7 @@ public class ButtonDebug : MonoBehaviour
         );
         CreateAllUnits(units);
     }
+   
 
 
 }

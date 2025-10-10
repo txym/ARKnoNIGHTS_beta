@@ -9,7 +9,8 @@ static class BakePaths
 {
     public const string UnitsJsonDir = "Assets/GameData/Units/Json";
     public const string InnateRegistryPath = "Assets/GameData/Units/Unit_Innate_Ability_Database.asset";
-    public static string UnitAssetPathById(int id) => $"Assets/Game/Data/Units/Unit_{id}.asset"; // ÈçÎŞ Template£¬¿ÉºöÂÔ
+    public const string UnitsIconImagePath = "Assets/GameData/UIIconImage";
+    public static string UnitAssetPathById(int id) => $"Assets/Game/Data/Units/Unit_{id}.asset"; // å¦‚æ—  Templateï¼Œå¯å¿½ç•¥
 }
 
 [System.Serializable]
@@ -27,14 +28,14 @@ public static class UnitJsonBake
         var reg = AssetDatabase.LoadAssetAtPath<TagRegistry>(BakePaths.InnateRegistryPath);
         if (reg == null)
         {
-            Debug.LogError($"Î´ÕÒµ½ Innate Registry: {BakePaths.InnateRegistryPath}");
+            Debug.LogError($"æœªæ‰¾åˆ° Innate Registry: {BakePaths.InnateRegistryPath}");
             return;
         }
 
         var jsonPaths = Directory.GetFiles(BakePaths.UnitsJsonDir, "*.json", SearchOption.AllDirectories);
         var units = new List<(string path, UnitJsonLite data)>(jsonPaths.Length);
 
-        // 1) ¶ÁÈ¡ JSON£¬»ã×Ü tag ²¢Ö»×·¼Óµ½ Registry
+        // 1) è¯»å– JSONï¼Œæ±‡æ€» tag å¹¶åªè¿½åŠ åˆ° Registry
         foreach (var p in jsonPaths)
         {
             var text = File.ReadAllText(p);
@@ -50,7 +51,7 @@ public static class UnitJsonBake
         EditorUtility.SetDirty(reg);
         AssetDatabase.SaveAssets();
 
-        // 2) »ØĞ´µ½ UnitTemplate£¨Èô´æÔÚ£©
+        // 2) å›å†™åˆ° UnitTemplateï¼ˆè‹¥å­˜åœ¨ï¼‰
         int baked = 0;
         foreach (var (_, u) in units)
         {
@@ -64,7 +65,7 @@ public static class UnitJsonBake
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[Bake] É¨Ãè {units.Count} ¸ö JSON£»×¢²á±í´óĞ¡={reg.Count}£»»ØĞ´ {baked} ¸ö UnitTemplate¡£");
+        Debug.Log($"[Bake] æ‰«æ {units.Count} ä¸ª JSONï¼›æ³¨å†Œè¡¨å¤§å°={reg.Count}ï¼›å›å†™ {baked} ä¸ª UnitTemplateã€‚");
     }
 }
 #endif

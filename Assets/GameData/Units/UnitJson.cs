@@ -4,6 +4,7 @@ public class UnitJson
     public int id;
     public string uintName;
     public string skeletonData;
+    public string ProfilePicture;
     public int Rarity;
     public int cost;
 

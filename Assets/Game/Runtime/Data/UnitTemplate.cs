@@ -8,6 +8,7 @@ public partial class UnitTemplate : ScriptableObject
     [Header("必须字段")]
     public int id = 1000;                 // 主键
     public string uintName = "gopro";
+    public string ProfilePicture = "UIImage_gopro";
     public int attackMethod = 0b01;    // 攻击方式
     public int actionMethod = 0b01;    // 行动方式
     public int Rarity = 1;             //稀有度
@@ -38,4 +39,3 @@ public partial class UnitTemplate : ScriptableObject
 
 }
 
-public enum State { Idle, Move, Attack, Death, Skill, Default }
