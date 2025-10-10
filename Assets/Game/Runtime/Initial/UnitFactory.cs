@@ -8,6 +8,22 @@ public static class UnitFactory
     private const string JsonRootRel = "GameData/Units/Json"; // 位于 Assets 下
     private const string PrefabResPath = "Prefabs/DefaultUnit"; // Resources.Load 不要带 "Resources/"
 
+    // �����ڻ��棨���ⲻ��¶��
+    private static Dictionary<int, UnitTemplate> sUnitSOMap;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => sUnitSOMap = new Dictionary<int, UnitTemplate>(); // ���� Play ʱ��һ�Σ������� Domain Reload ճס��
+
+    /// �� typeId ȡ unitSO��ȡ�������� null ��
+    public static UnitTemplate GetUnitBasicValueSO(int typeId)
+    {
+        if (sUnitSOMap != null && sUnitSOMap.TryGetValue(typeId, out var tpl))
+            return tpl;
+
+        Debug.LogError($"[UnitFactory] δ�ҵ� UnitBasicValueSO��typeId={typeId}");
+        return null;
+    }
+
     public static List<GameObject> SpawnAll(
         Transform parent,
         bool setInactive,
@@ -33,6 +49,8 @@ public static class UnitFactory
         var files = Directory.GetFiles(rootAbs, "*.json", SearchOption.AllDirectories);
         System.Array.Sort(files, System.StringComparer.Ordinal);
 
+        int mNextUnitID = -1;
+
         foreach (var file in files)
         {
             UnitJson j = null;
@@ -54,14 +72,29 @@ public static class UnitFactory
 
             var tpl = BuildTemplate(j);
 
+            if (sUnitSOMap.ContainsKey(tpl.typeID))
+            {
+                Debug.LogError($"[UnitFactory] �ظ��� typeID: {tpl.typeID}����Դ�ļ���{file}");
+                continue; // ���߸��ǣ�soMap[tpl.typeID] = tpl;
+            }
+            sUnitSOMap.Add(tpl.typeID, tpl);
+
             var go = Object.Instantiate(prefab, parent);
             if (setInactive) go.SetActive(false);
-            go.name = string.IsNullOrEmpty(tpl.uintName) ? $"Unit_{tpl.id}" : $"{tpl.uintName}_{tpl.id}";
+            go.name = string.IsNullOrEmpty(tpl.uintName) ? $"Unit_{tpl.typeID}" : $"{tpl.uintName}_{tpl.typeID}";
+
+            var unitIdentity = go.AddComponent<UnitIdentity>();
+            if (unitIdentity) 
+            { 
+                unitIdentity.SetTypeOnce(tpl.typeID);
+                unitIdentity.UnitID = mNextUnitID;
+                mNextUnitID--;
+            }
 
             var refCmp = go.GetComponent<UnitTemplateReference>();
             if (refCmp == null) refCmp = go.AddComponent<UnitTemplateReference>();
             refCmp.SetTemplate(tpl);
-            // ---- 不再调用 UnitView.ApplySkeleton；这里直接改 SkeletonAnimation ----
+
 
 
             var skel = go.GetComponent<SkeletonAnimation>();
@@ -71,8 +104,7 @@ public static class UnitFactory
             }
             else
             {
-                // 直接使用 JSON 里的资源名
-                // 例如： "Characters/gopro/enemy_1000_gopro_3_SkeletonData"
+
                 var resPath = BuildResPath(j.uintName, j.skeletonData);
                 var sda = Resources.Load<SkeletonDataAsset>(resPath);
                 if (!sda)
@@ -97,7 +129,7 @@ public static class UnitFactory
             // ----------------------------------------------------------------------
 
             result.Add(go);
-            idMap[tpl.id] = go;
+            idMap[tpl.typeID] = go;
         }
         return result;
     }
@@ -118,7 +150,7 @@ public static class UnitFactory
     {
         var so = ScriptableObject.CreateInstance<UnitTemplate>();
 
-        so.id = j.id;
+        so.typeID = j.id;
         so.uintName = j.uintName;
         so.ProfilePicture = j.ProfilePicture;
         so.Rarity = j.Rarity;

@@ -6,7 +6,7 @@ using UnityEngine;
 public partial class UnitTemplate : ScriptableObject
 {
     [Header("必须字段")]
-    public int id = 1000;                 // 主键
+    public int typeID = 1000;                 // 主键
     public string uintName = "gopro";
     public string ProfilePicture = "UIImage_gopro";
     public int attackMethod = 0b01;    // 攻击方式
