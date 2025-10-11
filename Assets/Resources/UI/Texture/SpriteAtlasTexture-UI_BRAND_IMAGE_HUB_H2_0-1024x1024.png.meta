@@ -1,0 +1,264 @@
+fileFormatVersion: 2
+guid: 8dc75839c0a632848bb9f2a840dfb853
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 0
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: iPhone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_1
+      rect:
+        serializedVersion: 2
+        x: 2
+        y: 843
+        width: 523
+        height: 105
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a276b8583250b394286175008f46a2bc
+      internalID: 949281723
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_2
+      rect:
+        serializedVersion: 2
+        x: 8
+        y: 524
+        width: 496
+        height: 308
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a7e7b8df2ccf0224bb4f5f911ec4f819
+      internalID: 2008949358
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_4
+      rect:
+        serializedVersion: 2
+        x: 507
+        y: 0
+        width: 335
+        height: 509
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ea147e7b85295c14182033dc2581cbf5
+      internalID: -365497959
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_3
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 505
+        height: 356
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b506d742d59e31345a22ba6a67daaab6
+      internalID: -1372860923
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 7f937e0b7f6a4ed4a8e5e80c3e96d55e
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_0: -1306054187
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_1: 949281723
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_11: 72708826
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_13: -1861452727
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_14: 1952398276
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_16: 1560776732
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_17: -426061353
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_18: 416287937
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_19: 652859974
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_2: 2008949358
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_20: 1717225812
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_21: -746674872
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_22: 895101042
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_23: 1031273152
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_24: 1432489066
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_25: -171782557
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_26: -1003618679
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_27: 1355790237
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_28: 2116688125
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_29: 674284768
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_3: -1372860923
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_30: -674723740
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_31: -1248938121
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_32: 419462644
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_33: 626650014
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_34: -2044073633
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_35: 971032257
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_36: 177135631
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_37: -351488491
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_38: 630440360
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_39: 2017502069
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_4: -365497959
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_40: -2004709430
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_41: -1891008044
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_42: 31749460
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_43: 21611069
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_5: 1475111606
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_7: -1710283330
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_8: 1186537734
+      SpriteAtlasTexture-UI_BRAND_IMAGE_HUB_H2_0-1024x1024_9: 569027349
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

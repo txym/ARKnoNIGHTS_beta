@@ -7,7 +7,7 @@ public class MergeTextureTool : EditorWindow
     // 用于存放输入的颜色图和 Alpha 图
     private Texture2D colorTexture;
     private Texture2D alphaTexture;
-    private string savePath = "Assets/Resources/UI/MergedTexture.png";  // 默认保存路径
+    private string savePath;  // 保存路径（会根据 colorTexture 自动生成）
 
     // 显示窗口
     [MenuItem("Tools/Merge RGBA Textures")]
@@ -24,8 +24,16 @@ public class MergeTextureTool : EditorWindow
         colorTexture = (Texture2D)EditorGUILayout.ObjectField("Color Texture", colorTexture, typeof(Texture2D), false);
         alphaTexture = (Texture2D)EditorGUILayout.ObjectField("Alpha Texture", alphaTexture, typeof(Texture2D), false);
 
+        // 根据颜色图动态生成保存路径
+        if (colorTexture != null)
+        {
+            // 获取文件名并拼接路径
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(AssetDatabase.GetAssetPath(colorTexture));
+            savePath = "Assets/Resources/UI/Texture/" + fileNameWithoutExtension + "_Merged.png";
+        }
+
         // 保存路径
-        savePath = EditorGUILayout.TextField("Save Path", savePath);
+        EditorGUILayout.LabelField("Save Path", savePath);
 
         if (colorTexture != null && alphaTexture != null)
         {
