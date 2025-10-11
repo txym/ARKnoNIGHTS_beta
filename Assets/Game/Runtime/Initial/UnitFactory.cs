@@ -91,11 +91,6 @@ public static class UnitFactory
                 mNextUnitID--;
             }
 
-            var refCmp = go.GetComponent<UnitTemplateReference>();
-            if (refCmp == null) refCmp = go.AddComponent<UnitTemplateReference>();
-            refCmp.SetTemplate(tpl);
-
-
 
             var skel = go.GetComponent<SkeletonAnimation>();
             if (!skel)

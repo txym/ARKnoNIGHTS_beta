@@ -45,26 +45,37 @@ public sealed class DataUISwitch
         var rt = _instanceGO.GetComponent<RectTransform>();
         if (rt != null)
         {
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.6f); // 屏幕左上 1/4 高度处
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(40f, 0f);
+
             rt.anchoredPosition = Vector2.zero;
             //rt.localScale = Vector3.one;
         }
         _instanceGO.SetActive(setActive);
     }
 
-    public void Toggle(GameObject gameObject)
+    public void Toggle(int id = 1000)
     {
         if (_instanceGO == null) { Debug.LogWarning("[DataUISwitch] 尚未初始化，忽略 Toggle"); return; }
-        _instanceGO.transform.position = gameObject.transform.position + new Vector3(0, 130, 0);
+        //_instanceGO.transform.position = gameObject.transform.position + new Vector3(0, 130, 0);
+        var tpl = UnitFactory.GetUnitBasicValueSO(id);
+        var descriptiontext = _instanceGO.GetComponentInChildren<Text>();
+        descriptiontext.text =
+        $"{tpl.uintName}\n" +
+        $"生命：{tpl.HP}\n" +
+        $"攻击：{tpl.atk}\n" +
+        $"防御：{tpl.def}\n" +
+        $"法抗：{tpl.res}\n" +
+        $"攻击间隔：{tpl.attackInterval}s\n" +
+        $"移动速度：{tpl.moveSpeed}";
         _instanceGO.SetActive(!_instanceGO.activeSelf);
     }
 
     public void Show()
     {
         if (_instanceGO == null) { Debug.LogWarning("[DataUISwitch] 尚未初始化，忽略 Show"); return; }
-        _instanceGO.SetActive(true);
+            _instanceGO.SetActive(true);
     }
 
     public void Hide()

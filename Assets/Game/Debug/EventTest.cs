@@ -27,7 +27,7 @@ public class EventTest : MonoBehaviour, IPointerClickHandler
 
         bool wasVisible = DataUISwitch.Instance.Visible;
 
-        if (toggleOnClick) DataUISwitch.Instance.Toggle(this.gameObject);
+        if (toggleOnClick) DataUISwitch.Instance.Toggle();
         else DataUISwitch.Instance.Show();
 
         bool nowVisible = DataUISwitch.Instance.Visible;
