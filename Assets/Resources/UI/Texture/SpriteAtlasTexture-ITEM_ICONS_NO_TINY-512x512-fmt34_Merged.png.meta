@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: f9ff6b7080da59c4b8bbc1ab0a9098d7
+guid: c240f3a153ba7f04890efcfd9838551e
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -123,13 +123,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_0
+      name: SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_0
       rect:
         serializedVersion: 2
-        x: 52
-        y: 326
-        width: 80
-        height: 80
+        x: 0
+        y: 364
+        width: 181
+        height: 130
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -137,20 +137,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 51f882d6c31ad02499f82518df0cefec
-      internalID: -2051188883
+      spriteID: d981072effff16c4396d260115c08d86
+      internalID: 1269931368
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_1
+      name: SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_1
       rect:
         serializedVersion: 2
-        x: 173
-        y: 382
-        width: 86
-        height: 86
+        x: 185
+        y: 366
+        width: 186
+        height: 132
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -158,20 +158,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 6df6d8c3a18d9f347b69def2e16f1135
-      internalID: 1735217401
+      spriteID: c28a294fcda7eea4cbc994e3b85693d0
+      internalID: -1232440409
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_4
+      name: SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_2
       rect:
         serializedVersion: 2
-        x: 288
-        y: 240
-        width: 79
-        height: 39
+        x: 1
+        y: 185
+        width: 180
+        height: 171
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -179,20 +179,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: a8a6f27d19241274a83fa2d2858a09e9
-      internalID: 756729729
+      spriteID: 357e5c1de99ac4e40af4c6d74cd9df45
+      internalID: -119267851
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_5
+      name: SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_3
       rect:
         serializedVersion: 2
-        x: 288
-        y: 192
-        width: 100
-        height: 39
+        x: 185
+        y: 181
+        width: 151
+        height: 183
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -200,20 +200,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 720ecad08e15d82449ecdba4433f3382
-      internalID: 561987763
+      spriteID: 502f3f994331ffd4a9cec38756285acb
+      internalID: -1611364214
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_7
+      name: SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_4
       rect:
         serializedVersion: 2
-        x: 280
-        y: 144
-        width: 124
-        height: 39
+        x: 3
+        y: 0
+        width: 177
+        height: 180
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -221,20 +221,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 5092ea19a4d0ad64ba3da0b4653f53ab
-      internalID: 75497858
+      spriteID: 6e6dc2e003eddfb44be93799c56ad430
+      internalID: -1695899306
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_8
+      name: SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_5
       rect:
         serializedVersion: 2
-        x: 280
-        y: 96
-        width: 144
-        height: 39
+        x: 184
+        y: 0
+        width: 152
+        height: 181
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -242,29 +242,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 280079707f20bc34ead6d081fef41627
-      internalID: 14605332
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_9
-      rect:
-        serializedVersion: 2
-        x: 280
-        y: 2
-        width: 86
-        height: 86
-      alignment: 6
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 37c6e95b3909dbd4591bc338a23a9cc1
-      internalID: -1390671545
+      spriteID: 44938ebc2d07e3647aa7e3cbca96263e
+      internalID: -1775462119
       vertices: []
       indices: 
       edges: []
@@ -272,7 +251,7 @@ TextureImporter:
     outline: []
     physicsShape: []
     bones: []
-    spriteID: 054d7cfea15af25448d00cd10278bb18
+    spriteID: cdeab062a6eb2ed49b660a94524c49c9
     internalID: 0
     vertices: []
     indices: 
@@ -280,16 +259,12 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     nameFileIdTable:
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_0: -2051188883
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_1: 1735217401
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_2: 784442059
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_3: 147704362
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_4: 756729729
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_5: 561987763
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_6: 1886474952
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_7: 75497858
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_8: 14605332
-      SpriteAtlasTexture-UI_RECRUIT_DETAIL_HUB-512x512-fmt34_Merged_9: -1390671545
+      SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_0: 1269931368
+      SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_1: -1232440409
+      SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_2: -119267851
+      SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_3: -1611364214
+      SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_4: -1695899306
+      SpriteAtlasTexture-ITEM_ICONS_NO_TINY-512x512-fmt34_Merged_5: -1775462119
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
