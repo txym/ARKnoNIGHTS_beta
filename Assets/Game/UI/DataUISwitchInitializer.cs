@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class DataUISwitchInitializerFromPath : MonoBehaviour
 {
-    public string resourcesPath = "Prefabs/DescriptionUI";
+    private string resourcesPath = "UIMaterial/UIPrefabs/UnitDescriptionPrefab";
     public bool startActive = false;
 
     public void InitUI()
