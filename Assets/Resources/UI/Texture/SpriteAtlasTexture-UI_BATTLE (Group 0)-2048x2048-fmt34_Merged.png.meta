@@ -1,0 +1,945 @@
+fileFormatVersion: 2
+guid: 2d50a11feb555d449881839d92ffa006
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 0
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: iPhone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_1
+      rect:
+        serializedVersion: 2
+        x: 212
+        y: 1984
+        width: 556
+        height: 12
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b202756be202b4c4d8c01613194cbcbb
+      internalID: -1552394223
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_2
+      rect:
+        serializedVersion: 2
+        x: 1287
+        y: 1915
+        width: 89
+        height: 86
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f92aa8b02a242d1429f550b9e190a5ac
+      internalID: -983472323
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_5
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1788
+        width: 744
+        height: 136
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2bcee1c78c9d8414f92e5a89c7ba1ea4
+      internalID: -1333216899
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_13
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1238
+        width: 385
+        height: 542
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ba019456d1c380b44ad924de9cf40aab
+      internalID: 279990687
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_22
+      rect:
+        serializedVersion: 2
+        x: 1204
+        y: 1396
+        width: 187
+        height: 161
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d0f7d4e28143c694c84c240d368e6b34
+      internalID: -1983384226
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_23
+      rect:
+        serializedVersion: 2
+        x: 1397
+        y: 1395
+        width: 179
+        height: 153
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f94e52fa7f3f6e247adc64a5d14bcd10
+      internalID: 2032536202
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_34
+      rect:
+        serializedVersion: 2
+        x: 736
+        y: 936
+        width: 839
+        height: 71
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 23dca9f8fc64b6a469a9ed348bcbf655
+      internalID: 1144015763
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_39
+      rect:
+        serializedVersion: 2
+        x: 460
+        y: 932
+        width: 24
+        height: 4
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3650037377c1cf44e9ca7c0c16aed8f1
+      internalID: -1717433929
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_40
+      rect:
+        serializedVersion: 2
+        x: 8
+        y: 8
+        width: 924
+        height: 924
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 12ac78ab1e5fdcb4f98c620fc1c76314
+      internalID: 1168207483
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_43
+      rect:
+        serializedVersion: 2
+        x: 1472
+        y: 864
+        width: 50
+        height: 27
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 63585337b8fe2ab4c83cb7baa6856a35
+      internalID: 717985651
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_45
+      rect:
+        serializedVersion: 2
+        x: 1556
+        y: 827
+        width: 64
+        height: 64
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 22103292a215eff42999d96b88ea4b6f
+      internalID: -2013871022
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_47
+      rect:
+        serializedVersion: 2
+        x: 1860
+        y: 855
+        width: 38
+        height: 26
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8ae84de6443d7634791f8c3bfc22f537
+      internalID: 2077833216
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_56
+      rect:
+        serializedVersion: 2
+        x: 952
+        y: 432
+        width: 256
+        height: 239
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ea5320aaa4ed4ee40afe0f663f6ecb8a
+      internalID: 1189674287
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_57
+      rect:
+        serializedVersion: 2
+        x: 1219
+        y: 535
+        width: 382
+        height: 128
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9d0ac77d4912d674a9292b974822c13c
+      internalID: 1520023327
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_62
+      rect:
+        serializedVersion: 2
+        x: 1328
+        y: 328
+        width: 204
+        height: 210
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d7c074ca98ddb5a418a544ded53170fe
+      internalID: -1654760064
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_65
+      rect:
+        serializedVersion: 2
+        x: 1929
+        y: 430
+        width: 34
+        height: 36
+      alignment: 6
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9166f69f6d727e54cbca8d736eda8db3
+      internalID: -1733255383
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_6
+      rect:
+        serializedVersion: 2
+        x: 1537
+        y: 321
+        width: 210
+        height: 210
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 98a83a9097ad5dc4aa7f3c65ab3e9f79
+      internalID: 886487812
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_0
+      rect:
+        serializedVersion: 2
+        x: 1716
+        y: 1731
+        width: 60
+        height: 53
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 97d93af5e15fada438a80606201c711b
+      internalID: 1234212174
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_4
+      rect:
+        serializedVersion: 2
+        x: 1709
+        y: 1667
+        width: 76
+        height: 62
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e715807d93fbc7549878b18426c0680d
+      internalID: 808399728
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_3
+      rect:
+        serializedVersion: 2
+        x: 1204
+        y: 679
+        width: 186
+        height: 193
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e510d27d37a5a9a47bc35bfc0b7bd807
+      internalID: -124301570
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_7
+      rect:
+        serializedVersion: 2
+        x: 1200
+        y: 884
+        width: 151
+        height: 16
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8328e8127bee92d42beaefac6e459db1
+      internalID: -535783365
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_8
+      rect:
+        serializedVersion: 2
+        x: 1012
+        y: 1895
+        width: 556
+        height: 12
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: da3dbecd71ea55d419c72ea6c192e73e
+      internalID: -1585930761
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_9
+      rect:
+        serializedVersion: 2
+        x: 212
+        y: 2008
+        width: 556
+        height: 12
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 67ddd739dc5a95c45ba292007b3c892e
+      internalID: 352663949
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_10
+      rect:
+        serializedVersion: 2
+        x: 212
+        y: 1960
+        width: 556
+        height: 12
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c8f4264a5a8ff3e4bb64e069ea200b3d
+      internalID: 333723496
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_11
+      rect:
+        serializedVersion: 2
+        x: 774
+        y: 1958
+        width: 149
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 51b923a7580912f4e89342cde5365db5
+      internalID: -656247204
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_12
+      rect:
+        serializedVersion: 2
+        x: 750
+        y: 1929
+        width: 531
+        height: 20
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: dd21ac54dd1f1d14a9359dc237179676
+      internalID: -1465099707
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_14
+      rect:
+        serializedVersion: 2
+        x: 1186
+        y: 1238
+        width: 98
+        height: 22
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 08f9e03441c242c4b91075b589d6bc19
+      internalID: 605582987
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_15
+      rect:
+        serializedVersion: 2
+        x: 1014
+        y: 1785
+        width: 98
+        height: 23
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 12beade08cdf89442b5db1d507f7bd19
+      internalID: 272897415
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_16
+      rect:
+        serializedVersion: 2
+        x: 1776
+        y: 932
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2c0edc5b8f67705458745e8a906e5806
+      internalID: 660072634
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_17
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 948
+        width: 563
+        height: 290
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f13269fa9663c4f4fb63f18a4880fcfe
+      internalID: 66154029
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_20
+      rect:
+        serializedVersion: 2
+        x: 1004
+        y: 1088
+        width: 182
+        height: 189
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ea34536c484e1f44e8fbf4c8adb5e4ba
+      internalID: -964332146
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_18
+      rect:
+        serializedVersion: 2
+        x: 1365
+        y: 1083
+        width: 333
+        height: 63
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9133ed20352fb47469a24dfc0771c89d
+      internalID: 1533955608
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_21
+      rect:
+        serializedVersion: 2
+        x: 930
+        y: 1958
+        width: 181
+        height: 13
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c7d9dc9cba4412f40b972ad77287796a
+      internalID: 2057379240
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_24
+      rect:
+        serializedVersion: 2
+        x: 1910
+        y: 536
+        width: 39
+        height: 8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a191ead406393fd41b84fd6d75e0667c
+      internalID: -663972824
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_25
+      rect:
+        serializedVersion: 2
+        x: 1219
+        y: 434
+        width: 56
+        height: 47
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f971e0669b09a9a458ee49345645bcb0
+      internalID: 246466206
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_0: 1234212174
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_1: -1552394223
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_10: 333723496
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_11: -656247204
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_12: -1465099707
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_13: 279990687
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_14: 605582987
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_15: 272897415
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_16: 660072634
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_17: 66154029
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_18: 1533955608
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_19: -1916953679
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_2: -983472323
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_20: -964332146
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_21: 2057379240
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_22: -1983384226
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_23: 2032536202
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_24: -663972824
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_25: 246466206
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_26: 2057461404
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_27: 966310947
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_28: 1152992274
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_29: -1266235783
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_3: -124301570
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_30: -710934891
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_31: 1642429046
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_32: 542217463
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_33: -1220725590
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_34: 1144015763
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_35: 1218644864
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_36: 747301556
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_37: 320861319
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_38: -122130954
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_39: -1717433929
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_4: 808399728
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_40: 1168207483
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_41: 993127888
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_42: 1933437501
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_43: 717985651
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_44: 794828221
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_45: -2013871022
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_46: 2046951448
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_47: 2077833216
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_48: -63826370
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_49: -97922358
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_5: -1333216899
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_50: -872805387
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_51: 406036594
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_52: 1147504647
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_53: -1210942673
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_54: 1536391261
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_55: -699844424
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_56: 1189674287
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_57: 1520023327
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_58: -451696228
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_59: 642238753
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_6: 886487812
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_60: 358835333
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_61: 216192148
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_62: -1654760064
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_63: 171764735
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_64: 676548470
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_65: -1733255383
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_66: -1921415160
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_67: 857423524
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_68: 1773239941
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_69: -1301079502
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_7: -535783365
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_8: -1585930761
+      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_9: 352663949
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
