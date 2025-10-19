@@ -1,0 +1,789 @@
+fileFormatVersion: 2
+guid: e16544601abf7814d8dd3defb6a777b8
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 0
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: iPhone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_3
+      rect:
+        serializedVersion: 2
+        x: 464
+        y: 678
+        width: 76
+        height: 339
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5d48da3ad1c1bbf4b973212e79d403dc
+      internalID: -1657787508
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_5
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 884
+        width: 299
+        height: 113
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 589783478e7f7314eb6a93c64b171571
+      internalID: -467401573
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_8
+      rect:
+        serializedVersion: 2
+        x: 556
+        y: 940
+        width: 320
+        height: 64
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7e8c452e687314e4ca93b77b7d69b66c
+      internalID: 1649326438
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_10
+      rect:
+        serializedVersion: 2
+        x: 336
+        y: 680
+        width: 124
+        height: 252
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 49f066abec8635f479e6b0629a99e17d
+      internalID: -1965672840
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_11
+      rect:
+        serializedVersion: 2
+        x: 565
+        y: 899
+        width: 299
+        height: 38
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 05782809895eb6f42aa9a829972b8b2b
+      internalID: -1432407365
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_15
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 678
+        width: 332
+        height: 202
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3b7283acc9bc1814da702402af95d578
+      internalID: -531619904
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_16
+      rect:
+        serializedVersion: 2
+        x: 556
+        y: 808
+        width: 320
+        height: 62
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c45f8bbcee34eaa4595c655b303d70e0
+      internalID: -2043098096
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_17
+      rect:
+        serializedVersion: 2
+        x: 553
+        y: 690
+        width: 299
+        height: 113
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6a7f2ed3a0e248c45a8ca2b7e0af3661
+      internalID: -384667277
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_25
+      rect:
+        serializedVersion: 2
+        x: 493
+        y: 621
+        width: 54
+        height: 54
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b8d6c1f3b8089514ca7b6cc3df999e4f
+      internalID: -1370156731
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_26
+      rect:
+        serializedVersion: 2
+        x: 552
+        y: 576
+        width: 300
+        height: 112
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3bcd47cd678ce7c46abc54e5fa115e55
+      internalID: -836642848
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_27
+      rect:
+        serializedVersion: 2
+        x: 856
+        y: 512
+        width: 124
+        height: 254
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 992d877a9bb9df343b3cfdab897ce3e0
+      internalID: -55609749
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_34
+      rect:
+        serializedVersion: 2
+        x: 494
+        y: 556
+        width: 57
+        height: 61
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 71f26aa0cafd37e47abac65d67aad745
+      internalID: 356335162
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_35
+      rect:
+        serializedVersion: 2
+        x: 553
+        y: 460
+        width: 299
+        height: 113
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8c9d962f1e93c6b4ab837c9772b53dde
+      internalID: -747948188
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_36
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 192
+        height: 552
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3c87311b48d6c404cbc99c42a91438a4
+      internalID: 1659853157
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_37
+      rect:
+        serializedVersion: 2
+        x: 195
+        y: 512
+        width: 111
+        height: 42
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 03e64a7f09c3ec64cacaf80e6e643b0a
+      internalID: 1741401530
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_38
+      rect:
+        serializedVersion: 2
+        x: 308
+        y: 512
+        width: 63
+        height: 37
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 1cfaed78e2971224e8d7f65be8539e24
+      internalID: 68724603
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_43
+      rect:
+        serializedVersion: 2
+        x: 196
+        y: 0
+        width: 176
+        height: 508
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c468d9bdef2f59a42ac342931ba05308
+      internalID: 588891273
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_44
+      rect:
+        serializedVersion: 2
+        x: 376
+        y: 0
+        width: 172
+        height: 508
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 58747e70c21bf6f449acb29608a3bdf7
+      internalID: -618505991
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_45
+      rect:
+        serializedVersion: 2
+        x: 552
+        y: 345
+        width: 300
+        height: 113
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8a3e72a30d85084409e0b458743a94bb
+      internalID: 1714603919
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_46
+      rect:
+        serializedVersion: 2
+        x: 856
+        y: 256
+        width: 124
+        height: 254
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b6b45e5ac4c7e9f4c93690bd1b6ad46e
+      internalID: 1242386094
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_47
+      rect:
+        serializedVersion: 2
+        x: 553
+        y: 230
+        width: 299
+        height: 113
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 869765f8e20f34848b23c0a7befbb208
+      internalID: -1732034187
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_49
+      rect:
+        serializedVersion: 2
+        x: 983
+        y: 279
+        width: 24
+        height: 30
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ae43558902def5746aa9263cdad9e622
+      internalID: 191318241
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_50
+      rect:
+        serializedVersion: 2
+        x: 863
+        y: 19
+        width: 109
+        height: 235
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5ce3ecacb83bd314591b413c062ca4ff
+      internalID: -716320821
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_51
+      rect:
+        serializedVersion: 2
+        x: 983
+        y: 246
+        width: 25
+        height: 31
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2a206d509d70f4042b3acf97da1928f5
+      internalID: -1832977380
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_52
+      rect:
+        serializedVersion: 2
+        x: 552
+        y: 116
+        width: 300
+        height: 112
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 93fb7b355de04c24b9cbbc73dfa4bf2b
+      internalID: -881433582
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_53
+      rect:
+        serializedVersion: 2
+        x: 983
+        y: 215
+        width: 29
+        height: 29
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: cba9b49ea21fdf0428d92dfd542f36fc
+      internalID: 150079417
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_56
+      rect:
+        serializedVersion: 2
+        x: 553
+        y: 0
+        width: 299
+        height: 113
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 804e93f99482e424c93d4f895290fe60
+      internalID: 2119512920
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_60
+      rect:
+        serializedVersion: 2
+        x: 983
+        y: 0
+        width: 39
+        height: 39
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f75681e21a0884a4a9fb402d654c9cd9
+      internalID: 199288742
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 486ef3db23a69cf4284f6856289203cf
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      common_atlas#0_Merged_0: -1413633449
+      common_atlas#0_Merged_1: -1793295824
+      common_atlas#0_Merged_10: -1965672840
+      common_atlas#0_Merged_11: -1432407365
+      common_atlas#0_Merged_12: -553039833
+      common_atlas#0_Merged_13: -1147667795
+      common_atlas#0_Merged_14: 1746729521
+      common_atlas#0_Merged_15: -531619904
+      common_atlas#0_Merged_16: -2043098096
+      common_atlas#0_Merged_17: -384667277
+      common_atlas#0_Merged_18: -786837208
+      common_atlas#0_Merged_19: 1406645972
+      common_atlas#0_Merged_2: 99903690
+      common_atlas#0_Merged_20: -1011842609
+      common_atlas#0_Merged_21: -1545536268
+      common_atlas#0_Merged_22: -618259268
+      common_atlas#0_Merged_23: -518370516
+      common_atlas#0_Merged_24: 1480477765
+      common_atlas#0_Merged_25: -1370156731
+      common_atlas#0_Merged_26: -836642848
+      common_atlas#0_Merged_27: -55609749
+      common_atlas#0_Merged_28: -634443238
+      common_atlas#0_Merged_29: -1040919084
+      common_atlas#0_Merged_3: -1657787508
+      common_atlas#0_Merged_30: 1546880656
+      common_atlas#0_Merged_31: -1005370504
+      common_atlas#0_Merged_32: 1086038581
+      common_atlas#0_Merged_33: -1973236923
+      common_atlas#0_Merged_34: 356335162
+      common_atlas#0_Merged_35: -747948188
+      common_atlas#0_Merged_36: 1659853157
+      common_atlas#0_Merged_37: 1741401530
+      common_atlas#0_Merged_38: 68724603
+      common_atlas#0_Merged_39: -1001238191
+      common_atlas#0_Merged_4: -1077041296
+      common_atlas#0_Merged_40: 321267704
+      common_atlas#0_Merged_41: 1647912916
+      common_atlas#0_Merged_42: 790893646
+      common_atlas#0_Merged_43: 588891273
+      common_atlas#0_Merged_44: -618505991
+      common_atlas#0_Merged_45: 1714603919
+      common_atlas#0_Merged_46: 1242386094
+      common_atlas#0_Merged_47: -1732034187
+      common_atlas#0_Merged_48: 1910111771
+      common_atlas#0_Merged_49: 191318241
+      common_atlas#0_Merged_5: -467401573
+      common_atlas#0_Merged_50: -716320821
+      common_atlas#0_Merged_51: -1832977380
+      common_atlas#0_Merged_52: -881433582
+      common_atlas#0_Merged_53: 150079417
+      common_atlas#0_Merged_54: 2063503304
+      common_atlas#0_Merged_55: 280747365
+      common_atlas#0_Merged_56: 2119512920
+      common_atlas#0_Merged_57: 234491640
+      common_atlas#0_Merged_58: 1142029897
+      common_atlas#0_Merged_59: 1750442590
+      common_atlas#0_Merged_6: -1040517599
+      common_atlas#0_Merged_60: 199288742
+      common_atlas#0_Merged_7: 1406965539
+      common_atlas#0_Merged_8: 1649326438
+      common_atlas#0_Merged_9: 839867798
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

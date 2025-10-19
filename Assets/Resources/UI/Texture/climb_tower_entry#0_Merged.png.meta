@@ -1,0 +1,998 @@
+fileFormatVersion: 2
+guid: 97c270854a7dcac47847780c294378a9
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 0
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: iPhone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 785
+        width: 72
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f52d7cc0d31ce464b80b4238d4e5f99c
+      internalID: 1362519220
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_1
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 773
+        width: 63
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0d9f048992edb8342b587b311716a437
+      internalID: 646526362
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_2
+      rect:
+        serializedVersion: 2
+        x: 338
+        y: 763
+        width: 241
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: da5286e65d361364eacf0d1f7e7276fd
+      internalID: 1442947773
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_3
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 740
+        width: 79
+        height: 43
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c7ed682958a04e5458afffb5cef5a15e
+      internalID: 882540700
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_4
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 652
+        width: 118
+        height: 118
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6e4e3996be31bdd4ea1c079b3c0a860d
+      internalID: 171986592
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_5
+      rect:
+        serializedVersion: 2
+        x: 340
+        y: 644
+        width: 348
+        height: 112
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8304b6f34cc7beb409f0b9c7fd96e243
+      internalID: 217958675
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_6
+      rect:
+        serializedVersion: 2
+        x: 691
+        y: 755
+        width: 42
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 114283651c93b5140a33b097a11712d7
+      internalID: -1898911290
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_7
+      rect:
+        serializedVersion: 2
+        x: 4
+        y: 580
+        width: 140
+        height: 156
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9ef72237037c8f04babaa0d8af047c80
+      internalID: -581869704
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_8
+      rect:
+        serializedVersion: 2
+        x: 691
+        y: 695
+        width: 23
+        height: 58
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c956a0b1bb32b1549ad22866976267dd
+      internalID: -373384669
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_9
+      rect:
+        serializedVersion: 2
+        x: 152
+        y: 580
+        width: 168
+        height: 68
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d430c384b74faf14d8fc3f2b7659b3a2
+      internalID: -766788388
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_10
+      rect:
+        serializedVersion: 2
+        x: 691
+        y: 633
+        width: 23
+        height: 59
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9de786ee89368d543b6930affa64dcf2
+      internalID: 895002477
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_11
+      rect:
+        serializedVersion: 2
+        x: 340
+        y: 508
+        width: 348
+        height: 116
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d4996ade5324efe4e9308cef214fd373
+      internalID: 2118266008
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_12
+      rect:
+        serializedVersion: 2
+        x: 691
+        y: 584
+        width: 49
+        height: 48
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: efab836358b351342bbe90744daf5444
+      internalID: 263366373
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_13
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 496
+        width: 251
+        height: 81
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2bd1bc1deafa44144adfe9f295882f43
+      internalID: -2066252439
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_14
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 551
+        width: 27
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 923a76f4150312c4e8836d0e0575d43e
+      internalID: 1216567650
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_15
+      rect:
+        serializedVersion: 2
+        x: 692
+        y: 499
+        width: 87
+        height: 83
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a664a0c2be2d20f45a7275ffc819f403
+      internalID: 57092124
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_16
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 527
+        width: 22
+        height: 22
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7f3aa73e7c88f3c4ba66b64d41698e44
+      internalID: 721081631
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_17
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 506
+        width: 25
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 55211455dbfef1d419e2a824bcd6de82
+      internalID: -647299262
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_18
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 413
+        width: 251
+        height: 81
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a8b05ed3160e3904ab30ef02ace1a16b
+      internalID: -473727661
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_19
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 480
+        width: 24
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 44944e96703084d4b96783050f84ca84
+      internalID: 127810988
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_20
+      rect:
+        serializedVersion: 2
+        x: 340
+        y: 176
+        width: 152
+        height: 321
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 19c12814259c8c643b070b8e73d68008
+      internalID: -925618553
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_21
+      rect:
+        serializedVersion: 2
+        x: 528
+        y: 436
+        width: 176
+        height: 60
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8df4a878c2d8a4c42959fca6ebc20c78
+      internalID: 317185760
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_22
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 454
+        width: 24
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2c100c93fedddb24d8830ea05b3a3468
+      internalID: -596948423
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_23
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 439
+        width: 24
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2b0c3496775450a46bddce9f6b3e7d28
+      internalID: 1116369045
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_24
+      rect:
+        serializedVersion: 2
+        x: 315
+        y: 439
+        width: 11
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 50deae5ed3094094fa7c6fd4fe6e473a
+      internalID: -1991409560
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_25
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 340
+        width: 288
+        height: 71
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 54a3fd29e87062d46a579085775f5eb8
+      internalID: -1552475178
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_26
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 408
+        width: 29
+        height: 28
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: fa8bf7e9fbc7ee2428e656a5ed12c609
+      internalID: 1957150216
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_27
+      rect:
+        serializedVersion: 2
+        x: 528
+        y: 280
+        width: 107
+        height: 144
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 58fe09d761ade4b45bb7f4704d6b3a69
+      internalID: -717573870
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_28
+      rect:
+        serializedVersion: 2
+        x: 637
+        y: 386
+        width: 50
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 31ed27f01250cae409c739680554fb9d
+      internalID: 1910638374
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_29
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 373
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 73cc5c92738770f44a76969efb218437
+      internalID: -36945033
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_30
+      rect:
+        serializedVersion: 2
+        x: 637
+        y: 348
+        width: 155
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 637cf820ced1d8c4cbe3fe3a8cb9e3be
+      internalID: -601314474
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_31
+      rect:
+        serializedVersion: 2
+        x: 290
+        y: 339
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0b0adbd0554683640b6ae1068ad4dc40
+      internalID: -2052074699
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_32
+      rect:
+        serializedVersion: 2
+        x: 637
+        y: 280
+        width: 130
+        height: 65
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5e5d3f6aaf1da3946a7b89a1d4217117
+      internalID: -289002200
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_33
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 180
+        width: 336
+        height: 157
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3215fa35e9892c144aab8669604072fe
+      internalID: 1400082475
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_34
+      rect:
+        serializedVersion: 2
+        x: 498
+        y: 196
+        width: 7
+        height: 22
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0c4837c33b16df74ab2def139e118ea7
+      internalID: -88966560
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_35
+      rect:
+        serializedVersion: 2
+        x: 528
+        y: 140
+        width: 136
+        height: 136
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 02c2425bf731f1946b4aee4f9402ca9a
+      internalID: 734747624
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_36
+      rect:
+        serializedVersion: 2
+        x: 498
+        y: 172
+        width: 22
+        height: 22
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 38ca5c7a1d70fd54e9a6e922f972ae98
+      internalID: 1117889023
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_37
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 526
+        height: 171
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 056f30da2f47bd540b7164d1ce211504
+      internalID: -642026834
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: climb_tower_entry#0_Merged_38
+      rect:
+        serializedVersion: 2
+        x: 528
+        y: 0
+        width: 136
+        height: 136
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: fca4d246da2bf65449897a9155fec837
+      internalID: -2090680561
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: b675578c1cf0ffb4481584493dde3b00
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      climb_tower_entry#0_Merged_0: 1362519220
+      climb_tower_entry#0_Merged_1: 646526362
+      climb_tower_entry#0_Merged_10: 895002477
+      climb_tower_entry#0_Merged_11: 2118266008
+      climb_tower_entry#0_Merged_12: 263366373
+      climb_tower_entry#0_Merged_13: -2066252439
+      climb_tower_entry#0_Merged_14: 1216567650
+      climb_tower_entry#0_Merged_15: 57092124
+      climb_tower_entry#0_Merged_16: 721081631
+      climb_tower_entry#0_Merged_17: -647299262
+      climb_tower_entry#0_Merged_18: -473727661
+      climb_tower_entry#0_Merged_19: 127810988
+      climb_tower_entry#0_Merged_2: 1442947773
+      climb_tower_entry#0_Merged_20: -925618553
+      climb_tower_entry#0_Merged_21: 317185760
+      climb_tower_entry#0_Merged_22: -596948423
+      climb_tower_entry#0_Merged_23: 1116369045
+      climb_tower_entry#0_Merged_24: -1991409560
+      climb_tower_entry#0_Merged_25: -1552475178
+      climb_tower_entry#0_Merged_26: 1957150216
+      climb_tower_entry#0_Merged_27: -717573870
+      climb_tower_entry#0_Merged_28: 1910638374
+      climb_tower_entry#0_Merged_29: -36945033
+      climb_tower_entry#0_Merged_3: 882540700
+      climb_tower_entry#0_Merged_30: -601314474
+      climb_tower_entry#0_Merged_31: -2052074699
+      climb_tower_entry#0_Merged_32: -289002200
+      climb_tower_entry#0_Merged_33: 1400082475
+      climb_tower_entry#0_Merged_34: -88966560
+      climb_tower_entry#0_Merged_35: 734747624
+      climb_tower_entry#0_Merged_36: 1117889023
+      climb_tower_entry#0_Merged_37: -642026834
+      climb_tower_entry#0_Merged_38: -2090680561
+      climb_tower_entry#0_Merged_4: 171986592
+      climb_tower_entry#0_Merged_5: 217958675
+      climb_tower_entry#0_Merged_6: -1898911290
+      climb_tower_entry#0_Merged_7: -581869704
+      climb_tower_entry#0_Merged_8: -373384669
+      climb_tower_entry#0_Merged_9: -766788388
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
