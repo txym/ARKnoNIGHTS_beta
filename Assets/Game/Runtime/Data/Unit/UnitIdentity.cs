@@ -3,7 +3,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class UnitIdentity : MonoBehaviour
 {
-    public int UnitID;
+    public int unitID;
 
     // 私有字段保存，Inspector 可见但外部代码改不了
     [SerializeField] private int unitTypeID;
@@ -20,7 +20,7 @@ public class UnitIdentity : MonoBehaviour
         if (_typeLocked)
         {
             Debug.LogWarning($"[UnitIdentity] {name} 已锁定为 type {unitTypeID}，忽略重复设置。");
-            return; // 或者抛异常
+            return; 
         }
         unitTypeID = typeId;
         _typeLocked = true;

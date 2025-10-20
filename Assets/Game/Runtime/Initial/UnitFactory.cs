@@ -87,7 +87,7 @@ public static class UnitFactory
             if (unitIdentity) 
             { 
                 unitIdentity.SetTypeOnce(tpl.typeID);
-                unitIdentity.UnitID = mNextUnitID;
+                unitIdentity.unitID = mNextUnitID;
                 mNextUnitID--;
             }
 
