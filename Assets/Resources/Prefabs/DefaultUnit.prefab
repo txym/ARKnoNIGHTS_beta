@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6766284818615302305}
   - component: {fileID: 2392398927054637304}
   - component: {fileID: 8714933595646148001}
+  - component: {fileID: 3910668718787673204}
   m_Layer: 0
   m_Name: DefaultUnit
   m_TagString: Untagged
@@ -62,7 +63,9 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9beaa7b1b1d99204784067c6a5d8f088, type: 2}
+  - {fileID: 2100000, guid: 9b0f92bb5789aad459396b2deada2ba4, type: 2}
+  - {fileID: 2100000, guid: 27c6da2e8b817e14f9261733ce8c76fd, type: 2}
+  - {fileID: 2100000, guid: 9b0f92bb5789aad459396b2deada2ba4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -121,3 +124,24 @@ MonoBehaviour:
   _animationName: 
   loop: 1
   timeScale: 1
+--- !u!65 &3910668718787673204
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5159625603229662224}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 3.3078656, y: 2.5700645, z: 0}
+  m_Center: {x: 0.18257761, y: 1.247581, z: 0}

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using Spine.Unity;
+using System.Threading;
 
 public static class UnitFactory
 {
@@ -27,7 +28,8 @@ public static class UnitFactory
     public static List<GameObject> SpawnAll(
         Transform parent,
         bool setInactive,
-        out Dictionary<int, GameObject> idMap)
+        out Dictionary<int, GameObject> idMap
+        )
     {
         idMap = new Dictionary<int, GameObject>();
         var result = new List<GameObject>();
@@ -90,6 +92,10 @@ public static class UnitFactory
                 unitIdentity.UnitID = mNextUnitID;
                 mNextUnitID--;
             }
+            var unitskel = go.AddComponent<UnitSkel>();
+            if (unitskel)
+                unitskel.unitIdentity = unitIdentity;
+            
 
 
             var skel = go.GetComponent<SkeletonAnimation>();
@@ -110,6 +116,7 @@ public static class UnitFactory
                 {
                     skel.skeletonDataAsset = sda;
                     skel.Initialize(true);  // 关键：重建骨骼实例
+                    
 
                     // 如果 JSON 后续增加了这三项，就按有值才设置；没配就保留 Inspector 里的设置
                     // if (!string.IsNullOrEmpty(j.initialSkin)) {

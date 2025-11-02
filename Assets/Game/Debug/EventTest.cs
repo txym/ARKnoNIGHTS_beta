@@ -9,8 +9,9 @@ public class EventTest : MonoBehaviour, IPointerClickHandler
     public UnityEvent OnClosed;
 
     // 二选一（也可换成 ScriptableObject）——哪个有值就发哪个
-    [SerializeField] private int unitId = 1000;
+    [SerializeField] private int unitId = 5503;
     [SerializeField] private string dataKey = "";
+    public int UnitID => unitId;
 
     private static int s_lastHandledFrame = -1; // 帧级防抖（多物体同帧点击）
 
@@ -34,5 +35,9 @@ public class EventTest : MonoBehaviour, IPointerClickHandler
         bool nowVisible = DataUISwitch.Instance.Visible;
         if (!wasVisible && nowVisible) OnOpened?.Invoke();
         if (wasVisible && !nowVisible) OnClosed?.Invoke();
+    }
+    public void ChangeUnitId(int id)
+    {
+        unitId = id;
     }
 }

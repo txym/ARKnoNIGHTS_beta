@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Spine.Unity;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -13,7 +14,7 @@ public class UnitDeployment : MonoBehaviour
 
     [Space(8)]
     [Header("生成 3D 物体")]
-    public GameObject dragPrefab;           // 只生成 3D 物体（已移除 UI 生成逻辑）
+    private GameObject dragPrefab;           // 只生成 3D 物体（已移除 UI 生成逻辑）
     public Camera worldCamera;              // 用于屏幕转世界的相机（留空用 Camera.main）
     public float fixedYValue = 50f;         // 3D 物体在 y=50 的水平面上移动
 
@@ -51,7 +52,7 @@ public class UnitDeployment : MonoBehaviour
         if (Input.GetMouseButtonUp(0) && _dragInstance != null)
         {
             var posiyion=ConvertCoordinate(_dragInstance.transform.position);
-            ButtonDebug.DeploymentUnit(_dragInstance,posiyion);
+            DeploymentUnit(_dragInstance,posiyion);
             ApplyBoundsVisibility();
             if(!_dragInstance.activeSelf)
             EndDrag3D(keepInstance: false);
@@ -110,16 +111,24 @@ public class UnitDeployment : MonoBehaviour
     // ============== 3D 拖拽（唯一路径） ==============
     private void StartDrag3D()
     {
-        if (dragPrefab == null)
+        List<GameObject> units = ButtonDebug.Instance.units;
+        if (units.Count==0)
         {
-            Debug.LogWarning("UnitDeployment: 未指定 dragPrefab。");
+            Debug.LogWarning("未初始化");
             return;
         }
+        EventTest eventTest=TEST.GetComponent<EventTest>();
+        int PrefabId = eventTest.UnitID;
+        dragPrefab = ButtonDebug.Instance.idMap[PrefabId];
+       _dragInstance = Instantiate(dragPrefab);
+        UnitSkel unitSkel =_dragInstance.GetComponent<UnitSkel>();
+        if (unitSkel != null) { unitSkel.PlayAnimation("Idle");
+        MoveTest.Instance.UnitSkelList.Add(unitSkel);
+            MoveTest.Instance.index++;
+                }
 
-        _dragInstance = Instantiate(dragPrefab);
-
-        // 初始位置：以识别到的 UI 的屏幕点，映射到 y=fixedYValue 平面
-        var cam = worldCamera != null ? worldCamera : Camera.main;
+       // 初始位置：以识别到的 UI 的屏幕点，映射到 y=fixedYValue 平面
+       var cam = worldCamera != null ? worldCamera : Camera.main;
         if (cam != null)
         {
             Vector3 startScreen = GetUIScreenPosition(TEST);
@@ -200,6 +209,19 @@ public class UnitDeployment : MonoBehaviour
     }
 
     // ============== Gizmos（可视化边界，编辑器里看） ==============
+    public static void DeploymentUnit(GameObject unit, (int, int) position)
+    {
+        int x = position.Item1;
+        int z = position.Item2;
+        if ((x == 5 && (z == 1 || z == 8)) || x < 1 || x > 9 || z < 1 || z > 8)
+        {
+            Destroy(unit);
+            return;
+        }
+        string positionName = $"Block({x},{z})";
+        GameObject positionMarker = GameObject.Find(positionName);
+        unit.transform.position = positionMarker.transform.position + new Vector3(0, 50, 0);
+    }
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()
     {

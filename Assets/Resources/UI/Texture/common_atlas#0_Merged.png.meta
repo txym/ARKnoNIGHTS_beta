@@ -126,8 +126,8 @@ TextureImporter:
       name: common_atlas#0_Merged_3
       rect:
         serializedVersion: 2
-        x: 464
-        y: 678
+        x: 463
+        y: 672
         width: 76
         height: 339
       alignment: 0
@@ -189,10 +189,10 @@ TextureImporter:
       name: common_atlas#0_Merged_10
       rect:
         serializedVersion: 2
-        x: 336
-        y: 680
-        width: 124
-        height: 252
+        x: 343
+        y: 688
+        width: 111
+        height: 243
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -706,6 +706,27 @@ TextureImporter:
       bones: []
       spriteID: f75681e21a0884a4a9fb402d654c9cd9
       internalID: 199288742
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: common_atlas#0_Merged_0
+      rect:
+        serializedVersion: 2
+        x: 412
+        y: 603
+        width: 1
+        height: 1
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d2a8f722ae14eba49b11e236e0fd7157
+      internalID: -1413633449
       vertices: []
       indices: 
       edges: []

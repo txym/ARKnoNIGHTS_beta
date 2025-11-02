@@ -5,22 +5,23 @@ public class UnitIdentity : MonoBehaviour
 {
     public int UnitID;
 
-    // Ë½ÓĞ×Ö¶Î±£´æ£¬Inspector ¿É¼ûµ«Íâ²¿´úÂë¸Ä²»ÁË
+    // ç§æœ‰å­—æ®µä¿å­˜ï¼ŒInspector å¯è§ä½†å¤–éƒ¨ä»£ç æ”¹ä¸äº†
     [SerializeField] private int unitTypeID;
 
-    // ¶ÔÍâÖ»¶Á·ÃÎÊ
+    // å¯¹å¤–åªè¯»è®¿é—®
     public int UnitTypeID => unitTypeID;
+    public object Payload =>unitTypeID;
 
-    // ÊÇ·ñÒÑ¾­Ëø¶¨£¨ÔËĞĞÆÚ·À¶ş´ÎĞŞ¸Ä£©
+    // æ˜¯å¦å·²ç»é”å®šï¼ˆè¿è¡ŒæœŸé˜²äºŒæ¬¡ä¿®æ”¹ï¼‰
     [SerializeField, HideInInspector] private bool _typeLocked = false;
 
-    /// <summary>½öÔÊĞíÉèÖÃÒ»´ÎÀàĞÍID¡£</summary>
+    /// <summary>ä»…å…è®¸è®¾ç½®ä¸€æ¬¡ç±»å‹IDã€‚</summary>
     public void SetTypeOnce(int typeId)
     {
         if (_typeLocked)
         {
-            Debug.LogWarning($"[UnitIdentity] {name} ÒÑËø¶¨Îª type {unitTypeID}£¬ºöÂÔÖØ¸´ÉèÖÃ¡£");
-            return; // »òÕßÅ×Òì³£
+            Debug.LogWarning($"[UnitIdentity] {name} å·²é”å®šä¸º type {unitTypeID}ï¼Œå¿½ç•¥é‡å¤è®¾ç½®ã€‚");
+            return; // æˆ–è€…æŠ›å¼‚å¸¸
         }
         unitTypeID = typeId;
         _typeLocked = true;

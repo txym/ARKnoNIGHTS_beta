@@ -343,7 +343,8 @@ MonoBehaviour:
   OnClosed:
     m_PersistentCalls:
       m_Calls: []
-  toggleOnClick: 1
+  unitId: 5503
+  dataKey: 
 --- !u!1 &9048590119913358957
 GameObject:
   m_ObjectHideFlags: 0
