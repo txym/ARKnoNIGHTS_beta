@@ -121,7 +121,7 @@ public class UnitDeployment : MonoBehaviour
         int PrefabId = eventTest.UnitID;
         dragPrefab = ButtonDebug.Instance.idMap[PrefabId];
        _dragInstance = Instantiate(dragPrefab);
-        UnitSkel unitSkel =_dragInstance.GetComponent<UnitSkel>();
+        UnitSkelBase unitSkel =_dragInstance.GetComponent<UnitSkelBase>();
         if (unitSkel != null) { unitSkel.PlayAnimation("Idle");
         MoveTest.Instance.UnitSkelList.Add(unitSkel);
             MoveTest.Instance.index++;

@@ -9,7 +9,7 @@ public class EventTest : MonoBehaviour, IPointerClickHandler
     public UnityEvent OnClosed;
 
     // 二选一（也可换成 ScriptableObject）——哪个有值就发哪个
-    [SerializeField] private int unitId = 5503;
+    [SerializeField] private int unitId = 1000;
     [SerializeField] private string dataKey = "";
     public int UnitID => unitId;
 

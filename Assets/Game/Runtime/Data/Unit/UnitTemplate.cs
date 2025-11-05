@@ -11,6 +11,7 @@ public partial class UnitTemplate : ScriptableObject
     public string ProfilePicture = "UIImage_gopro";
     public int attackMethod = 0b01;    // 攻击方式
     public int actionMethod = 0b01;    // 行动方式
+    public int unitskeltype = 1;       //动画机种类
     public int Rarity = 1;             //稀有度
     public int cost = 2;               //部署费用
 

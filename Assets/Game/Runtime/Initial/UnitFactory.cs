@@ -92,12 +92,17 @@ public static class UnitFactory
                 unitIdentity.UnitID = mNextUnitID;
                 mNextUnitID--;
             }
-            var unitskel = go.AddComponent<UnitSkel>();
-            if (unitskel)
-                unitskel.unitIdentity = unitIdentity;
-            
+            switch(tpl.unitskeltype)
+            {
+                case 1:var unitskel1=go.AddComponent<UnitSkelType1>();
+                       unitskel1.unitIdentity = unitIdentity;
+                    break;
+                case 2:
+                    var unitskel2 = go.AddComponent<UnitSkelType2>();
+                    unitskel2.unitIdentity = unitIdentity;
+                    break;
 
-
+            }
             var skel = go.GetComponent<SkeletonAnimation>();
             if (!skel)
             {
@@ -160,6 +165,7 @@ public static class UnitFactory
 
         so.attackMethod = j.attackMethod;
         so.actionMethod = j.actionMethod;
+        so.unitskeltype = j.unitskeltype;
 
         so.HP = j.HP;
         so.atk = j.atk;

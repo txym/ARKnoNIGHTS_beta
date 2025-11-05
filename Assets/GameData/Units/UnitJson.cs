@@ -10,6 +10,7 @@ public class UnitJson
 
     public int attackMethod;
     public int actionMethod;
+    public int unitskeltype;
 
     public int HP;
     public int atk;

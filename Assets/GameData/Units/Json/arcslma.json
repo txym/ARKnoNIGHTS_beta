@@ -8,6 +8,7 @@
 
   "attackMethod": 1,
   "actionMethod": 1,
+"unitskeltype":2,
 
   "HP": 18000,
   "atk": 1100,

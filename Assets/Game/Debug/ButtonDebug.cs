@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using JetBrains.Annotations;
 using Spine.Unity;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 
 public class ButtonDebug : MonoBehaviour
 {
@@ -11,6 +11,7 @@ public class ButtonDebug : MonoBehaviour
     public Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
     public VirtualSlotPanel virtualSlotPanel;
     public GameObject ShopPanel;
+    private string loadpath = "ProfilePicture/";
     public static ButtonDebug Instance { get; private set; }
     private void Awake()
     {
@@ -27,7 +28,7 @@ public class ButtonDebug : MonoBehaviour
         for(int i=0;i<12;i++)
         {
             //GameObject newgameobject = Instantiate(test);
-            virtualSlotPanel.PlaceObjectInSlot(i);
+            //virtualSlotPanel.PlaceObjectInSlot(i);
         }
     }
     public void Debugbutton()
@@ -38,6 +39,14 @@ public class ButtonDebug : MonoBehaviour
             setInactive: false,       // 若想先隐藏，改成 true，等布置好再 SetActive(true)
             out idMap
         );
+        for(int i=0;i<units.Count;i++)
+        {
+            var obj = virtualSlotPanel.PlaceObjectInSlot(i);
+            var image=obj.GetComponent<Image>();
+            var eventText=obj.GetComponent<EventTest>();
+            image.sprite= Resources.Load<Sprite>(loadpath+UnitFactory.GetUnitBasicValueSO(units[i].GetComponent<UnitIdentity>().UnitTypeID).ProfilePicture);
+            eventText.ChangeUnitId(units[i].GetComponent<UnitIdentity>().UnitTypeID);
+        }
         DataUISwitchInitializerFromPath.InitUI();
     }
     public void ShopPanelFolder( )

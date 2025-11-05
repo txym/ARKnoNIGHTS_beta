@@ -6,7 +6,7 @@ public class MoveTest : MonoBehaviour
 {
   
          public static MoveTest Instance { get; private set; }
-    public  List<UnitSkel> UnitSkelList;
+    public  List<UnitSkelBase> UnitSkelList;
     public  int index = -1;
     private void Awake()
     {
@@ -19,6 +19,6 @@ public class MoveTest : MonoBehaviour
     }
     public  void Movetest()
     {
-        UnitSkelList[index].ApplyHostMoveCommand(new Vector3(200,50,200),new Vector3(300,50,300),5);
+        UnitSkelList[index].ApplyHostMoveCommand(new Vector3(200,50,200),new Vector3(700,50,700),3);
     }
 }
