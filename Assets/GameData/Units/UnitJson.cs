@@ -4,11 +4,13 @@ public class UnitJson
     public int id;
     public string uintName;
     public string skeletonData;
+    public string ProfilePicture;
     public int Rarity;
     public int cost;
 
     public int attackMethod;
     public int actionMethod;
+    public int unitskeltype;
 
     public int HP;
     public int atk;

@@ -1,67 +1,60 @@
 using System.Collections;
 using System.Collections.Generic;
+using JetBrains.Annotations;
+using Spine.Unity;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 
 public class ButtonDebug : MonoBehaviour
 {
     public List<GameObject> units = new List<GameObject>();
-    private Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
-    private Dictionary<int, UnitTemplate> UnitSOMap = new Dictionary<int, UnitTemplate>();
-    public void CreateAllUnits(List<GameObject> unitPrefabs)
+    public Dictionary<int, GameObject> idMap = new Dictionary<int, GameObject>();
+    public VirtualSlotPanel virtualSlotPanel;
+    public GameObject ShopPanel;
+    private string loadpath = "ProfilePicture/";
+    public static ButtonDebug Instance { get; private set; }
+    private void Awake()
     {
-        if (unitPrefabs == null || unitPrefabs.Count == 0)
+        if (Instance != null && Instance != this)
         {
-            Debug.LogWarning("Unit prefabs list is null or empty");
+            Destroy(gameObject);
             return;
         }
+        Instance = this;
+    }
 
-        int spawnedCount = 0;
-        int maxUnits = unitPrefabs.Count;
-
-        for (int x = 1; x <= 9; x++)
+    public void Start()
+    {
+        for(int i=0;i<12;i++)
         {
-            for (int y = 1; y <= 8; y++)
-            {
-                // 跳过特定位置
-                if (x == 5 && (y == 1 || y == 8))
-                    continue;
-
-                // 检查是否已生成所有单位
-                if (spawnedCount >= maxUnits)
-                    return;
-
-                string positionName = $"Block({x},{y})";
-                GameObject positionMarker = GameObject.Find(positionName);
-
-                if (positionMarker == null)
-                {
-                    Debug.LogWarning($"Position marker not found: {positionName}");
-                    continue;
-                }
-
-                // 实例化单位
-                Instantiate(unitPrefabs[spawnedCount], positionMarker.transform.position + new Vector3(0, 50, 0), unitPrefabs[spawnedCount].transform.rotation);
-                spawnedCount++;
-
-                Debug.Log($"生成单位 #{spawnedCount} 在坐标: ({x},{y})");
-            }
-        }
-
-        if (spawnedCount < maxUnits)
-        {
-            Debug.LogWarning($"只有 {spawnedCount} 个单位被生成，但提供了 {maxUnits} 个预设体");
+            //GameObject newgameobject = Instantiate(test);
+            //virtualSlotPanel.PlaceObjectInSlot(i);
         }
     }
     public void Debugbutton()
     {
+        units.Clear();
         units = UnitFactory.SpawnAll(
             parent: this.transform,   // 全部挂到当前物体下面
             setInactive: false,       // 若想先隐藏，改成 true，等布置好再 SetActive(true)
             out idMap
         );
-        CreateAllUnits(units);
+        for(int i=0;i<units.Count;i++)
+        {
+            var obj = virtualSlotPanel.PlaceObjectInSlot(i);
+            var image=obj.GetComponent<Image>();
+            var eventText=obj.GetComponent<EventTest>();
+            image.sprite= Resources.Load<Sprite>(loadpath+UnitFactory.GetUnitBasicValueSO(units[i].GetComponent<UnitIdentity>().UnitTypeID).ProfilePicture);
+            eventText.ChangeUnitId(units[i].GetComponent<UnitIdentity>().UnitTypeID);
+        }
+        DataUISwitchInitializerFromPath.InitUI();
     }
+    public void ShopPanelFolder( )
+    {
+        GameObject button = GameObject.Find("FoldButton");
+        FoldButtonHandler.SwitchShopFolder(button, ShopPanel);
+    }
+   
 
 
 }

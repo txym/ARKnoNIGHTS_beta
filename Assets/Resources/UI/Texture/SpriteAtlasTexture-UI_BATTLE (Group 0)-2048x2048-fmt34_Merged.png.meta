@@ -253,9 +253,9 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 736
-        y: 936
-        width: 839
-        height: 71
+        y: 945
+        width: 832
+        height: 60
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -853,6 +853,27 @@ TextureImporter:
       bones: []
       spriteID: f971e0669b09a9a458ee49345645bcb0
       internalID: 246466206
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_19
+      rect:
+        serializedVersion: 2
+        x: 1771
+        y: 370
+        width: 110
+        height: 103
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d17e5409ba4b8d544b43cb2b73f8ebf6
+      internalID: -1916953679
       vertices: []
       indices: 
       edges: []

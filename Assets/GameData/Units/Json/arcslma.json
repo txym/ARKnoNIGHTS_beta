@@ -2,11 +2,13 @@
   "id": 5503,
   "uintName": "arcslma",
   "skeletonData": "enemy_5503_arcslma_SkeletonData",
+  "ProfilePicture":"UIImage_arcslma",
   "Rarity": 4,
   "cost": 12,
 
   "attackMethod": 1,
   "actionMethod": 1,
+"unitskeltype":2,
 
   "HP": 18000,
   "atk": 1100,

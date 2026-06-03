@@ -2,32 +2,34 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using Spine.Unity;
+using System.Threading;
 
 public static class UnitFactory
 {
-    private const string JsonRootRel = "GameData/Units/Json"; // Î»ÓÚ Assets ÏÂ
-    private const string PrefabResPath = "Prefabs/DefaultUnit"; // Resources.Load ²»Òª´ø "Resources/"
+    private const string JsonRootRel = "GameData/Units/Json"; // ä½äº Assets ä¸‹
+    private const string PrefabResPath = "Prefabs/DefaultUnit"; // Resources.Load ä¸è¦å¸¦ "Resources/"
 
-    // ÔËĞĞÆÚ»º´æ£¨¶ÔÍâ²»±©Â¶£©
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ú»ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½â²»ï¿½ï¿½Â¶ï¿½ï¿½
     private static Dictionary<int, UnitTemplate> sUnitSOMap;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => sUnitSOMap = new Dictionary<int, UnitTemplate>(); // ½øÈë Play Ê±ÇåÒ»´Î£¨±ÜÃâÎŞ Domain Reload Õ³×¡£©
+    static void ResetStatics() => sUnitSOMap = new Dictionary<int, UnitTemplate>(); // ï¿½ï¿½ï¿½ï¿½ Play Ê±ï¿½ï¿½Ò»ï¿½Î£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Domain Reload Õ³×¡ï¿½ï¿½
 
-    /// °´ typeId È¡ unitSO£¨È¡²»µ½·µ»Ø null £©
+    /// ï¿½ï¿½ typeId È¡ unitSOï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ null ï¿½ï¿½
     public static UnitTemplate GetUnitBasicValueSO(int typeId)
     {
         if (sUnitSOMap != null && sUnitSOMap.TryGetValue(typeId, out var tpl))
             return tpl;
 
-        Debug.LogError($"[UnitFactory] Î´ÕÒµ½ UnitBasicValueSO£¬typeId={typeId}");
+        Debug.LogError($"[UnitFactory] Î´ï¿½Òµï¿½ UnitBasicValueSOï¿½ï¿½typeId={typeId}");
         return null;
     }
 
     public static List<GameObject> SpawnAll(
         Transform parent,
         bool setInactive,
-        out Dictionary<int, GameObject> idMap)
+        out Dictionary<int, GameObject> idMap
+        )
     {
         idMap = new Dictionary<int, GameObject>();
         var result = new List<GameObject>();
@@ -35,14 +37,14 @@ public static class UnitFactory
         string rootAbs = Path.Combine(Application.dataPath, JsonRootRel);
         if (!Directory.Exists(rootAbs))
         {
-            Debug.LogError($"[UnitFactory] JSON Ä¿Â¼²»´æÔÚ: {rootAbs}");
+            Debug.LogError($"[UnitFactory] JSON ç›®å½•ä¸å­˜åœ¨: {rootAbs}");
             return result;
         }
 
         var prefab = Resources.Load<GameObject>(PrefabResPath);
         if (!prefab)
         {
-            Debug.LogError($"[UnitFactory] ÕÒ²»µ½Ô¤ÖÆÌå: Resources/{PrefabResPath}");
+            Debug.LogError($"[UnitFactory] æ‰¾ä¸åˆ°é¢„åˆ¶ä½“: Resources/{PrefabResPath}");
             return result;
         }
 
@@ -61,12 +63,12 @@ public static class UnitFactory
             }
             catch
             {
-                Debug.LogError($"[UnitFactory] JSON ½âÎöÊ§°Ü: {file}");
+                Debug.LogError($"[UnitFactory] JSON è§£æå¤±è´¥: {file}");
                 continue;
             }
             if (j == null)
             {
-                Debug.LogError($"[UnitFactory] JSON Îª¿Õ: {file}");
+                Debug.LogError($"[UnitFactory] JSON ä¸ºç©º: {file}");
                 continue;
             }
 
@@ -74,8 +76,8 @@ public static class UnitFactory
 
             if (sUnitSOMap.ContainsKey(tpl.typeID))
             {
-                Debug.LogError($"[UnitFactory] ÖØ¸´µÄ typeID: {tpl.typeID}£¬À´Ô´ÎÄ¼ş£º{file}");
-                continue; // »òÕß¸²¸Ç£ºsoMap[tpl.typeID] = tpl;
+                Debug.LogError($"[UnitFactory] ï¿½Ø¸ï¿½ï¿½ï¿½ typeID: {tpl.typeID}ï¿½ï¿½ï¿½ï¿½Ô´ï¿½Ä¼ï¿½ï¿½ï¿½{file}");
+                continue; // ï¿½ï¿½ï¿½ß¸ï¿½ï¿½Ç£ï¿½soMap[tpl.typeID] = tpl;
             }
             sUnitSOMap.Add(tpl.typeID, tpl);
 
@@ -90,29 +92,38 @@ public static class UnitFactory
                 unitIdentity.unitID = mNextUnitID;
                 mNextUnitID--;
             }
+            switch(tpl.unitskeltype)
+            {
+                case 1:var unitskel1=go.AddComponent<UnitSkelType1>();
+                       unitskel1.unitIdentity = unitIdentity;
+                    break;
+                case 2:
+                    var unitskel2 = go.AddComponent<UnitSkelType2>();
+                    unitskel2.unitIdentity = unitIdentity;
+                    break;
 
-            // ---- ²»ÔÙµ÷ÓÃ UnitView.ApplySkeleton£»ÕâÀïÖ±½Ó¸Ä SkeletonAnimation ----
-
-
+            }
             var skel = go.GetComponent<SkeletonAnimation>();
             if (!skel)
             {
-                Debug.LogError("[UnitFactory] DefaultUnit ÉÏÈ±ÉÙ SkeletonAnimation ×é¼ş");
+                Debug.LogError("[UnitFactory] DefaultUnit ä¸Šç¼ºå°‘ SkeletonAnimation ç»„ä»¶");
             }
             else
             {
+
                 var resPath = BuildResPath(j.uintName, j.skeletonData);
                 var sda = Resources.Load<SkeletonDataAsset>(resPath);
                 if (!sda)
                 {
-                    Debug.LogError($"[UnitFactory] SkeletonDataAsset Î´ÕÒµ½: Resources/{resPath}");
+                    Debug.LogError($"[UnitFactory] SkeletonDataAsset æœªæ‰¾åˆ°: Resources/{resPath}");
                 }
                 else
                 {
                     skel.skeletonDataAsset = sda;
-                    skel.Initialize(true);  // ¹Ø¼ü£ºÖØ½¨¹Ç÷ÀÊµÀı
+                    skel.Initialize(true);  // å…³é”®ï¼šé‡å»ºéª¨éª¼å®ä¾‹
+                    
 
-                    // Èç¹û JSON ºóĞøÔö¼ÓÁËÕâÈıÏî£¬¾Í°´ÓĞÖµ²ÅÉèÖÃ£»Ã»Åä¾Í±£Áô Inspector ÀïµÄÉèÖÃ
+                    // å¦‚æœ JSON åç»­å¢åŠ äº†è¿™ä¸‰é¡¹ï¼Œå°±æŒ‰æœ‰å€¼æ‰è®¾ç½®ï¼›æ²¡é…å°±ä¿ç•™ Inspector é‡Œçš„è®¾ç½®
                     // if (!string.IsNullOrEmpty(j.initialSkin)) {
                     //     skel.Skeleton.SetSkin(j.initialSkin);
                     //     skel.Skeleton.SetSlotsToSetupPose();
@@ -130,7 +141,7 @@ public static class UnitFactory
         return result;
     }
 
-    // ÇåÏ´²¢Æ´½Ó Resources Â·¾¶£º "unitName/file"
+    // æ¸…æ´—å¹¶æ‹¼æ¥ Resources è·¯å¾„ï¼š "unitName/file"
     private static string BuildResPath(string unitName, string file)
     {
         if (string.IsNullOrEmpty(file)) return null;
@@ -141,18 +152,20 @@ public static class UnitFactory
             : $"Characters/{u}/{f}";
     }
 
-    // Ô­Ñù¿½±´£¨²»×öÊıÖµ¶µµ×£©
+    // åŸæ ·æ‹·è´ï¼ˆä¸åšæ•°å€¼å…œåº•ï¼‰
     private static UnitTemplate BuildTemplate(UnitJson j)
     {
         var so = ScriptableObject.CreateInstance<UnitTemplate>();
 
         so.typeID = j.id;
         so.uintName = j.uintName;
+        so.ProfilePicture = j.ProfilePicture;
         so.Rarity = j.Rarity;
         so.cost = j.cost;
 
         so.attackMethod = j.attackMethod;
         so.actionMethod = j.actionMethod;
+        so.unitskeltype = j.unitskeltype;
 
         so.HP = j.HP;
         so.atk = j.atk;
