@@ -5,7 +5,9 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]serSettings/
+[Aa]rtifacts/
 MemoryCaptures/
+UserSettings/
 .vs/
 .vscode/
 *.suo
