@@ -22,6 +22,7 @@ public abstract class UnitSkelBase : MonoBehaviour
     public UnitIdentity unitIdentity;
     protected float selfspeed = 1f;
     protected float selfattackInterval = 1f;
+    private bool catalogPresentationDataConfigured;
 
     [Tooltip("动画加速上限，防止异常指令让动画过快")]
     [SerializeField] protected float maxAnimTimeScale = 3f;
@@ -29,7 +30,7 @@ public abstract class UnitSkelBase : MonoBehaviour
     [Header("Playback (Base)")]
     [Range(0f, 4f)]
     [SerializeField] protected float speed = 1f;           // 基础播放倍速（作用在 SkeletonAnimation.timeScale）
-    [SerializeField] protected string defaultAnimation = "idle";
+    [SerializeField] protected string defaultAnimation = "Idle";
     [SerializeField] protected bool defaultLoop = true;
 
     [Header("Move Animation Settings")]
@@ -91,6 +92,18 @@ public abstract class UnitSkelBase : MonoBehaviour
 
     public float GetSpeed() => speed;
 
+    /// <summary>
+    /// Supplies presentation-only values for catalog-backed battle views before Start.
+    /// Legacy UnitFactory-created units continue to load their UnitTemplate in LoadSelfData.
+    /// </summary>
+    public void ConfigureCatalogPresentationData(UnitIdentity identity, float moveSpeedMetresPerSecond, float attackIntervalSeconds)
+    {
+        unitIdentity = identity;
+        selfspeed = Mathf.Max(0f, moveSpeedMetresPerSecond);
+        selfattackInterval = Mathf.Max(0f, attackIntervalSeconds);
+        catalogPresentationDataConfigured = true;
+    }
+
     public TrackEntry PlayAnimation(string animName, bool loop = true)
     {
         try
@@ -120,6 +133,18 @@ public abstract class UnitSkelBase : MonoBehaviour
             Debug.LogError("[UnitSkel] PlayAnimation 异常：" + e.Message, this);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Presentation-only single animation command. The caller supplies an event-derived speed multiplier;
+    /// this method never starts combat logic or changes any authoritative battle state.
+    /// </summary>
+    public bool PlayPresentationAnimation(string animName, bool loop, float animationSpeedMultiplier)
+    {
+        var entry = PlayAnimation(animName, loop);
+        if (entry == null) return false;
+        entry.TimeScale = Mathf.Max(0f, animationSpeedMultiplier);
+        return true;
     }
 
     public TrackEntry QueueAnimation(string animName, bool loop = true)
@@ -322,7 +347,21 @@ public abstract class UnitSkelBase : MonoBehaviour
     }
     protected void LoadSelfData()
     {
-        selfspeed = UnitFactory.GetUnitBasicValueSO(unitIdentity.UnitTypeID).moveSpeed;
-        selfattackInterval = UnitFactory.GetUnitBasicValueSO(unitIdentity.UnitTypeID).attackInterval;
+        if (catalogPresentationDataConfigured) return;
+        if (!unitIdentity)
+        {
+            Debug.LogWarning("[UnitSkel] UnitIdentity 缺失，保留默认表现速度。", this);
+            return;
+        }
+
+        var template = UnitFactory.GetUnitBasicValueSO(unitIdentity.UnitTypeID);
+        if (!template)
+        {
+            Debug.LogWarning("[UnitSkel] 未加载 UnitTemplate，保留默认表现速度。", this);
+            return;
+        }
+
+        selfspeed = template.moveSpeed;
+        selfattackInterval = template.attackInterval;
     }
 }

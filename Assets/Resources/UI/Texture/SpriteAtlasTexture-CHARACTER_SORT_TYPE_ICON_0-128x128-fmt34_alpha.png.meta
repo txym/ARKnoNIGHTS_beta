@@ -270,13 +270,13 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_8
+      name: BattleStatusPanelClockIcon
       rect:
         serializedVersion: 2
         x: 2
-        y: 29
-        width: 23
-        height: 23
+        y: 30
+        width: 22
+        height: 22
       alignment: 6
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -448,6 +448,7 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     nameFileIdTable:
+      BattleStatusPanelClockIcon: -511215167
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_0: -1471387747
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_1: 337360049
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_10: -1461778916
@@ -462,7 +463,6 @@ TextureImporter:
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_5: 122820292
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_6: -1597859425
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_7: -1958452225
-      SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_8: -511215167
       SpriteAtlasTexture-CHARACTER_SORT_TYPE_ICON_0-128x128-fmt34_alpha_9: 274870325
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0

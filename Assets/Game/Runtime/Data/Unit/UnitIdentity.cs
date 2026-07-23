@@ -5,11 +5,15 @@ public class UnitIdentity : MonoBehaviour
 {
     public int unitID;
 
+    [SerializeField, HideInInspector] private string playerUnitId;
+
     // 私有字段保存，Inspector 可见但外部代码改不了
     [SerializeField] private int unitTypeID;
 
     // 对外只读访问
     public int UnitTypeID => unitTypeID;
+    /// <summary>Stable PlayerState instance ID for preparation views; empty for legacy/debug prototypes.</summary>
+    public string PlayerUnitId => playerUnitId;
     public object Payload =>unitTypeID;
 
     // 是否已经锁定（运行期防二次修改）
@@ -25,6 +29,16 @@ public class UnitIdentity : MonoBehaviour
         }
         unitTypeID = typeId;
         _typeLocked = true;
+    }
+
+    public void SetPlayerUnitId(string value)
+    {
+        if (!string.IsNullOrEmpty(playerUnitId) && !string.Equals(playerUnitId, value, System.StringComparison.Ordinal))
+        {
+            Debug.LogWarning($"[UnitIdentity] {name} 已绑定 player unit {playerUnitId}，忽略重复设置。", this);
+            return;
+        }
+        playerUnitId = value ?? string.Empty;
     }
 
     [ContextMenu("Log UnitBasicValueSO")]

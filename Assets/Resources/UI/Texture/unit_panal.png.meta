@@ -1,0 +1,285 @@
+fileFormatVersion: 2
+guid: f0d67a9378a22dd4fa2ebab0e4cbfda0
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 0
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: iPhone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: unit_panal_1
+      rect:
+        serializedVersion: 2
+        x: 302
+        y: 744
+        width: 51
+        height: 26
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5bd854fe9dfcff1418a485cfdd866a15
+      internalID: 1497978984
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: UnitInformationPanelStatEntryBackground
+      rect:
+        serializedVersion: 2
+        x: 516
+        y: 643
+        width: 193
+        height: 40
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5348f0c64b2c1384b92235e7c6b7a26f
+      internalID: 1798883710
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: UnitInformationPanelTargetValueIcon
+      rect:
+        serializedVersion: 2
+        x: 656
+        y: 453
+        width: 40
+        height: 36
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d4757cf0174b46a4dbf098f887100ef5
+      internalID: -953521351
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: UnitInformationPanelMoveSpeedIcon
+      rect:
+        serializedVersion: 2
+        x: 222
+        y: 584
+        width: 20
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: fff6ceff3992cf84686082de3fb07119
+      internalID: 766926685
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5458a794d8e0ba5409fdb1796c9987e7
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      hp_icon: 902885682
+      UnitInformationPanelMoveSpeedIcon: 766926685
+      unit_panal_1: 1497978984
+      unit_panal_10: 1313690632
+      unit_panal_11: -669301356
+      unit_panal_12: -1455634317
+      unit_panal_13: 340988137
+      unit_panal_14: 1242153557
+      unit_panal_15: 1612490377
+      unit_panal_16: 1264107485
+      unit_panal_17: 457563751
+      unit_panal_18: -1081699591
+      unit_panal_19: 1320661159
+      unit_panal_2: 1314309947
+      unit_panal_21: 899163313
+      unit_panal_22: -190441427
+      unit_panal_23: 142101247
+      unit_panal_24: -1210791901
+      unit_panal_25: -1378049051
+      unit_panal_26: 2057574934
+      unit_panal_27: -1460450587
+      unit_panal_28: 370334341
+      unit_panal_29: -1893047229
+      unit_panal_3: 1912086710
+      unit_panal_30: 1577446314
+      unit_panal_31: -553131511
+      unit_panal_32: -1476201418
+      unit_panal_33: -765390417
+      unit_panal_34: -1428029758
+      unit_panal_35: 1144612110
+      unit_panal_36: -1937887474
+      unit_panal_37: 226719905
+      unit_panal_38: 2136209447
+      unit_panal_39: -930202123
+      unit_panal_4: 29287557
+      unit_panal_40: 1121830501
+      unit_panal_41: -1181625529
+      unit_panal_42: -363694559
+      unit_panal_43: 777357848
+      unit_panal_44: 1800497599
+      unit_panal_45: 1219695106
+      unit_panal_46: -2265573
+      unit_panal_47: -947678978
+      unit_panal_48: 270566105
+      unit_panal_49: -1463726283
+      unit_panal_5: 1088494000
+      unit_panal_50: -1637790833
+      unit_panal_51: -682361199
+      unit_panal_53: 339631032
+      unit_panal_54: 577960978
+      unit_panal_55: 2014489088
+      unit_panal_56: 1287796664
+      unit_panal_57: 34516112
+      unit_panal_58: 596481666
+      unit_panal_59: 1376446910
+      unit_panal_6: -1087095041
+      unit_panal_7: -2026607621
+      unit_panal_8: 1372134075
+      unit_panal_9: -1498849107
+      UnitInformationPanelStatEntryBackground: 1798883710
+      UnitInformationPanelTargetValueIcon: 206733771
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

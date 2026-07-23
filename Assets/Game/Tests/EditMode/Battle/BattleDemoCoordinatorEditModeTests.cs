@@ -1,0 +1,100 @@
+using System;
+using System.Collections.Generic;
+using ArknoNights.Battle.Demo;
+using ArknoNights.Battle.Presentation;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace ArknoNights.Battle.Tests
+{
+    public sealed class BattleDemoCoordinatorEditModeTests
+    {
+        private const string CatalogPath = "BattleData/unit-catalog-v1";
+        private const string BattlePath = "BattleData/task004a-real-1v1";
+
+        [Test]
+        public void RealBattle_StartPauseContinueReplayAndViewKeepCompletedResultImmutable()
+        {
+            var factory = new FakeFactory();
+            var expectedViewCount = 0;
+            using (var demo = new BattleDemoCoordinator())
+            {
+                Assert.IsTrue(demo.StartOrContinue(factory, CatalogPath, BattlePath));
+                Assert.AreEqual(BattleDemoState.Playing, demo.State);
+                var inputDigest = demo.InputDigest;
+                var eventDigest = demo.EventDigest;
+                var resultDigest = demo.ResultDigest;
+
+                demo.Advance(0.05f);
+                var pausedTick = demo.PresentationTick;
+                var pausedEvents = demo.ConsumedEventCount;
+                Assert.IsTrue(demo.Pause());
+                demo.Advance(10f);
+                Assert.AreEqual(pausedTick, demo.PresentationTick);
+                Assert.AreEqual(pausedEvents, demo.ConsumedEventCount);
+
+                Assert.IsTrue(demo.StartOrContinue(factory, CatalogPath, BattlePath));
+                demo.SetSpeed(2f);
+                demo.SetObserver(BattleObserverView.Away);
+                demo.Advance(120f);
+                Assert.AreEqual(BattleDemoState.Completed, demo.State);
+                // TASK-004A's real-data regression establishes Away as the winner for this fixed input.
+                Assert.AreEqual("Away", demo.WinnerOrReason);
+                Assert.AreEqual(eventDigest, demo.EventDigest);
+                Assert.AreEqual(resultDigest, demo.ResultDigest);
+
+                Assert.IsTrue(demo.Replay());
+                Assert.AreEqual(BattleDemoState.Playing, demo.State);
+                Assert.AreEqual(inputDigest, demo.InputDigest);
+                Assert.AreEqual(eventDigest, demo.EventDigest);
+                Assert.AreEqual(resultDigest, demo.ResultDigest);
+                Assert.AreEqual(BattleObserverView.Away, demo.Observer);
+                expectedViewCount = demo.Result.FinalUnits.Count * 2;
+            }
+            Assert.AreEqual(expectedViewCount, factory.Created);
+            Assert.AreEqual(expectedViewCount, factory.Disposed);
+        }
+
+        [Test]
+        public void MissingRealInput_EntersStructuredErrorWithoutCreatingViews()
+        {
+            var factory = new FakeFactory();
+            using (var demo = new BattleDemoCoordinator())
+            {
+                Assert.IsFalse(demo.Recalculate(factory, CatalogPath, "BattleData/not-present", true));
+                Assert.AreEqual(BattleDemoState.Error, demo.State);
+                StringAssert.Contains("load.failed", demo.LastError);
+                StringAssert.Contains("localBattle.resource.missing", demo.LastError);
+                Assert.AreEqual(0, factory.Created);
+            }
+        }
+
+        private sealed class FakeFactory : IBattlePresentationViewFactory
+        {
+            public int Created { get; private set; }
+            public int Disposed { get; private set; }
+            public bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic)
+            {
+                Created++;
+                view = new FakeView(() => Disposed++);
+                diagnostic = null;
+                return true;
+            }
+        }
+
+        private sealed class FakeView : IBattlePresentationView
+        {
+            private readonly Action onDispose;
+            public FakeView(Action onDispose) { this.onDispose = onDispose; }
+            public void SetWorldPosition(Vector3 position) { }
+            public void SetFacing(Vector3 direction) { }
+            public void SetPlaybackSpeed(float playbackSpeed) { }
+            public void PlayMove() { }
+            public void PlayAttack(float animationSpeedMultiplier) { }
+            public void PlayHit() { }
+            public void PlayDeath() { }
+            public void SetStatusBarState(string unitId, bool isEnemy, int currentHitPoints, int currentShield) { }
+            public void Dispose() => onDispose();
+        }
+    }
+}

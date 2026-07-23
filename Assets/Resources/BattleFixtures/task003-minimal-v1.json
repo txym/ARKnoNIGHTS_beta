@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "battle-fixture-v1",
+  "battleId": "task003-minimal",
+  "maxTicks": 40,
+  "unitTypes": [
+    {
+      "typeId": "home-striker", "maxHitPoints": 1000, "attack": 200, "defense": 0, "magicResistance": 0,
+      "moveSpeedCentimetresPerSecond": 100, "attackIntervalTicks": 4, "attackAnimationDurationTicks": 6,
+      "damageType": "Physical", "attackMethod": "Melee", "blockCapacity": 1, "isSyntheticFixtureData": true
+    },
+    {
+      "typeId": "away-guard", "maxHitPoints": 240, "attack": 10, "defense": 0, "magicResistance": 0,
+      "moveSpeedCentimetresPerSecond": 100, "attackIntervalTicks": 4, "attackAnimationDurationTicks": 2,
+      "damageType": "Physical", "attackMethod": "Melee", "blockCapacity": 1, "isSyntheticFixtureData": true
+    }
+  ],
+  "players": [
+    { "playerId": "home-player", "side": "Home", "units": [
+      { "unitId": "home-1", "typeId": "home-striker", "zone": "Deployed", "formationX": 4, "formationY": 4, "buffs": [] }
+    ] },
+    { "playerId": "away-player", "side": "Away", "units": [
+      { "unitId": "away-1", "typeId": "away-guard", "zone": "Deployed", "formationX": 6, "formationY": 4, "buffs": [] }
+    ] }
+  ]
+}

@@ -61,10 +61,11 @@ public class UITest : MonoBehaviour
             return;
         }
 
+        Sprite targetSprite;
 #if UNITY_EDITOR
         // 编辑器模式：直接加载 .png 里的 Sprite 子资源
         Sprite[] sprites = AssetDatabase.LoadAllAssetsAtPath(spritePath).OfType<Sprite>().ToArray();
-        Sprite targetSprite = sprites.Length > 0 ? sprites[0] : null;
+        targetSprite = sprites.Length > 0 ? sprites[0] : null;
 #else
         // 打包后模式：需要把图片放在 Resources 并改成 Sprite 导入设置
         string resourcesPath = spritePath.Replace("Assets/Resources/", "").Replace(".png", "");

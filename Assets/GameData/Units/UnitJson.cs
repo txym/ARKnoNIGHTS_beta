@@ -1,31 +1,42 @@
 [System.Serializable]
 public class UnitJson
 {
-    public int id;
-    public string uintName;
-    public string skeletonData;
-    public string ProfilePicture;
-    public int Rarity;
-    public int cost;
+    // unit-source-v1. This is the sole source-data contract; UnitFactory maps it to legacy UnitTemplate fields.
+    public string schemaVersion;
+    public int typeId;
+    public string resourceKey;
+    public string displayNameZhHans;
+    public string skillDescriptionZhHans;
+
+    public int rarity;
+    public int deploymentCost;
+    public int initialEliteLevel;
 
     public int attackMethod;
     public int actionMethod;
-    public int unitskeltype;
+    public int unitSkeletonType;
 
-    public int HP;
-    public int atk;
-    public int def;
-    public int res;
+    public int maxHitPoints;
+    public int attack;
+    public int defense;
+    public int magicResistance;
+    public float moveSpeedMetresPerSecond;
+    public float attackIntervalSeconds;
+    public float attackAnimationDurationSeconds;
+    public float attackRadiusMetres;
+    public float blockRadiusMetres;
 
-    public float attackInterval;
-    public float attackRadius;
-    public float BlockRadius;
+    public bool canBlock;
+    public int blockCapacity;
+    public int tauntLevel;
+    public int lifeDeduct;
+    public string damageType;
+    public System.Collections.Generic.List<string> innateAbilityIds;
 
-    public float moveSpeed;
-    public bool isBlock;
-
-    public System.Collections.Generic.List<string> FixedAbility;
-
-    public int LifeDeduct;
-    public int narrowTitle;
+    public string skeletonDataResourceName;
+    public string profilePictureResourceName;
+    public string moveAnimation;
+    public string attackAnimation;
+    public string hitAnimation;
+    public string deathAnimation;
 }

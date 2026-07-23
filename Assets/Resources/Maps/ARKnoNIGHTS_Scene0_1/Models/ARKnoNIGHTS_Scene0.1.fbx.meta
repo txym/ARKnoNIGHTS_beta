@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: b714ccdedb4734741975cf6ed2ce13be
+guid: 6163bcf47b505a145901c8c48fff153b
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
@@ -58,12 +58,12 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: "\u5730\u9762.001"
-    second: {fileID: 2100000, guid: 4ceea839266d3a641b7e904b8f2513c7, type: 2}
+    second: {fileID: 2100000, guid: a8715486bc57e7647b4c1086701ec322, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: "\u5730\u9762.002"
-    second: {fileID: 2100000, guid: 4ceea839266d3a641b7e904b8f2513c7, type: 2}
+    second: {fileID: 2100000, guid: a8715486bc57e7647b4c1086701ec322, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
@@ -103,17 +103,12 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: "\u6750\u8D28.003"
-    second: {fileID: 2100000, guid: 0b5447f25c3636c43ba4c0fc9509b852, type: 2}
+    second: {fileID: 2100000, guid: c6436b2cb6650e145b215408788659eb, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: "\u6750\u8D28.004"
-    second: {fileID: 2100000, guid: 0b5447f25c3636c43ba4c0fc9509b852, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: "\u6750\u8D28.068"
-    second: {fileID: 2100000, guid: 2804fd1f9279df640836d69e80b8d09d, type: 2}
+    second: {fileID: 2100000, guid: c6436b2cb6650e145b215408788659eb, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
@@ -159,6 +154,11 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: "\u6750\u8D28.194"
     second: {fileID: 2100000, guid: 2804fd1f9279df640836d69e80b8d09d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: "\u6E90\u77F3\u788E\u7247.001"
+    second: {fileID: 2100000, guid: b1ba37d2813ab3b4cb86789723c6ef33, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

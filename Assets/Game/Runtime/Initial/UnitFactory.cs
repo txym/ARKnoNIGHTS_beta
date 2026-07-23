@@ -111,7 +111,7 @@ public static class UnitFactory
             else
             {
 
-                var resPath = BuildResPath(j.uintName, j.skeletonData);
+                var resPath = BuildResPath(j.resourceKey, j.skeletonDataResourceName);
                 var sda = Resources.Load<SkeletonDataAsset>(resPath);
                 if (!sda)
                 {
@@ -157,32 +157,32 @@ public static class UnitFactory
     {
         var so = ScriptableObject.CreateInstance<UnitTemplate>();
 
-        so.typeID = j.id;
-        so.uintName = j.uintName;
-        so.ProfilePicture = j.ProfilePicture;
-        so.Rarity = j.Rarity;
-        so.cost = j.cost;
+        so.typeID = j.typeId;
+        so.uintName = j.resourceKey;
+        so.ProfilePicture = j.profilePictureResourceName;
+        so.Rarity = j.rarity;
+        so.cost = j.deploymentCost;
 
         so.attackMethod = j.attackMethod;
         so.actionMethod = j.actionMethod;
-        so.unitskeltype = j.unitskeltype;
+        so.unitskeltype = j.unitSkeletonType;
 
-        so.HP = j.HP;
-        so.atk = j.atk;
-        so.def = j.def;
-        so.res = j.res;
+        so.HP = j.maxHitPoints;
+        so.atk = j.attack;
+        so.def = j.defense;
+        so.res = j.magicResistance;
 
-        so.attackInterval = j.attackInterval;
-        so.attackRadius = j.attackRadius;
-        so.BlockRadius = j.BlockRadius;
+        so.attackInterval = j.attackIntervalSeconds;
+        so.attackRadius = j.attackRadiusMetres;
+        so.BlockRadius = j.blockRadiusMetres;
 
-        so.moveSpeed = j.moveSpeed;
-        so.isBlock = j.isBlock;
+        so.moveSpeed = j.moveSpeedMetresPerSecond;
+        so.isBlock = j.canBlock;
 
-        so.FixedAbility = j.FixedAbility;
+        so.FixedAbility = j.innateAbilityIds ?? new List<string>();
 
-        so.LifeDeduct = j.LifeDeduct;
-        so.narrowTitle = j.narrowTitle;
+        so.LifeDeduct = j.lifeDeduct;
+        so.narrowTitle = j.tauntLevel;
 
         return so;
     }

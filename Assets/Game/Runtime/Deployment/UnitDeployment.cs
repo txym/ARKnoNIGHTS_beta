@@ -234,6 +234,8 @@ public class UnitDeployment : MonoBehaviour
         Gizmos.DrawLine(a, b); Gizmos.DrawLine(b, c);
         Gizmos.DrawLine(c, d); Gizmos.DrawLine(d, a);
     }
+#endif
+
     public static (int, int) ConvertCoordinate(Vector3 position)
     {
         int ConvertValue(float value)
@@ -243,5 +245,4 @@ public class UnitDeployment : MonoBehaviour
 
         return (ConvertValue(position.x), ConvertValue(position.z));
     }//坐标转换这一块
-#endif
 }

@@ -1,0 +1,23 @@
+{
+  "name": "ARKnoNIGHTS.Battle.EditModeTests",
+  "rootNamespace": "ArknoNights.Battle.Tests",
+  "references": [
+    "ARKnoNIGHTS.Battle.Core",
+    "ARKnoNIGHTS.Battle.Infrastructure",
+    "ARKnoNIGHTS.Battle.Presentation",
+    "ARKnoNIGHTS.Battle.Demo",
+    "ARKnoNIGHTS.PlayerState",
+    "ARKnoNIGHTS.Round",
+    "ARKnoNIGHTS.UI"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}

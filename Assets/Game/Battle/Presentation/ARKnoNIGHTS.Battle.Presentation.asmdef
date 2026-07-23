@@ -1,0 +1,16 @@
+{
+  "name": "ARKnoNIGHTS.Battle.Presentation",
+  "rootNamespace": "ArknoNights.Battle.Presentation",
+  "references": [
+    "ARKnoNIGHTS.Battle.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

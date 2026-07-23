@@ -16,8 +16,8 @@ static class BakePaths
 [System.Serializable]
 class UnitJsonLite
 {
-    public int id;
-    public List<string> FixedAbility;
+    public int typeId;
+    public List<string> innateAbilityIds;
 }
 
 public static class UnitJsonBake
@@ -43,8 +43,8 @@ public static class UnitJsonBake
             if (u == null) continue;
             units.Add((p, u));
 
-            if (u.FixedAbility == null) continue;
-            foreach (var tag in u.FixedAbility)
+            if (u.innateAbilityIds == null) continue;
+            foreach (var tag in u.innateAbilityIds)
                 if (!string.IsNullOrWhiteSpace(tag)) reg.TryGetOrAdd(tag.Trim());
         }
 
@@ -55,7 +55,7 @@ public static class UnitJsonBake
         int baked = 0;
         foreach (var (_, u) in units)
         {
-            var assetPath = BakePaths.UnitAssetPathById(u.id);
+            var assetPath = BakePaths.UnitAssetPathById(u.typeId);
             var ut = AssetDatabase.LoadAssetAtPath<UnitTemplate>(assetPath);
             if (ut == null) continue;
 

@@ -1,30 +1,36 @@
 {
-  "id": 5503,
-  "uintName": "arcslma",
-  "skeletonData": "enemy_5503_arcslma_SkeletonData",
-  "ProfilePicture":"UIImage_arcslma",
-  "Rarity": 4,
-  "cost": 12,
-
+  "schemaVersion": "unit-source-v1",
+  "typeId": 5503,
+  "resourceKey": "arcslma",
+  "displayNameZhHans": "果冻小子",
+  "skillDescriptionZhHans": "",
+  "rarity": 4,
+  "deploymentCost": 12,
+  "initialEliteLevel": 0,
   "attackMethod": 1,
   "actionMethod": 1,
-"unitskeltype":2,
-
-  "HP": 18000,
-  "atk": 1100,
-  "def": 0,
-  "res": 0,
-  "attackInterval": 4.0,
-  "attackRadius": 0,
-
-  "moveSpeed": 0.2,
-  "isBlock": true,
-
-  "FixedAbility": [
+  "unitSkeletonType": 2,
+  "maxHitPoints": 18000,
+  "attack": 1100,
+  "defense": 0,
+  "magicResistance": 0,
+  "moveSpeedMetresPerSecond": 0.2,
+  "attackIntervalSeconds": 4.0,
+  "attackAnimationDurationSeconds": 2.666667,
+  "attackRadiusMetres": 0,
+  "blockRadiusMetres": 0.1,
+  "canBlock": true,
+  "blockCapacity": 1,
+  "tauntLevel": 0,
+  "lifeDeduct": 1,
+  "damageType": "Physical",
+  "innateAbilityIds": [
     "SPLIT_THREE"
   ],
-
-  "LifeDeduct": 1,
-  "narrowTitle": 0,
-  "BlockRadius": 0.1
+  "skeletonDataResourceName": "enemy_5503_arcslma_SkeletonData",
+  "profilePictureResourceName": "UIImage_arcslma",
+  "moveAnimation": "Move",
+  "attackAnimation": "Attack",
+  "hitAnimation": "",
+  "deathAnimation": "Die"
 }

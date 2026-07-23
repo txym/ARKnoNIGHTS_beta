@@ -123,7 +123,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_1
+      name: UnitInformationPanelHealthBarFill
       rect:
         serializedVersion: 2
         x: 212
@@ -186,7 +186,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_13
+      name: UnitInformationPanelUpperBackground
       rect:
         serializedVersion: 2
         x: 0
@@ -207,10 +207,10 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_22
+      name: SettingsButtonIcon
       rect:
         serializedVersion: 2
-        x: 1204
+        x: 1203
         y: 1396
         width: 187
         height: 161
@@ -249,12 +249,12 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_34
+      name: BattleStatusPanelBackground
       rect:
         serializedVersion: 2
-        x: 736
+        x: 737
         y: 945
-        width: 832
+        width: 831
         height: 60
       alignment: 6
       pivot: {x: 0, y: 0}
@@ -291,7 +291,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_40
+      name: DeployedUnitSelectionOverlay
       rect:
         serializedVersion: 2
         x: 8
@@ -354,7 +354,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_47
+      name: StagingSlotElite0Icon
       rect:
         serializedVersion: 2
         x: 1860
@@ -375,49 +375,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_56
-      rect:
-        serializedVersion: 2
-        x: 952
-        y: 432
-        width: 256
-        height: 239
-      alignment: 6
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: ea5320aaa4ed4ee40afe0f663f6ecb8a
-      internalID: 1189674287
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_57
-      rect:
-        serializedVersion: 2
-        x: 1219
-        y: 535
-        width: 382
-        height: 128
-      alignment: 6
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 9d0ac77d4912d674a9292b974822c13c
-      internalID: 1520023327
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_62
+      name: ReturnToStagingButtonIcon
       rect:
         serializedVersion: 2
         x: 1328
@@ -438,34 +396,13 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_65
+      name: StagingSlotPortraitOverlay
       rect:
         serializedVersion: 2
-        x: 1929
-        y: 430
-        width: 34
-        height: 36
-      alignment: 6
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 9166f69f6d727e54cbca8d736eda8db3
-      internalID: -1733255383
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_6
-      rect:
-        serializedVersion: 2
-        x: 1537
-        y: 321
-        width: 210
-        height: 210
+        x: 1538
+        y: 322
+        width: 193
+        height: 201
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -480,11 +417,11 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_0
+      name: BattleStatusPanelPlayerHealthIcon
       rect:
         serializedVersion: 2
         x: 1716
-        y: 1731
+        y: 1733
         width: 60
         height: 53
       alignment: 0
@@ -501,10 +438,10 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_4
+      name: BattleStatusPanel_EnemyCount
       rect:
         serializedVersion: 2
-        x: 1709
+        x: 1711
         y: 1667
         width: 76
         height: 62
@@ -522,7 +459,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_3
+      name: StagingSlotSelectionOverlay
       rect:
         serializedVersion: 2
         x: 1204
@@ -543,7 +480,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_7
+      name: 1
       rect:
         serializedVersion: 2
         x: 1200
@@ -606,7 +543,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_10
+      name: UnitInformationPanelHealthBarBackground
       rect:
         serializedVersion: 2
         x: 212
@@ -627,13 +564,13 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_11
+      name: UnitInformationPanelHealthValueBackground
       rect:
         serializedVersion: 2
-        x: 774
-        y: 1958
-        width: 149
-        height: 50
+        x: 777
+        y: 1959
+        width: 146
+        height: 47
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -690,7 +627,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_15
+      name: BattleStatusPanel_PlayerHPLoss
       rect:
         serializedVersion: 2
         x: 1014
@@ -711,7 +648,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_16
+      name: StagingSlotElite2PlusHighlight
       rect:
         serializedVersion: 2
         x: 1776
@@ -732,7 +669,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_17
+      name: UnitInformationPanelLowerBackground
       rect:
         serializedVersion: 2
         x: 127
@@ -753,12 +690,12 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_20
+      name: StagingSlotBackground
       rect:
         serializedVersion: 2
-        x: 1004
+        x: 1006
         y: 1088
-        width: 182
+        width: 180
         height: 189
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
@@ -798,7 +735,7 @@ TextureImporter:
       name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_21
       rect:
         serializedVersion: 2
-        x: 930
+        x: 931
         y: 1958
         width: 181
         height: 13
@@ -816,28 +753,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_24
-      rect:
-        serializedVersion: 2
-        x: 1910
-        y: 536
-        width: 39
-        height: 8
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: a191ead406393fd41b84fd6d75e0667c
-      internalID: -663972824
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_25
+      name: StagingSlotHeaderHalfBackground
       rect:
         serializedVersion: 2
         x: 1219
@@ -858,22 +774,211 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_19
+      name: DeploymentCostPanelIcon
       rect:
         serializedVersion: 2
-        x: 1771
-        y: 370
-        width: 110
-        height: 103
+        x: 1186
+        y: 1643
+        width: 46
+        height: 46
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: d17e5409ba4b8d544b43cb2b73f8ebf6
-      internalID: -1916953679
+      spriteID: caefcad527e16cf41a33705863b71437
+      internalID: -1412366243
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: StagingSlotCostIcon
+      rect:
+        serializedVersion: 2
+        x: 1293
+        y: 1246
+        width: 20
+        height: 20
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d242b2b4eda5bac45aa127f85f2f3255
+      internalID: 653596483
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FightIcon
+      rect:
+        serializedVersion: 2
+        x: 1580
+        y: 1146
+        width: 62
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6b3d746234fa90d4483d6743ce1ea3df
+      internalID: 1102878165
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: UnitInformationPanelTabInactiveDecoration
+      rect:
+        serializedVersion: 2
+        x: 551
+        y: 1719
+        width: 270
+        height: 17
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 16fa4e84deb27da4d9e9a45523a7fb17
+      internalID: -940689205
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: StagingSlotElite2Icon
+      rect:
+        serializedVersion: 2
+        x: 1683
+        y: 937
+        width: 42
+        height: 35
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b0cf1ee55920a774097390c9e4ba47f6
+      internalID: -1619046636
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: StagingSlotElite1Icon
+      rect:
+        serializedVersion: 2
+        x: 1932
+        y: 396
+        width: 40
+        height: 27
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 528c41718714b6342a0232a8f0b2bfcc
+      internalID: -552245580
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: StagingSlotElite3Icon
+      rect:
+        serializedVersion: 2
+        x: 1649
+        y: 1151
+        width: 42
+        height: 44
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2678ef507b3df1741a8ad6df89e9dd5d
+      internalID: 1361857712
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: StagingSlotElite1Decoration
+      rect:
+        serializedVersion: 2
+        x: 1308
+        y: 1025
+        width: 550
+        height: 40
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 23c0b6ca6921b12419d2e1ad2d1f7080
+      internalID: -1490857333
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ResourcePanelBackground
+      rect:
+        serializedVersion: 2
+        x: 1050
+        y: 1338
+        width: 168
+        height: 47
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5c4d176151dbba84f8ac84409bb87e6a
+      internalID: -649287754
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: BattleStatusPanelEnemyCountIcon
+      rect:
+        serializedVersion: 2
+        x: 1807
+        y: 214
+        width: 68
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d9f3725ceb9b62541ae50ef13c3104c0
+      internalID: -180941519
       vertices: []
       indices: 
       edges: []
@@ -889,49 +994,45 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     nameFileIdTable:
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_0: 1234212174
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_1: -1552394223
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_10: 333723496
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_11: -656247204
+      1: -535783365
+      BattleStatusPanelBackground: 1144015763
+      BattleStatusPanelEnemyCountIcon: -180941519
+      BattleStatusPanelPlayerHealthIcon: 1234212174
+      BattleStatusPanel_EnemyCount: 808399728
+      BattleStatusPanel_PlayerHPLoss: 272897415
+      DeployedUnitSelectionOverlay: 1168207483
+      DeploymentCostPanelIcon: -1412366243
+      FightIcon: 1102878165
+      ResourcePanelBackground: -649287754
+      ReturnToStagingButtonIcon: -1654760064
+      SettingsButtonIcon: -1983384226
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_12: -1465099707
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_13: 279990687
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_14: 605582987
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_15: 272897415
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_16: 660072634
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_17: 66154029
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_18: 1533955608
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_19: -1916953679
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_2: -983472323
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_20: -964332146
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_21: 2057379240
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_22: -1983384226
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_23: 2032536202
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_24: -663972824
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_25: 246466206
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_26: 2057461404
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_27: 966310947
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_28: 1152992274
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_29: -1266235783
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_3: -124301570
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_30: -710934891
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_31: 1642429046
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_32: 542217463
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_33: -1220725590
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_34: 1144015763
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_35: 1218644864
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_36: 747301556
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_37: 320861319
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_38: -122130954
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_39: -1717433929
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_4: 808399728
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_40: 1168207483
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_41: 993127888
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_42: 1933437501
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_43: 717985651
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_44: 794828221
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_45: -2013871022
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_46: 2046951448
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_47: 2077833216
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_48: -63826370
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_49: -97922358
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_5: -1333216899
@@ -945,10 +1046,8 @@ TextureImporter:
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_57: 1520023327
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_58: -451696228
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_59: 642238753
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_6: 886487812
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_60: 358835333
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_61: 216192148
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_62: -1654760064
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_63: 171764735
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_64: 676548470
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_65: -1733255383
@@ -956,9 +1055,26 @@ TextureImporter:
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_67: 857423524
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_68: 1773239941
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_69: -1301079502
-      SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_7: -535783365
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_8: -1585930761
       SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged_9: 352663949
+      StagingSlotBackground: -964332146
+      StagingSlotCostIcon: 653596483
+      StagingSlotElite0Icon: 2077833216
+      StagingSlotElite1Decoration: -1490857333
+      StagingSlotElite1Icon: -552245580
+      StagingSlotElite2Icon: -1619046636
+      StagingSlotElite2PlusHighlight: 660072634
+      StagingSlotElite3Icon: 1361857712
+      StagingSlotHeaderHalfBackground: 246466206
+      StagingSlotPortraitOverlay: 886487812
+      StagingSlotSelectionOverlay: -124301570
+      UnitInformationPanelHealthBarBackground: 333723496
+      UnitInformationPanelHealthBarFill: -1552394223
+      UnitInformationPanelHealthValueBackground: -656247204
+      UnitInformationPanelLowerBackground: 66154029
+      UnitInformationPanelTabActiveDecoration: 1080555306
+      UnitInformationPanelTabInactiveDecoration: -940689205
+      UnitInformationPanelUpperBackground: 279990687
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

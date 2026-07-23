@@ -1,0 +1,273 @@
+# 当前项目架构
+
+## 1. 文档范围与状态
+
+本文档记录仓库在静态审计时真实存在的结构、入口、数据流和模块边界。它不把 `docs/SPEC.md` 中尚未实现的目标设计描述为现有能力。
+
+TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译、EditMode（30/30）、PlayMode（5/5）、Windows x86_64 构建和实际 Player 验收均成功。早期 TASK-001 的 Standalone 失败是保留的历史基线；`UITest.targetSprite` 的四个同根因诊断已被最小作用域修复消除。固定 Demo 的 Player-safe 目录/快照加载、真实单位视图、十次确定性、Home/Away 与 Replay 已由 Player 日志验证；人工 UI/动画观感仍未验证。
+
+## 2. 项目基线
+
+- Unity Editor 版本：`2022.3.62f1c1`。
+- 当前使用 Built-in Render Pipeline，没有配置自定义 Scriptable Render Pipeline。
+- Project Settings 当前选择旧 Input Manager；第一方交互代码使用 `UnityEngine.Input`。`UIManager` 保留了新 Input System 条件分支，但项目没有直接安装 Input System Package，当前不会走该分支。
+- Build Settings 当前只启用 `Assets/Scenes/SampleScene.unity`。
+- `SampleScene` 同时承担启动场景和当前战斗交互原型场景，没有独立的启动、准备或结算场景。
+- 第一方运行时代码没有自有 `.asmdef`，统一进入 Unity 预定义程序集 `Assembly-CSharp`。
+- 仓库中仅 Spine Runtime 和 Spine Editor 使用独立程序集定义。
+- Spine Unity 以源码和资源形式放在 `Assets/Spine`，不是 UPM 依赖；其仓库内版本信息为 Spine Unity 3.8 系列。界面使用 uGUI、TextMesh Pro 和 Unity EventSystem。
+
+## 3. 目录与模块边界
+
+| 区域 | 当前职责 | 当前接入状态 |
+|---|---|---|
+| `Assets/Game/Runtime/Initial` | 从单位 JSON 构造运行时单位模板和单位对象 | 由场景调试按钮显式触发 |
+| `Assets/Game/Runtime/Data/Unit` | 单位模板、实例身份、Spine 移动和攻击表现接口 | 已被单位工厂和场景原型使用 |
+| `Assets/Game/Runtime/Data/Player` | 玩家单位集合、区域分桶和 `9×4` 位置索引 | 当前没有调用方，未接入场景流程 |
+| `Assets/Game/Runtime/Deployment` | 从单位 UI 拖拽生成 3D 单位并吸附到地图格 | 已挂入 `SampleScene`，属于原型实现 |
+| `Assets/Game/Runtime/Bitset` | 标签位集、标签注册表和单位固有能力查询 | 有数据资产和烘焙工具，未形成战斗流程 |
+| `Assets/Game/UI` | 单位栏、商店面板、详情面板和点击数据路由 | 已用于 `SampleScene` 原型 |
+| `Assets/Game/Debug` | 初始化、移动和 UI 调试入口 | 已由场景按钮引用；不是自动化测试 |
+| `Assets/Game/Editor` | 纹理合并和单位固有能力数据烘焙 | 仅编辑器工具 |
+| `Assets/GameData/Units` | 单位 JSON、JSON 数据结构和固有能力数据库 | 单位工厂直接读取其中的 JSON |
+| `Assets/Resources` | 默认单位 Prefab、单位 Spine 资源和 UI Prefab | 通过 `Resources.Load` 在运行时加载 |
+
+## 4. 场景与运行入口
+
+### 4.1 自动入口
+
+- `UnitFactory.ResetStatics` 使用 `SubsystemRegistration` 初始化单位类型缓存。它只重置缓存，不加载单位。
+- `UIManager.InitOnLoad` 使用 `AfterSceneLoad` 安装全局点击监听。启用旧输入系统时，它会创建常驻的 `__UIManagerRunner`；启用新输入系统时则订阅 Input System 事件。
+- `VirtualSlotPanel.Start`、`OnEnable` 和 `Update` 负责计算单位栏虚拟槽位与响应尺寸变化。
+- `ShopSlotPanel.Start` 初始化商店槽位。
+- `UnitDeployment.Update` 每帧处理单位 UI 命中、拖拽、取消和落格。
+
+### 4.2 场景调试入口
+
+`SampleScene` 中存在三条主要按钮链路：
+
+1. 初始化按钮调用 `ButtonDebug.Debugbutton`；
+2. 移动按钮调用 `MoveTest.Movetest`；
+3. 折叠按钮调用 `ButtonDebug.ShopPanelFolder`。
+
+场景中还存在地图模型、格位标记、单位栏、商店面板、详情面板相关对象，以及 `RemainingTime`、`PlayerHp` 等界面对象；没有发现驱动回合计时或玩家生命结算的对应业务逻辑。
+
+## 5. 当前实际运行流程
+
+### 5.1 单位初始化
+
+当前单位初始化不是自动场景流程，而是由初始化调试按钮触发：
+
+1. `ButtonDebug.Debugbutton` 调用 `UnitFactory.SpawnAll`；
+2. `UnitFactory` 扫描 `Application.dataPath/GameData/Units/Json` 下的 `*.json`，当前仓库内有 `arcslma.json` 和 `gopro.json`；
+3. JSON 经 `JsonUtility` 反序列化为 `UnitJson`；
+4. 工厂为每种类型创建内存中的 `UnitTemplate`，并按 `typeID` 写入静态字典；
+5. 工厂加载 `Resources/Prefabs/DefaultUnit` 并为每种类型实例化一个对象；
+6. 工厂动态添加 `UnitIdentity` 和对应的 `UnitSkelType1` 或 `UnitSkelType2`；
+7. 工厂按 JSON 字段加载 Spine `SkeletonDataAsset`；
+8. `ButtonDebug` 把单位类型填入 `VirtualSlotPanel`，建立可点击、可拖拽的单位 UI。
+
+工厂为每种类型生成的单位对象分配负数 `unitID`。这套编号只服务当前原型，尚未接入 SPEC 所描述的对战输入快照或玩家单位持久数据。
+
+### 5.2 单位详情 UI
+
+单位 UI 通过公开的 `Payload` 暴露数据。`UIManager` 在 3D 或 2D 命中对象及其父级组件上用反射查找 `Payload`，然后调用 `DataUISwitch` 显示详情。
+
+`DataUISwitch` 是非 `MonoBehaviour` 单例，按需加载并实例化单位详情 Prefab，通过订阅 `UIManager.OnApplyData` 更新绑定字段。该机制依赖静态事件和运行时实例，场景重载后的订阅与清理行为尚无测试覆盖。
+
+### 5.3 拖拽部署原型
+
+`UnitDeployment` 当前实现的是 UI 到 3D 场景的直接拖拽：
+
+1. 每帧通过 EventSystem 射线检测带 `UnitUI` 标签的界面对象；
+2. 鼠标按下后，从 `ButtonDebug` 保存的单位模板对象克隆一个 3D 单位；
+3. 拖拽期间把鼠标射线投影到固定的 `y=50` 平面；
+4. 鼠标释放时把世界位置换算为一基格坐标；
+5. 坐标有效时查找名为 `Block(x,z)` 的场景对象并吸附；无效时销毁本次克隆。
+
+当前有效范围是 `x=1..9`、`z=1..8`，并排除 `(5,1)` 和 `(5,8)`。这与当前 SPEC 的完整战场范围一致，但没有限制为本地 `9×4` 部署半场。
+
+该流程没有连接 `PlayerUnitCollection`，也没有检查阶段、格位占用、单位池数量、堆叠、替换、部署费用或操作原子性。多个单位落在同一格时没有业务层冲突处理。
+
+### 5.4 移动与攻击表现
+
+`UnitSkelBase` 及两个派生类型提供 Spine 动画、移动指令和攻击动画接口。
+
+- 移动通过协程按 `Time.time` 和渲染帧在起终点间插值；
+- 攻击接口只负责播放或调节攻击动画；
+- `MoveTest` 对最近一次拖出的单位发送固定起点、终点和持续时间的调试移动指令。
+
+这些类目前是表现层原型，不包含权威战斗计算。它们没有实现逻辑帧、寻路、索敌、阻挡、伤害、当前生命值、死亡或胜负结算。
+
+## 6. 数据结构现状
+
+### 6.1 单位静态数据与运行时身份
+
+- `UnitJson` 定义 JSON 输入字段。
+- `UnitTemplate` 是运行时创建的 `ScriptableObject`，保存类型级属性；它不是仓库内逐单位持久化的资产。
+- `UnitIdentity` 保存实例 `unitID` 和 `UnitTypeID`。
+- `UnitFactory` 以 `typeID` 为键缓存 `UnitTemplate`。
+
+旧原型仍没有可供其自身使用的统一对战输入结构；TASK-002 新增的 Battle Core 已独立提供不可变的双方快照，包含单位位置、Buff 占位、阵营和商店记录，但尚未接入旧原型。
+
+### 6.2 `PlayerUnitCollection`
+
+`PlayerUnitCollection` 是纯 C#、固定容量为 48 的结构，包含：
+
+- `Staging`、`Deployed`、`Overflow`、`Shop` 四个区域；
+- 按区域维护的稠密索引和显示顺序；
+- `9×4` 的格位到单位双向索引；
+- 整表加载、区域排序和严格部署位置写入等操作。
+
+该类型当前没有调用方。其位置索引为零基内部格编号，区域定义和固定容量也尚未与当前 SPEC 的一基坐标、待部署堆叠及槽位规则对齐。因此它只能视为孤立的数据结构，不能视为现行玩家单位池实现。
+
+### 6.3 `LocalPlayerState`（UI-001）
+
+`ARKnoNIGHTS.PlayerState` 是独立于场景、`MonoBehaviour`、Transform 和 Unity 物理的本地玩家状态程序集。它以 Player-safe `UnitCatalog` 作为唯一运行时类型目录，维护玩家 ID、可用部署费用、独立单位 ID、type ID、区域、当前精英化、不可变 Buff 快照和可选的一基本地阵型坐标；对 UI 只公开只读快照、版本号和成功变更通知。它内部持有并按每次成功变更重建 `PlayerUnitCollection` 的固定容量/区域桶派生投影，但字符串实例记录仍是唯一权威状态，旧集合和其零基坐标 API 不向 UI 暴露。
+
+`LocalPlayerStateLoader` 从 `Resources/PlayerData/local-player-state-v1.json` 读取版本化固定测试状态，并拒绝未知 schema、重复 unit ID、未知类型、非法精英化/区域/坐标、负费用、重复占位、超过 48 个单位和超过 13 个严格待部署槽。固定数据使用真实 `gopro`/`arcslma`，初始 Cost 为 99，包含两个可堆叠 `gopro`、一个 `arcslma` 和一个 Overflow 单位。
+
+`PlayerState.TryDeploy`、`TryRetreat` 和 `RemoveOverflowUnits` 是原子操作：部署只接受一基 `9×4` 空格并拒绝 `(5,1)`；成功时扣除目录部署费用，撤退成功时返还全部费用，Overflow 清理只删除 Overflow。待部署快照按 Cost、type ID 排序，并且数量为 1 时仍保留槽位数量。Buff 仍无游戏语义；当前只比较完整快照而不规范化它。
+
+旧 `PlayerUnitCollection` 和 `UnitFactory.SpawnAll` 继续保留为未接入的 legacy/debug 原型，未改变公开零基接口语义；它们不是 UI-001 的权威状态来源。
+
+### 6.4 标签与固有能力
+
+`BitSet64`、`TagMask`、`TagRegistry` 和 `UnitInnateAbilityDatabase` 提供最多 64 位的标签/固有能力表示。`UnitJsonAbilityBakeTool` 可在编辑器内扫描单位 JSON 并更新数据库资产。
+
+当前单位模板可以查询固有能力掩码，但没有战斗系统消费这些数据，也没有看到 Buff 实例、持续时间或叠加规则的运行时模型。
+
+## 7. 当前不存在的架构能力
+
+以下能力由 SPEC 描述或验收需要，但当前代码中没有形成可执行系统：
+
+- 回合、准备、锁定、战斗和结算状态机；
+- Unity 表现层对主客场计算结果的观察视角转换；
+- 移动路径、最近敌人索敌、阻挡关系和阻挡数管理；
+- 物理、法术、真实伤害计算；
+- 当前生命值、死亡、胜负和单场结算；
+- 真实单位 JSON/Player-safe 目录到实际 Unity/Spine 资源的类型映射（规划由 TASK-004A 补齐），以及后续由 TASK-005 接入场景的控制器；
+- 从 fixture 到 Unity 表现/场景初始化双方数据的流程；
+- 多玩家房间、同步、断线或重连。
+
+## 8. 已知边界与风险
+
+1. `UnitDeployment.Update` 在所有构建中调用 `ConvertCoordinate`。TASK-001 已将不依赖 `UnityEditor` 的方法移出 `#if UNITY_EDITOR`，保留 `OnDrawGizmosSelected` 为 Editor 专用；复核后的 Windows Standalone 编译不再报告该符号缺失。
+2. `UITest.targetSprite` 的条件编译作用域已在 TASK-006 修复：变量在条件块外声明，Editor `AssetDatabase` 与 Player `Resources.Load` 分支仅各自赋值；Windows Standalone 构建已复测成功。
+3. `UnitFactory` 仍从 `Application.dataPath` 下的松散 JSON 路径读取数据，是旧原型风险。第一阶段新 Demo 不调用该链路，而是从 `Resources` 加载 `unit-catalog-v1` 与 `local-battle-v1`；该新链路已在实际 Player 中验证。
+4. 旧第一方业务代码仍位于 `Assembly-CSharp`，但 Battle Core、fixture 适配层和 EditMode 测试已具备独立程序集隔离；新 Core 不反向依赖旧程序集。
+5. `Runtime/Deployment` 直接依赖 `Assets/Game/Debug` 中的 `ButtonDebug`、`MoveTest` 和 `EventTest`。因此 Debug 目录当前是实际运行链的一部分，不能作为可独立移除的开发辅助层。
+6. 当前没有统一的 Bootstrap 或 Game Manager。初始化分散在运行时静态钩子、场景组件生命周期和调试按钮中。
+7. 多处运行流程依赖静态单例和场景对象名称，包括 `ButtonDebug.Instance`、`MoveTest.Instance`、`DataUISwitch.Instance` 和 `Block(x,z)` 查找；格位对象查找失败时还缺少完整的空值处理。
+8. 部署逻辑直接实例化表现对象并以对象位置作为结果，没有独立的权威部署状态。
+9. 移动协程使用渲染时间，适合表现插值，不满足确定性战斗计算的状态来源要求。
+10. 已有 TASK-002 的 10 项 Battle Core EditMode 自动化测试；场景、静态生命周期、Player fixture 加载和 Standalone 构建风险仍缺少回归保护。
+11. 项目使用 Unity 2022.3，而仓库内 Spine Unity 资源自述为 3.8 系列；静态审计不能判断兼容性，需要通过真实导入、编译和场景运行验证。
+
+## 9. 架构事实来源
+
+本文件主要依据以下内容维护：
+
+- `ProjectSettings/ProjectVersion.txt`
+- `ProjectSettings/EditorBuildSettings.asset`
+- `Packages/manifest.json`
+- `Packages/packages-lock.json`
+- `Assets/Game` 下的第一方 C# 脚本
+- `Assets/GameData` 下的单位数据和数据结构
+- `Assets/Scenes/SampleScene.unity`
+- 第一方 Prefab、Resources、`.asmdef` 和测试文件清单
+
+行为目标和验收口径仍以 `docs/SPEC.md` 为准；当实现与 SPEC 不一致时，本文件记录实现现状，不替代机制确认。
+
+## 10. TASK-002 Battle Core 基础层（2026-07-17）
+
+已新增三个隔离区域：
+
+- `Assets/Game/Battle/Core`：`ARKnoNIGHTS.Battle.Core` 为 `noEngineReferences` 的纯 C# 程序集，定义一基坐标、主客场映射、厘米定点逻辑位置、不可变输入快照、验证、运行时初始单位状态及显式 20 TPS runner。
+- `Assets/Game/Battle/Infrastructure`：唯一允许使用 `UnityEngine` 的 fixture 适配层。它以 `JsonUtility` 和 `Resources.Load<TextAsset>` 读取 `battle-fixture-v1`，转换为 Core 的不可变值，并将验证失败返回为结构化错误。
+- `Assets/Game/Tests/EditMode/Battle`：最小 EditMode 测试程序集，引用 Core 和 Infrastructure；`Assets/Resources/BattleFixtures/task002-minimal-v1.json` 是 Player-safe 的合成测试 fixture，不复用 `Application.dataPath` 的旧单位 JSON 路径。
+
+Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径或 Unity 时间。只有 Deployed 快照生成 `RuntimeUnitState`；Staging 与 Shop 仍保留在输入中。`BattleRunner.Step()` 是唯一推进入口；TASK-003 已在既有 runner 中补齐移动、索敌、阻挡、攻击、伤害、死亡、胜方和公开事件，`maxTicks` 仍以无胜方的 `MaxTicksReached` 未解决诊断停止。
+
+## 11. TASK-003 确定性单场战斗 Core（2026-07-18）
+
+`BattleRunner` 现以稳定的九阶段顺序推进：清理失效待结算攻击、索敌、基于快照的移动意图并批量应用、阻挡评估、攻击开始、同 Tick 批量伤害、死亡与关系清理、终局判定和事件封存。运行时单位仅在 Core 内维护当前 HP、存活、目标、容量感知的对称阻挡列表、攻击冷却和定点移动余量；阻挡评估以入站候选的“当前目标、嘲讽、到本方门格距离、unit ID”顺序建立关系，并以目标 unit ID 解决跨目标容量争用。所有单位遍历、索敌决胜、事件和摘要均使用显式稳定排序。
+
+`Assets/Game/Battle/Core/Events/BattleEvents.cs` 定义不含 Unity 或运行时可变对象引用的只读事件 DTO。Spawn 在 Tick 0 输出；其余事件按阶段输出并以 Tick 内 sequence 严格递增。`BattleRunResult` 以不可变快照公开事件、trace、胜方和停止原因。胜利、同时全灭和 maxTicks 均产生明确结果，不会伪造胜方；多单位阻挡容量竞争由确定性优先级消解，不再作为不支持内容停止。
+
+移动使用厘米整数位置和余量累积；距离比较、阻挡半径和索敌只使用整数。攻击的原始和有效动画 Tick、计划出伤 Tick 均进入 Attack 事件；到达同一 Tick 的攻击先按阶段开始存活状态过滤、批量应用伤害、再统一死亡。`DamageCalculator` 支持 Physical、Magic（法术语义）和 True 三种整数伤害。
+
+`Assets/Resources/BattleFixtures/task003-minimal-v1.json` 是不触发 Buff 或非整数 Tick 的 1v1 完整闭环 fixture。多单位阻挡竞争使用 Core EditMode 构造输入回归：移动中拦截、容量、目标优先、嘲讽、到门距离和 ID 决胜均不依赖 Unity 物理。它不改变 `battle-fixture-v1` schema；原 TASK-002 fixture 仍保留用于 maxTicks 和输入兼容回归。现有 Unity 表现、场景、Prefab、旧部署/UI 与 UnitFactory 均未接入或修改。
+
+## 12. TASK-004 表现回放边界（EditMode 已验证）
+
+- `ARKnoNIGHTS.Battle.Presentation` 只引用 Battle Core 与 UnityEngine。`BattleEventPlaybackController` 仅保留已完成 `BattleRunResult` 的只读引用，按输入的 `(tick, sequence)` 顺序消费事件；`BattleRunResult.FinalUnits` 公开最终的位置、HP、阵营、生死和类型快照，播放结束时逐单位核对。暂停、调速、视角和重播只影响演示时间轴，不会创建或推进 Core runner。
+- 为支持未来 Buff 临时生成单位，`Spawn` 事件现公开不可变的 `unitId`、`unitTypeId`、`unitSide` 和初始定点位置。表现层以 `unitId → ViewRecord` 建立唯一映射；重复 Spawn、未知单位、缺少 Spawn 字段或工厂无映射均产生结构化诊断，不会猜测资源。
+- `BattlefieldWorldProjection` 使用主场直投影与客场 180 度变换；连续定点位置按同一中心变换，`1` 个 Core 厘米单位对应 `1` 个 Unity 世界坐标单位，即 `1m = 100` Unity 单位。
+- 回放在相邻 Move 事件的一个 Tick 区间内插值 Transform，并在事件 Tick 对齐权威最终位置。Attack、Damage、Death 分别驱动攻击、受击、死亡命令；攻击局部倍速使用 `originalAnimationTicks / effectiveAnimationTicks`。`UnitSkelPresentationView` 缺少动画时记录诊断，死亡动画缺失时采用隐藏这个已由事件确认死亡的对象的降级策略。
+- 同一单位的连续 Move 事件只启动一次循环移动动画，不会每 Tick 重置 Spine Track。Attack 从其事件 Tick 持续到 `effectiveAnimationTicks` 结束，期间仍可按 Core 结果更新 Transform，但后续 Move 事件不得覆盖攻击动画；暂停将视图播放倍率置为 `0`，恢复时才还原当前演示倍率。上述演示策略不改变事件、坐标、阻挡、伤害或 winner。
+- `UnitSkelPresentationView` 与 `MappedBattlePresentationViewFactory` 位于 `Assembly-CSharp`，作为旧 `DefaultUnit`、`UnitIdentity`、`UnitSkelBase`/Spine 原型对隔离 Presentation 程序集的单向桥接。后者只接受 Inspector 明确配置的 `coreTypeId → prefab / SkeletonDataAsset / legacy type ID` 绑定；未配置时返回 `resource.mapping.missing`，不会猜测绑定。没有反向把 Unity 对象、Transform 或动画状态带入 Core。
+- `task003-minimal-v1` 的 `home-striker`、`away-guard` 是合成算法测试类型，仍没有也不应被猜测为 `gopro`/`arcslma` 资源映射。因此实际 Spine/Prefab 创建与视觉播放保持未验证；规划中的 TASK-004A 必须先建立真实单位目录与玩家对战快照的连接并完成真实资源回归，TASK-005 才能接场景。
+
+## 13. TASK-004A 真实目录与本地对战适配（2026-07-18）
+
+`Assets/Game/Battle/Infrastructure/RealBattleDataLoader.cs` 新增 Player-safe 数据边界：`UnitCatalogLoader` 以 `Resources.Load<TextAsset>` 加载 `Assets/Resources/BattleData/unit-catalog-v1.json`，验证数值、枚举、ID、Prefab/Skeleton Resources 路径并公开只读 `UnitCatalog`；`LocalBattleLoader` 再读取 `task004a-real-1v1.json`，以目录定义连接玩家实例，构造已有的不可变 `BattleInput`。`BattleInputFactory` 同时接受旧 `battle-fixture-v1` 和适配后的 `local-battle-v1`，两者的 Core 输入、事件和 runner 语义不变。
+
+目录由 `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs` 从 `unit-source-v1` 生成。它稳定排序源 JSON、校验 type ID/resource key/稀有度/精英化/目标价值、严格换算米/秒和秒/Tick，并通过 Unity/Spine API 验证目录声明的 Move、Attack、Death 动画及 Attack 时长，随后写入 Resources 输出；`Task004aSpineProbe` 保留为可重复的动画证据探针。运行时不读取 `Application.dataPath/GameData/...`。
+
+`UnitCatalogEntry` 明确分离 `ResourceKey`、可为空的 `DisplayNameZhHans`、可为空的 `SkillDescriptionZhHans` 与 `LifeDeduct`；`UnitCatalogLoader` 对目录 `rarity=1..6` 和非负 `lifeDeduct` 进行运行时校验。`PlayerState` 将目录 `Rarity` 原样投影至 `StagingStackSnapshot`，UI 不读取 Editor 源 JSON 或由精英化等级推断稀有度。`UnitFactory` 和 `UnitJsonBake` 分别将新字段适配到旧 `UnitTemplate`、以及读取 `typeId + innateAbilityIds`，不保留双格式源读取。
+
+`MappedBattlePresentationViewFactory` 现优先从目录按真实 Core type ID 自动解析 `Prefabs/DefaultUnit`、SkeletonDataAsset、legacy ID、`unitskeltype` 和动画名；既有 Inspector Binding 仍是显式覆盖。新创建的 `UnitSkelBase` 在 `Start` 前由目录注入只读表现速度/间隔，避免依赖旧 `UnitFactory.SpawnAll` 的模板缓存。`UnitSkelPresentationView` 使用目录动画；空 Hit 为无操作降级，缺 Death 仍沿用隐藏已死亡视图的策略。整个桥接仍只从结果事件流向 Unity，绝不反向写入 Core。
+
+## 14. TASK-005 固定真实对战 Demo（2026-07-18）
+
+- `ARKnoNIGHTS.Battle.Demo` 中的 `BattleDemoCoordinator` 是固定 Demo 的显式状态机：`Idle`、`LoadingComputing`、`Ready`、`Playing`、`Paused`、`Completed`、`Error`。它通过 `LocalBattleLoader.LoadFromResources("BattleData/unit-catalog-v1", "BattleData/task004a-real-1v1")` 连接真实目录和玩家快照，在局部 `BattleRunner` 完整运行并封存 `BattleRunResult` 后才创建 `BattleEventPlaybackController`；协调器不保留可继续 Step 的 runner。
+- `BattleDemoCoordinator` 暴露 input/event/result 的稳定 FNV-1a 摘要、玩家/单位摘要、演示 Tick、事件进度、winner/unresolved reason 与结构化最后错误。Replay 仅重新初始化同一封存结果；`Recalculate` 是独立的明确调试入口。Home/Away、暂停与速度只作用于 Presentation。
+- `SampleScene` 保留唯一 Build Settings 入口、旧 `InitButton`、`ButtonTest` 和 `FoldButton`。新增独立顶层 `BattleDemoRoot`，其中 `BattleDemoViews` 是数据驱动工厂创建真实视图的父节点，`BattleDemoUI` 是排序层级 100 的独立 uGUI Canvas。根对象通过序列化字段关联 `BattleDemoController`、`MappedBattlePresentationViewFactory`、视图父节点和 UI；没有在运行时按场景名称查找这些对象。
+- `BattleDemoUi` 在其明确根节点下创建轻量 uGUI 控件：Start/Continue、Pause、Replay、Recalculate、0.5x/1x/2x 速度循环，以及 Home/Away 观察视角。状态区域显示 schema、真实玩家与 type ID、摘要、Tick、事件消费、winner/reason 和最后错误。稳定日志前缀为 `[BattleDemo]`，只在操作和状态转换时输出。
+- `UnitSkelPresentationView.SetFacing` 使用投影后的世界方向：默认朝右（世界 X 正向、60 度基础倾角），X 负向时只附加一个 Y 轴 180 度翻转，纯 Z 方向保留最近左右朝向。回放器按当前展示 Tick 的活动（或最近完成）Move 段提供移动方向；开局只会使用第一段已开始的 Move，绝不预先采用整场最后一段 Move 的方向。Attack 消费时记录攻击者和目标在该 Tick 的权威位置，并以目标方向覆盖不早于它的 Move 朝向；后续 Move 可再次接管朝向。Home/Away 仍只改变坐标投影，不改变 Core 位置、事件或结果。
+- `OnDisable`/`OnDestroy` 调用协调器 `Dispose`，从而停止播放器并释放本场视图；场景和旧原型静态入口不接收 Demo 状态。`Assets/Game/Editor/Battle/BattleDemoSceneSetup.cs` 是幂等的场景接线工具：发现已有 Demo 根对象时拒绝修改，避免覆盖已有接线。
+
+## 15. TASK-006 构建与 Player 验收入口（2026-07-18）
+
+- `Assets/Game/Editor/Battle/Task006StandaloneBuild.cs` 提供 `Task006StandaloneBuild.BuildWindowsX64`：只读取现有 Build Settings 启用场景、构建 `StandaloneWindows64`、默认写入忽略的 `Temp/TASK-006/WindowsStandalone`、记录 `BuildReport` 摘要并以可靠退出码结束；它不改动场景、Package 或 ProjectSettings。`RunEditorAcceptance` 以相同真实 Resources 输入记录十次稳定摘要。
+- `Assets/Game/Runtime/Initial/Task006PlayerAcceptance.cs` 仅在 Player 明确收到 `-task006-acceptance` 时创建临时验收器。该验收器驱动现有 `BattleDemoController` 加载真实目录/对战快照，比较十次权威计算，完成 Home、Away 和 Replay，并在帧末释放重播旧视图后记录摘要、退出。普通手动 Demo 不读取该参数时不会改变行为。
+- 2026-07-18 的 Editor 与 Player 摘要均为 `0160DA1D/F247BEA4/C578716F`。固定真实快照采用 Home 3 对 Away 4，双方混用 `gopro`（`1000`）和 `arcslma`（`5503`）并打乱部署坐标；Away 胜，最终两个 Away `arcslma` 存活。摘要来自不可变 `BattleInput`、`BattleRunResult` 与事件 DTO 的稳定 FNV-1a 表示，不使用运行时 `HashCode`。
+
+## 16. UI-002 正式待部署 HUD（2026-07-21）
+
+- `ARKnoNIGHTS.UI` 是独立的 uGUI 表现程序集。`StagingHudController` 挂在 `SampleScene/FormalBattleHudRoot`，在 `Awake` 中只创建一份 `LocalPlayerState`，订阅其只读 `Changed` 快照，并在销毁时取消订阅；加载失败会输出 `[StagingHud][playerState.load.failed]`，保持正式 HUD 的空/错误态，不回退到 `ButtonDebug` 或 `UnitFactory`。
+- `PlayerState.StagingStackSnapshot` 增加了只读 `PortraitResourcePath`。它仍由 Player-safe `UnitCatalog` 在创建权威堆叠快照时填充，UI 不查询旧集合、源 JSON 或场景对象来推断头像；既有 type ID、Cost、精英化、完整 Buff 和有序 unit ID 继续构成 UI 的只读输入。
+- HUD 运行时在根对象下创建 `FormalBattleHudCanvas`（参考 `1920×1080`，排序层 `200`）、`StagingArea` 和 `DeploymentCostPanel`。槽位使用图集已确认 Sprite、`RectMask2D` 裁切固定比例头像、当前精英化装饰、Cost 与始终显示的 `Xn` 数量；它不创建第二份权威排序。`ToggleSelection` 只记录稳定堆叠 ID，不修改玩家状态，并在最新快照不再包含该 ID 时清除选择，供 UI-003 使用。
+- `StagingHudLayout` 是无场景依赖的 UI_SPEC 计算：自然布局右对齐，压缩布局铺满；压缩选择使选中槽恢复自然宽度，其他槽按距离等差下降并在最小 `7/9` 头像宽度处钳制，最终总宽保持在可用宽内。
+- `BattleDemoUiVisibilityToggle` 只控制 `BattleDemoUI` 的 Canvas、GraphicRaycaster 与 CanvasGroup，默认隐藏，默认组合键为 `Ctrl+Shift+F10`。它不禁用 `BattleDemoRoot`、`BattleDemoController` 或 Presentation 工厂。
+- `UI002SampleSceneSetup.SetupSampleScene` 是幂等场景接线工具：添加/复用唯一 `FormalBattleHudRoot`，给现有 `BattleDemoUI` 增加 CanvasGroup 并序列化绑定，默认失活 `InitButton`、`ShopPanel`、`FoldButton`、`ButtonTest` 和旧 `VirtualSlotPanel` 对象；它不改地图、相机、Package 或 BattleDemoRoot。
+
+## 17. UI-003 状态驱动部署与撤退（2026-07-21）
+
+- `StateDrivenDeploymentController` 是 `FormalBattleHudRoot` 上唯一的准备阶段输入拥有者。正式待部署槽只向它报告稳定堆叠 ID；控制器从该快照的有序 `unitIds` 选择首个具体实例，并以 `Idle`、`Dragging`、`SelectedDeployed`、`Disabled` 状态管理预览、选择和输入锁。它不会读取 `ButtonDebug`、`UnitFactory` 或 `UnitDeployment` 原型数据。
+- `PreparationGridProjection` 将 UI/世界候选投影为一基本地阵型：格心为 `(x * 100, 0, y * 100)`。拖拽期间预览自由跟随鼠标投影到的世界坐标；松手时才换算、验证并由 `PlayerState.TryDeploy` 决定是否吸附到格心。
+- 拖拽预览由 `PreparationUnitViewBuilder` 使用 Player-safe 目录和真实 `DefaultUnit` 资源创建，但不进入玩家快照、不会占格或扣费；取消/锁定时销毁。它的 `UnitIdentity` 同时持有唯一运行时整数 ID 与稳定 PlayerState 实例 ID；成功部署或撤退后，`PreparationUnitViewCoordinator` 订阅同一 `PlayerState.Changed` 快照并幂等维护 `player unit ID → PreparationUnitView` 的一对一映射；该根 `PreparationUnitViews` 与 `BattleDemoViews` 生命周期分离。
+- 已部署视图与待部署槽共用一个互斥选择：选择任一待部署槽会清除场上选择，选择已部署视图或开始拖拽会清除待部署槽选择。`PreparationSelectionIndicator` 是独立世界空间 SpriteRenderer 组：命名子物体 `Overlay` 与 `ReturnToStaging` 是各自的中心锚点，内部 `Graphic` 只负责补偿图集 Sprite pivot；两者按 `1.5×` 缩放，菱形水平平行地面。组根取“单位 Transform 锚点的 `z + 50` → 摄像机”直线与 `y=200` 平面的交点；撤退图标使用局部二维坐标 `(-60,60)` 并创建与自身可见尺寸相符的命中框。命中框只发起 `TryRetreat`，成功后由快照清理视图和选择组；它不直接改 Cost、阵型或 GameObject 权威状态。
+- `SetInteractionEnabled(bool)` 是 UI-004 的阶段锁入口：禁用时取消预览、清选和关闭撤退输入。`UI003SampleSceneSetup.SetupSampleScene` 幂等地只向既有 `FormalBattleHudRoot` 添加控制器，不修改地图、相机、BattleDemoRoot 或 DefaultUnit。
+
+## 18. TASK-007 DefaultUnit 世界空间状态条（2026-07-22）
+
+- `DefaultUnit.prefab` 根物体附加 `UnitWorldStatusBar`，并包含失活的 `WorldStatusBar` 子层级：`Background`、非渲染布局锚点 `MaxHpCapacity`、`CurrentHpFill` 与 `ShieldFill`。它们使用 MeshRenderer/MeshFilter，不使用 Canvas、uGUI、Collider 或战斗逻辑；状态条生命周期随单位 GameObject 销毁。
+- `UnitWorldStatusBarLayout` 是无场景依赖的展示公式：总宽 `90`，先计算最大血量容量段，再计算其中当前 HP 的左锚填充，护盾段从右边缘向左填充。满血无盾隐藏；`maxHitPoints <= 0` 隐藏且每个组件实例最多记录一次带 unit ID 的诊断。所有 clamp 仅影响几何，不回写 Core。
+- 数据流为 `UnitCatalogEntry.Definition.MaxHitPoints → MappedBattlePresentationViewFactory.ConfigureStatusBarMaximumHitPoints → UnitSkelPresentationView`。`BattleEventPlaybackController` 在 Spawn、Damage、Death 与 Home/Away 观察者切换时调用只读的 `SetStatusBarState(unitId, isEnemy, currentHitPoints, currentShield)`；当前事件流始终传入 `currentShield = 0`，没有新增护盾结算机制。
+- `UnitStatusBarOverlay` 是只用于状态条的局部透明 Shader：共享材质配合 `MaterialPropertyBlock` 设置贴图、Sprite UV 与颜色，不在更新中实例化 `renderer.material`。背景使用 `slider_hp_back`，我方/敌方 HP 分别使用 `slider_hp_fill`/`slider_hp_enemy`；`ShieldFill` 复用填充 alpha 但由 `_ForceWhite` 输出白色。Shader `ZWrite Off`、`ZTest LEqual`，不会强制穿透地面；没有修改全局渲染管线或 Quality/Graphics 设置。
+- 状态条以单位的局部 Y/Z 偏移定位并保持与单位贴图共面。左右朝向变化会立即重新计算局部左右锚点，`LateUpdate` 继续兜底更新位置，防止转向后直到受击才恢复正确血量/护盾方向。
+
+## 19. UI-004 本地阶段与运行时战斗输入（2026-07-22）
+
+- `ARKnoNIGHTS.Round` 将可测试的 `PreparationBattlePhaseMachine`、`PreparationBattleSealer` 和 `PlayerStateBattleInputAdapter` 与 Unity 场景分离。时钟只有 `Loading/Preparation/Battle/Error`，以 30 秒 unscaled 输入推进，跨过零点只产生一次转换；sealer 在 PlayerState 上按已确认顺序提交 Overflow 删除、必要的 `(5,2)` 自动部署和 BattleInput 封存。
+
+## 20. UI-005 正式 HUD 与截图证据边界（2026-07-23）
+
+- `FormalBattleHudUi005` 在既有 `FormalBattleHudRoot` 上建立正式顶部状态栏、玩家 Cost/占位资源区、待部署槽和单位信息面板；它只读取既有 `PlayerState`、`PreparationBattleLoopController`、`StateDrivenDeploymentController` 与 BattleDemo 的状态，不复制玩家状态或重新计算战斗结果。
+- 信息面板选择由统一路由维护：选择待部署槽、已部署单位或战斗敌人会清除另两个来源，避免多个单位面板同时成为权威。面板血条独立于 TASK-007 的世界空间条；`HealthValue` 左上锚定在剩余血条右上，数值超过 9 个字符时缩小字号。
+- 中文字体为 Noto Sans SC normal，数字字体为 Novecento Wide Normal Regular；未确认的赤金、玩家生命和页签业务保持显式占位或禁用。
+- `UI005CaptureSuite` 通过 Player 命令行入口产出固定状态 PNG 与 JSON 清单，便于本地审查。当前清单仅有分辨率、阶段、选择、Cost 和倒计时，尚不是 UI-005 所要求的完整布局 manifest；它只能作为部分视觉证据，不能替代逐图审查和完整 GUI 流程验收。
+- `PreparationBattleLoopController` 是 `FormalBattleHudRoot` 的运行时幂等桥。它等待 UI-002/003 初始化，加载 Player-safe catalog 与固定 `task004a-real-1v1` 的 Away 快照，锁定输入并隐藏 `PreparationUnitViews` 后启动运行时战斗；Completed 时释放 `BattleDemoViews`、恢复准备投影/交互并重置时钟。场景重载通过 `SceneManager.sceneLoaded` 重新附加，且不会创建多个桥。
+- `BattleDemoCoordinator.StartRuntimeBattle` 是固定 Resources 入口之外的加法入口：它接收已验证 `BattleInput + UnitCatalog`，仍由局部 `BattleRunner` 先计算再复用原 Playback 生命周期。正式循环模式会阻止调试 Start/Recalculate 重载固定输入，但保留暂停、速度、观察视角和同一封存结果 Replay。Core 的 HP、死亡和 winner 未回写 PlayerState。
