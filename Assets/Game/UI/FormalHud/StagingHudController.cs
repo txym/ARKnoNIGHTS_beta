@@ -364,12 +364,14 @@ namespace ArknoNights.UI
     // StandaloneInputModule only assigns pointerDrag to an IDragHandler. IBeginDragHandler alone is never invoked.
     internal sealed class StagingSlotView : MonoBehaviour, IBeginDragHandler, IDragHandler
     {
+        private static readonly Dictionary<int, Sprite> raritySprites = new Dictionary<int, Sprite>();
         private readonly Dictionary<int, Image> eliteIcons = new Dictionary<int, Image>();
         private Image background;
         private Image portrait;
         private Image portraitOverlay;
         private Image eliteDecoration;
         private Image eliteHighlight;
+        private Image rarityIcon;
         private Image selectionOverlay;
         private Text countText;
         private RectTransform root;
@@ -405,6 +407,9 @@ namespace ArknoNights.UI
             eliteLevel = stack.EliteLevel;
             portrait.sprite = portraitSprite;
             portrait.enabled = portraitSprite != null;
+            rarityIcon.sprite = LoadRaritySprite(stack.Rarity);
+            rarityIcon.enabled = rarityIcon.sprite != null;
+            if (!rarityIcon.enabled) Debug.LogError("[StagingHud][rarity.icon.missing] rarity=" + stack.Rarity);
             countText.text = "X" + stack.Count;
             var icon = GetComponentInChildren<StagingSlotCostTextMarker>();
             if (icon != null) icon.Text.text = stack.DeploymentCost.ToString();
@@ -462,6 +467,11 @@ namespace ArknoNights.UI
             eliteIconRoot.anchorMax = new Vector2(0f, 0f);
             eliteIconRoot.pivot = Vector2.zero;
             eliteIconRoot.anchoredPosition = new Vector2(portraitSize / 30f, portraitSize / 30f);
+            rarityIcon.rectTransform.anchorMin = new Vector2(1f, 1f);
+            rarityIcon.rectTransform.anchorMax = new Vector2(1f, 1f);
+            rarityIcon.rectTransform.pivot = new Vector2(1f, 1f);
+            rarityIcon.rectTransform.anchoredPosition = new Vector2(-portraitSize / 30f, -portraitSize / 30f);
+            rarityIcon.rectTransform.sizeDelta = new Vector2(portraitSize * .25f, portraitSize * .25f);
             countText.rectTransform.anchorMin = new Vector2(1f, 0f);
             countText.rectTransform.anchorMax = new Vector2(1f, 0f);
             countText.rectTransform.pivot = new Vector2(1f, 0f);
@@ -479,6 +489,7 @@ namespace ArknoNights.UI
             portrait = StagingHudController.CreateImage("Portrait", portraitClip, null);
             portraitOverlay = StagingHudController.CreateImage("PortraitOverlay", transform, Sprite(sprites, "StagingSlotPortraitOverlay"));
             portraitOverlay.preserveAspect = false;
+            rarityIcon = StagingHudController.CreateImage("RarityIcon", transform, null);
             eliteDecoration = StagingHudController.CreateImage("Elite1Decoration", transform, Sprite(sprites, "StagingSlotElite1Decoration"));
             eliteDecoration.preserveAspect = false;
             eliteHighlight = StagingHudController.CreateImage("Elite2PlusHighlight", transform, Sprite(sprites, "StagingSlotElite2PlusHighlight"));
@@ -543,6 +554,15 @@ namespace ArknoNights.UI
             if (sprites.TryGetValue(name, out var sprite)) return sprite;
             Debug.LogError("[StagingHud][sprite.missing] " + name);
             return null;
+        }
+
+        private static Sprite LoadRaritySprite(int rarity)
+        {
+            if (raritySprites.TryGetValue(rarity, out var cached)) return cached;
+            var texture = Resources.Load<Texture2D>("UI/Texture/UnitRarity" + rarity + "Icon");
+            var sprite = texture == null ? null : UnityEngine.Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+            raritySprites[rarity] = sprite;
+            return sprite;
         }
     }
 

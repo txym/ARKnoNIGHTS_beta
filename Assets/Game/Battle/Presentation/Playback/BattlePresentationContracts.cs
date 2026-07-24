@@ -40,7 +40,7 @@ namespace ArknoNights.Battle.Presentation
 
     public sealed class BattlePresentationViewState
     {
-        internal BattlePresentationViewState(string unitId, string typeId, BattleSide side, FixedPosition position, int hitPoints, bool isAlive)
+        internal BattlePresentationViewState(string unitId, string typeId, BattleSide side, FixedPosition position, int hitPoints, bool isAlive, int eliteLevel)
         {
             UnitId = unitId;
             TypeId = typeId;
@@ -48,6 +48,7 @@ namespace ArknoNights.Battle.Presentation
             Position = position;
             HitPoints = hitPoints;
             IsAlive = isAlive;
+            EliteLevel = eliteLevel;
         }
 
         public string UnitId { get; }
@@ -56,5 +57,6 @@ namespace ArknoNights.Battle.Presentation
         public FixedPosition Position { get; }
         public int HitPoints { get; }
         public bool IsAlive { get; }
+        public int EliteLevel { get; }
     }
 }

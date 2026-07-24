@@ -174,7 +174,8 @@ namespace ArknoNights.Battle.Demo
                 // The runner is deliberately a local value: presentation receives only the completed result.
                 result = new BattleRunner(input).RunToCompletion();
                 playback = new BattleEventPlaybackController();
-                if (!playback.Load(result, factory, out var diagnostics)) return Fail("presentation.load.failed", Join(diagnostics));
+                var eliteLevels = input.Players.SelectMany(player => player.Units).ToDictionary(unit => unit.UnitId, unit => unit.EliteLevel, StringComparer.Ordinal);
+                if (!playback.Load(result, factory, eliteLevels, out var diagnostics)) return Fail("presentation.load.failed", Join(diagnostics));
                 playback.SetObserver(observer);
                 playback.SetPlaybackSpeed(speed);
                 State = BattleDemoState.Ready;

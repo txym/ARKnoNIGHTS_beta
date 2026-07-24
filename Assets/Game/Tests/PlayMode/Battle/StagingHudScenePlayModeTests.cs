@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using System.Reflection;
 using ArknoNights.UI;
 using NUnit.Framework;
@@ -37,6 +38,7 @@ namespace ArknoNights.Battle.Tests
             var firstSlot = canvas.Find("StagingArea/StagingSlot");
             var portraitSize = firstSlot.Find("PortraitClip/Portrait").GetComponent<RectTransform>().rect.width;
             Assert.That(firstSlot.Find("EliteIcon").GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(portraitSize / 30f, portraitSize / 30f)));
+            Assert.NotNull(firstSlot.Find("RarityIcon").GetComponent<Image>().sprite, "Every staging stack must render the catalog-provided rarity icon.");
 
             hud.ToggleSelection(StagingHudController.BuildSlotId(hud.Snapshot.StagingSlots[0]));
             yield return null;
@@ -50,6 +52,10 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(24, information.Find("HealthValue/Text").GetComponent<Text>().fontSize);
             Assert.That(information.Find("HealthValue/Text").GetComponent<RectTransform>().offsetMax.y, Is.EqualTo(-5f).Within(0.01f));
             Assert.IsFalse(information.Find("HealthValue/Text").GetComponent<Text>().text.Contains(" "));
+            Assert.AreEqual("--", information.Find("UnitName").GetComponent<Text>().text, "An empty Chinese display name must not fall back to a resource key.");
+            Assert.NotNull(information.Find("Rarity").GetComponent<Image>().sprite);
+            Assert.NotNull(information.Find("Elite").GetComponent<Image>().sprite);
+            Assert.AreEqual(8, information.Cast<Transform>().Count(child => child.name.StartsWith("Stat_")));
             Assert.That(canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color, Is.EqualTo(new Color(1f, .47058824f, .47058824f)));
             Assert.IsTrue(information.Find("Tab_技能").GetComponent<Text>().text.Contains("未接入"));
         }

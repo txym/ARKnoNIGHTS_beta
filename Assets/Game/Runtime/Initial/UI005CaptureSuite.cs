@@ -4,7 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ArknoNights.Battle.Core;
+using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Deployment;
+using ArknoNights.Details;
+using ArknoNights.Round;
 using ArknoNights.UI;
 using UnityEngine;
 
@@ -99,8 +102,33 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         }
         Destroy(probe);
         if (!valid) { Fail("screenshot.invalid:" + name); yield break; }
-        captures.Add(new CaptureRecord { name = name, path = path, width = capturedWidth, height = capturedHeight, phase = phase, selectedUnitId = selectedUnitId ?? string.Empty, cost = hud.PlayerState.DeploymentCost, remainingPreparationSeconds = loop.RemainingPreparationSeconds });
+        var detail = ResolveDetail(selectedUnitId);
+        var panel = hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/UnitInformationPanel") as RectTransform;
+        captures.Add(new CaptureRecord
+        {
+            name = name, path = path, width = capturedWidth, height = capturedHeight, phase = phase,
+            selectedUnitId = selectedUnitId ?? string.Empty, cost = hud.PlayerState.DeploymentCost,
+            remainingPreparationSeconds = loop.RemainingPreparationSeconds,
+            source = detail == null ? string.Empty : (loop.Phase == LocalBattlePhase.Battle ? "sealed-battle-input+presentation" : "player-state"),
+            typeId = detail?.TypeId ?? string.Empty, displayNameConfigured = detail != null && !string.IsNullOrWhiteSpace(detail.DisplayNameZhHans),
+            rarity = detail?.Rarity ?? 0, eliteLevel = detail?.EliteLevel ?? -1, currentHitPoints = detail?.CurrentHitPoints ?? 0,
+            maxHitPoints = detail?.MaxHitPoints ?? 0, values = detail == null ? Array.Empty<string>() : new[] { detail.MaxHitPoints.ToString(), Detail(detail.MoveSpeedCentimetresPerSecond), Detail(detail.Attack), Detail(detail.AttackIntervalTicks), Detail(detail.Defense), Detail(detail.MagicResistance), detail.BlockCapacity.ToString(), detail.DeploymentCost.ToString(), detail.LifeDeduct.ToString() },
+            informationPanelWidth = panel == null ? 0f : panel.rect.width, informationPanelHeight = panel == null ? 0f : panel.rect.height
+        });
     }
+
+    private UnitDetailSnapshot ResolveDetail(string unitId)
+    {
+        if (string.IsNullOrEmpty(unitId)) return null;
+        var catalogLoad = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
+        if (!catalogLoad.Success) return null;
+        var input = FindObjectOfType<BattleDemoController>()?.Coordinator?.Input;
+        var states = FindObjectOfType<BattleDemoController>()?.Coordinator?.PresentationViewStates;
+        if (loop.Phase == LocalBattlePhase.Battle && input != null && UnitDetailResolver.TryResolveBattle(input, states, catalogLoad.Catalog, unitId, out var battleDetail)) return battleDetail;
+        return UnitDetailResolver.TryResolvePreparation(hud.Snapshot, catalogLoad.Catalog, unitId, out var preparationDetail) ? preparationDetail : null;
+    }
+
+    private static string Detail(int? value) => value.HasValue ? value.Value.ToString() : "--";
 
     private static IEnumerator SetResolution(int width, int height)
     {
@@ -113,7 +141,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
     private void Fail(string detail) { Debug.LogError("[UI-005][capture.failed] " + detail, this); Application.Quit(1); }
     private static string CommandLineValue(string flag) { var args = Environment.GetCommandLineArgs(); for (var index = 0; index + 1 < args.Length; index++) if (args[index] == flag) return args[index + 1]; return null; }
     [Serializable] private sealed class CaptureManifest { public CaptureRecord[] captures; }
-    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public string phase; public string selectedUnitId; public int cost; public float remainingPreparationSeconds; }
+    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public string phase; public string selectedUnitId; public int cost; public float remainingPreparationSeconds; public string source; public string typeId; public bool displayNameConfigured; public int rarity; public int eliteLevel; public int currentHitPoints; public int maxHitPoints; public string[] values; public float informationPanelWidth; public float informationPanelHeight; }
 }
 
 internal static class UI005CaptureSuiteBootstrap

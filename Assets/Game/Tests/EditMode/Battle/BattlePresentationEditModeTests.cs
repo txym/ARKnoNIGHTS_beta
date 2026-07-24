@@ -55,6 +55,24 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void Playback_ExposesSealedEliteMetadataWithoutChangingEventPlayback()
+        {
+            var result = RunFixture();
+            var factory = new FakeFactory();
+            var eliteLevels = new Dictionary<string, int> { { "home-1", 2 }, { "away-1", 3 } };
+            using (var playback = new BattleEventPlaybackController())
+            {
+                Assert.IsTrue(playback.Load(result, factory, eliteLevels, out var diagnostics), string.Join(";", diagnostics));
+                Assert.AreEqual(2, playback.ViewStates.Single(item => item.UnitId == "home-1").EliteLevel);
+                Assert.AreEqual(3, playback.ViewStates.Single(item => item.UnitId == "away-1").EliteLevel);
+                playback.Play();
+                playback.Advance(10f);
+                Assert.AreEqual(2, playback.ViewStates.Single(item => item.UnitId == "home-1").EliteLevel);
+                Assert.AreEqual(3, playback.ViewStates.Single(item => item.UnitId == "away-1").EliteLevel);
+            }
+        }
+
+        [Test]
         public void Playback_InterpolatesMoveAndAwayObserverOnlyChangesProjection()
         {
             var factory = new FakeFactory();

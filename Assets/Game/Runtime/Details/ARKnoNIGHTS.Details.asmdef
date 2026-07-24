@@ -1,0 +1,19 @@
+{
+  "name": "ARKnoNIGHTS.Details",
+  "rootNamespace": "ArknoNights.Details",
+  "references": [
+    "ARKnoNIGHTS.Battle.Core",
+    "ARKnoNIGHTS.Battle.Infrastructure",
+    "ARKnoNIGHTS.Battle.Presentation",
+    "ARKnoNIGHTS.PlayerState"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

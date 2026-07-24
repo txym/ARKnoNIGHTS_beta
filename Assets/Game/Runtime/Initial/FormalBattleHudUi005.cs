@@ -7,6 +7,7 @@ using ArknoNights.Battle.Demo;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Battle.Presentation;
 using ArknoNights.Deployment;
+using ArknoNights.Details;
 using ArknoNights.Player;
 using ArknoNights.Round;
 using ArknoNights.UI;
@@ -26,6 +27,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private const string ClockPath = "UI/Texture/BattleStatusPanelClockIcon_Transparent";
     private const string GoldIconPath = "UI/Texture/round_sources_icon";
     private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+    private readonly Dictionary<int, Sprite> raritySprites = new Dictionary<int, Sprite>();
     private StagingHudController hud;
     private StateDrivenDeploymentController deployment;
     private PreparationBattleLoopController loop;
@@ -34,8 +36,13 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private RectTransform root;
     private RectTransform infoPanel;
     private Image portrait;
+    private Image rarityIcon;
+    private Image eliteIcon;
     private Text unitName;
-    private Text elite;
+    private Text combatSummary;
+    private Text targetValue;
+    private readonly Dictionary<string, Text> statValues = new Dictionary<string, Text>(StringComparer.Ordinal);
+    private readonly HashSet<string> reportedDetailDiagnostics = new HashSet<string>(StringComparer.Ordinal);
     private Image hpFill;
     private RectTransform hpValueRoot;
     private Text hpValue;
@@ -145,6 +152,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private void Build()
     {
         foreach (var sprite in Resources.LoadAll<Sprite>(AtlasPath)) if (sprite != null) sprites[sprite.name] = sprite;
+        foreach (var sprite in Resources.LoadAll<Sprite>("UI/Texture/unit_panal")) if (sprite != null) sprites[sprite.name] = sprite;
         var canvas = GetComponentInChildren<Canvas>();
         if (canvas == null) { Debug.LogError("[UI-005][canvas.missing]", this); return; }
         root = Rect("FormalHudUi005", canvas.transform);
@@ -198,8 +206,22 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         var upper = Image("UpperBackground", infoPanel, Sprite("UnitInformationPanelUpperBackground")); upper.rectTransform.anchorMin = new Vector2(0f, .475f); upper.rectTransform.anchorMax = Vector2.one; upper.rectTransform.offsetMin = upper.rectTransform.offsetMax = Vector2.zero; upper.preserveAspect = false;
         var lower = Image("LowerBackground", infoPanel, Sprite("UnitInformationPanelLowerBackground")); lower.rectTransform.anchorMin = Vector2.zero; lower.rectTransform.anchorMax = new Vector2(1f, .475f); lower.rectTransform.offsetMin = lower.rectTransform.offsetMax = Vector2.zero; lower.preserveAspect = false;
         portrait = Image("Portrait", infoPanel, null); Position(portrait.rectTransform, .2f, .79f, 180f, 180f); portrait.preserveAspect = true;
-        unitName = Text("UnitName", infoPanel, 25, TextAnchor.MiddleLeft, Color.white); Position(unitName.rectTransform, .48f, .86f, 320f, 45f);
-        elite = Text("Elite", infoPanel, 18, TextAnchor.MiddleLeft, new Color(.95f, .82f, .3f)); Position(elite.rectTransform, .48f, .8f, 320f, 38f);
+        rarityIcon = Image("Rarity", infoPanel, null); Position(rarityIcon.rectTransform, .27f, .86f, 45f, 45f); rarityIcon.preserveAspect = true;
+        eliteIcon = Image("Elite", infoPanel, null); Position(eliteIcon.rectTransform, .27f, .71f, 48f, 40f); eliteIcon.preserveAspect = true;
+        unitName = Text("UnitName", infoPanel, 28, TextAnchor.MiddleLeft, Color.white); Position(unitName.rectTransform, .48f, .88f, 320f, 45f);
+        combatSummary = Text("CombatSummary", infoPanel, 20, TextAnchor.MiddleLeft, new Color(.8f, .8f, .8f)); Position(combatSummary.rectTransform, .48f, .835f, 320f, 34f);
+        var target = Rect("TargetValue", infoPanel); Position(target, .2f, .655f, 180f, 42f);
+        var targetBack = Image("Background", target, Sprite("UnitInformationPanelStatEntryBackground")); Stretch(targetBack.rectTransform); targetBack.preserveAspect = false;
+        var targetIcon = Image("Icon", target, Sprite("UnitInformationPanelTargetValueIcon")); Position(targetIcon.rectTransform, .14f, .5f, 28f, 28f);
+        targetValue = NumberText("Value", target, 23, TextAnchor.MiddleRight, Color.white); Position(targetValue.rectTransform, .64f, .5f, 105f, 34f);
+        AddStat("maxHp", "\u751f\u547d\u503c", .48f, .765f);
+        AddStat("moveSpeed", "\u79fb\u52a8\u901f\u5ea6", .76f, .765f);
+        AddStat("attack", "\u653b\u51fb\u529b", .48f, .70f);
+        AddStat("attackInterval", "\u653b\u51fb\u95f4\u9694", .76f, .70f);
+        AddStat("defense", "\u9632\u5fa1\u529b", .48f, .635f);
+        AddStat("magicResistance", "\u6cd5\u672f\u6297\u6027", .76f, .635f);
+        AddStat("block", "\u963b\u6321\u6570", .48f, .57f);
+        AddStat("deploymentCost", "\u90e8\u7f72\u8d39\u7528", .76f, .57f);
         // Fig. 2–4 use the native 556×12 bar and place it at the lower edge of the unit overview.
         var hpBack = Image("HealthBackground", infoPanel, Sprite("UnitInformationPanelHealthBarBackground")); hpBack.rectTransform.anchorMin = hpBack.rectTransform.anchorMax = new Vector2(0f, 1f); hpBack.rectTransform.pivot = new Vector2(0f, 1f); hpBack.rectTransform.anchoredPosition = new Vector2(0f, -490f); hpBack.rectTransform.sizeDelta = new Vector2(556f, 12f); hpBack.preserveAspect = false;
         hpFill = Image("HealthFill", hpBack.rectTransform, Sprite("UnitInformationPanelHealthBarFill")); hpFill.rectTransform.anchorMin = hpFill.rectTransform.anchorMax = new Vector2(0f, .5f); hpFill.rectTransform.pivot = new Vector2(0f, .5f); hpFill.rectTransform.sizeDelta = new Vector2(556f, 12f); hpFill.preserveAspect = false;
@@ -238,6 +260,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         RefreshInformation();
     }
 
+    #if false // Replaced by the unit-detail projection below; retained only until the next source cleanup pass.
     private void RefreshInformation()
     {
         if (string.IsNullOrEmpty(selectedUnitId)) { if (infoPanel) infoPanel.gameObject.SetActive(false); return; }
@@ -280,6 +303,71 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         var valueText = Mathf.Clamp(currentHp, 0, maxHp) + "/" + maxHp;
         hpValue.fontSize = valueText.Length > 9 ? 20 : 24;
         hpValue.text = valueText;
+    }
+
+    #endif
+
+    private void RefreshInformation()
+    {
+        if (!TryResolveSelectedDetail(out var detail)) { ClearSelection(); return; }
+        infoPanel.gameObject.SetActive(true);
+        foreach (var diagnostic in detail.Diagnostics)
+            if (reportedDetailDiagnostics.Add(diagnostic)) Debug.LogWarning("[UI-INFO-001][" + diagnostic + "]", this);
+        portrait.sprite = Resources.Load<Sprite>(detail.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
+        rarityIcon.sprite = LoadRaritySprite(detail.Rarity); rarityIcon.enabled = rarityIcon.sprite != null;
+        eliteIcon.sprite = Sprite("StagingSlotElite" + detail.EliteLevel + "Icon"); eliteIcon.enabled = eliteIcon.sprite != null;
+        unitName.text = string.IsNullOrWhiteSpace(detail.DisplayNameZhHans) ? "--" : detail.DisplayNameZhHans;
+        combatSummary.text = AttackMethodText(detail.AttackMethod) + "  " + DamageTypeText(detail.DamageType);
+        targetValue.text = detail.LifeDeduct.ToString();
+        SetStat("maxHp", UnitDetailNumberFormatter.Value(detail.MaxHitPoints));
+        SetStat("moveSpeed", DetailValue(detail.MoveSpeedCentimetresPerSecond, UnitDetailNumberFormatter.MoveSpeed));
+        SetStat("attack", DetailValue(detail.Attack, UnitDetailNumberFormatter.Value));
+        SetStat("attackInterval", DetailValue(detail.AttackIntervalTicks, UnitDetailNumberFormatter.AttackInterval));
+        SetStat("defense", DetailValue(detail.Defense, UnitDetailNumberFormatter.Value));
+        SetStat("magicResistance", DetailValue(detail.MagicResistance, UnitDetailNumberFormatter.Value));
+        SetStat("block", UnitDetailNumberFormatter.Value(detail.BlockCapacity));
+        SetStat("deploymentCost", UnitDetailNumberFormatter.Value(detail.DeploymentCost));
+        var ratio = detail.MaxHitPoints <= 0 ? 0f : Mathf.Clamp01((float)detail.CurrentHitPoints / detail.MaxHitPoints);
+        hpFill.rectTransform.sizeDelta = new Vector2(556f * ratio, 12f);
+        hpValueRoot.anchoredPosition = new Vector2(556f * ratio, -490f);
+        var valueText = Mathf.Clamp(detail.CurrentHitPoints, 0, detail.MaxHitPoints) + "/" + detail.MaxHitPoints;
+        hpValue.fontSize = valueText.Length > 9 ? 20 : 24;
+        hpValue.text = valueText;
+    }
+
+    private bool TryResolveSelectedDetail(out UnitDetailSnapshot detail)
+    {
+        detail = null;
+        if (string.IsNullOrEmpty(selectedUnitId)) return false;
+        var localUnit = hud?.Snapshot?.Units.FirstOrDefault(item => item.UnitId == selectedUnitId);
+        if (loop.Phase == LocalBattlePhase.Battle && (selectedBattleEnemy || localUnit == null || localUnit.Zone != PlayerUnitZone.Staging))
+        {
+            var input = demo.Coordinator?.Input;
+            return input != null && UnitDetailResolver.TryResolveBattle(input, demo.Coordinator.PresentationViewStates, catalog, selectedUnitId, out detail);
+        }
+        return hud?.Snapshot != null && UnitDetailResolver.TryResolvePreparation(hud.Snapshot, catalog, selectedUnitId, out detail);
+    }
+
+    private void AddStat(string key, string label, float x, float y)
+    {
+        var entry = Rect("Stat_" + key, infoPanel); Position(entry, x, y, 190f, 40f);
+        var background = Image("Background", entry, Sprite("UnitInformationPanelStatEntryBackground")); Stretch(background.rectTransform); background.preserveAspect = false;
+        var labelText = Text("Label", entry, 16, TextAnchor.MiddleLeft, new Color(.74f, .74f, .74f)); Position(labelText.rectTransform, .08f, .5f, 105f, 32f); labelText.text = label;
+        var value = NumberText("Value", entry, 20, TextAnchor.MiddleRight, Color.white); Position(value.rectTransform, .77f, .5f, 74f, 32f);
+        statValues.Add(key, value);
+    }
+
+    private void SetStat(string key, string value) { if (statValues.TryGetValue(key, out var target)) target.text = value; }
+    private static string DetailValue(int? value, Func<int, string> format) => value.HasValue ? format(value.Value) : "--";
+    private static string AttackMethodText(AttackMethod method) => method == AttackMethod.Ranged ? "\u8fdc\u7a0b" : "\u8fd1\u6218";
+    private static string DamageTypeText(DamageType type) => type == DamageType.Magic ? "\u6cd5\u672f" : type == DamageType.True ? "\u771f\u5b9e" : "\u7269\u7406";
+    private Sprite LoadRaritySprite(int rarity)
+    {
+        if (raritySprites.TryGetValue(rarity, out var cached)) return cached;
+        var texture = Resources.Load<Texture2D>("UI/Texture/UnitRarity" + rarity + "Icon");
+        var sprite = texture == null ? null : UnityEngine.Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+        raritySprites[rarity] = sprite;
+        return sprite;
     }
 
     private Sprite Sprite(string name) { sprites.TryGetValue(name, out var sprite); return sprite; }

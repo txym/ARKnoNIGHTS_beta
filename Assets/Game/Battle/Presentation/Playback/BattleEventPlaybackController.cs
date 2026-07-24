@@ -22,6 +22,7 @@ namespace ArknoNights.Battle.Presentation
         private int nextEventIndex;
         private float displayTicks;
         private bool hasValidatedCompletion;
+        private IReadOnlyDictionary<string, int> eliteLevels = new Dictionary<string, int>(StringComparer.Ordinal);
 
         public BattleEventPlaybackController(BattlefieldWorldProjection projection = null)
         {
@@ -41,9 +42,15 @@ namespace ArknoNights.Battle.Presentation
 
         public bool Load(BattleRunResult source, IBattlePresentationViewFactory viewFactory, out IReadOnlyList<BattlePresentationDiagnostic> loadDiagnostics)
         {
+            return Load(source, viewFactory, null, out loadDiagnostics);
+        }
+
+        public bool Load(BattleRunResult source, IBattlePresentationViewFactory viewFactory, IReadOnlyDictionary<string, int> sourceEliteLevels, out IReadOnlyList<BattlePresentationDiagnostic> loadDiagnostics)
+        {
             StopAndClear();
             result = source;
             factory = viewFactory;
+            eliteLevels = sourceEliteLevels ?? new Dictionary<string, int>(StringComparer.Ordinal);
             if (source == null) AddDiagnostic("result.missing", "A completed BattleRunResult is required.");
             if (viewFactory == null) AddDiagnostic("viewFactory.missing", "A presentation view factory is required.");
             if (diagnostics.Count == 0)
@@ -184,7 +191,8 @@ namespace ArknoNights.Battle.Presentation
                         diagnostics.Add(createDiagnostic ?? new BattlePresentationDiagnostic("view.create.failed", "No view was created for type " + item.UnitTypeId + ".", item.Tick, item.Sequence));
                         return false;
                     }
-                    var record = new ViewRecord(item.UnitId, item.UnitTypeId, item.UnitSide.Value, item.ToPosition.Value, item.HitPointsAfter, created);
+                    eliteLevels.TryGetValue(item.UnitId, out var eliteLevel);
+                    var record = new ViewRecord(item.UnitId, item.UnitTypeId, item.UnitSide.Value, item.ToPosition.Value, item.HitPointsAfter, eliteLevel, created);
                     views.Add(item.UnitId, record);
                     foreach (var move in events.Where(candidate => candidate.Type == BattleEventType.Move && string.Equals(candidate.UnitId, item.UnitId, StringComparison.Ordinal) && candidate.FromPosition.HasValue && candidate.ToPosition.HasValue))
                         record.AddMove(move.Tick, move.FromPosition.Value, move.ToPosition.Value);
@@ -306,12 +314,13 @@ namespace ArknoNights.Battle.Presentation
         private sealed class ViewRecord
         {
             private readonly List<MoveSegment> moves = new List<MoveSegment>();
-            public ViewRecord(string unitId, string typeId, BattleSide side, FixedPosition initialPosition, int hitPoints, IBattlePresentationView view) { UnitId = unitId; TypeId = typeId; Side = side; InitialPosition = initialPosition; HitPoints = hitPoints; View = view; }
+            public ViewRecord(string unitId, string typeId, BattleSide side, FixedPosition initialPosition, int hitPoints, int eliteLevel, IBattlePresentationView view) { UnitId = unitId; TypeId = typeId; Side = side; InitialPosition = initialPosition; HitPoints = hitPoints; EliteLevel = eliteLevel; View = view; }
             public string UnitId { get; }
             public string TypeId { get; }
             public BattleSide Side { get; }
             public FixedPosition InitialPosition { get; }
             public IBattlePresentationView View { get; }
+            public int EliteLevel { get; }
             public bool IsAlive { get; set; } = true;
             public int HitPoints { get; set; }
             private int lastMoveEventTick = int.MinValue;
@@ -376,7 +385,7 @@ namespace ArknoNights.Battle.Presentation
                 tick = lastAttackFacingTick;
                 return tick != int.MinValue && tick <= Mathf.FloorToInt(currentTicks);
             }
-            public BattlePresentationViewState ToState() => new BattlePresentationViewState(UnitId, TypeId, Side, PositionAt(float.MaxValue), HitPoints, IsAlive);
+            public BattlePresentationViewState ToState() => new BattlePresentationViewState(UnitId, TypeId, Side, PositionAt(float.MaxValue), HitPoints, IsAlive, EliteLevel);
         }
 
         private readonly struct MoveSegment { public MoveSegment(int tick, FixedPosition from, FixedPosition to) { Tick = tick; From = from; To = to; } public int Tick { get; } public FixedPosition From { get; } public FixedPosition To { get; } }

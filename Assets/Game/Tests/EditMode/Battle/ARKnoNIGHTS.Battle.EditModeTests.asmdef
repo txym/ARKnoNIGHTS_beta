@@ -8,7 +8,8 @@
     "ARKnoNIGHTS.Battle.Demo",
     "ARKnoNIGHTS.PlayerState",
     "ARKnoNIGHTS.Round",
-    "ARKnoNIGHTS.UI"
+    "ARKnoNIGHTS.UI",
+    "ARKnoNIGHTS.Details"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
