@@ -505,6 +505,12 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 
 ## 13. UNIT-DATA-001 单位源数据契约（2026-07-23）
 
+## 14. UI-INFO-001 单位详情投影（2026-07-24）
+
+- 准备阶段由本地 PlayerState 与独立临时敌方 PlayerState 一起封存；任意跨方 unitId 冲突都会中止并提供可定位诊断。
+- eliteLevel 仅作为实例表现元数据穿过 PlayerState、BattleInput 与 Presentation，不参与战斗数值或胜负。
+- UnitInformationPanel 只读取 UnitDetailSnapshot：名称未配置显示 `--`；未结算 Buff 的六项动态属性显示 `--`，不猜测 Buff 效果。
+
 - 两个真实源文件使用 `unit-source-v1`，按身份与文本、养成与费用、行为分类、战斗数值、阻挡/价值/能力、资源与动画的顺序定义 lower camel case 字段。`resourceKey` 仅用于技术资源查找；`displayNameZhHans` 与 `skillDescriptionZhHans` 是独立的玩家可见简体中文字段。
 - 当前两个中文文本字段均为空，表示等待配置；显示名为空时不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`initialEliteLevel` 必须为 `0..3`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。
 - 源 JSON 是唯一权威。Editor 将它确定性生成 Player-safe `unit-catalog-v1`；Player 再从目录读取资源键、中文文本、稀有度、目标价值以及既有战斗/表现字段。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。

@@ -266,6 +266,10 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 ## 20. UI-005 正式 HUD 与截图证据边界（2026-07-23）
 
+## 21. UI-INFO-001 详情投影边界（2026-07-24）
+
+数据单向流为 `PlayerStateSnapshot -> BattleInput -> PresentationViewState -> UnitDetailResolver -> FormalBattleHudUi005`。`ARKnoNIGHTS.Details` 承载不可变详情 DTO 和解析器，Core 不反向依赖该程序集。
+
 - `FormalBattleHudUi005` 在既有 `FormalBattleHudRoot` 上建立正式顶部状态栏、玩家 Cost/占位资源区、待部署槽和单位信息面板；它只读取既有 `PlayerState`、`PreparationBattleLoopController`、`StateDrivenDeploymentController` 与 BattleDemo 的状态，不复制玩家状态或重新计算战斗结果。
 - 信息面板选择由统一路由维护：选择待部署槽、已部署单位或战斗敌人会清除另两个来源，避免多个单位面板同时成为权威。面板血条独立于 TASK-007 的世界空间条；`HealthValue` 左上锚定在剩余血条右上，数值超过 9 个字符时缩小字号。
 - 中文字体为 Noto Sans SC normal，数字字体为 Novecento Wide Normal Regular；未确认的赤金、玩家生命和页签业务保持显式占位或禁用。

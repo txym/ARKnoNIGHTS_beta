@@ -483,6 +483,12 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 
 ## 31. PREP-DEPLOY 已部署单位拖动时隐藏选择框（2026-07-24）
 
+## 32. UI-INFO-001 验证（2026-07-24）
+
+- Focused EditMode：42 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135249/EditModeResults.xml`。
+- Focused PlayMode：10 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135337/PlayModeResults.xml`。
+- Windows Player 构建、capture suite 运行与人工视觉比对尚未执行。
+
 - TDD 红灯：`Temp/PREP-DEPLOY-001-indicator/red/PlayModeResults.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 `9` 项、通过 `6`、失败 `3`、跳过 `0`。三个失败均为新断言：开始已选中单位的重定位后 `DeployedUnitSelectionIndicator.activeSelf` 仍为 `true`，证实测试捕获的是本次需求缺口。
 - 定向 PlayMode：`Temp/PREP-DEPLOY-001-indicator/green-review/PlayModeResults.xml`，同一筛选共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。覆盖拖动开始隐藏选择框、成功换位与同格 no-op 后恢复、门格失败后恢复、UI 上松手与失焦取消后恢复，以及交互锁仍清除选择框。
 - Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001-indicator\compile-final.log` 退出码 `0`；日志含 `Tundra build success` 并以 `Exiting batchmode successfully now!` 结束，未发现 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
