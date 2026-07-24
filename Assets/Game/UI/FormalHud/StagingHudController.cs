@@ -467,10 +467,10 @@ namespace ArknoNights.UI
             eliteIconRoot.anchorMax = new Vector2(0f, 0f);
             eliteIconRoot.pivot = Vector2.zero;
             eliteIconRoot.anchoredPosition = new Vector2(portraitSize / 30f, portraitSize / 30f);
-            rarityIcon.rectTransform.anchorMin = new Vector2(1f, 1f);
-            rarityIcon.rectTransform.anchorMax = new Vector2(1f, 1f);
-            rarityIcon.rectTransform.pivot = new Vector2(1f, 1f);
-            rarityIcon.rectTransform.anchoredPosition = new Vector2(-portraitSize / 30f, -portraitSize / 30f);
+            rarityIcon.rectTransform.anchorMin = new Vector2(0f, 1f);
+            rarityIcon.rectTransform.anchorMax = new Vector2(0f, 1f);
+            rarityIcon.rectTransform.pivot = new Vector2(0f, 1f);
+            rarityIcon.rectTransform.anchoredPosition = Vector2.zero;
             rarityIcon.rectTransform.sizeDelta = new Vector2(portraitSize * .25f, portraitSize * .25f);
             countText.rectTransform.anchorMin = new Vector2(1f, 0f);
             countText.rectTransform.anchorMax = new Vector2(1f, 0f);
@@ -489,7 +489,7 @@ namespace ArknoNights.UI
             portrait = StagingHudController.CreateImage("Portrait", portraitClip, null);
             portraitOverlay = StagingHudController.CreateImage("PortraitOverlay", transform, Sprite(sprites, "StagingSlotPortraitOverlay"));
             portraitOverlay.preserveAspect = false;
-            rarityIcon = StagingHudController.CreateImage("RarityIcon", transform, null);
+            rarityIcon = StagingHudController.CreateImage("RarityIcon", portrait.rectTransform, null);
             eliteDecoration = StagingHudController.CreateImage("Elite1Decoration", transform, Sprite(sprites, "StagingSlotElite1Decoration"));
             eliteDecoration.preserveAspect = false;
             eliteHighlight = StagingHudController.CreateImage("Elite2PlusHighlight", transform, Sprite(sprites, "StagingSlotElite2PlusHighlight"));
