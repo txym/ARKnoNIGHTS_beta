@@ -480,3 +480,10 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - Windows Standalone：`Task006StandaloneBuild.BuildWindowsX64` 输出 `Temp/PREP-DEPLOY-001/final2/WindowsStandalone/ARKnoNIGHTS.exe`，构建摘要为 `result=Succeeded`、`errors=0`、`warnings=1`、总大小 `165411244` 字节。
 - 结果保留说明：上述测试脚本均在 XML 首次完整写入、确认测试数大于零后立即解析并输出结果；随后 Unity 的 AssetDatabase 清理了这些 `Temp/PREP-DEPLOY-001` 短生命周期 XML。因此计数以本轮脚本的当场结构化解析输出为准，未将已清理文件视为持续可用证据。
 - 未验证：当前无可靠的交互式 Unity Editor/Player GUI 驱动，未手工执行第一次点击、真实鼠标阈值拖动、空格移动、两单位交换、门格失败及战斗后返回准备的视觉流程；也未在生成的 Windows Player 内人工验收。自动断言不替代这些视觉/手势检查。
+
+## 31. PREP-DEPLOY 已部署单位拖动时隐藏选择框（2026-07-24）
+
+- TDD 红灯：`Temp/PREP-DEPLOY-001-indicator/red/PlayModeResults.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 `9` 项、通过 `6`、失败 `3`、跳过 `0`。三个失败均为新断言：开始已选中单位的重定位后 `DeployedUnitSelectionIndicator.activeSelf` 仍为 `true`，证实测试捕获的是本次需求缺口。
+- 定向 PlayMode：`Temp/PREP-DEPLOY-001-indicator/green-review/PlayModeResults.xml`，同一筛选共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。覆盖拖动开始隐藏选择框、成功换位与同格 no-op 后恢复、门格失败后恢复、UI 上松手与失焦取消后恢复，以及交互锁仍清除选择框。
+- Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001-indicator\compile-final.log` 退出码 `0`；日志含 `Tundra build success` 并以 `Exiting batchmode successfully now!` 结束，未发现 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
+- 未验证：无可靠的交互式 Unity Editor/Player GUI 驱动，尚未以真实鼠标拖动目视检查隐藏和恢复的逐帧表现；自动场景断言验证的是实际控制器生命周期而非人工视觉体验。

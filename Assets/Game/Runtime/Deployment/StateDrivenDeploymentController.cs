@@ -122,7 +122,7 @@ namespace ArknoNights.Deployment
         /// <summary>UI-004 keeps preparation projections separate from BattleDemoViews without changing PlayerState.</summary>
         public void SetPreparationViewsVisible(bool visible)
         {
-            if (!visible) CancelDrag("preparation.views.hidden");
+            if (!visible) CancelDrag("preparation.views.hidden", false);
             if (viewCoordinator != null) viewCoordinator.gameObject.SetActive(visible);
         }
 
@@ -206,7 +206,7 @@ namespace ArknoNights.Deployment
 
         private void OnDisable()
         {
-            CancelDrag("controller.disabled");
+            CancelDrag("controller.disabled", false);
             ClearSelection();
         }
 
@@ -221,7 +221,7 @@ namespace ArknoNights.Deployment
             interactionEnabled = enabled;
             if (!enabled)
             {
-                CancelDrag("interaction.locked");
+                CancelDrag("interaction.locked", false);
                 ClearSelection();
                 State = PreparationInteractionState.Disabled;
                 return;
@@ -339,7 +339,6 @@ namespace ArknoNights.Deployment
                 var isSwap = candidate.HasValue && before.Units.Any(unit =>
                     unit.Zone == PlayerUnitZone.Deployed && unit.Formation.HasValue && unit.Formation.Value.Equals(candidate.Value));
                 if (result != null && result.Success && !isNoOp) relocatingView = null;
-                RebindSelectedView();
                 var outcome = result == null ? "invalid" :
                     result.Success ? (isNoOp ? "noop" : (isSwap ? "swap" : "success")) :
                     result.Code == PlayerOperationCode.CoordinateIsGate ? "gate" : "invalid";
@@ -358,14 +357,13 @@ namespace ArknoNights.Deployment
             return result;
         }
 
-        private void CancelDrag(string reason)
+        private void CancelDrag(string reason, bool restoreSelectionIndicator = true)
         {
             var wasRelocating = dragSession != null && dragSession.Source == PreparationDragSource.DeployedRelocation;
             if (wasRelocating &&
                 relocatingView != null && dragSession.Origin.HasValue)
             {
                 relocatingView.transform.position = PreparationGridProjection.ToWorld(dragSession.Origin.Value);
-                RebindSelectedView();
             }
             if (dragPreview) Destroy(dragPreview);
             dragPreview = null;
@@ -379,6 +377,7 @@ namespace ArknoNights.Deployment
                 State = interactionEnabled
                     ? (wasRelocating && !string.IsNullOrEmpty(selectedUnitId) ? PreparationInteractionState.SelectedDeployed : PreparationInteractionState.Idle)
                     : PreparationInteractionState.Disabled;
+            if (wasRelocating && restoreSelectionIndicator && interactionEnabled) RebindSelectedView();
         }
 
         private bool BeginRelocateSelected(PreparationUnitView view)
@@ -391,6 +390,7 @@ namespace ArknoNights.Deployment
             dragSession = new PreparationDragSession(unit.UnitId, unit.TypeId, PreparationDragSource.DeployedRelocation, unit.Formation);
             relocatingView = view;
             submittedCurrentDrag = false;
+            if (selectionIndicator != null) selectionIndicator.gameObject.SetActive(false);
             State = PreparationInteractionState.Dragging;
             Debug.Log("[PreparationDeployment][relocate.started] unit=" + unit.UnitId + "; origin=" + unit.Formation.Value, this);
             return true;
@@ -418,7 +418,9 @@ namespace ArknoNights.Deployment
         private void RebindSelectedView()
         {
             if (string.IsNullOrEmpty(selectedUnitId) || viewCoordinator == null || selectionIndicator == null) return;
-            if (viewCoordinator.TryGetView(selectedUnitId, out var view)) selectionIndicator.Bind(view, worldCamera);
+            if (!viewCoordinator.TryGetView(selectedUnitId, out var view)) return;
+            selectionIndicator.gameObject.SetActive(true);
+            selectionIndicator.Bind(view, worldCamera);
         }
 
         private void ProcessWorldClick(Vector3 screenPosition)
@@ -512,7 +514,7 @@ namespace ArknoNights.Deployment
 
         private void ShutdownBindings()
         {
-            CancelDrag("controller.shutdown");
+            CancelDrag("controller.shutdown", false);
             ClearSelection();
             if (hud != null)
             {

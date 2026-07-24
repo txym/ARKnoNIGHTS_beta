@@ -259,18 +259,30 @@ namespace ArknoNights.Battle.Tests
 
             Assert.IsFalse((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }), "An unselected deployed unit must not start relocation.");
             Assert.IsTrue((bool)type.GetMethod("SelectDeployedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            var indicator = GameObject.Find("DeployedUnitSelectionIndicator");
+            Assert.NotNull(indicator);
+            Assert.IsTrue(indicator.activeSelf);
             var beforeCost = hud.PlayerState.DeploymentCost;
             Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            Assert.IsFalse(indicator.activeSelf, "The selected-unit frame must be hidden while relocation is dragging.");
             type.GetMethod("SetDragWorldPositionForTests").Invoke(controller, new object[] { new Vector3(600f, 0f, 200f) });
             var result = (ArknoNights.Player.PlayerOperationResult)type.GetMethod("CommitCurrentDragForTests").Invoke(controller, null);
             yield return null;
 
             Assert.IsTrue(result.Success);
+            Assert.IsTrue(indicator.activeSelf, "The selected-unit frame must return after relocation completes.");
             Assert.AreEqual(beforeCost, hud.PlayerState.DeploymentCost);
             Assert.AreEqual("local-1000-alpha", (string)type.GetProperty("SelectedUnitId").GetValue(controller));
             Assert.AreEqual(new Vector3(600f, 0f, 200f), GameObject.Find("PreparationUnitViews").transform.Find("PreparationView_local-1000-alpha").position);
             Assert.AreEqual(new Vector3(400f, 0f, 200f), GameObject.Find("PreparationUnitViews").transform.Find("PreparationView_local-1000-bravo").position);
             Assert.AreEqual(2, (int)type.GetProperty("PreparationViewCount").GetValue(controller));
+
+            Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            Assert.IsFalse(indicator.activeSelf);
+            var noOpResult = (ArknoNights.Player.PlayerOperationResult)type.GetMethod("CommitCurrentDragForTests").Invoke(controller, null);
+            yield return null;
+            Assert.IsTrue(noOpResult.Success);
+            Assert.IsTrue(indicator.activeSelf, "A same-cell no-op must restore the frame for the original selection.");
         }
 
         [UnityTest]
@@ -285,11 +297,14 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(hud.PlayerState.TryDeploy("local-1000-alpha", 4, 2).Success);
             yield return null;
             Assert.IsTrue((bool)type.GetMethod("SelectDeployedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            var indicator = GameObject.Find("DeployedUnitSelectionIndicator");
+            Assert.NotNull(indicator);
             var before = hud.Snapshot.CanonicalSummary;
             var view = GameObject.Find("PreparationUnitViews").transform.Find("PreparationView_local-1000-alpha");
             var origin = view.position;
 
             Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            Assert.IsFalse(indicator.activeSelf);
             type.GetMethod("SetDragWorldPositionForTests").Invoke(controller, new object[] { new Vector3(500f, 0f, 100f) });
             var gateResult = (ArknoNights.Player.PlayerOperationResult)type.GetMethod("CommitCurrentDragForTests").Invoke(controller, null);
             yield return null;
@@ -297,6 +312,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(before, hud.Snapshot.CanonicalSummary);
             Assert.AreEqual(origin, view.position);
             Assert.AreEqual("local-1000-alpha", (string)type.GetProperty("SelectedUnitId").GetValue(controller));
+            Assert.IsTrue(indicator.activeSelf, "A failed relocation must restore the frame for the original selection.");
 
             Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
             type.GetMethod("SetDragWorldPositionForTests").Invoke(controller, new object[] { new Vector3(600f, 0f, 200f) });
@@ -305,6 +321,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(before, hud.Snapshot.CanonicalSummary);
             Assert.AreEqual(origin, view.position);
             Assert.IsNull(type.GetProperty("SelectedUnitId").GetValue(controller));
+            Assert.IsNull(GameObject.Find("DeployedUnitSelectionIndicator"), "Phase lock must retain its existing selection-clear behavior.");
         }
 
         [UnityTest]
@@ -319,11 +336,14 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(hud.PlayerState.TryDeploy("local-1000-alpha", 4, 2).Success);
             yield return null;
             Assert.IsTrue((bool)type.GetMethod("SelectDeployedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            var indicator = GameObject.Find("DeployedUnitSelectionIndicator");
+            Assert.NotNull(indicator);
             var before = hud.Snapshot.CanonicalSummary;
             var view = GameObject.Find("PreparationUnitViews").transform.Find("PreparationView_local-1000-alpha");
             var origin = view.position;
 
             Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            Assert.IsFalse(indicator.activeSelf);
             type.GetMethod("SetDragWorldPositionForTests").Invoke(controller, new object[] { new Vector3(600f, 0f, 200f) });
             Assert.IsNull(type.GetMethod("ReleaseCurrentDragForTests").Invoke(controller, new object[] { true }));
             yield return null;
@@ -332,6 +352,15 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(origin, view.position);
             Assert.AreEqual("local-1000-alpha", (string)type.GetProperty("SelectedUnitId").GetValue(controller));
             Assert.AreEqual("SelectedDeployed", type.GetProperty("State").GetValue(controller).ToString());
+            Assert.IsTrue(indicator.activeSelf, "Cancelling release over UI must restore the original selection frame.");
+
+            Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
+            Assert.IsFalse(indicator.activeSelf);
+            type.GetMethod("OnApplicationFocus", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(controller, new object[] { false });
+            yield return null;
+            Assert.AreEqual("local-1000-alpha", (string)type.GetProperty("SelectedUnitId").GetValue(controller));
+            Assert.AreEqual("SelectedDeployed", type.GetProperty("State").GetValue(controller).ToString());
+            Assert.IsTrue(indicator.activeSelf, "Focus-loss cancellation must restore the frame for the original selection.");
         }
 
         [UnityTest]
