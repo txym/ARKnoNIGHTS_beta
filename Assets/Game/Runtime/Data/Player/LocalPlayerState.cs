@@ -228,6 +228,31 @@ namespace ArknoNights.Player
             return Result(PlayerOperationCode.Success);
         }
 
+        /// <summary>
+        /// Repositions one deployed unit within the local formation. An occupied target atomically swaps
+        /// the two friendly deployed units; the source cell is a successful no-op. Deployment cost is not involved.
+        /// </summary>
+        public PlayerOperationResult TryRelocateDeployed(string unitId, int x, int y)
+        {
+            if (!unitsById.TryGetValue(unitId ?? string.Empty, out var unit)) return Result(PlayerOperationCode.UnitNotFound);
+            if (unit.Zone != PlayerUnitZone.Deployed || !unit.Formation.HasValue) return Result(PlayerOperationCode.UnitNotDeployed);
+            if (!LocalFormationCoordinate.TryCreate(x, y, out var target)) return Result(PlayerOperationCode.CoordinateOutOfBounds);
+            if (!LocalFormationCoordinate.IsDeployable(x, y)) return Result(PlayerOperationCode.CoordinateIsGate);
+
+            var origin = unit.Formation.Value;
+            if (origin.Equals(target)) return Result(PlayerOperationCode.Success);
+
+            var occupant = unitsById.Values.FirstOrDefault(candidate =>
+                candidate.Zone == PlayerUnitZone.Deployed &&
+                candidate.Formation.HasValue &&
+                candidate.Formation.Value.Equals(target));
+
+            unit.Formation = target;
+            if (occupant != null) occupant.Formation = origin;
+            NotifyChanged();
+            return Result(PlayerOperationCode.Success);
+        }
+
         public PlayerOperationResult TryRetreat(string unitId)
         {
             if (!unitsById.TryGetValue(unitId ?? string.Empty, out var unit)) return Result(PlayerOperationCode.UnitNotFound);

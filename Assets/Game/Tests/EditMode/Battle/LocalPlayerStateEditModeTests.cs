@@ -133,6 +133,79 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void RelocateDeployed_MovesToEmptyCell_ChangesOnceAndPreservesCost()
+        {
+            var state = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerStatePath).State;
+            Assert.IsTrue(state.TryDeploy("local-1000-alpha", 4, 2).Success);
+            var before = state.Snapshot;
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            var result = state.TryRelocateDeployed("local-1000-alpha", 6, 2);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(before.DeploymentCost, result.Snapshot.DeploymentCost);
+            Assert.AreEqual(before.Version + 1, result.Snapshot.Version);
+            Assert.AreNotEqual(before.CanonicalSummary, result.Snapshot.CanonicalSummary);
+            Assert.AreEqual(1, notifications);
+            Assert.AreEqual(new LocalFormationCoordinate(6, 2), result.Snapshot.Units.Single(unit => unit.UnitId == "local-1000-alpha").Formation.Value);
+        }
+
+        [Test]
+        public void RelocateDeployed_SwapsOccupiedFriendlyCellAtomically()
+        {
+            var state = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerStatePath).State;
+            Assert.IsTrue(state.TryDeploy("local-1000-alpha", 4, 2).Success);
+            Assert.IsTrue(state.TryDeploy("local-1000-bravo", 6, 2).Success);
+            var before = state.Snapshot;
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            var result = state.TryRelocateDeployed("local-1000-alpha", 6, 2);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(before.DeploymentCost, result.Snapshot.DeploymentCost);
+            Assert.AreEqual(before.Version + 1, result.Snapshot.Version);
+            Assert.AreNotEqual(before.CanonicalSummary, result.Snapshot.CanonicalSummary);
+            Assert.AreEqual(1, notifications);
+            Assert.AreEqual(new LocalFormationCoordinate(6, 2), result.Snapshot.Units.Single(unit => unit.UnitId == "local-1000-alpha").Formation.Value);
+            Assert.AreEqual(new LocalFormationCoordinate(4, 2), result.Snapshot.Units.Single(unit => unit.UnitId == "local-1000-bravo").Formation.Value);
+        }
+
+        [Test]
+        public void RelocateDeployed_NoOpAndFailures_LeaveStateCostVersionAndNotificationsUnchanged()
+        {
+            var state = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerStatePath).State;
+            Assert.IsTrue(state.TryDeploy("local-1000-alpha", 4, 2).Success);
+            var before = state.Snapshot;
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            Assert.IsTrue(state.TryRelocateDeployed("local-1000-alpha", 4, 2).Success);
+            Assert.AreEqual(PlayerOperationCode.CoordinateOutOfBounds, state.TryRelocateDeployed("local-1000-alpha", 0, 2).Code);
+            Assert.AreEqual(PlayerOperationCode.CoordinateIsGate, state.TryRelocateDeployed("local-1000-alpha", 5, 1).Code);
+            Assert.AreEqual(PlayerOperationCode.UnitNotFound, state.TryRelocateDeployed("missing", 6, 2).Code);
+            Assert.AreEqual(PlayerOperationCode.UnitNotDeployed, state.TryRelocateDeployed("local-1000-bravo", 6, 2).Code);
+
+            Assert.AreEqual(before.CanonicalSummary, state.Snapshot.CanonicalSummary);
+            Assert.AreEqual(before.DeploymentCost, state.DeploymentCost);
+            Assert.AreEqual(before.Version, state.Version);
+            Assert.AreEqual(0, notifications);
+        }
+
+        [Test]
+        public void RelocateDeployed_RepeatedFixedSequenceProducesTheSameSnapshot()
+        {
+            var first = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerStatePath).State;
+            var second = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerStatePath).State;
+
+            ApplyRelocationSequence(first);
+            ApplyRelocationSequence(second);
+
+            Assert.AreEqual(first.Snapshot.CanonicalSummary, second.Snapshot.CanonicalSummary);
+        }
+
+        [Test]
         public void Retreat_WhenReturnWouldExceedStagingCapacity_DoesNotChangeStateOrCost()
         {
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
@@ -182,5 +255,13 @@ namespace ArknoNights.Battle.Tests
 
         private static string Errors(System.Collections.Generic.IReadOnlyList<PlayerStateValidationError> errors) => string.Join("; ", errors.Select(error => error.ToString()));
         private static string Errors(System.Collections.Generic.IReadOnlyList<ArknoNights.Battle.Core.ValidationError> errors) => string.Join("; ", errors.Select(error => error.ToString()));
+
+        private static void ApplyRelocationSequence(PlayerState state)
+        {
+            Assert.IsTrue(state.TryDeploy("local-1000-alpha", 4, 2).Success);
+            Assert.IsTrue(state.TryDeploy("local-1000-bravo", 6, 2).Success);
+            Assert.IsTrue(state.TryRelocateDeployed("local-1000-alpha", 6, 2).Success);
+            Assert.IsTrue(state.TryRelocateDeployed("local-1000-bravo", 7, 2).Success);
+        }
     }
 }

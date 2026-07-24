@@ -469,3 +469,14 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。
 - 实际测试：仓库 `scripts/Invoke-UnityTests.ps1` 分别运行全量 EditMode 与 PlayMode；脚本在结果 XML 写入后验证非零测试数并解析结果。EditMode 为 `66` 通过、`0` 失败、`0` 跳过；PlayMode 为 `14` 通过、`0` 失败、`0` 跳过。Unity 清理 `Temp` 时删除了这些短生命周期 XML，因此计数以脚本当场解析的结果为准；无测试失败或编译错误。
 - 实际 Windows Standalone 构建：`Task006StandaloneBuild.BuildWindowsX64` 成功，日志 `Temp/UNIT-DATA-001/WindowsStandaloneBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=2`，产物输出到忽略的 `Temp/TASK-006/WindowsStandalone/`。未执行人工 GUI 验收；中文名和技能说明仍等待用户填写。
+
+## 30. PREP-DEPLOY-001 已部署单位选中后拖动换位（2026-07-24）
+
+- 状态层 EditMode：`Temp/PREP-DEPLOY-001/final-focused-edit/EditModeResults.xml`，筛选 `ArknoNights.Battle.Tests.LocalPlayerStateEditModeTests`，共 `12` 项、通过 `12`、失败 `0`、跳过 `0`。新增断言覆盖空格移动、己方占格原子交换、同格成功 no-op、越界/门格/不存在/非部署失败、费用不变、version/Changed 次数、CanonicalSummary 变化和重复固定序列确定性。
+- 场景 PlayMode：`Temp/PREP-DEPLOY-001/green-review-fixes/PlayModeResults.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。新增断言覆盖未选中单位不能开始重定位、选中单位交换后的两个视图位置、原始 unit ID 选择保持、门格失败恢复、交互锁取消不改状态、屏幕 UI 上松手取消，以及撤退命中框不启动换位。`Temp/PREP-DEPLOY-001/phase-loop/PlayModeResults.xml` 中 `PreparationBattleLoopPlayModeTests` 为 `1/1` 通过，确认准备→战斗→准备循环回归。
+- 全量 PlayMode：`Temp/PREP-DEPLOY-001/final2-full-play/PlayModeResults.xml`，共 `18` 项、通过 `18`、失败 `0`、跳过 `0`。
+- 全量 EditMode：`Temp/PREP-DEPLOY-001/final2-full-edit/EditModeResults.xml`，共 `70` 项、通过 `69`、失败 `1`、跳过 `0`，因此不得记为全量通过。失败项为既有 `BattleCoreEditModeTests.RealCatalog_ParsesSourceValuesAndLoadsDeterministicallyFromResources`：`HEAD` 中 `Assets/GameData/Units/Json/gopro.json` 的 `displayNameZhHans` 已为 `狂暴的猎狗pro`，该既有测试仍断言空字符串；两者都不在本任务 diff。本任务范围的 `LocalPlayerStateEditModeTests` 已在上述定向 XML 中全数通过。
+- Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001\final2\compile.log` 退出码 `0`；日志含 `Tundra build success`，未含 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
+- Windows Standalone：`Task006StandaloneBuild.BuildWindowsX64` 输出 `Temp/PREP-DEPLOY-001/final2/WindowsStandalone/ARKnoNIGHTS.exe`，构建摘要为 `result=Succeeded`、`errors=0`、`warnings=1`、总大小 `165411244` 字节。
+- 结果保留说明：上述测试脚本均在 XML 首次完整写入、确认测试数大于零后立即解析并输出结果；随后 Unity 的 AssetDatabase 清理了这些 `Temp/PREP-DEPLOY-001` 短生命周期 XML。因此计数以本轮脚本的当场结构化解析输出为准，未将已清理文件视为持续可用证据。
+- 未验证：当前无可靠的交互式 Unity Editor/Player GUI 驱动，未手工执行第一次点击、真实鼠标阈值拖动、空格移动、两单位交换、门格失败及战斗后返回准备的视觉流程；也未在生成的 Windows Player 内人工验收。自动断言不替代这些视觉/手势检查。

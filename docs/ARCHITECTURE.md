@@ -127,7 +127,7 @@ TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译�
 
 `LocalPlayerStateLoader` 从 `Resources/PlayerData/local-player-state-v1.json` 读取版本化固定测试状态，并拒绝未知 schema、重复 unit ID、未知类型、非法精英化/区域/坐标、负费用、重复占位、超过 48 个单位和超过 13 个严格待部署槽。固定数据使用真实 `gopro`/`arcslma`，初始 Cost 为 99，包含两个可堆叠 `gopro`、一个 `arcslma` 和一个 Overflow 单位。
 
-`PlayerState.TryDeploy`、`TryRetreat` 和 `RemoveOverflowUnits` 是原子操作：部署只接受一基 `9×4` 空格并拒绝 `(5,1)`；成功时扣除目录部署费用，撤退成功时返还全部费用，Overflow 清理只删除 Overflow。待部署快照按 Cost、type ID 排序，并且数量为 1 时仍保留槽位数量。Buff 仍无游戏语义；当前只比较完整快照而不规范化它。
+`PlayerState.TryDeploy`、`TryRelocateDeployed`、`TryRetreat` 和 `RemoveOverflowUnits` 是原子操作：部署只接受一基 `9×4` 空格并拒绝 `(5,1)`；已部署单位重定位对空格只移动该单位、对己方已部署占格在一次通知中交换两个 Formation、对原格返回不通知的成功 no-op；成功部署时扣除目录部署费用，撤退成功时返还全部费用，重定位不改变费用，Overflow 清理只删除 Overflow。待部署快照按 Cost、type ID 排序，并且数量为 1 时仍保留槽位数量。Buff 仍无游戏语义；当前只比较完整快照而不规范化它。
 
 旧 `PlayerUnitCollection` 和 `UnitFactory.SpawnAll` 继续保留为未接入的 legacy/debug 原型，未改变公开零基接口语义；它们不是 UI-001 的权威状态来源。
 
@@ -247,6 +247,7 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 - `StateDrivenDeploymentController` 是 `FormalBattleHudRoot` 上唯一的准备阶段输入拥有者。正式待部署槽只向它报告稳定堆叠 ID；控制器从该快照的有序 `unitIds` 选择首个具体实例，并以 `Idle`、`Dragging`、`SelectedDeployed`、`Disabled` 状态管理预览、选择和输入锁。它不会读取 `ButtonDebug`、`UnitFactory` 或 `UnitDeployment` 原型数据。
 - `PreparationGridProjection` 将 UI/世界候选投影为一基本地阵型：格心为 `(x * 100, 0, y * 100)`。拖拽期间预览自由跟随鼠标投影到的世界坐标；松手时才换算、验证并由 `PlayerState.TryDeploy` 决定是否吸附到格心。
+- 已部署单位重定位使用同一控制器的来源标记拖动会话：首次世界点击只选择，只有当前 `selectedUnitId` 对应 view 的后续超过阈值手势才能开始拖动。该会话临时移动已有 view，不在松手前写入 `PlayerState`；松手时调用 `TryRelocateDeployed`，由 `PreparationUnitViewCoordinator` 的同一 Changed 快照同步移动或交换结果。失败、同格 no-op、交互锁、隐藏准备视图和生命周期取消都会恢复权威 Formation 投影；`DeployedSelectionChanged` 仍携带原始稳定 unit ID，因此 HUD 选择不会跳到被交换单位。
 - 拖拽预览由 `PreparationUnitViewBuilder` 使用 Player-safe 目录和真实 `DefaultUnit` 资源创建，但不进入玩家快照、不会占格或扣费；取消/锁定时销毁。它的 `UnitIdentity` 同时持有唯一运行时整数 ID 与稳定 PlayerState 实例 ID；成功部署或撤退后，`PreparationUnitViewCoordinator` 订阅同一 `PlayerState.Changed` 快照并幂等维护 `player unit ID → PreparationUnitView` 的一对一映射；该根 `PreparationUnitViews` 与 `BattleDemoViews` 生命周期分离。
 - 已部署视图与待部署槽共用一个互斥选择：选择任一待部署槽会清除场上选择，选择已部署视图或开始拖拽会清除待部署槽选择。`PreparationSelectionIndicator` 是独立世界空间 SpriteRenderer 组：命名子物体 `Overlay` 与 `ReturnToStaging` 是各自的中心锚点，内部 `Graphic` 只负责补偿图集 Sprite pivot；两者按 `1.5×` 缩放，菱形水平平行地面。组根取“单位 Transform 锚点的 `z + 50` → 摄像机”直线与 `y=200` 平面的交点；撤退图标使用局部二维坐标 `(-60,60)` 并创建与自身可见尺寸相符的命中框。命中框只发起 `TryRetreat`，成功后由快照清理视图和选择组；它不直接改 Cost、阵型或 GameObject 权威状态。
 - `SetInteractionEnabled(bool)` 是 UI-004 的阶段锁入口：禁用时取消预览、清选和关闭撤退输入。`UI003SampleSceneSetup.SetupSampleScene` 幂等地只向既有 `FormalBattleHudRoot` 添加控制器，不修改地图、相机、BattleDemoRoot 或 DefaultUnit。
