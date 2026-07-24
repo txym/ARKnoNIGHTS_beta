@@ -16,10 +16,10 @@
   ],
   "players": [
     { "playerId": "home-player", "side": "Home", "units": [
-      { "unitId": "home-1", "typeId": "home-striker", "zone": "Deployed", "formationX": 4, "formationY": 4, "buffs": [] }
+      { "unitId": "home-1", "typeId": "home-striker", "zone": "Deployed", "formationX": 4, "formationY": 4, "eliteLevel": 0, "buffs": [] }
     ] },
     { "playerId": "away-player", "side": "Away", "units": [
-      { "unitId": "away-1", "typeId": "away-guard", "zone": "Deployed", "formationX": 6, "formationY": 4, "buffs": [] }
+      { "unitId": "away-1", "typeId": "away-guard", "zone": "Deployed", "formationX": 6, "formationY": 4, "eliteLevel": 0, "buffs": [] }
     ] }
   ]
 }

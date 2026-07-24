@@ -238,7 +238,7 @@ namespace ArknoNights.Battle.Infrastructure
                 if (FormationCoordinate.TryCreate(dto.formationX, dto.formationY, out var parsed)) formation = parsed;
                 else formation = default(FormationCoordinate);
             }
-            return new UnitSnapshot(dto.unitId, dto.typeId, ParseEnum<UnitZone>(dto.zone), formation, (dto.buffs ?? Array.Empty<BuffDto>()).Where(buff => buff != null).Select(buff => new BuffPlaceholder(buff.id, buff.rawPayload)));
+            return new UnitSnapshot(dto.unitId, dto.typeId, ParseEnum<UnitZone>(dto.zone), formation, (dto.buffs ?? Array.Empty<BuffDto>()).Where(buff => buff != null).Select(buff => new BuffPlaceholder(buff.id, buff.rawPayload)), dto.eliteLevel);
         }
 
         private static T ParseEnum<T>(string value) where T : struct => Enum.TryParse(value, true, out T parsed) && Enum.IsDefined(typeof(T), parsed) ? parsed : (T)Enum.ToObject(typeof(T), -1);
@@ -246,7 +246,7 @@ namespace ArknoNights.Battle.Infrastructure
 
         [Serializable] private sealed class LocalBattleDto { public string schemaVersion; public string battleId; public int maxTicks; public PlayerDto[] players; }
         [Serializable] private sealed class PlayerDto { public string playerId; public string side; public UnitDto[] units; }
-        [Serializable] private sealed class UnitDto { public string unitId; public string typeId; public string zone; public int formationX; public int formationY; public BuffDto[] buffs; }
+        [Serializable] private sealed class UnitDto { public string unitId; public string typeId; public string zone; public int formationX; public int formationY; public int eliteLevel; public BuffDto[] buffs; }
         [Serializable] private sealed class BuffDto { public string id; public string rawPayload; }
     }
 }

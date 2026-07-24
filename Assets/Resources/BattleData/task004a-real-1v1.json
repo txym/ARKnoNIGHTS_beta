@@ -7,19 +7,19 @@
       "playerId": "local-home",
       "side": "Home",
       "units": [
-        { "unitId": "home-1000-alpha", "typeId": "1000", "zone": "Deployed", "formationX": 1, "formationY": 1, "buffs": [] },
-        { "unitId": "home-5503-alpha", "typeId": "5503", "zone": "Deployed", "formationX": 3, "formationY": 3, "buffs": [] },
-        { "unitId": "home-1000-bravo", "typeId": "1000", "zone": "Deployed", "formationX": 8, "formationY": 4, "buffs": [] }
+        { "unitId": "home-1000-alpha", "typeId": "1000", "zone": "Deployed", "formationX": 1, "formationY": 1, "eliteLevel": 0, "buffs": [] },
+        { "unitId": "home-5503-alpha", "typeId": "5503", "zone": "Deployed", "formationX": 3, "formationY": 3, "eliteLevel": 0, "buffs": [] },
+        { "unitId": "home-1000-bravo", "typeId": "1000", "zone": "Deployed", "formationX": 8, "formationY": 4, "eliteLevel": 0, "buffs": [] }
       ]
     },
     {
       "playerId": "local-away",
       "side": "Away",
       "units": [
-        { "unitId": "away-5503-alpha", "typeId": "5503", "zone": "Deployed", "formationX": 9, "formationY": 1, "buffs": [] },
-        { "unitId": "away-1000-alpha", "typeId": "1000", "zone": "Deployed", "formationX": 7, "formationY": 3, "buffs": [] },
-        { "unitId": "away-5503-bravo", "typeId": "5503", "zone": "Deployed", "formationX": 2, "formationY": 4, "buffs": [] },
-        { "unitId": "away-1000-bravo", "typeId": "1000", "zone": "Deployed", "formationX": 4, "formationY": 2, "buffs": [] }
+        { "unitId": "away-5503-alpha", "typeId": "5503", "zone": "Deployed", "formationX": 9, "formationY": 1, "eliteLevel": 0, "buffs": [] },
+        { "unitId": "away-1000-alpha", "typeId": "1000", "zone": "Deployed", "formationX": 7, "formationY": 3, "eliteLevel": 0, "buffs": [] },
+        { "unitId": "away-5503-bravo", "typeId": "5503", "zone": "Deployed", "formationX": 2, "formationY": 4, "eliteLevel": 0, "buffs": [] },
+        { "unitId": "away-1000-bravo", "typeId": "1000", "zone": "Deployed", "formationX": 4, "formationY": 2, "eliteLevel": 0, "buffs": [] }
       ]
     }
   ]

@@ -89,12 +89,18 @@ namespace ArknoNights.Battle.Core
     public sealed class UnitSnapshot
     {
         public UnitSnapshot(string unitId, string typeId, UnitZone zone, FormationCoordinate? formation, IEnumerable<BuffPlaceholder> buffs)
+            : this(unitId, typeId, zone, formation, buffs, 0)
+        {
+        }
+
+        public UnitSnapshot(string unitId, string typeId, UnitZone zone, FormationCoordinate? formation, IEnumerable<BuffPlaceholder> buffs, int eliteLevel)
         {
             UnitId = unitId;
             TypeId = typeId;
             Zone = zone;
             Formation = formation;
             Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
+            EliteLevel = eliteLevel;
         }
 
         public string UnitId { get; }
@@ -102,6 +108,7 @@ namespace ArknoNights.Battle.Core
         public UnitZone Zone { get; }
         public FormationCoordinate? Formation { get; }
         public IReadOnlyList<BuffPlaceholder> Buffs { get; }
+        public int EliteLevel { get; }
     }
 
     public sealed class PlayerSnapshot
@@ -153,7 +160,7 @@ namespace ArknoNights.Battle.Core
                 builder.Append("|P:").Append((int)player.Side).Append(',').Append(player.PlayerId);
                 foreach (var unit in player.Units.OrderBy(item => item.UnitId, StringComparer.Ordinal))
                 {
-                    builder.Append("|U:").Append(unit.UnitId).Append(',').Append(unit.TypeId).Append(',').Append((int)unit.Zone).Append(',');
+                    builder.Append("|U:").Append(unit.UnitId).Append(',').Append(unit.TypeId).Append(',').Append((int)unit.Zone).Append(',').Append(unit.EliteLevel).Append(',');
                     if (unit.Formation.HasValue) builder.Append(unit.Formation.Value.X).Append(',').Append(unit.Formation.Value.Y);
                     foreach (var buff in unit.Buffs.OrderBy(item => item.Id, StringComparer.Ordinal).ThenBy(item => item.RawPayload, StringComparer.Ordinal)) builder.Append("|B:").Append(buff.Id).Append(',').Append(buff.RawPayload);
                 }
@@ -208,6 +215,7 @@ namespace ArknoNights.Battle.Core
                     if (unit == null) { validationErrors.Add(new ValidationError("unit.missing", "Unit snapshot is missing.")); continue; }
                     if (string.IsNullOrWhiteSpace(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.invalid", "Unit ID is required."));
                     else if (!unitIds.Add(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.duplicate", "Duplicate unit ID: " + unit.UnitId));
+                    if (unit.EliteLevel < 0 || unit.EliteLevel > 3) validationErrors.Add(new ValidationError("unit.elite.invalid", "Unit elite level must be within 0..3: " + unit.UnitId));
                     if (string.IsNullOrWhiteSpace(unit.TypeId) || !typeIds.Contains(unit.TypeId)) validationErrors.Add(new ValidationError("unit.type.unknown", "Unit has an unknown type ID: " + (unit.TypeId ?? "<missing>")));
                     if (!Enum.IsDefined(typeof(UnitZone), unit.Zone)) validationErrors.Add(new ValidationError("unit.zone.invalid", "Unit zone is invalid: " + unit.UnitId));
                     if (unit.Zone == UnitZone.Deployed)

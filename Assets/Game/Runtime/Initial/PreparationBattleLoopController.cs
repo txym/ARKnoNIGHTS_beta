@@ -5,6 +5,7 @@ using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Demo;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Deployment;
+using ArknoNights.Player;
 using ArknoNights.Round;
 using ArknoNights.UI;
 using UnityEngine;
@@ -19,13 +20,14 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
 {
     private const string CatalogPath = "BattleData/unit-catalog-v1";
     private const string FixedBattlePath = "BattleData/task004a-real-1v1";
+    private const string TemporaryOpponentPath = "PlayerData/temporary-opponent-player-state-v1";
 
     private readonly PreparationBattlePhaseMachine machine = new PreparationBattlePhaseMachine();
     private StagingHudController hud;
     private StateDrivenDeploymentController deployment;
     private BattleDemoController demo;
     private UnitCatalog catalog;
-    private PlayerSnapshot fixedAway;
+    private PlayerState temporaryOpponent;
     private int maxTicks;
     private int roundNumber;
     private PreparationSealResult activeSeal;
@@ -77,10 +79,17 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
             Fail("round.fixedAway.load.failed:" + string.Join(" | ", fixedLoad.Errors.Select(error => error.ToString()).ToArray()));
             return;
         }
-        fixedAway = fixedLoad.Input.Players.SingleOrDefault(player => player.Side == BattleSide.Away);
-        if (fixedAway == null || !fixedAway.Units.Any(unit => unit.Zone == UnitZone.Deployed))
+        var opponentLoad = LocalPlayerStateLoader.LoadFromResources(CatalogPath, TemporaryOpponentPath);
+        if (!opponentLoad.Success)
         {
-            Fail("round.fixedAway.empty");
+            Fail("round.temporaryOpponent.load.failed:" + string.Join(" | ", opponentLoad.Errors.Select(error => error.ToString()).ToArray()));
+            return;
+        }
+
+        temporaryOpponent = opponentLoad.State;
+        if (!temporaryOpponent.GetUnits(PlayerUnitZone.Deployed).Any())
+        {
+            Fail("round.temporaryOpponent.empty");
             return;
         }
 
@@ -113,7 +122,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
         deployment.SetInteractionEnabled(false);
         deployment.SetPreparationViewsVisible(false);
         var battleId = "ui004-round-" + (++roundNumber);
-        if (!PreparationBattleSealer.TrySeal(hud.PlayerState, catalog, fixedAway, battleId, maxTicks, out activeSeal, out var error))
+        if (!PreparationBattleSealer.TrySeal(hud.PlayerState, temporaryOpponent, catalog, battleId, maxTicks, out activeSeal, out var error))
         {
             Fail(error);
             return;

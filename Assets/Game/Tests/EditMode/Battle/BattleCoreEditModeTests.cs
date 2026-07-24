@@ -561,6 +561,31 @@ namespace ArknoNights.Battle.Tests
             Assert.That(loaded.Errors.Select(error => error.Code), Does.Contain("catalog.skeleton.resource.missing"));
         }
 
+        [Test]
+        public void EliteMetadata_ChangesInputDigestButNotCombatResult()
+        {
+            var constructor = typeof(UnitSnapshot).GetConstructor(new[]
+            {
+                typeof(string), typeof(string), typeof(UnitZone), typeof(FormationCoordinate?), typeof(System.Collections.Generic.IEnumerable<BuffPlaceholder>), typeof(int)
+            });
+            Assert.NotNull(constructor, "UnitSnapshot must preserve an explicit instance elite level.");
+
+            var zero = (UnitSnapshot)constructor.Invoke(new object[] { "home", "unit", UnitZone.Deployed, new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>(), 0 });
+            var three = (UnitSnapshot)constructor.Invoke(new object[] { "home", "unit", UnitZone.Deployed, new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>(), 3 });
+            var away = Unit("away", "unit", 4, 3);
+            var definitions = new[] { Definition("unit", 100) };
+            var eliteZero = CreateInput(200, definitions, new[] { zero }, new[] { away });
+            var eliteThree = CreateInput(200, definitions, new[] { three }, new[] { away });
+
+            Assert.AreNotEqual(eliteZero.CanonicalSummary, eliteThree.CanonicalSummary);
+            var zeroResult = new BattleRunner(eliteZero).RunToCompletion();
+            var threeResult = new BattleRunner(eliteThree).RunToCompletion();
+            Assert.AreEqual(zeroResult.CompletedTicks, threeResult.CompletedTicks);
+            Assert.AreEqual(zeroResult.StopReason, threeResult.StopReason);
+            Assert.AreEqual(zeroResult.Winner, threeResult.Winner);
+            CollectionAssert.AreEqual(zeroResult.Events.Select(EventSummary), threeResult.Events.Select(EventSummary));
+        }
+
         private static UnitDefinition Definition(string typeId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1, int tauntLevel = 0)
             => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true);
 

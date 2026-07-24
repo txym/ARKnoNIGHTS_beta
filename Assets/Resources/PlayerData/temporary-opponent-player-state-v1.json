@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "local-player-state-v1",
+  "playerId": "temporary-opponent-player",
+  "deploymentCost": 99,
+  "units": [
+    {
+      "unitId": "opponent-5503-alpha",
+      "typeId": "5503",
+      "zone": "Deployed",
+      "eliteLevel": 0,
+      "buffs": [],
+      "formationX": 5,
+      "formationY": 2
+    }
+  ]
+}

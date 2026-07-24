@@ -12,6 +12,7 @@ namespace ArknoNights.Battle.Tests
     {
         private const string CatalogPath = "BattleData/unit-catalog-v1";
         private const string PlayerStatePath = "PlayerData/local-player-state-v1";
+        private const string TemporaryOpponentPath = "PlayerData/temporary-opponent-player-state-v1";
 
         [Test]
         public void RealCatalog_ProvidesPlayerSafeUiFieldsFromConfirmedSourceValues()
@@ -59,6 +60,20 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.AreEqual(new[] { 2, 1 }, snapshot.StagingSlots.Select(slot => slot.Count).ToArray());
             CollectionAssert.AreEqual(new[] { "local-1000-alpha", "local-1000-bravo" }, snapshot.StagingSlots[0].UnitIds);
             Assert.AreEqual(1, first.State.GetUnits(PlayerUnitZone.Overflow).Count);
+        }
+
+        [Test]
+        public void TemporaryOpponent_LoadsAsIndependentDeployedPlayer()
+        {
+            var result = LocalPlayerStateLoader.LoadFromResources(CatalogPath, TemporaryOpponentPath);
+
+            Assert.IsTrue(result.Success, Errors(result.Errors));
+            Assert.AreEqual("temporary-opponent-player", result.State.PlayerId);
+            var unit = result.State.GetUnits(PlayerUnitZone.Deployed).Single();
+            Assert.AreEqual("opponent-5503-alpha", unit.UnitId);
+            Assert.AreEqual(new LocalFormationCoordinate(5, 2), unit.Formation.Value);
+            Assert.AreEqual(0, unit.EliteLevel);
+            Assert.AreEqual(0, unit.Buffs.Count);
         }
 
         [Test]

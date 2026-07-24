@@ -60,7 +60,7 @@ namespace ArknoNights.Battle.Infrastructure
                 if (FormationCoordinate.TryCreate(dto.formationX, dto.formationY, out var parsed)) formation = parsed;
                 else formation = default(FormationCoordinate);
             }
-            return new UnitSnapshot(dto.unitId, dto.typeId, ParseEnum<UnitZone>(dto.zone), formation, ConvertBuffs(dto.buffs));
+            return new UnitSnapshot(dto.unitId, dto.typeId, ParseEnum<UnitZone>(dto.zone), formation, ConvertBuffs(dto.buffs), dto.eliteLevel);
         }
 
         private static IEnumerable<BuffPlaceholder> ConvertBuffs(BuffDto[] buffs) => (buffs ?? Array.Empty<BuffDto>()).Where(item => item != null).Select(item => new BuffPlaceholder(item.id, item.rawPayload));
@@ -70,7 +70,7 @@ namespace ArknoNights.Battle.Infrastructure
         [Serializable] private sealed class BattleFixtureDto { public string schemaVersion; public string battleId; public int maxTicks; public UnitDefinitionDto[] unitTypes; public PlayerDto[] players; }
         [Serializable] private sealed class UnitDefinitionDto { public string typeId; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int blockCapacity; public int tauntLevel; public bool isSyntheticFixtureData; }
         [Serializable] private sealed class PlayerDto { public string playerId; public string side; public UnitDto[] units; }
-        [Serializable] private sealed class UnitDto { public string unitId; public string typeId; public string zone; public int formationX; public int formationY; public BuffDto[] buffs; }
+        [Serializable] private sealed class UnitDto { public string unitId; public string typeId; public string zone; public int formationX; public int formationY; public int eliteLevel; public BuffDto[] buffs; }
         [Serializable] private sealed class BuffDto { public string id; public string rawPayload; }
     }
 }

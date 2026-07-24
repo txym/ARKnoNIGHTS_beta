@@ -37,16 +37,16 @@
       "playerId": "home-player",
       "side": "Home",
       "units": [
-        { "unitId": "unit-home-1", "typeId": "guard-alpha", "zone": "Deployed", "formationX": 4, "formationY": 2, "buffs": [ { "id": "fixture-marker", "rawPayload": "home" } ] },
-        { "unitId": "unit-home-staging", "typeId": "guard-beta", "zone": "Staging", "buffs": [] },
-        { "unitId": "unit-home-shop", "typeId": "guard-beta", "zone": "Shop", "buffs": [] }
+        { "unitId": "unit-home-1", "typeId": "guard-alpha", "zone": "Deployed", "formationX": 4, "formationY": 2, "eliteLevel": 0, "buffs": [ { "id": "fixture-marker", "rawPayload": "home" } ] },
+        { "unitId": "unit-home-staging", "typeId": "guard-beta", "zone": "Staging", "eliteLevel": 0, "buffs": [] },
+        { "unitId": "unit-home-shop", "typeId": "guard-beta", "zone": "Shop", "eliteLevel": 0, "buffs": [] }
       ]
     },
     {
       "playerId": "away-player",
       "side": "Away",
       "units": [
-        { "unitId": "unit-away-1", "typeId": "guard-alpha", "zone": "Deployed", "formationX": 4, "formationY": 3, "buffs": [ { "id": "fixture-marker", "rawPayload": "away" } ] }
+        { "unitId": "unit-away-1", "typeId": "guard-alpha", "zone": "Deployed", "formationX": 4, "formationY": 3, "eliteLevel": 0, "buffs": [ { "id": "fixture-marker", "rawPayload": "away" } ] }
       ]
     }
   ]

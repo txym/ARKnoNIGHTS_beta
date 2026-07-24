@@ -1,9 +1,11 @@
 using System.Linq;
+using System.Reflection;
 using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Player;
 using ArknoNights.Round;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace ArknoNights.Battle.Tests
 {
@@ -11,6 +13,7 @@ namespace ArknoNights.Battle.Tests
     {
         private const string CatalogPath = "BattleData/unit-catalog-v1";
         private const string PlayerPath = "PlayerData/local-player-state-v1";
+        private const string TemporaryOpponentPath = "PlayerData/temporary-opponent-player-state-v1";
         private const string FixedBattlePath = "BattleData/task004a-real-1v1";
 
         [Test]
@@ -89,6 +92,28 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(0, seal.After.DeploymentCost);
         }
 
+        [Test]
+        public void Seal_WhenStatesShareUnitId_FailsWithStableDiagnosticBeforeMutatingLocalState()
+        {
+            var fixedBattle = LoadFixed();
+            var localJson = Resources.Load<TextAsset>(PlayerPath).text.Replace("local-1000-alpha", "opponent-5503-alpha");
+            var local = LocalPlayerStateLoader.LoadFromJson(fixedBattle.Catalog, localJson).State;
+            var opponent = LocalPlayerStateLoader.LoadFromResources(CatalogPath, TemporaryOpponentPath).State;
+            var before = local.Snapshot.CanonicalSummary;
+            var seal = typeof(PreparationBattleSealer).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .SingleOrDefault(method => method.Name == "TrySeal" && method.GetParameters().Length == 7 && method.GetParameters()[1].ParameterType == typeof(PlayerState));
+
+            Assert.NotNull(seal, "The sealer must accept independent Home and Away PlayerState instances.");
+            var arguments = new object[] { local, opponent, fixedBattle.Catalog, "duplicate-id", fixedBattle.Input.MaxTicks, null, string.Empty };
+            Assert.IsFalse((bool)seal.Invoke(null, arguments));
+            var error = (string)arguments[6];
+            StringAssert.Contains("player.unitId.conflict", error);
+            StringAssert.Contains(local.PlayerId, error);
+            StringAssert.Contains(opponent.PlayerId, error);
+            StringAssert.Contains("opponent-5503-alpha", error);
+            Assert.AreEqual(before, local.Snapshot.CanonicalSummary);
+        }
+
         private static LocalBattleLoadResult LoadFixed()
         {
             var result = LocalBattleLoader.LoadFromResources(CatalogPath, FixedBattlePath);
@@ -99,6 +124,13 @@ namespace ArknoNights.Battle.Tests
         private static PlayerState LoadPlayer()
         {
             var result = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerPath);
+            Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
+            return result.State;
+        }
+
+        private static PlayerState LoadOpponent()
+        {
+            var result = LocalPlayerStateLoader.LoadFromResources(CatalogPath, TemporaryOpponentPath);
             Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
             return result.State;
         }
