@@ -59,7 +59,7 @@ Windows 与 Android 均使用 .NET socket API。Android 在连接页期间申请
 
 ## 组件边界
 
-- `ARKnoNIGHTS.Lobby`：纯 C# 的协议 DTO、房间号、快照、连接状态与可测试的消息编解码；不得依赖 Unity 场景或 Battle Core。
+- `ARKnoNIGHTS.Lobby`：纯 C# 的协议 DTO、房间号、快照、连接状态、可测试的消息编解码与 Android multicast lock 抽象；不得依赖 Unity 场景或 Battle Core。
 - `LanRoomHost` / `LanRoomClient`：负责 UDP/TCP、取消、超时、线程切换和向上层发布只读快照；不得修改战斗数据。
 - `LanLobbyController`：唯一的 Unity 会话协调器，控制主界面、房间页、身份偏好、`PreparationBattleLoopController` 的大厅门控与战斗入口切换。
 - `LanLobbyView`：只创建与刷新 uGUI 视图，使用新导入的 `autochessouter` 素材和现有正式 HUD 字体；不保存第二份业务状态。

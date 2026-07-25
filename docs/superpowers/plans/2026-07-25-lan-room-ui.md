@@ -32,7 +32,7 @@
 | Assets/Game/Runtime/Lobby/LanRoomHost.cs / LanRoomClient.cs | TCP listener/client、心跳、快照及停止。 |
 | Assets/Game/Runtime/Initial/LanLobbyController.cs | Unity 会话协调、身份偏好、大厅门控、战斗入口。 |
 | Assets/Game/Runtime/Initial/LanLobbyView.cs / LanLobbyLayout.cs | 只渲染 uGUI 首页/房间页和响应布局。 |
-| Assets/Game/Runtime/Initial/AndroidMulticastLock.cs | Android multicast lock；其他平台无副作用。 |
+| Assets/Game/Runtime/Lobby/AndroidMulticastLock.cs | Android multicast lock；其他平台无副作用；归入可测试的 Lobby 程序集。 |
 | Assets/Game/Runtime/Initial/PreparationBattleLoopController.cs | 仅追加大厅门控 API。 |
 | Assets/Game/Editor/UI/LobbyAssetImportSetup.cs | 导入白名单贴图的 Sprite 设置。 |
 | Assets/Plugins/Android/AndroidManifest.xml | LAN 所需 Android 权限。 |
@@ -243,7 +243,7 @@ Expected: loopback join, full snapshot, ready, start, RTT, leave, port release, 
 
 **Files:**
 
-- Create: Assets/Game/Runtime/Initial/AndroidMulticastLock.cs
+- Create: Assets/Game/Runtime/Lobby/AndroidMulticastLock.cs
 - Create: Assets/Plugins/Android/AndroidManifest.xml
 - Create: Assets/Game/Tests/PlayMode/Lobby/AndroidMulticastLockPlayModeTests.cs
 - Modify: ProjectSettings/ProjectSettings.asset
@@ -286,7 +286,7 @@ Expected: Editor path executes no Android calls; manifest is valid and no unrela
 
 - [ ] **Step 5: Commit**
 
-    git add Assets/Game/Runtime/Initial/AndroidMulticastLock.cs Assets/Plugins/Android/AndroidManifest.xml Assets/Game/Tests/PlayMode/Lobby/AndroidMulticastLockPlayModeTests.cs ProjectSettings/ProjectSettings.asset
+    git add Assets/Game/Runtime/Lobby/AndroidMulticastLock.cs Assets/Plugins/Android/AndroidManifest.xml Assets/Game/Tests/PlayMode/Lobby/AndroidMulticastLockPlayModeTests.cs ProjectSettings/ProjectSettings.asset
     git commit -m "feat: enable Android LAN multicast discovery"
 
 ## Task 5: Import and audit the only allowed UI assets
