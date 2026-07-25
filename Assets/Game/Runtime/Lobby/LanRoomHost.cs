@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -21,11 +22,14 @@ namespace ArknoNights.Lobby
         private readonly bool acceptsAnyRoomCode;
         private readonly Task acceptTask;
         private readonly Task heartbeatTask;
+        private readonly ConcurrentQueue<LobbyRoomSnapshot> pendingSnapshots = new ConcurrentQueue<LobbyRoomSnapshot>();
+        private LobbyRoomSnapshot publishedSnapshot;
         private bool stopped;
 
         private LanRoomHost(LobbyProfile hostProfile, int tcpPort, bool acceptsAnyRoomCode)
         {
             room = LobbyRoomState.CreateHost(hostProfile, CreateRoomCode());
+            publishedSnapshot = room.Snapshot;
             this.acceptsAnyRoomCode = acceptsAnyRoomCode;
             listener = new TcpListener(IPAddress.Any, tcpPort);
             listener.Start();
@@ -35,12 +39,17 @@ namespace ArknoNights.Lobby
 
         public LobbyRoomSnapshot Snapshot
         {
-            get { lock (gate) return CreateSnapshotWithLatency(); }
+            get { return publishedSnapshot; }
         }
 
         public string RoomCode => Snapshot.RoomCode;
         public int TcpPort => ((IPEndPoint)listener.LocalEndpoint).Port;
         public IPEndPoint LoopbackEndpoint => new IPEndPoint(IPAddress.Loopback, TcpPort);
+
+        public void Tick()
+        {
+            while (pendingSnapshots.TryDequeue(out var snapshot)) publishedSnapshot = snapshot;
+        }
 
         public static Task<LanRoomHost> StartAsync(LobbyProfile hostProfile)
         {
@@ -72,13 +81,16 @@ namespace ArknoNights.Lobby
         public bool TryStart(string playerId, out LobbyJoinFailure failure)
         {
             bool started;
+            LobbyRoomSnapshot snapshot;
             lock (gate)
             {
                 started = room.TryStart(playerId, out failure);
+                snapshot = started ? CreateSnapshotWithLatency() : null;
             }
 
             if (started)
             {
+                PublishSnapshot(snapshot);
                 _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.Start));
             }
 
@@ -116,13 +128,19 @@ namespace ArknoNights.Lobby
         public void SetReadyForTests(string playerId, bool isReady)
         {
             bool changed;
+            LobbyRoomSnapshot snapshot;
             lock (gate)
             {
                 changed = room.TrySetReady(playerId, playerId, isReady, out var failure);
                 if (!changed) throw new InvalidOperationException("Could not update readiness: " + failure + ".");
+                snapshot = CreateSnapshotWithLatency();
             }
 
-            if (changed) _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
+            if (changed)
+            {
+                PublishSnapshot(snapshot);
+                _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
+            }
         }
 
         private async Task AcceptLoopAsync()
@@ -172,7 +190,13 @@ namespace ArknoNights.Lobby
             if (kind == LobbyMessageKind.SetReady)
             {
                 bool changed;
-                lock (gate) changed = room.TrySetReady(message.playerId, message.playerId, message.isReady, out _);
+                LobbyRoomSnapshot snapshot;
+                lock (gate)
+                {
+                    changed = room.TrySetReady(message.playerId, message.playerId, message.isReady, out _);
+                    snapshot = changed ? CreateSnapshotWithLatency() : null;
+                }
+                if (changed) PublishSnapshot(snapshot);
                 if (changed) await BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot);
             }
             else if (kind == LobbyMessageKind.Leave)
@@ -189,13 +213,14 @@ namespace ArknoNights.Lobby
                 {
                     connection.MissedPongs = 0;
                     connection.LatencyMilliseconds = Math.Max(0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.sentUnixMilliseconds);
+                    PublishSnapshot(CreateSnapshotWithLatency());
                 }
             }
         }
 
         private async Task HandleJoinAsync(GuestConnection connection, LobbyWireMessage message)
         {
-            if ((!acceptsAnyRoomCode && !string.Equals(message.roomCode, RoomCode, StringComparison.Ordinal))
+            if ((!acceptsAnyRoomCode && !string.Equals(message.roomCode, CurrentRoomCode, StringComparison.Ordinal))
                 || connection.PlayerId != null)
             {
                 await connection.SendAsync(CreateMessage(LobbyMessageKind.Reject, message.playerId, 0, null, LobbyJoinFailure.InvalidRoomCode.ToString()));
@@ -213,6 +238,7 @@ namespace ArknoNights.Lobby
                     connection.PlayerId = profile.PlayerId;
                     guestsByPlayerId[profile.PlayerId] = connection;
                     snapshot = CreateSnapshotWithLatency();
+                    PublishSnapshot(snapshot);
                 }
             }
 
@@ -286,6 +312,7 @@ namespace ArknoNights.Lobby
         private void RemoveConnection(GuestConnection connection)
         {
             bool changed = false;
+            LobbyRoomSnapshot snapshot = null;
             lock (gate)
             {
                 connections.Remove(connection);
@@ -293,11 +320,13 @@ namespace ArknoNights.Lobby
                 {
                     guestsByPlayerId.Remove(connection.PlayerId);
                     changed = room.RemovePlayer(connection.PlayerId);
+                    if (changed) snapshot = CreateSnapshotWithLatency();
                     connection.PlayerId = null;
                 }
             }
 
             connection.Close();
+            if (changed) PublishSnapshot(snapshot);
             if (changed && !stopped) _ = BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot);
         }
 
@@ -327,6 +356,7 @@ namespace ArknoNights.Lobby
                 do { replacement = CreateRoomCode(); }
                 while (string.Equals(replacement, before.RoomCode, StringComparison.Ordinal));
                 room = RecreateRoomWithCode(before, replacement);
+                PublishSnapshot(CreateSnapshotWithLatency());
             }
 
             _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
@@ -357,12 +387,22 @@ namespace ArknoNights.Lobby
             {
                 protocolVersion = LobbyProtocol.ProtocolVersion,
                 kind = kind.ToString(),
-                roomCode = RoomCode,
+                roomCode = CurrentRoomCode,
                 playerId = playerId,
                 sentUnixMilliseconds = sentUnixMilliseconds,
                 snapshotJson = snapshot == null ? null : LanRoomTransport.SerializeSnapshot(snapshot),
                 rejectionCode = rejection
             };
+        }
+
+        private void PublishSnapshot(LobbyRoomSnapshot snapshot)
+        {
+            if (snapshot != null) pendingSnapshots.Enqueue(snapshot);
+        }
+
+        private string CurrentRoomCode
+        {
+            get { lock (gate) return room.Snapshot.RoomCode; }
         }
 
         private static string CreateRoomCode()

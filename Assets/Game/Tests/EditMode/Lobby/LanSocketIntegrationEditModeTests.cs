@@ -26,7 +26,7 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(client.Snapshot.Members.Select(member => member.PlayerId), Is.EquivalentTo(new[] { "host", "guest" }));
 
                 Run(() => client.SetReadyAsync(true));
-                WaitUntil(() => host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady, TimeSpan.FromSeconds(2));
+                WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady; }, TimeSpan.FromSeconds(2));
                 host.SetReadyForTests("host", true);
                 Assert.That(host.TryStart("host", out var failure), Is.True, failure.ToString());
 
@@ -36,7 +36,7 @@ namespace ArknoNights.Lobby.Tests
                 WaitUntil(() => { client.Tick(); return client.LatencyMilliseconds >= 0; }, TimeSpan.FromSeconds(2));
 
                 Run(() => client.LeaveAsync());
-                WaitUntil(() => host.Snapshot.Members.Count == 1, TimeSpan.FromSeconds(2));
+                WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Count == 1; }, TimeSpan.FromSeconds(2));
             }
             finally
             {
@@ -142,6 +142,26 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
+        public void HostSnapshot_IsPublishedOnlyWhenMainThreadTicks()
+        {
+            var host = Run(() => LanRoomHost.StartAsync(Profile("host")));
+            var client = Run(() => LanRoomClient.JoinAsync(host.LoopbackEndpoint, host.RoomCode, Profile("guest")));
+            try
+            {
+                Assert.That(host.Snapshot.Members.Select(member => member.PlayerId), Is.EquivalentTo(new[] { "host" }));
+
+                host.Tick();
+
+                Assert.That(host.Snapshot.Members.Select(member => member.PlayerId), Is.EquivalentTo(new[] { "host", "guest" }));
+            }
+            finally
+            {
+                Run(() => client.StopAsync());
+                Run(() => host.StopAsync());
+            }
+        }
+
+        [Test]
         public void HostDiscoveryCollision_RegeneratesAuthoritativeCodeAndRetainsExistingGuests()
         {
             var host = Run(() => LanRoomHost.StartAsync(Profile("host")));
@@ -151,7 +171,7 @@ namespace ArknoNights.Lobby.Tests
             try
             {
                 Run(() => existingGuest.SetReadyAsync(true));
-                WaitUntil(() => host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady, TimeSpan.FromSeconds(2));
+                WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady; }, TimeSpan.FromSeconds(2));
                 var originalCode = host.RoomCode;
                 discovery = host.CreateDiscoveryService();
                 discovery.Start();
@@ -166,6 +186,7 @@ namespace ArknoNights.Lobby.Tests
                 WaitUntil(() =>
                 {
                     discovery.Tick(DateTimeOffset.UtcNow);
+                    host.Tick();
                     return host.RoomCode != originalCode && host.RoomCode == discovery.LocalRoomCode;
                 }, TimeSpan.FromSeconds(2));
 
