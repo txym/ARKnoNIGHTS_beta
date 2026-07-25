@@ -93,9 +93,9 @@ namespace ArknoNights.Battle.Tests
                 valid.Replace("battle-fixture-v1", "unknown-v99"),
                 valid.Replace("unit-away-1", "unit-home-1"),
                 valid.Replace("guard-beta", "guard-alpha"),
-                valid.Replace("guard-alpha\", \"zone\": \"Deployed", "missing-type\", \"zone\": \"Deployed"),
+                valid.Replace("\"unitId\": \"unit-home-1\", \"typeId\": \"guard-alpha\"", "\"unitId\": \"unit-home-1\", \"typeId\": \"missing-type\""),
                 valid.Replace("\"formationX\": 4, \"formationY\": 2", "\"formationX\": 5, \"formationY\": 1"),
-                valid.Replace("\"zone\": \"Staging\", \"buffs\": []", "\"zone\": \"Staging\", \"formationX\": 1, \"formationY\": 1, \"buffs\": []"),
+                valid.Replace("\"zone\": \"Staging\", \"eliteLevel\": 0, \"buffs\": []", "\"zone\": \"Staging\", \"formationX\": 1, \"formationY\": 1, \"eliteLevel\": 0, \"buffs\": []"),
                 valid.Replace("\"attackIntervalTicks\": 20", "\"attackIntervalTicks\": 0")
             };
             foreach (var json in variants)
@@ -442,7 +442,7 @@ namespace ArknoNights.Battle.Tests
             var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/arcslma.json"));
             StringAssert.Contains("\"schemaVersion\": \"unit-source-v1\"", sourceGopro);
             StringAssert.Contains("\"resourceKey\": \"gopro\"", sourceGopro);
-            StringAssert.Contains("\"displayNameZhHans\": \"\"", sourceGopro);
+            StringAssert.Contains("\"displayNameZhHans\": \"狂暴的猎狗pro\"", sourceGopro);
             StringAssert.Contains("\"skillDescriptionZhHans\": \"\"", sourceArcslma);
             StringAssert.Contains("\"attackAnimationDurationSeconds\": 1.0", sourceGopro);
             StringAssert.Contains("\"attackAnimationDurationSeconds\": 2.666667", sourceArcslma);

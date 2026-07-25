@@ -26,8 +26,23 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private const string AtlasPath = "UI/Texture/SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged";
     private const string ClockPath = "UI/Texture/BattleStatusPanelClockIcon_Transparent";
     private const string GoldIconPath = "UI/Texture/round_sources_icon";
+    private static readonly Color InformationEntryBackgroundTint = new Color(.32f, .32f, .32f, .94f);
+    private static readonly Color PlayerHealthTextColor = new Color(1f, .47058824f, .47058824f);
+    private static readonly IReadOnlyDictionary<string, InformationIconSource> InformationIcons = new Dictionary<string, InformationIconSource>(StringComparer.Ordinal)
+    {
+        { "maxHp", new InformationIconSource("UI/Texture/UnitInformationPanelHealthIcon", "UnitInformationPanelHealthIcon") },
+        { "moveSpeed", new InformationIconSource(null, "UnitInformationPanelMoveSpeedIcon") },
+        { "attack", new InformationIconSource("UI/Texture/UnitInformationPanelAttackIcon", "UnitInformationPanelAttackIcon") },
+        { "attackInterval", new InformationIconSource("UI/Texture/UnitInformationPanelAttackIntervalIcon", "UnitInformationPanelAttackIntervalIcon") },
+        { "defense", new InformationIconSource("UI/Texture/UnitInformationPanelDefenseIcon", "UnitInformationPanelDefenseIcon") },
+        { "magicResistance", new InformationIconSource("UI/Texture/UnitInformationPanelMagicResistanceIcon", "UnitInformationPanelMagicResistanceIcon") },
+        { "block", new InformationIconSource("UI/Texture/UnitInformationPanelBlockCountIcon", "UnitInformationPanelBlockCountIcon") },
+        { "deploymentCost", new InformationIconSource("UI/Texture/UnitInformationPanelDeploymentCostIcon", "UnitInformationPanelDeploymentCostIcon") },
+        { "targetValue", new InformationIconSource(null, "UnitInformationPanelTargetValueIcon") }
+    };
     private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
     private readonly Dictionary<int, Sprite> raritySprites = new Dictionary<int, Sprite>();
+    private readonly Dictionary<string, Sprite> informationIcons = new Dictionary<string, Sprite>(StringComparer.Ordinal);
     private StagingHudController hud;
     private StateDrivenDeploymentController deployment;
     private PreparationBattleLoopController loop;
@@ -52,11 +67,28 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private Text statusMiddle;
     private Text statusRight;
     private string selectedUnitId;
+    private string visualFixtureId;
     private bool selectedBattleEnemy;
     private bool initialized;
 
     public string SelectedUnitId => selectedUnitId;
     public bool SelectedBattleEnemy => selectedBattleEnemy;
+
+    /// <summary>Capture/test-only layout data. It never writes PlayerState, the unit catalog, or battle input.</summary>
+    public void ShowVisualFixtureForCapture(string fixtureId)
+    {
+        if (!string.Equals(fixtureId, "empty-name", StringComparison.Ordinal) && !string.Equals(fixtureId, "medium-name", StringComparison.Ordinal))
+            throw new ArgumentOutOfRangeException(nameof(fixtureId));
+        visualFixtureId = fixtureId;
+        Refresh();
+    }
+
+    /// <summary>Returns rendering to the selected production unit after an explicit capture/test fixture.</summary>
+    public void ClearVisualFixtureForCapture()
+    {
+        visualFixtureId = null;
+        Refresh();
+    }
 
     private IEnumerator Start()
     {
@@ -197,31 +229,32 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         statusClockIcon = Image("Clock", panel, Resources.Load<Sprite>(ClockPath)); statusClockIcon.rectTransform.anchorMin = statusClockIcon.rectTransform.anchorMax = new Vector2(.42f, .5f); statusClockIcon.rectTransform.sizeDelta = new Vector2(48f, 48f); statusClockIcon.color = new Color(.72f, .72f, .72f, 1f);
         statusMiddle = Text("Middle", panel, 28, TextAnchor.MiddleCenter, Color.white); Position(statusMiddle.rectTransform, .57f, .5f, 120f, 50f);
         var health = Image("PlayerHealthIcon", panel, Sprite("BattleStatusPanelPlayerHealthIcon")); health.rectTransform.anchorMin = health.rectTransform.anchorMax = new Vector2(.75f, .5f); health.rectTransform.sizeDelta = new Vector2(60f, 53f); health.preserveAspect = true;
-        statusRight = NumberText("PlayerHealth", panel, 28, TextAnchor.MiddleCenter, new Color(1f, .47058824f, .47058824f)); Position(statusRight.rectTransform, .89f, .5f, 80f, 50f); statusRight.text = "--";
+        statusRight = NumberText("PlayerHealth", panel, 28, TextAnchor.MiddleCenter, PlayerHealthTextColor); Position(statusRight.rectTransform, .89f, .5f, 80f, 50f); statusRight.text = "--";
     }
 
     private void BuildInformationPanel()
     {
         infoPanel = Rect("UnitInformationPanel", root); infoPanel.anchorMin = new Vector2(0f, 0f); infoPanel.anchorMax = new Vector2(0f, 1f); infoPanel.pivot = new Vector2(0f, 0f); infoPanel.sizeDelta = new Vector2(720f, 0f);
+        var layout = UnitInformationPanelLayout.ForPanelWidth(infoPanel.sizeDelta.x);
         var upper = Image("UpperBackground", infoPanel, Sprite("UnitInformationPanelUpperBackground")); upper.rectTransform.anchorMin = new Vector2(0f, .475f); upper.rectTransform.anchorMax = Vector2.one; upper.rectTransform.offsetMin = upper.rectTransform.offsetMax = Vector2.zero; upper.preserveAspect = false;
         var lower = Image("LowerBackground", infoPanel, Sprite("UnitInformationPanelLowerBackground")); lower.rectTransform.anchorMin = Vector2.zero; lower.rectTransform.anchorMax = new Vector2(1f, .475f); lower.rectTransform.offsetMin = lower.rectTransform.offsetMax = Vector2.zero; lower.preserveAspect = false;
-        portrait = Image("Portrait", infoPanel, null); Position(portrait.rectTransform, .2f, .79f, 180f, 180f); portrait.preserveAspect = true;
+        portrait = Image("Portrait", infoPanel, null); PositionFromTopLeft(portrait.rectTransform, layout.Portrait); portrait.preserveAspect = true;
         rarityIcon = Image("Rarity", portrait.rectTransform, null); rarityIcon.rectTransform.anchorMin = rarityIcon.rectTransform.anchorMax = new Vector2(0f, 1f); rarityIcon.rectTransform.pivot = new Vector2(0f, 1f); rarityIcon.rectTransform.anchoredPosition = Vector2.zero; rarityIcon.rectTransform.sizeDelta = new Vector2(45f, 45f); rarityIcon.preserveAspect = true;
         eliteIcon = Image("Elite", portrait.rectTransform, null); eliteIcon.rectTransform.anchorMin = eliteIcon.rectTransform.anchorMax = new Vector2(0f, 0f); eliteIcon.rectTransform.pivot = new Vector2(0f, 0f); eliteIcon.rectTransform.anchoredPosition = Vector2.zero; eliteIcon.rectTransform.sizeDelta = new Vector2(48f, 40f); eliteIcon.preserveAspect = true;
-        unitName = Text("UnitName", infoPanel, 28, TextAnchor.MiddleLeft, Color.white); Position(unitName.rectTransform, .48f, .88f, 320f, 45f);
-        combatSummary = Text("CombatSummary", infoPanel, 20, TextAnchor.MiddleLeft, new Color(.8f, .8f, .8f)); Position(combatSummary.rectTransform, .48f, .835f, 320f, 34f);
-        var target = Rect("TargetValue", infoPanel); Position(target, .2f, .655f, 180f, 42f);
-        var targetBack = Image("Background", target, Sprite("UnitInformationPanelStatEntryBackground")); Stretch(targetBack.rectTransform); targetBack.preserveAspect = false;
-        var targetIcon = Image("Icon", target, Sprite("UnitInformationPanelTargetValueIcon")); Position(targetIcon.rectTransform, .14f, .5f, 28f, 28f);
-        targetValue = NumberText("Value", target, 23, TextAnchor.MiddleRight, Color.white); Position(targetValue.rectTransform, .64f, .5f, 105f, 34f);
-        AddStat("maxHp", "\u751f\u547d\u503c", .48f, .765f);
-        AddStat("moveSpeed", "\u79fb\u52a8\u901f\u5ea6", .76f, .765f);
-        AddStat("attack", "\u653b\u51fb\u529b", .48f, .70f);
-        AddStat("attackInterval", "\u653b\u51fb\u95f4\u9694", .76f, .70f);
-        AddStat("defense", "\u9632\u5fa1\u529b", .48f, .635f);
-        AddStat("magicResistance", "\u6cd5\u672f\u6297\u6027", .76f, .635f);
-        AddStat("block", "\u963b\u6321\u6570", .48f, .57f);
-        AddStat("deploymentCost", "\u90e8\u7f72\u8d39\u7528", .76f, .57f);
+        unitName = Text("UnitName", infoPanel, 36, TextAnchor.MiddleLeft, Color.white); PositionFromTopLeft(unitName.rectTransform, layout.UnitName);
+        combatSummary = Text("CombatSummary", infoPanel, 26, TextAnchor.MiddleLeft, new Color(.8f, .8f, .8f)); PositionFromTopLeft(combatSummary.rectTransform, layout.CombatSummary);
+        var target = Rect("TargetValue", infoPanel); PositionFromTopLeft(target, layout.TargetValue);
+        var targetBack = Image("Background", target, Sprite("UnitInformationPanelStatEntryBackground")); Stretch(targetBack.rectTransform); targetBack.preserveAspect = false; targetBack.color = InformationEntryBackgroundTint;
+        var targetIcon = Image("Icon", target, LoadInformationIcon("targetValue")); PositionFromTopLeft(targetIcon.rectTransform, layout.TargetValueIcon); targetIcon.preserveAspect = true;
+        targetValue = NumberText("Value", target, 29, TextAnchor.MiddleRight, PlayerHealthTextColor); PositionFromTopLeft(targetValue.rectTransform, layout.TargetValueValue);
+        AddStat("maxHp", "\u751f\u547d\u503c", layout.StatEntry(0, 0), layout);
+        AddStat("moveSpeed", "\u79fb\u52a8\u901f\u5ea6", layout.StatEntry(1, 0), layout);
+        AddStat("attack", "\u653b\u51fb\u529b", layout.StatEntry(0, 1), layout);
+        AddStat("attackInterval", "\u653b\u51fb\u95f4\u9694", layout.StatEntry(1, 1), layout);
+        AddStat("defense", "\u9632\u5fa1\u529b", layout.StatEntry(0, 2), layout);
+        AddStat("magicResistance", "\u6cd5\u672f\u6297\u6027", layout.StatEntry(1, 2), layout);
+        AddStat("block", "\u963b\u6321\u6570", layout.StatEntry(0, 3), layout);
+        AddStat("deploymentCost", "\u90e8\u7f72\u8d39\u7528", layout.StatEntry(1, 3), layout);
         // Fig. 2–4 use the native 556×12 bar and place it at the lower edge of the unit overview.
         var hpBack = Image("HealthBackground", infoPanel, Sprite("UnitInformationPanelHealthBarBackground")); hpBack.rectTransform.anchorMin = hpBack.rectTransform.anchorMax = new Vector2(0f, 1f); hpBack.rectTransform.pivot = new Vector2(0f, 1f); hpBack.rectTransform.anchoredPosition = new Vector2(0f, -490f); hpBack.rectTransform.sizeDelta = new Vector2(556f, 12f); hpBack.preserveAspect = false;
         hpFill = Image("HealthFill", hpBack.rectTransform, Sprite("UnitInformationPanelHealthBarFill")); hpFill.rectTransform.anchorMin = hpFill.rectTransform.anchorMax = new Vector2(0f, .5f); hpFill.rectTransform.pivot = new Vector2(0f, .5f); hpFill.rectTransform.sizeDelta = new Vector2(556f, 12f); hpFill.preserveAspect = false;
@@ -257,6 +290,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
             statusMiddle.text = Mathf.CeilToInt(loop.RemainingPreparationSeconds).ToString();
         }
         statusRight.text = "--";
+        if (!string.IsNullOrEmpty(visualFixtureId)) { RefreshVisualFixture(); return; }
         RefreshInformation();
     }
 
@@ -335,6 +369,33 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         hpValue.text = valueText;
     }
 
+    private void RefreshVisualFixture()
+    {
+        if (infoPanel == null) return;
+        infoPanel.gameObject.SetActive(true);
+        if (catalog.TryGet("1000", out var entry))
+        {
+            portrait.sprite = Resources.Load<Sprite>(entry.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
+            rarityIcon.sprite = LoadRaritySprite(entry.Rarity); rarityIcon.enabled = rarityIcon.sprite != null;
+            eliteIcon.sprite = Sprite("StagingSlotElite0Icon"); eliteIcon.enabled = eliteIcon.sprite != null;
+        }
+        unitName.text = string.Equals(visualFixtureId, "empty-name", StringComparison.Ordinal) ? "--" : "视觉验证单位";
+        combatSummary.text = "近战  物理";
+        targetValue.text = "2";
+        SetStat("maxHp", "18000");
+        SetStat("moveSpeed", "1.9");
+        SetStat("attack", "1100");
+        SetStat("attackInterval", "4");
+        SetStat("defense", "0");
+        SetStat("magicResistance", "20");
+        SetStat("block", "1");
+        SetStat("deploymentCost", "12");
+        hpFill.rectTransform.sizeDelta = new Vector2(556f, 12f);
+        hpValueRoot.anchoredPosition = new Vector2(556f, -490f);
+        hpValue.fontSize = 20;
+        hpValue.text = "18000/18000";
+    }
+
     private bool TryResolveSelectedDetail(out UnitDetailSnapshot detail)
     {
         detail = null;
@@ -348,13 +409,31 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         return hud?.Snapshot != null && UnitDetailResolver.TryResolvePreparation(hud.Snapshot, catalog, selectedUnitId, out detail);
     }
 
-    private void AddStat(string key, string label, float x, float y)
+    private void AddStat(string key, string label, UnitInformationPanelLayout.Placement placement, UnitInformationPanelLayout layout)
     {
-        var entry = Rect("Stat_" + key, infoPanel); Position(entry, x, y, 190f, 40f);
-        var background = Image("Background", entry, Sprite("UnitInformationPanelStatEntryBackground")); Stretch(background.rectTransform); background.preserveAspect = false;
-        var labelText = Text("Label", entry, 16, TextAnchor.MiddleLeft, new Color(.74f, .74f, .74f)); Position(labelText.rectTransform, .08f, .5f, 105f, 32f); labelText.text = label;
-        var value = NumberText("Value", entry, 20, TextAnchor.MiddleRight, Color.white); Position(value.rectTransform, .77f, .5f, 74f, 32f);
+        var entry = Rect("Stat_" + key, infoPanel); PositionFromTopLeft(entry, placement);
+        var background = Image("Background", entry, Sprite("UnitInformationPanelStatEntryBackground")); Stretch(background.rectTransform); background.preserveAspect = false; background.color = InformationEntryBackgroundTint;
+        var icon = Image("Icon", entry, LoadInformationIcon(key)); PositionFromTopLeft(icon.rectTransform, layout.StatIcon); icon.preserveAspect = true;
+        var labelText = Text("Label", entry, 23, TextAnchor.MiddleLeft, new Color(.74f, .74f, .74f)); PositionFromTopLeft(labelText.rectTransform, layout.StatLabel); labelText.text = label;
+        var value = NumberText("Value", entry, 29, TextAnchor.MiddleRight, Color.white); PositionFromTopLeft(value.rectTransform, layout.StatValue);
         statValues.Add(key, value);
+    }
+
+    private Sprite LoadInformationIcon(string key)
+    {
+        if (informationIcons.TryGetValue(key, out var cached)) return cached;
+        if (!InformationIcons.TryGetValue(key, out var source)) { Debug.LogError("[UI-INFO-002][icon.key.missing] key=" + key, this); return null; }
+        Sprite icon;
+        if (string.IsNullOrEmpty(source.TextureResourcePath)) icon = Sprite(source.SpriteName);
+        else
+        {
+            var texture = Resources.Load<Texture2D>(source.TextureResourcePath);
+            icon = texture == null ? null : UnityEngine.Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+            if (icon != null) icon.name = source.SpriteName;
+        }
+        if (icon == null) Debug.LogError("[UI-INFO-002][icon.resource.missing] key=" + key + "; source=" + source.DisplayName, this);
+        informationIcons[key] = icon;
+        return icon;
     }
 
     private void SetStat(string key, string value) { if (statValues.TryGetValue(key, out var target)) target.text = value; }
@@ -376,7 +455,21 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private static Image Image(string name, Transform parent, Sprite sprite) { var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image)); value.transform.SetParent(parent, false); var image = value.GetComponent<Image>(); image.sprite = sprite; image.raycastTarget = false; return image; }
     private static Text Text(string name, Transform parent, int size, TextAnchor alignment, Color color) { var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text)); value.transform.SetParent(parent, false); var text = value.GetComponent<Text>(); text.font = StagingHudController.FormalUiFont; text.fontStyle = FontStyle.Normal; text.resizeTextForBestFit = false; text.fontSize = size; text.alignment = alignment; text.color = color; text.raycastTarget = false; text.horizontalOverflow = HorizontalWrapMode.Overflow; text.verticalOverflow = VerticalWrapMode.Overflow; return text; }
     private static void Stretch(RectTransform target) { target.anchorMin = Vector2.zero; target.anchorMax = Vector2.one; target.offsetMin = target.offsetMax = Vector2.zero; }
+    private static void PositionFromTopLeft(RectTransform target, UnitInformationPanelLayout.Placement placement) { target.anchorMin = target.anchorMax = new Vector2(0f, 1f); target.pivot = new Vector2(0f, 1f); target.anchoredPosition = new Vector2(placement.Left, -placement.Top); target.sizeDelta = new Vector2(placement.Width, placement.Height); }
     private static void Position(RectTransform target, float x, float y, float width, float height) { target.anchorMin = target.anchorMax = new Vector2(x, y); target.pivot = new Vector2(.5f, .5f); target.sizeDelta = new Vector2(width, height); }
+
+    private sealed class InformationIconSource
+    {
+        public InformationIconSource(string textureResourcePath, string spriteName)
+        {
+            TextureResourcePath = textureResourcePath;
+            SpriteName = spriteName;
+        }
+
+        public string TextureResourcePath { get; }
+        public string SpriteName { get; }
+        public string DisplayName => string.IsNullOrEmpty(TextureResourcePath) ? SpriteName : TextureResourcePath;
+    }
 }
 
 internal static class FormalBattleHudUi005Bootstrap

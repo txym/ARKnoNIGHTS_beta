@@ -273,6 +273,7 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `FormalBattleHudUi005` 在既有 `FormalBattleHudRoot` 上建立正式顶部状态栏、玩家 Cost/占位资源区、待部署槽和单位信息面板；它只读取既有 `PlayerState`、`PreparationBattleLoopController`、`StateDrivenDeploymentController` 与 BattleDemo 的状态，不复制玩家状态或重新计算战斗结果。
 - 信息面板选择由统一路由维护：选择待部署槽、已部署单位或战斗敌人会清除另两个来源，避免多个单位面板同时成为权威。面板血条独立于 TASK-007 的世界空间条；`HealthValue` 左上锚定在剩余血条右上，数值超过 9 个字符时缩小字号。
 - 中文字体为 Noto Sans SC normal，数字字体为 Novecento Wide Normal Regular；未确认的赤金、玩家生命和页签业务保持显式占位或禁用。
-- `UI005CaptureSuite` 通过 Player 命令行入口产出固定状态 PNG 与 JSON 清单，便于本地审查。当前清单仅有分辨率、阶段、选择、Cost 和倒计时，尚不是 UI-005 所要求的完整布局 manifest；它只能作为部分视觉证据，不能替代逐图审查和完整 GUI 流程验收。
+- `UI005CaptureSuite` 通过 Player 命令行入口产出固定状态 PNG 与布局 JSON 清单，记录 capture stage、Canvas scale、详情组件 screen rect、文本字体/字号/对齐/字符串、图标资源和参考映射。默认 `-uiCaptureSuite` 只使用真实生产状态；额外的 `-uiCaptureVisualFixture` 才会渲染空名和中等长度中文名夹具，且不会写入 `PlayerState`、单位目录或战斗输入。`scripts/ExportUiInfoEvidence.ps1` 基于清单生成面板裁切、参考并排图和调整记录，作为逐图审查的可追溯证据，不能替代人工 GUI 流程验收。
+- UI-INFO-002 将 `UnitInformationPanelLayout` 作为上半部统一缩放的几何来源；`FormalBattleHudUi005` 构建时缓存九个图标，并为默认导入的独立 PNG 一次性创建 Sprite。
 - `PreparationBattleLoopController` 是 `FormalBattleHudRoot` 的运行时幂等桥。它等待 UI-002/003 初始化，加载 Player-safe catalog 与固定 `task004a-real-1v1` 的 Away 快照，锁定输入并隐藏 `PreparationUnitViews` 后启动运行时战斗；Completed 时释放 `BattleDemoViews`、恢复准备投影/交互并重置时钟。场景重载通过 `SceneManager.sceneLoaded` 重新附加，且不会创建多个桥。
 - `BattleDemoCoordinator.StartRuntimeBattle` 是固定 Resources 入口之外的加法入口：它接收已验证 `BattleInput + UnitCatalog`，仍由局部 `BattleRunner` 先计算再复用原 Playback 生命周期。正式循环模式会阻止调试 Start/Recalculate 重载固定输入，但保留暂停、速度、观察视角和同一封存结果 Replay。Core 的 HP、死亡和 winner 未回写 PlayerState。

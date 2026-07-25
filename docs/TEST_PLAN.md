@@ -489,6 +489,13 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - Focused PlayMode：10 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135337/PlayModeResults.xml`。
 - Windows Player 构建、capture suite 运行与人工视觉比对尚未执行。
 
+## 33. UI-INFO-002 信息面板局部视觉验证（2026-07-25）
+
+- Player 证据位于 `Artifacts/UI-INFO-002/00-baseline` 至 `10-final`。`scripts/ExportUiInfoEvidence.ps1` 为各阶段生成原始 PNG、面板裁切、JSON manifest、图 6 并排图和调整记录；最终证据为 `Artifacts/UI-INFO-002/10-final/captures/`。
+- TDD 夹具入口先按预期失败（入口不存在），实现后单项 PlayMode 转绿。夹具仅经 `-uiCaptureVisualFixture` 显式触发，覆盖 `--`、中等长度中文名和 `18000/18000` 的 20pt HP 文本。
+- 全量 EditMode：`Artifacts/UI-INFO-002/10-final/verification/EditModeResults.xml`，`77 passed / 0 failed / 0 skipped`。全量 PlayMode：`Artifacts/UI-INFO-002/10-final/verification/PlayModeResults.xml`，`19 passed / 0 failed / 0 skipped`。
+- Windows Player 构建日志 `Artifacts/UI-INFO-002/10-final/verification/WindowsStandaloneBuild.log` 为 `Succeeded`、`errors=0`、`warnings=1`（未修改的 `TagRegistry.freezeAppend`，CS0414）；最终 Player 日志 `Artifacts/UI-INFO-002/10-final/verification/PlayerCapture.log` 为 `capture.completed count=8`。用户已人工确认鼠标交互通过，并已目检最终空名、中等中文名及并排图。
+
 - TDD 红灯：`Temp/PREP-DEPLOY-001-indicator/red/PlayModeResults.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 `9` 项、通过 `6`、失败 `3`、跳过 `0`。三个失败均为新断言：开始已选中单位的重定位后 `DeployedUnitSelectionIndicator.activeSelf` 仍为 `true`，证实测试捕获的是本次需求缺口。
 - 定向 PlayMode：`Temp/PREP-DEPLOY-001-indicator/green-review/PlayModeResults.xml`，同一筛选共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。覆盖拖动开始隐藏选择框、成功换位与同格 no-op 后恢复、门格失败后恢复、UI 上松手与失焦取消后恢复，以及交互锁仍清除选择框。
 - Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001-indicator\compile-final.log` 退出码 `0`；日志含 `Tundra build success` 并以 `Exiting batchmode successfully now!` 结束，未发现 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。

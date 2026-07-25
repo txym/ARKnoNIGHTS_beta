@@ -26,7 +26,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(1, gopro.Rarity);
             Assert.AreEqual(0, gopro.InitialEliteLevel);
             Assert.AreEqual("gopro", gopro.ResourceKey);
-            Assert.AreEqual(string.Empty, gopro.DisplayNameZhHans);
+            Assert.AreEqual("狂暴的猎狗pro", gopro.DisplayNameZhHans);
             Assert.AreEqual(string.Empty, gopro.SkillDescriptionZhHans);
             Assert.AreEqual(1, gopro.LifeDeduct);
 
@@ -36,7 +36,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(4, arcslma.Rarity);
             Assert.AreEqual(0, arcslma.InitialEliteLevel);
             Assert.AreEqual("arcslma", arcslma.ResourceKey);
-            Assert.AreEqual(string.Empty, arcslma.DisplayNameZhHans);
+            Assert.AreEqual("果冻小子", arcslma.DisplayNameZhHans);
             Assert.AreEqual(string.Empty, arcslma.SkillDescriptionZhHans);
             Assert.AreEqual(1, arcslma.LifeDeduct);
         }

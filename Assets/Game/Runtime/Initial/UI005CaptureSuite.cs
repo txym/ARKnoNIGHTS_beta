@@ -10,17 +10,32 @@ using ArknoNights.Details;
 using ArknoNights.Round;
 using ArknoNights.UI;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>Explicit Player-only UI-005 visual acceptance entry. It uses production layout and commands,
 /// waits for end-of-frame rendering, validates each written PNG, and writes a JSON manifest beside captures.</summary>
 public sealed class UI005CaptureSuite : MonoBehaviour
 {
     private readonly List<CaptureRecord> captures = new List<CaptureRecord>();
+    private static readonly string[] InformationElementPaths =
+    {
+        "UnitName", "CombatSummary", "Portrait", "TargetValue", "TargetValue/Background", "TargetValue/Icon", "TargetValue/Value", "HealthBackground", "HealthValue",
+        "Stat_maxHp", "Stat_maxHp/Background", "Stat_maxHp/Icon", "Stat_maxHp/Label", "Stat_maxHp/Value",
+        "Stat_moveSpeed", "Stat_moveSpeed/Background", "Stat_moveSpeed/Icon", "Stat_moveSpeed/Label", "Stat_moveSpeed/Value",
+        "Stat_attack", "Stat_attack/Background", "Stat_attack/Icon", "Stat_attack/Label", "Stat_attack/Value",
+        "Stat_attackInterval", "Stat_attackInterval/Background", "Stat_attackInterval/Icon", "Stat_attackInterval/Label", "Stat_attackInterval/Value",
+        "Stat_defense", "Stat_defense/Background", "Stat_defense/Icon", "Stat_defense/Label", "Stat_defense/Value",
+        "Stat_magicResistance", "Stat_magicResistance/Background", "Stat_magicResistance/Icon", "Stat_magicResistance/Label", "Stat_magicResistance/Value",
+        "Stat_block", "Stat_block/Background", "Stat_block/Icon", "Stat_block/Label", "Stat_block/Value",
+        "Stat_deploymentCost", "Stat_deploymentCost/Background", "Stat_deploymentCost/Icon", "Stat_deploymentCost/Label", "Stat_deploymentCost/Value"
+    };
     private string outputDirectory;
     private StagingHudController hud;
     private FormalBattleHudUi005 formalHud;
     private StateDrivenDeploymentController deployment;
     private PreparationBattleLoopController loop;
+    private bool captureVisualFixtures;
+    private string activeVisualFixtureId;
 
     private void Awake()
     {
@@ -28,6 +43,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         outputDirectory = CommandLineValue("-uiCaptureOutput") ?? Path.Combine(Application.dataPath, "..", "UI-005-Captures");
         outputDirectory = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(outputDirectory);
+        captureVisualFixtures = HasCommandLineFlag("-uiCaptureVisualFixture");
         StartCoroutine(Capture());
     }
 
@@ -65,6 +81,18 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         yield return CaptureOne("prep_or_battle_1600x900", loop.Phase.ToString(), formalHud.SelectedUnitId);
         yield return SetResolution(1280, 1024);
         yield return CaptureOne("prep_or_battle_1280x1024", loop.Phase.ToString(), formalHud.SelectedUnitId);
+        if (captureVisualFixtures)
+        {
+            yield return SetResolution(1920, 1080);
+            activeVisualFixtureId = "empty-name";
+            formalHud.ShowVisualFixtureForCapture(activeVisualFixtureId);
+            yield return CaptureOne("fixture_empty_name_1920x1080", "VisualFixture", null);
+            activeVisualFixtureId = "medium-name";
+            formalHud.ShowVisualFixtureForCapture(activeVisualFixtureId);
+            yield return CaptureOne("fixture_medium_name_1920x1080", "VisualFixture", null);
+            formalHud.ClearVisualFixtureForCapture();
+            activeVisualFixtureId = null;
+        }
         File.WriteAllText(Path.Combine(outputDirectory, "manifest.json"), JsonUtility.ToJson(new CaptureManifest { captures = captures.ToArray() }, true));
         Debug.Log("[UI-005][capture.completed] count=" + captures.Count + "; output=" + outputDirectory, this);
         Application.Quit(0);
@@ -104,16 +132,22 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         if (!valid) { Fail("screenshot.invalid:" + name); yield break; }
         var detail = ResolveDetail(selectedUnitId);
         var panel = hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/UnitInformationPanel") as RectTransform;
+        var visualFixture = !string.IsNullOrEmpty(activeVisualFixtureId);
         captures.Add(new CaptureRecord
         {
             name = name, path = path, width = capturedWidth, height = capturedHeight, phase = phase,
+            captureStage = CommandLineValue("-uiCaptureStage") ?? "unspecified",
             selectedUnitId = selectedUnitId ?? string.Empty, cost = hud.PlayerState.DeploymentCost,
             remainingPreparationSeconds = loop.RemainingPreparationSeconds,
-            source = detail == null ? string.Empty : (loop.Phase == LocalBattlePhase.Battle ? "sealed-battle-input+presentation" : "player-state"),
-            typeId = detail?.TypeId ?? string.Empty, displayNameConfigured = detail != null && !string.IsNullOrWhiteSpace(detail.DisplayNameZhHans),
+            source = visualFixture ? "visualFixture" : (detail == null ? string.Empty : (loop.Phase == LocalBattlePhase.Battle ? "sealed-battle-input+presentation" : "player-state")),
+            typeId = visualFixture ? activeVisualFixtureId : (detail?.TypeId ?? string.Empty), displayNameConfigured = visualFixture ? !string.Equals(activeVisualFixtureId, "empty-name", StringComparison.Ordinal) : detail != null && !string.IsNullOrWhiteSpace(detail.DisplayNameZhHans),
             rarity = detail?.Rarity ?? 0, eliteLevel = detail?.EliteLevel ?? -1, currentHitPoints = detail?.CurrentHitPoints ?? 0,
             maxHitPoints = detail?.MaxHitPoints ?? 0, values = detail == null ? Array.Empty<string>() : new[] { detail.MaxHitPoints.ToString(), Detail(detail.MoveSpeedCentimetresPerSecond), Detail(detail.Attack), Detail(detail.AttackIntervalTicks), Detail(detail.Defense), Detail(detail.MagicResistance), detail.BlockCapacity.ToString(), detail.DeploymentCost.ToString(), detail.LifeDeduct.ToString() },
-            informationPanelWidth = panel == null ? 0f : panel.rect.width, informationPanelHeight = panel == null ? 0f : panel.rect.height
+            informationPanelWidth = panel == null ? 0f : panel.rect.width, informationPanelHeight = panel == null ? 0f : panel.rect.height,
+            canvasScale = hud.GetComponentInChildren<Canvas>() == null ? 0f : hud.GetComponentInChildren<Canvas>().scaleFactor,
+            panelRect = ScreenRect(panel), elementRects = CaptureRects(panel), texts = CaptureTexts(panel), icons = CaptureIcons(panel),
+            visualFixture = visualFixture, visualFixtureId = activeVisualFixtureId ?? string.Empty,
+            referenceRect = "1040,200,830,420", mappedTargetRect = "0,90,720,364.3"
         });
     }
 
@@ -130,6 +164,41 @@ public sealed class UI005CaptureSuite : MonoBehaviour
 
     private static string Detail(int? value) => value.HasValue ? value.Value.ToString() : "--";
 
+    private static ElementRecord[] CaptureRects(RectTransform panel)
+    {
+        if (panel == null) return Array.Empty<ElementRecord>();
+        return InformationElementPaths.Select(path => new ElementRecord { name = path, rect = ScreenRect(panel.Find(path) as RectTransform) }).ToArray();
+    }
+
+    private static TextRecord[] CaptureTexts(RectTransform panel)
+    {
+        if (panel == null) return Array.Empty<TextRecord>();
+        return panel.GetComponentsInChildren<Text>(true).Select(text => new TextRecord
+        {
+            name = text.transform.GetPath(panel), value = text.text, font = text.font == null ? string.Empty : text.font.name,
+            fontSize = text.fontSize, alignment = text.alignment.ToString(), rect = ScreenRect(text.rectTransform)
+        }).ToArray();
+    }
+
+    private static IconRecord[] CaptureIcons(RectTransform panel)
+    {
+        if (panel == null) return Array.Empty<IconRecord>();
+        return panel.GetComponentsInChildren<UnityEngine.UI.Image>(true).Where(image => image.transform.name == "Icon").Select(image => new IconRecord
+        {
+            name = image.transform.GetPath(panel), sprite = image.sprite == null ? string.Empty : image.sprite.name, rect = ScreenRect(image.rectTransform)
+        }).ToArray();
+    }
+
+    private static RectRecord ScreenRect(RectTransform transform)
+    {
+        if (transform == null) return new RectRecord();
+        var corners = new Vector3[4];
+        transform.GetWorldCorners(corners);
+        var bottomLeft = RectTransformUtility.WorldToScreenPoint(null, corners[0]);
+        var topRight = RectTransformUtility.WorldToScreenPoint(null, corners[2]);
+        return new RectRecord { x = bottomLeft.x, y = Screen.height - topRight.y, width = topRight.x - bottomLeft.x, height = topRight.y - bottomLeft.y };
+    }
+
     private static IEnumerator SetResolution(int width, int height)
     {
         Screen.SetResolution(width, height, false);
@@ -140,8 +209,24 @@ public sealed class UI005CaptureSuite : MonoBehaviour
 
     private void Fail(string detail) { Debug.LogError("[UI-005][capture.failed] " + detail, this); Application.Quit(1); }
     private static string CommandLineValue(string flag) { var args = Environment.GetCommandLineArgs(); for (var index = 0; index + 1 < args.Length; index++) if (args[index] == flag) return args[index + 1]; return null; }
+    private static bool HasCommandLineFlag(string flag) => Environment.GetCommandLineArgs().Any(arg => string.Equals(arg, flag, StringComparison.OrdinalIgnoreCase));
     [Serializable] private sealed class CaptureManifest { public CaptureRecord[] captures; }
-    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public string phase; public string selectedUnitId; public int cost; public float remainingPreparationSeconds; public string source; public string typeId; public bool displayNameConfigured; public int rarity; public int eliteLevel; public int currentHitPoints; public int maxHitPoints; public string[] values; public float informationPanelWidth; public float informationPanelHeight; }
+    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public string phase; public string captureStage; public string selectedUnitId; public int cost; public float remainingPreparationSeconds; public string source; public string typeId; public bool displayNameConfigured; public int rarity; public int eliteLevel; public int currentHitPoints; public int maxHitPoints; public string[] values; public float informationPanelWidth; public float informationPanelHeight; public float canvasScale; public RectRecord panelRect; public ElementRecord[] elementRects; public TextRecord[] texts; public IconRecord[] icons; public bool visualFixture; public string visualFixtureId; public string referenceRect; public string mappedTargetRect; }
+    [Serializable] private sealed class RectRecord { public string name; public float x; public float y; public float width; public float height; }
+    [Serializable] private sealed class ElementRecord { public string name; public RectRecord rect; }
+    [Serializable] private sealed class TextRecord { public string name; public string value; public string font; public int fontSize; public string alignment; public RectRecord rect; }
+    [Serializable] private sealed class IconRecord { public string name; public string sprite; public RectRecord rect; }
+}
+
+internal static class UiCaptureTransformExtensions
+{
+    public static string GetPath(this Transform transform, Transform ancestor)
+    {
+        if (transform == null || transform == ancestor) return string.Empty;
+        var segments = new Stack<string>();
+        for (var current = transform; current != null && current != ancestor; current = current.parent) segments.Push(current.name);
+        return string.Join("/", segments);
+    }
 }
 
 internal static class UI005CaptureSuiteBootstrap

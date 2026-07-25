@@ -55,14 +55,86 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(24, information.Find("HealthValue/Text").GetComponent<Text>().fontSize);
             Assert.That(information.Find("HealthValue/Text").GetComponent<RectTransform>().offsetMax.y, Is.EqualTo(-5f).Within(0.01f));
             Assert.IsFalse(information.Find("HealthValue/Text").GetComponent<Text>().text.Contains(" "));
-            Assert.AreEqual("--", information.Find("UnitName").GetComponent<Text>().text, "An empty Chinese display name must not fall back to a resource key.");
+            Assert.AreEqual("狂暴的猎狗pro", information.Find("UnitName").GetComponent<Text>().text, "The configured Chinese display name must reach the selected unit information panel.");
             Assert.NotNull(information.Find("Portrait/Rarity").GetComponent<Image>().sprite);
             Assert.NotNull(information.Find("Portrait/Elite").GetComponent<Image>().sprite);
             Assert.That(information.Find("Portrait/Rarity").GetComponent<RectTransform>().anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
             Assert.That(information.Find("Portrait/Elite").GetComponent<RectTransform>().anchorMin, Is.EqualTo(Vector2.zero));
             Assert.AreEqual(8, information.Cast<Transform>().Count(child => child.name.StartsWith("Stat_")));
+            AssertUnitInformationEntry(information.Find("TargetValue"), "UnitInformationPanelTargetValueIcon", false);
+            AssertUnitInformationEntry(information.Find("Stat_maxHp"), "UnitInformationPanelHealthIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_moveSpeed"), "UnitInformationPanelMoveSpeedIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_attack"), "UnitInformationPanelAttackIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_attackInterval"), "UnitInformationPanelAttackIntervalIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_defense"), "UnitInformationPanelDefenseIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_magicResistance"), "UnitInformationPanelMagicResistanceIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_block"), "UnitInformationPanelBlockCountIcon", true);
+            AssertUnitInformationEntry(information.Find("Stat_deploymentCost"), "UnitInformationPanelDeploymentCostIcon", true);
+            var firstStat = information.Find("Stat_maxHp").GetComponent<RectTransform>();
+            var secondStat = information.Find("Stat_moveSpeed").GetComponent<RectTransform>();
+            Assert.That(firstStat.rect.width, Is.EqualTo(241.5f).Within(0.01f));
+            Assert.That(firstStat.rect.height, Is.EqualTo(52f).Within(0.01f));
+            Assert.That(firstStat.rect.width, Is.EqualTo(secondStat.rect.width).Within(0.01f));
+            Assert.That(firstStat.rect.height, Is.EqualTo(secondStat.rect.height).Within(0.01f));
+            Assert.That(firstStat.anchoredPosition.y, Is.EqualTo(secondStat.anchoredPosition.y).Within(0.01f));
             Assert.That(canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color, Is.EqualTo(new Color(1f, .47058824f, .47058824f)));
+            Assert.That(information.Find("TargetValue/Value").GetComponent<Text>().color, Is.EqualTo(canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color), "Target value must use the same color as the battle status player health.");
             Assert.IsTrue(information.Find("Tab_技能").GetComponent<Text>().text.Contains("未接入"));
+        }
+
+        private static void AssertUnitInformationEntry(Transform entry, string expectedSpriteName, bool requiresLabel)
+        {
+            var background = entry.Find("Background");
+            Assert.NotNull(background, entry.name + " must retain its background.");
+            var backgroundImage = background.GetComponent<Image>();
+            Assert.Less(backgroundImage.color.grayscale, .5f, entry.name + " background must use a darker tint for improved contrast.");
+            var icon = entry.Find("Icon");
+            Assert.NotNull(icon, entry.name + " must expose a dedicated icon child.");
+            if (requiresLabel)
+            {
+                var label = entry.Find("Label");
+                Assert.NotNull(label, entry.name + " must retain its label.");
+                Assert.Greater(label.GetComponent<Text>().fontSize, 22, entry.name + " label must be larger than the prior 22-point text.");
+            }
+            var value = entry.Find("Value");
+            Assert.NotNull(value, entry.name + " must retain its value.");
+            Assert.Greater(value.GetComponent<Text>().fontSize, 28, entry.name + " value must be larger than the prior 28-point text.");
+            var image = icon.GetComponent<Image>();
+            Assert.NotNull(image.sprite, entry.name + " icon must have a resolved sprite.");
+            Assert.AreEqual(expectedSpriteName, image.sprite.name, entry.name + " icon sprite mismatch.");
+            Assert.IsTrue(image.preserveAspect, entry.name + " icon must retain source aspect ratio.");
+            Assert.IsFalse(image.raycastTarget, entry.name + " icon must not intercept HUD input.");
+            Assert.Greater(icon.GetComponent<RectTransform>().rect.width, 28f, entry.name + " icon must be larger than the prior 28-pixel icon.");
+        }
+
+        [UnityTest]
+        public IEnumerator SampleScene_UI005VisualFixtureIsExplicitAndCoversEmptyAndMediumNames()
+        {
+            SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+            for (var frame = 0; frame < 16; frame++) yield return null;
+
+            var hud = Object.FindObjectOfType<StagingHudController>();
+            var formalHud = hud.GetComponent("FormalBattleHudUi005");
+            var showFixture = formalHud.GetType().GetMethod("ShowVisualFixtureForCapture");
+            Assert.NotNull(showFixture, "The UI capture suite must have an explicit, opt-in visual fixture entry point.");
+
+            showFixture.Invoke(formalHud, new object[] { "empty-name" });
+            yield return null;
+            var information = hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/UnitInformationPanel");
+            Assert.IsTrue(information.gameObject.activeSelf);
+            Assert.AreEqual("--", information.Find("UnitName").GetComponent<Text>().text);
+            Assert.AreEqual("18000", information.Find("Stat_maxHp/Value").GetComponent<Text>().text);
+            Assert.AreEqual(20, information.Find("HealthValue/Text").GetComponent<Text>().fontSize);
+
+            showFixture.Invoke(formalHud, new object[] { "medium-name" });
+            yield return null;
+            Assert.AreEqual("视觉验证单位", information.Find("UnitName").GetComponent<Text>().text);
+
+            var clearFixture = formalHud.GetType().GetMethod("ClearVisualFixtureForCapture");
+            Assert.NotNull(clearFixture, "The fixture must be removable so it cannot leak into normal HUD rendering.");
+            clearFixture.Invoke(formalHud, null);
+            yield return null;
+            Assert.IsFalse(information.gameObject.activeSelf);
         }
 
         [UnityTest]
