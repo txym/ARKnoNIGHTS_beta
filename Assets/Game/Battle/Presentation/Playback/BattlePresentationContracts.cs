@@ -24,15 +24,24 @@ namespace ArknoNights.Battle.Presentation
     public sealed class BattlePresentationDiagnostic
     {
         public BattlePresentationDiagnostic(string code, string message, int tick = -1, int sequence = -1)
+            : this(code, message, string.Empty, string.Empty, tick, sequence)
+        {
+        }
+
+        public BattlePresentationDiagnostic(string code, string message, string battleId, string unitId, int tick = -1, int sequence = -1)
         {
             Code = code ?? string.Empty;
             Message = message ?? string.Empty;
+            BattleId = battleId ?? string.Empty;
+            UnitId = unitId ?? string.Empty;
             Tick = tick;
             Sequence = sequence;
         }
 
         public string Code { get; }
         public string Message { get; }
+        public string BattleId { get; }
+        public string UnitId { get; }
         public int Tick { get; }
         public int Sequence { get; }
         public override string ToString() => Code + ": " + Message + " @ " + Tick + "/" + Sequence;
