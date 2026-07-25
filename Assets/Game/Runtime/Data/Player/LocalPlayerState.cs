@@ -21,7 +21,9 @@ namespace ArknoNights.Player
         CoordinateOutOfBounds,
         CoordinateIsGate,
         CoordinateOccupied,
-        StagingCapacityExceeded
+        StagingCapacityExceeded,
+        UnitIdDuplicate,
+        UnitCapacityExceeded
     }
 
     public readonly struct LocalFormationCoordinate : IEquatable<LocalFormationCoordinate>
@@ -278,6 +280,27 @@ namespace ArknoNights.Player
             return Result(PlayerOperationCode.Success, ids);
         }
 
+        /// <summary>
+        /// Adds one shop purchase without exposing the mutable unit collection to callers. The new unit follows the
+        /// same strict staging-stack rule as loading: it enters staging when that projection has room, otherwise
+        /// Overflow. It never spends deployment cost or deploys the unit.
+        /// </summary>
+        public PlayerOperationResult TryAddPurchasedUnit(string unitId, string typeId)
+        {
+            if (string.IsNullOrWhiteSpace(unitId) || unitsById.ContainsKey(unitId)) return Result(PlayerOperationCode.UnitIdDuplicate);
+            if (!catalog.TryGet(typeId ?? string.Empty, out var type)) return Result(PlayerOperationCode.TypeUnknown);
+            if (unitsById.Count >= FixedCapacity) return Result(PlayerOperationCode.UnitCapacityExceeded);
+
+            var candidate = new PlayerUnitData(unitId, typeId, PlayerUnitZone.Staging, type.InitialEliteLevel, Array.Empty<PlayerBuffSnapshot>(), null);
+            var prospective = unitsById.Values.Concat(new[] { candidate }).ToArray();
+            if (CountStagingSlots(prospective, catalog) > StagingSlotCapacity)
+                candidate.Zone = PlayerUnitZone.Overflow;
+
+            unitsById.Add(candidate.UnitId, candidate);
+            NotifyChanged();
+            return Result(PlayerOperationCode.Success);
+        }
+
         private PlayerOperationResult Result(PlayerOperationCode code, IEnumerable<string> removedUnitIds = null) => new PlayerOperationResult(code, CreateSnapshot(), removedUnitIds);
 
         private void NotifyChanged()
@@ -357,8 +380,15 @@ namespace ArknoNights.Player
         {
             var catalogResult = UnitCatalogLoader.LoadFromResources(catalogResourcePath);
             if (!catalogResult.Success) return Failure("playerState.catalog.invalid", string.Join(";", catalogResult.Errors.Select(error => error.ToString())));
+            return LoadFromResources(catalogResult.Catalog, playerStateResourcePath);
+        }
+
+        /// <summary>Loads a fixed player fixture using an already validated catalog so a local match has one catalog authority.</summary>
+        internal static PlayerStateLoadResult LoadFromResources(UnitCatalog catalog, string playerStateResourcePath)
+        {
+            if (catalog == null) return Failure("playerState.catalog.missing", "catalog is required");
             var asset = Resources.Load<TextAsset>(playerStateResourcePath);
-            return asset == null ? Failure("playerState.resource.missing", "resource=" + playerStateResourcePath) : LoadFromJson(catalogResult.Catalog, asset.text);
+            return asset == null ? Failure("playerState.resource.missing", "resource=" + playerStateResourcePath) : LoadFromJson(catalog, asset.text);
         }
 
         public static PlayerStateLoadResult LoadFromJson(UnitCatalog catalog, string json)

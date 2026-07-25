@@ -1,0 +1,1 @@
+{ "schemaVersion": "local-player-state-v1", "playerId": "local-ui-player-4", "deploymentCost": 99, "units": [{ "unitId": "local-4-1000-alpha", "typeId": "1000", "zone": "Staging", "eliteLevel": 0, "buffs": [], "formationX": 0, "formationY": 0 }] }
