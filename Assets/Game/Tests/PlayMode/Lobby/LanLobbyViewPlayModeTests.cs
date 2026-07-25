@@ -118,6 +118,51 @@ namespace ArknoNights.Lobby.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator RoomPermissions_RequireLocalMemberAndNeverAllowStartedRoomActions()
+        {
+            view.BindRoom(Room("654321", everyoneReady: true), "missing");
+            Assert.That(view.ReadyInteractableForTests, Is.False);
+            Assert.That(view.StartInteractableForTests, Is.False);
+
+            view.BindRoom(Room("654321", everyoneReady: true), "host");
+            Assert.That(view.ReadyInteractableForTests, Is.True);
+            Assert.That(view.StartInteractableForTests, Is.True);
+
+            view.BindRoom(Room("654321", hasStarted: true, everyoneReady: true), "host");
+            Assert.That(view.ReadyInteractableForTests, Is.False);
+            Assert.That(view.StartInteractableForTests, Is.False);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSnapshot_RendersEachMemberAvatarIndexInItsCard()
+        {
+            view.BindRoom(Room("654321"), "host");
+
+            Assert.That(view.RoomCardAvatarTextForTests(0), Is.EqualTo("A1"));
+            Assert.That(view.RoomCardAvatarTextForTests(1), Is.EqualTo("A2"));
+            Assert.That(view.RoomCardAvatarTextForTests(2), Is.EqualTo("A3"));
+            Assert.That(view.RoomCardAvatarTextForTests(3), Is.EqualTo("A4"));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator DiscoveredRooms_CapsVisibleItemsAndRetainsPrefillForVisibleRoom()
+        {
+            view.BindDiscoveredRooms(new[]
+            {
+                Discovery("100001"), Discovery("100002"), Discovery("100003"),
+                Discovery("100004"), Discovery("100005"), Discovery("100006")
+            });
+
+            Assert.That(view.DiscoveryRenderedItemCountForTests, Is.EqualTo(4));
+            Assert.That(view.DiscoveryOverflowCountForTests, Is.EqualTo(2));
+            view.ClickDiscoveredRoomForTests("100004");
+            Assert.That(view.RoomCodeTextForTests, Is.EqualTo("100004"));
+            yield return null;
+        }
+
         private void OnJoinRequested(string roomCode)
         {
             joinRequests++;
@@ -128,15 +173,15 @@ namespace ArknoNights.Lobby.Tests
             return new LobbyDiscoveryEntry(roomCode, "Host", memberCount, capacity, joinable, 12345, 1);
         }
 
-        private static LobbyRoomSnapshot Room(string roomCode)
+        private static LobbyRoomSnapshot Room(string roomCode, bool hasStarted = false, bool everyoneReady = false)
         {
             return new LobbyRoomSnapshot(roomCode, "host", new[]
             {
                 new LobbyMemberSnapshot(new LobbyProfile("host", "Host", 0), true, 42),
-                new LobbyMemberSnapshot(new LobbyProfile("guest-1", "Guest One", 1), false, 60),
+                new LobbyMemberSnapshot(new LobbyProfile("guest-1", "Guest One", 1), everyoneReady, 60),
                 new LobbyMemberSnapshot(new LobbyProfile("guest-2", "Guest Two", 2), true, 80),
-                new LobbyMemberSnapshot(new LobbyProfile("guest-3", "Guest Three", 3), false, 100)
-            }, false, 1);
+                new LobbyMemberSnapshot(new LobbyProfile("guest-3", "Guest Three", 3), everyoneReady, 100)
+            }, hasStarted, 1);
         }
     }
 }

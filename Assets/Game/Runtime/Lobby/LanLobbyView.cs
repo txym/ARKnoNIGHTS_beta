@@ -9,12 +9,14 @@ using UnityEngine.UI;
 public sealed class LanLobbyView : MonoBehaviour
 {
     private const int CanvasOrder = 1000;
+    private const int MaximumVisibleDiscoveryRooms = 4;
     private const string FontPath = "Fonts/Novecento wide Normal Regular.woff2";
     private const string SpriteRoot = "UI/Lobby/";
 
     private readonly Dictionary<string, LobbyDiscoveryEntry> discoveries = new Dictionary<string, LobbyDiscoveryEntry>(StringComparer.Ordinal);
     private readonly List<Image> roomCardImages = new List<Image>();
     private readonly List<Text> roomCardTexts = new List<Text>();
+    private readonly List<Text> roomCardAvatarTexts = new List<Text>();
     private Canvas canvas;
     private RectTransform homeRoot;
     private RectTransform roomRoot;
@@ -23,6 +25,8 @@ public sealed class LanLobbyView : MonoBehaviour
     private InputField roomCodeInput;
     private Button joinButton;
     private Text statusText;
+    private RectTransform discoveryItemsRoot;
+    private Text discoveryOverflowText;
     private Text latencyText;
     private Text roomCodeText;
     private Button readyButton;
@@ -30,6 +34,7 @@ public sealed class LanLobbyView : MonoBehaviour
     private string localPlayerId;
     private int avatarIndex;
     private int readyCardCount;
+    private int discoveryOverflowCount;
 
     public event Action CreateRequested;
     public event Action<string> JoinRequested;
@@ -45,6 +50,14 @@ public sealed class LanLobbyView : MonoBehaviour
     public int ReadyCardCountForTests => readyCardCount;
     public string LocalLatencyTextForTests => latencyText == null ? string.Empty : latencyText.text;
     public int CanvasSortOrderForTests => canvas == null ? -1 : canvas.sortingOrder;
+    public bool ReadyInteractableForTests => readyButton != null && readyButton.interactable;
+    public bool StartInteractableForTests => startButton != null && startButton.interactable;
+    public int DiscoveryRenderedItemCountForTests => discoveryItemsRoot == null ? 0 : discoveryItemsRoot.childCount;
+    public int DiscoveryOverflowCountForTests => discoveryOverflowCount;
+    public string RoomCardAvatarTextForTests(int index)
+    {
+        return index >= 0 && index < roomCardAvatarTexts.Count ? roomCardAvatarTexts[index].text : string.Empty;
+    }
 
     private void Awake()
     {
@@ -115,24 +128,32 @@ public sealed class LanLobbyView : MonoBehaviour
             roomCardTexts[index].text = hasMember
                 ? member.Profile.DisplayName + (member.PlayerId == room.HostPlayerId ? "  HOST" : string.Empty) + "\n" + (ready ? "READY" : "WAITING") + "  " + member.LatencyMilliseconds + " ms"
                 : "OPEN SLOT";
+            roomCardAvatarTexts[index].gameObject.SetActive(hasMember);
+            if (hasMember)
+            {
+                roomCardAvatarTexts[index].text = "A" + (member.Profile.AvatarIndex + 1);
+                roomCardAvatarTexts[index].color = AvatarColor(member.Profile.AvatarIndex);
+            }
             if (ready) readyCardCount++;
         }
 
         var localMemberReady = false;
+        var hasLocalMember = false;
         var localIsHost = false;
         if (room != null)
         {
             foreach (var member in room.Members)
             {
                 if (member == null || member.PlayerId != localPlayerId) continue;
+                hasLocalMember = true;
                 localMemberReady = member.IsReady;
                 localIsHost = member.PlayerId == room.HostPlayerId;
                 break;
             }
         }
 
-        readyButton.interactable = room != null && !room.HasStarted && !string.IsNullOrEmpty(localPlayerId);
-        startButton.interactable = localIsHost && room != null && room.Members.Count > 0 && readyCardCount == room.Members.Count;
+        readyButton.interactable = room != null && !room.HasStarted && hasLocalMember;
+        startButton.interactable = room != null && !room.HasStarted && localIsHost && room.Members.Count > 0 && readyCardCount == room.Members.Count;
         readyButton.GetComponentInChildren<Text>().text = localMemberReady ? "UNREADY" : "READY";
     }
 
@@ -238,14 +259,21 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var discovered = Image("DiscoveredRooms", parent, "img_player_bkg");
         Position(discovered.rectTransform, new Vector2(.78f, .3f), new Vector2(720f, 330f));
-        discovered.gameObject.AddComponent<VerticalLayoutGroup>().spacing = 8f;
-        var padding = discovered.GetComponent<VerticalLayoutGroup>().padding;
-        padding.left = padding.right = 28;
-        padding.top = padding.bottom = 35;
-        discovered.GetComponent<VerticalLayoutGroup>().padding = padding;
-        var fitter = discovered.gameObject.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        discoveryItemsRoot = Rect("Items", discovered.transform);
+        Stretch(discoveryItemsRoot);
+        discoveryItemsRoot.offsetMin = new Vector2(28f, 54f);
+        discoveryItemsRoot.offsetMax = new Vector2(-28f, -30f);
+        var itemLayout = discoveryItemsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+        itemLayout.spacing = 8f;
+        itemLayout.childAlignment = TextAnchor.UpperCenter;
+        itemLayout.childControlWidth = true;
+        itemLayout.childForceExpandHeight = false;
+        discoveryOverflowText = Text("Overflow", discovered.transform, 18, TextAnchor.LowerRight, new Color(.3f, .95f, .95f));
+        discoveryOverflowText.rectTransform.anchorMin = new Vector2(0f, 0f);
+        discoveryOverflowText.rectTransform.anchorMax = new Vector2(1f, 0f);
+        discoveryOverflowText.rectTransform.pivot = new Vector2(.5f, 0f);
+        discoveryOverflowText.rectTransform.anchoredPosition = new Vector2(0f, 16f);
+        discoveryOverflowText.rectTransform.sizeDelta = new Vector2(-48f, 30f);
 
         statusText = Text("Status", parent, 24, TextAnchor.MiddleCenter, Color.white);
         Position(statusText.rectTransform, new Vector2(.51f, .32f), new Vector2(700f, 50f));
@@ -275,6 +303,13 @@ public sealed class LanLobbyView : MonoBehaviour
             text.rectTransform.offsetMax = new Vector2(-28f, -36f);
             text.text = "OPEN SLOT";
             roomCardTexts.Add(text);
+            var avatarFrame = Image("AvatarFrame", card.transform, "team_icon_frame");
+            Position(avatarFrame.rectTransform, new Vector2(.5f, .76f), new Vector2(86f, 86f));
+            avatarFrame.preserveAspect = true;
+            var avatarText = Text("Avatar", avatarFrame.transform, 20, TextAnchor.MiddleCenter, Color.white);
+            Stretch(avatarText.rectTransform);
+            avatarText.text = string.Empty;
+            roomCardAvatarTexts.Add(avatarText);
         }
 
         readyButton = Button("Ready", parent, "btn_match_grey", "READY", 30);
@@ -290,14 +325,18 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void RebuildDiscoveryItems()
     {
-        var list = transform.Find("LanLobbyRoot/Home/DiscoveredRooms");
-        if (list == null) return;
-        for (var index = list.childCount - 1; index >= 0; index--) Destroy(list.GetChild(index).gameObject);
-        foreach (var pair in discoveries)
+        if (discoveryItemsRoot == null) return;
+        for (var index = discoveryItemsRoot.childCount - 1; index >= 0; index--) Destroy(discoveryItemsRoot.GetChild(index).gameObject);
+        var entries = new List<LobbyDiscoveryEntry>(discoveries.Values);
+        entries.Sort((left, right) => string.CompareOrdinal(left.RoomCode, right.RoomCode));
+        discoveryOverflowCount = Math.Max(0, entries.Count - MaximumVisibleDiscoveryRooms);
+        discoveryOverflowText.text = discoveryOverflowCount > 0 ? "+" + discoveryOverflowCount + " MORE ROOMS" : string.Empty;
+        var visibleCount = Math.Min(entries.Count, MaximumVisibleDiscoveryRooms);
+        for (var index = 0; index < visibleCount; index++)
         {
-            var entry = pair.Value;
+            var entry = entries[index];
             var label = entry.RoomCode + "  " + entry.HostDisplayName + "  " + entry.MemberCount + "/" + entry.Capacity;
-            var item = Button("Room_" + entry.RoomCode, list, "player_card_waiting", label, 22);
+            var item = Button("Room_" + entry.RoomCode, discoveryItemsRoot, "player_card_waiting", label, 22);
             item.GetComponent<LayoutElement>().preferredHeight = 54f;
             var code = entry.RoomCode;
             item.onClick.AddListener(() => SetRoomCode(code));
@@ -369,6 +408,17 @@ public sealed class LanLobbyView : MonoBehaviour
     private void RefreshAvatarIndex()
     {
         if (avatarIndexText != null) avatarIndexText.text = "AVATAR " + (avatarIndex + 1);
+    }
+
+    private static Color AvatarColor(int value)
+    {
+        switch (value % 4)
+        {
+            case 0: return new Color(.3f, .95f, .95f);
+            case 1: return new Color(1f, .72f, .25f);
+            case 2: return new Color(.7f, .5f, 1f);
+            default: return new Color(.45f, 1f, .55f);
+        }
     }
 
     private static Button Button(string name, Transform parent, string spriteName, string label, int fontSize)
