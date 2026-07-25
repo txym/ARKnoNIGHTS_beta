@@ -20,3 +20,10 @@ The lock implementation is at `Assets/Game/Runtime/Lobby/AndroidMulticastLock.cs
 ## Concerns
 
 - The Editor test verifies the non-Android no-op path only. Android Java calls and real Wi-Fi multicast discovery require device validation on a same-Wi-Fi Android Player.
+
+## Fix round 1 — Android 12 manifest activity contract
+
+- Root cause: the initial custom main manifest declared a `MAIN`/`LAUNCHER` activity without `android:exported="true"`, and omitted Unity's standard orientation/configuration/lifecycle attributes.
+- Red static validation recorded the missing `android:exported`, `screenOrientation`, `configChanges`, and `launchMode` attributes before the change.
+- Added the Android 12 export flag plus `fullSensor`, Unity configuration-change handling, and `singleTask` launch mode. The permission list and PlayerSettings remain unchanged.
+- Focused PlayMode rerun: `Temp/TASK-4/fix1-green/PlayModeResults.xml` is `Passed`, total `1`, failed `0`, skipped `0`.
