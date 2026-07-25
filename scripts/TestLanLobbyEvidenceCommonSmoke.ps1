@@ -7,6 +7,7 @@ $commonScript = Join-Path $PSScriptRoot 'LanLobbyEvidence.Common.ps1'
 $scratch = Join-Path $projectRoot ('Temp/LAN-LOBBY-CommonSmoke-' + [Guid]::NewGuid().ToString('N'))
 $unsafeOutput = Join-Path $projectRoot 'Assets/LanLobbyCommonSmokeForbidden'
 $unmappedOutput = Join-Path $scratch 'unmapped-output'
+$nullRecordOutput = Join-Path $scratch 'null-record-output'
 $assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
 
 function Assert-True([bool] $Condition, [string] $Message)
@@ -52,6 +53,12 @@ try
     Assert-True ($first.SourcePath -eq '[uc]autochessouter/bg_terrain.png') 'Approved source path must be preserved.'
     Assert-True ($first.ResourcesPath -eq 'UI/Lobby/bg_terrain') 'Resources path must be parsed from ASSET_MAP.'
     Assert-True ($first.ImportedSha256 -match '^[A-Fa-f0-9]{64}$') 'Imported PNG SHA-256 must be complete.'
+
+    $nullRecordManifestPath = Join-Path $scratch 'manifest-with-null-record.json'
+    [pscustomobject]@{ captures = @($records; $null) } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $nullRecordManifestPath -Encoding UTF8
+    Assert-FailsWithoutOutput {
+        Get-LanLobbyCaptureManifest -ManifestPath $nullRecordManifestPath | Out-Null
+    } $nullRecordOutput 'exactly five capture records'
 
     Assert-FailsWithoutOutput {
         Assert-LanLobbySafeOutputDirectory -ProjectRoot $projectRoot -OutputDirectory $unsafeOutput

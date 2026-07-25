@@ -54,9 +54,10 @@ function Get-LanLobbyCaptureManifest
     try { $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json }
     catch { throw "Capture manifest is invalid JSON: $ManifestPath. $($_.Exception.Message)" }
 
-    $captures = @($manifest.captures | Where-Object { $null -ne $_ })
+    $rawCaptures = @($manifest.captures)
+    $captures = @($rawCaptures | Where-Object { $null -ne $_ })
     $expected = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full')
-    if ($captures.Count -ne $expected.Count) { throw 'The manifest must contain exactly five capture records.' }
+    if ($rawCaptures.Count -ne $expected.Count -or $captures.Count -ne $expected.Count) { throw 'The manifest must contain exactly five capture records.' }
     if ((@($captures.name | Sort-Object) -join '|') -ne (@($expected | Sort-Object) -join '|')) { throw 'Capture names do not match the approved lobby evidence set.' }
     foreach ($capture in $captures)
     {
