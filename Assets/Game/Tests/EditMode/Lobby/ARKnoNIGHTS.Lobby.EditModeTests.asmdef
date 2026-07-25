@@ -1,15 +1,7 @@
 {
-  "name": "ARKnoNIGHTS.Battle.EditModeTests",
-  "rootNamespace": "ArknoNights.Battle.Tests",
+  "name": "ARKnoNIGHTS.Lobby.EditModeTests",
+  "rootNamespace": "ArknoNights.Lobby.Tests",
   "references": [
-    "ARKnoNIGHTS.Battle.Core",
-    "ARKnoNIGHTS.Battle.Infrastructure",
-    "ARKnoNIGHTS.Battle.Presentation",
-    "ARKnoNIGHTS.Battle.Demo",
-    "ARKnoNIGHTS.PlayerState",
-    "ARKnoNIGHTS.Round",
-    "ARKnoNIGHTS.UI",
-    "ARKnoNIGHTS.Details",
     "ARKnoNIGHTS.Lobby"
   ],
   "includePlatforms": ["Editor"],
