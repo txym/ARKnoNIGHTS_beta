@@ -33,6 +33,8 @@
 
 玩家只能切换自己的准备状态。主机可以解散房间；当所有已连接成员准备后，主机可开始。客户端在等待开始时显示明确状态。离开或断线后，主机将该成员移除并更新房间广播。
 
+房间 UI 存在期间，现有 `PreparationBattleLoopController` 的自动准备倒计时必须被一个明确的只读“大厅门控”暂停，不能在玩家仍处于房间内时于后台开始本地战斗。收到主机 `Start` 后，各端在同一帧解除门控、关闭大厅 Canvas，并把现有准备循环重置到它原有的 30 秒准备入口；之后仍遵循当前单机循环，且不向房间回写战斗状态。
+
 ## 网络设计
 
 ### 发现和连接
@@ -59,7 +61,7 @@ Windows 与 Android 均使用 .NET socket API。Android 在连接页期间申请
 
 - `ARKnoNIGHTS.Lobby`：纯 C# 的协议 DTO、房间号、快照、连接状态与可测试的消息编解码；不得依赖 Unity 场景或 Battle Core。
 - `LanRoomHost` / `LanRoomClient`：负责 UDP/TCP、取消、超时、线程切换和向上层发布只读快照；不得修改战斗数据。
-- `LanLobbyController`：唯一的 Unity 会话协调器，控制主界面、房间页、身份偏好与战斗入口切换。
+- `LanLobbyController`：唯一的 Unity 会话协调器，控制主界面、房间页、身份偏好、`PreparationBattleLoopController` 的大厅门控与战斗入口切换。
 - `LanLobbyView`：只创建与刷新 uGUI 视图，使用新导入的 `autochessouter` 素材和现有正式 HUD 字体；不保存第二份业务状态。
 
 现有 `PlayerState`、`PreparationBattleLoopController`、`FormalBattleHudUi005` 和 Battle Core 不承载网络房间状态。该任务不修改当前已有的脏工作树文件、场景或 Prefab；需要接线时采用新增启动组件或待后续稳定工作树中的最小编辑。
