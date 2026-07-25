@@ -493,3 +493,11 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 定向 PlayMode：`Temp/PREP-DEPLOY-001-indicator/green-review/PlayModeResults.xml`，同一筛选共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。覆盖拖动开始隐藏选择框、成功换位与同格 no-op 后恢复、门格失败后恢复、UI 上松手与失焦取消后恢复，以及交互锁仍清除选择框。
 - Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001-indicator\compile-final.log` 退出码 `0`；日志含 `Tundra build success` 并以 `Exiting batchmode successfully now!` 结束，未发现 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
 - 未验证：无可靠的交互式 Unity Editor/Player GUI 驱动，尚未以真实鼠标拖动目视检查隐藏和恢复的逐帧表现；自动场景断言验证的是实际控制器生命周期而非人工视觉体验。
+-
+## LAN 房间 UI 与局域网验收（2026-07-25）
+
+1. 定向 EditMode：运行 `LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、`LanSocketIntegrationEditModeTests` 和 `LobbyAssetMapEditModeTests`，确认每个 NUnit XML 的测试数大于零且失败为零。
+2. 定向 PlayMode：运行 `LanLobbyViewPlayModeTests`、`LanLobbyControllerPlayModeTests`、`AndroidMulticastLockPlayModeTests` 和 `LanLobbyCaptureSuitePlayModeTests`；最后一个实际写出五个 PNG 和包含 Canvas scale、房间、成员/ready、延迟、rect 和 Sprite 来源的 JSON 清单。
+3. Windows Player：以固定 Unity `D:\2022.3.62f1c1\Editor\Unity.exe` 执行 `Task006StandaloneBuild.BuildWindowsX64`；随后从产物启动 `ARKnoNIGHTS.exe -lanLobbyCaptureSuite -lanLobbyCaptureOutput <ignored-output>`，等待退出码 0、五张可解码 PNG 和 manifest。
+4. 本地导出：执行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\ExportLanLobbyEvidence.ps1 -CaptureDirectory <ignored-output>`。脚本必须拒绝任一未映射 Sprite，并生成五张实际/参考并排图；逐图检查布局、文本、顶部延迟、四人卡片、预填房间号和没有 IP/端口输入。
+5. 真实局域网：在同一非隔离 Wi-Fi 上让 Windows 与 Android Player 按 `docs/LAN-LOBBY-REPORT.md` 的五步流程完成创建、发现、预填、明确加入、延迟、双端准备、开始及断连恢复。Editor loopback、截图或单机 Player 不能替代此验收；没有两台实体设备时必须标记为未验证。

@@ -24,6 +24,13 @@ namespace ArknoNights.Lobby.Tests
                 UnityEngine.Object.Destroy(controller.gameObject);
             }
 
+            // SampleScene owns a generic EventSystem. Without removing it, the following isolated
+            // view fixture correctly reuses that external system and cannot exercise owned-system cleanup.
+            foreach (var eventSystem in Resources.FindObjectsOfTypeAll<UnityEngine.EventSystems.EventSystem>())
+            {
+                if (eventSystem != null) UnityEngine.Object.Destroy(eventSystem.gameObject);
+            }
+
             yield return null;
         }
 

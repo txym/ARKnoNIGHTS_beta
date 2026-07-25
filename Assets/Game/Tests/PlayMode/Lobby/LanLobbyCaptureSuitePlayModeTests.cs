@@ -1,0 +1,67 @@
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+namespace ArknoNights.Lobby.Tests
+{
+    public sealed class LanLobbyCaptureSuitePlayModeTests
+    {
+        private string outputDirectory;
+
+        [UnitySetUp]
+        public IEnumerator SetUp()
+        {
+            outputDirectory = Path.Combine(Application.temporaryCachePath, "LanLobbyCaptureSuiteTests", Guid.NewGuid().ToString("N"));
+            yield return null;
+        }
+
+        [UnityTearDown]
+        public IEnumerator TearDown()
+        {
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, true);
+            var fixture = GameObject.Find("LanLobbyCaptureSuiteTests");
+            if (fixture != null) UnityEngine.Object.Destroy(fixture);
+            foreach (var eventSystem in Resources.FindObjectsOfTypeAll<UnityEngine.EventSystems.EventSystem>())
+                if (eventSystem != null && eventSystem.name == "LanLobbyEventSystem") UnityEngine.Object.Destroy(eventSystem.gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CaptureSuite_EmitsHomeAndRoomRecords()
+        {
+            var suiteType = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("LanLobbyCaptureSuite"))
+                .FirstOrDefault(type => type != null);
+            Assert.That(suiteType, Is.Not.Null, "The Player capture suite must be available from the Initial presentation assembly.");
+            var capture = suiteType.GetMethod("CaptureForTests", BindingFlags.Public | BindingFlags.Static);
+            Assert.That(capture, Is.Not.Null, "The suite needs a test-only capture entry that uses the production view.");
+
+            var routine = capture.Invoke(null, new object[] { outputDirectory }) as IEnumerator;
+            Assert.That(routine, Is.Not.Null);
+            yield return routine;
+
+            var manifestPath = Path.Combine(outputDirectory, "manifest.json");
+            Assert.That(File.Exists(manifestPath), Is.True);
+            var manifest = File.ReadAllText(manifestPath);
+            var expectedNames = new[] { "home", "discovered-prefill", "room-host", "room-ready", "room-full" };
+            foreach (var name in expectedNames)
+            {
+                StringAssert.Contains("\"name\": \"" + name + "\"", manifest);
+                Assert.That(File.Exists(Path.Combine(outputDirectory, name + ".png")), Is.True);
+            }
+
+            StringAssert.Contains("\"canvasScale\"", manifest);
+            StringAssert.Contains("\"roomCode\"", manifest);
+            StringAssert.Contains("\"members\"", manifest);
+            StringAssert.Contains("\"localLatencyMilliseconds\"", manifest);
+            StringAssert.Contains("\"rects\"", manifest);
+            StringAssert.Contains("\"spriteSources\"", manifest);
+            StringAssert.Contains("[uc]autochessouter/", manifest);
+        }
+    }
+}

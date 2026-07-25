@@ -276,3 +276,9 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `UI005CaptureSuite` 通过 Player 命令行入口产出固定状态 PNG 与 JSON 清单，便于本地审查。当前清单仅有分辨率、阶段、选择、Cost 和倒计时，尚不是 UI-005 所要求的完整布局 manifest；它只能作为部分视觉证据，不能替代逐图审查和完整 GUI 流程验收。
 - `PreparationBattleLoopController` 是 `FormalBattleHudRoot` 的运行时幂等桥。它等待 UI-002/003 初始化，加载 Player-safe catalog 与固定 `task004a-real-1v1` 的 Away 快照，锁定输入并隐藏 `PreparationUnitViews` 后启动运行时战斗；Completed 时释放 `BattleDemoViews`、恢复准备投影/交互并重置时钟。场景重载通过 `SceneManager.sceneLoaded` 重新附加，且不会创建多个桥。
 - `BattleDemoCoordinator.StartRuntimeBattle` 是固定 Resources 入口之外的加法入口：它接收已验证 `BattleInput + UnitCatalog`，仍由局部 `BattleRunner` 先计算再复用原 Playback 生命周期。正式循环模式会阻止调试 Start/Recalculate 重载固定输入，但保留暂停、速度、观察视角和同一封存结果 Replay。Core 的 HP、死亡和 winner 未回写 PlayerState。
+-
+## LAN 房间展示与验收边界（2026-07-25）
+
+- 依赖方向严格为 `ARKnoNIGHTS.Lobby`（房间 DTO、发现、socket、uGUI View）→ `Assembly-CSharp/Initial` 的 `LanLobbyController`（主线程会话与本地准备阶段门控）→ 既有本地 `PreparationBattleLoopController`。Lobby 不引用 `PlayerState`、Battle Core 或场景序列化对象；网络房间只同步成员、头像索引、准备、延迟与开始。
+- `LanLobbyCaptureSuite` 位于 Initial 展示层，只在 Player 显式收到 `-lanLobbyCaptureSuite` 时启动。它以生产 `LanLobbyView` 产生五种固定证据状态，并将截图与 JSON 清单写入调用方指定的忽略目录；它不写入 `Assets`、不改场景、Prefab 或玩家战斗数据。
+- 清单中的 Sprite 来源由 capture suite 限制为已审批的 `UI/Lobby` 白名单，`ExportLanLobbyEvidence.ps1` 再逐项和 `docs/references/ui/lobby/ASSET_MAP.md` 对照。任何未知 Sprite、缺图、缺参考图或不完整清单都会令导出失败，而不会生成看似有效的证据。
