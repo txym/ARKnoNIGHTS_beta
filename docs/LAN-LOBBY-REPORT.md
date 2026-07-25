@@ -6,6 +6,23 @@
 
 Run `scripts/ExportLanLobbyEvidence.ps1 -CaptureDirectory <ignored-directory>` afterwards. Its output follows the same `Temp/`/`Artifacts/` restriction. The script rejects records whose Sprite source is not exactly in `docs/references/ui/lobby/ASSET_MAP.md`, requires exactly one exact reference filename for each of numeric suffixes `9` and `10`, then copies the manifest and writes one actual/reference side-by-side PNG per state. Home states require suffix `9`; room states require suffix `10`.
 
+## Visual-difference evidence (2026-07-26)
+
+The visual-difference exporter is non-blocking: it reports `ATTENTION` when a measured, unmasked region differs; it does not make a Player run or LAN room flow fail. It emits actual, normalized-reference, overlay, and heatmap PNGs, plus Markdown/JSON reports and a source-audited Sprite usage table. Masked regions are transparent black in heatmaps and excluded from measurements. Reference images are input evidence only and are never copied to or changed in their source directory.
+
+For an isolated worktree which does not contain exact `图9.png` and `图10.png`, provide the primary worktree reference directory explicitly and treat it as read-only:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ExportLanLobbyVisualDiff.ps1 `
+  -CaptureDirectory .\Temp\LAN-LOBBY\CapturesFinal `
+  -OutputDirectory .\Temp\LAN-LOBBY\VisualDiff `
+  -ReferenceDirectory 'G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud'
+```
+
+Latest real evidence was captured from a visible `-force-d3d11` Windows Player (not a hidden window) at `1920x1080`; it is stored only in ignored `Temp/LAN-LOBBY/CapturesFinal/` and `Temp/LAN-LOBBY/VisualDiff/`. The Player exited `0`. The five capture names are `home`, `discovered-prefill`, `room-host`, `room-ready`, and `room-full`; the first two use `图9.png`, while the room states use `图10.png`. The exporter recorded native reference sizes `2102x1149` (图9) and `2107x1153` (图10), each independently normalized on X/Y to the Player's `1920x1080` grid. All five captures were `ATTENTION` (`0.5445`/`0.5473` home difference ratios; `0.4654`–`0.4658` room difference ratios), which is expected evidence of remaining visual differences rather than a failed build or network test. The report includes 13 mapped Sprite rows; every row records its `UI/Lobby/...` Resources path, `[uc]autochessouter/...` source-relative path, imported SHA-256, capture names, and occurrence count.
+
+The generated JSON is authoritative for native dimensions. Its current generated Markdown preamble still contains the earlier `2048x1118` planning assumption; do not interpret that sentence as an observed dimension. This is a reporting-text follow-up only; the JSON values, normalized PNGs, region masks, measurements, and input validation use the actual files above.
+
 ## Automated result
 
 - Red baseline: `Temp/UnityTests/20260725-184254/PlayModeResults.xml` recorded `LanLobbyCaptureSuitePlayModeTests` as `0/1` before the suite existed.
@@ -15,7 +32,8 @@ Run `scripts/ExportLanLobbyEvidence.ps1 -CaptureDirectory <ignored-directory>` a
 - Player capture command: `ARKnoNIGHTS.exe -force-d3d11 -lanLobbyCaptureSuite -lanLobbyCaptureOutput Temp/LAN-LOBBY/CapturesFinal -screen-width 1920 -screen-height 1080`. It emitted five decodeable, non-black `1920x1080` PNGs and manifest. A prior hidden-window run emitted all-black PNGs despite a D3D11 / RTX 4060 Ti device; the suite now rejects that case by pixel-brightness validation, and only the non-hidden rerun is usable evidence.
 - Evidence export is intentionally **unverified**: this worktree's `docs/references/ui/battle_hud/` contains only reference numeric suffixes `1` through `6`, not the user-required `9` and `10`. `ExportLanLobbyEvidence.ps1` stops before sheet creation rather than silently substituting another reference.
 - Output-boundary regression: `scripts/TestExportLanLobbyEvidenceSmoke.ps1` passes. It confirms `Assets/` output is rejected before manifest/output writes, and missing or ambiguous exact reference candidates fail before the requested evidence directory is created.
-- Visual inspection of all five `Temp/LAN-LOBBY/CapturesFinal/*.png` confirms the opaque blocker removes legacy Formal Battle HUD/scene leakage. `discovered-prefill` exposes `654321` without joining; `room-host`, `room-ready`, and `room-full` show the room number, top-left local latency, and the expected one/two/four member ready states. The actual/reference side-by-side comparison remains blocked only by the missing numeric-suffix `9`/`10` sources above.
+- Visual inspection of all five `Temp/LAN-LOBBY/CapturesFinal/*.png` confirms the opaque blocker removes legacy Formal Battle HUD/scene leakage. `discovered-prefill` exposes `654321` without joining; `room-host`, `room-ready`, and `room-full` show the room number, top-left local latency, and the expected one/two/four member ready states. The isolated worktree itself still lacks numeric-suffix `9`/`10` sources, but the visual-difference run above now uses the explicitly supplied primary-worktree references rather than substituting another image.
+- Visual-difference regression: `scripts/TestExportLanLobbyEvidenceSmoke.ps1` and `scripts/TestLanLobbyVisualDiffSmoke.ps1` both pass. The latter asserts that a missing default worktree reference fails before output creation, while an explicitly supplied fixture directory with exact 图9/图10 succeeds without any reference-file mutation.
 
 ## Same-Wi-Fi Windows-Android acceptance (manual, not yet performed)
 

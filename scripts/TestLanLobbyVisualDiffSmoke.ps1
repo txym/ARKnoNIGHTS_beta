@@ -135,8 +135,27 @@ try
         & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $preexistingOutput -ReferenceDirectory $malformedReferences
     } $preexistingOutput $sentinel 'reference image'
 
+    # The isolated worktree deliberately lacks the user-owned figures 9/10.  The default
+    # may therefore only be used when those exact files exist; callers must be able to
+    # supply a separate read-only directory without the exporter changing it.
+    $defaultReferenceOutput = Join-Path $scratch 'default-reference-output'
+    Assert-FailsWithoutOutput {
+        & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $defaultReferenceOutput
+    } $defaultReferenceOutput 'Expected exactly one reference 9'
+
+    $referenceFixtureHashes = @(
+        Get-ChildItem -LiteralPath $referenceDirectory -File | Sort-Object Name | ForEach-Object {
+            "$($_.Name):$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash)"
+        }
+    )
     $output = Join-Path $scratch 'output'
     & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $output -ReferenceDirectory $referenceDirectory | Out-Null
+    $referenceFixtureHashesAfterExport = @(
+        Get-ChildItem -LiteralPath $referenceDirectory -File | Sort-Object Name | ForEach-Object {
+            "$($_.Name):$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash)"
+        }
+    )
+    Assert-True (($referenceFixtureHashes -join "`n") -eq ($referenceFixtureHashesAfterExport -join "`n")) 'explicit external references must remain read-only exporter inputs'
     $report = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.json') | ConvertFrom-Json
     $homeCapture = $report.captures | Where-Object name -eq 'home'
     Assert-True (($report.captures | Measure-Object).Count -eq 5) 'five captures must be reported'
