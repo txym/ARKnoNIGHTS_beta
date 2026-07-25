@@ -1,5 +1,8 @@
 using System;
 using System.Collections;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using ArknoNights.Lobby;
 using NUnit.Framework;
@@ -11,6 +14,19 @@ namespace ArknoNights.Lobby.Tests
 {
     public sealed class LanLobbyControllerPlayModeTests
     {
+        [UnityTearDown]
+        public IEnumerator TearDown()
+        {
+            foreach (var controller in Resources.FindObjectsOfTypeAll<MonoBehaviour>()
+                .Where(item => item != null && string.Equals(item.GetType().Name, "LanLobbyController", StringComparison.Ordinal))
+                .ToArray())
+            {
+                UnityEngine.Object.Destroy(controller.gameObject);
+            }
+
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator LobbyGate_FreezesPreparationUntilHostStart()
         {
@@ -52,14 +68,43 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(GameObject.Find("LanLobbyRoot"), Is.Not.Null);
         }
 
+        [UnityTest]
+        public IEnumerator ReplacedCreate_StopsCompletedStaleHostListener()
+        {
+            SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+            yield return WaitForSceneBootstrap();
+            var controller = FindComponent("LanLobbyController");
+            var type = controller.GetType();
+            var listenersBefore = ListenerKeys();
+
+            type.GetMethod("CreateRoom", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(controller, null);
+            type.GetMethod("LeaveRoom", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(controller, null);
+            yield return null;
+            yield return null;
+
+            var listenersAfter = ListenerKeys();
+            Assert.That(listenersAfter.Except(listenersBefore), Is.Empty, "A superseded successful create must release its unbound TCP listener.");
+        }
+
         private static IEnumerator WaitForSceneBootstrap()
         {
+            EnsureControllerForIsolatedTest();
             for (var frame = 0; frame < 20; frame++)
             {
                 if (FindComponent("PreparationBattleLoopController") != null && FindComponent("LanLobbyController") != null)
                     yield break;
                 yield return null;
             }
+        }
+
+        private static void EnsureControllerForIsolatedTest()
+        {
+            if (FindComponent("LanLobbyController") != null) return;
+            var controllerType = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("LanLobbyController"))
+                .FirstOrDefault(type => type != null);
+            Assert.That(controllerType, Is.Not.Null);
+            new GameObject("LanLobbyRoot").AddComponent(controllerType);
         }
 
         private static Component FindComponent(string typeName)
@@ -70,6 +115,15 @@ namespace ArknoNights.Lobby.Tests
             }
 
             return null;
+        }
+
+        private static string[] ListenerKeys()
+        {
+            return IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
+                .Where(endpoint => endpoint.Address.Equals(IPAddress.Any))
+                .Select(endpoint => endpoint.Address + ":" + endpoint.Port)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
         }
     }
 }

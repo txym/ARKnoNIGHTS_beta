@@ -163,7 +163,11 @@ public sealed class LanLobbyController : MonoBehaviour
         StopDiscovery();
         var task = LanRoomHost.StartAsync(profile);
         yield return WaitForTask(task);
-        if (version != operationVersion) yield break;
+        if (version != operationVersion)
+        {
+            if (task.Status == TaskStatus.RanToCompletion) ObserveStop(task.Result);
+            yield break;
+        }
         if (task.IsFaulted || task.IsCanceled)
         {
             EnterHome("Could not create room.");
