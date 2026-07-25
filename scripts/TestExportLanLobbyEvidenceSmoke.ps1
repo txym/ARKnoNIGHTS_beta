@@ -64,6 +64,20 @@ try
         & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $ambiguousOutput -ReferenceDirectory @($firstReferences, $secondReferences)
     } $ambiguousOutput 'reference 9'
 
+    $successfulOutput = Join-Path $scratch 'successful-output'
+    & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $successfulOutput -ReferenceDirectory $firstReferences | Out-Null
+    foreach ($captureName in @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full'))
+    {
+        if (-not (Test-Path -LiteralPath (Join-Path $successfulOutput ($captureName + '-side-by-side.png'))))
+        {
+            throw "Expected side-by-side output for $captureName"
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $successfulOutput 'manifest.json')))
+    {
+        throw 'Expected copied manifest in successful evidence export.'
+    }
+
     Write-Output 'Export LAN lobby evidence smoke: PASS'
 }
 finally

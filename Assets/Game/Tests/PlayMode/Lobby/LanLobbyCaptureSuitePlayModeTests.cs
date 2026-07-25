@@ -62,6 +62,22 @@ namespace ArknoNights.Lobby.Tests
             StringAssert.Contains("\"rects\"", manifest);
             StringAssert.Contains("\"spriteSources\"", manifest);
             StringAssert.Contains("[uc]autochessouter/", manifest);
+
+            var parsed = JsonUtility.FromJson<CaptureManifestProbe>(manifest);
+            Assert.That(parsed.captures, Has.Length.EqualTo(expectedNames.Length));
+            foreach (var captureRecord in parsed.captures)
+            {
+                Assert.That(captureRecord.spriteSources, Is.Not.Null.And.Not.Empty, captureRecord.name + " must include sprite provenance.");
+                foreach (var spriteSource in captureRecord.spriteSources)
+                {
+                    Assert.That(spriteSource.spriteName, Is.Not.Null.And.Not.Empty);
+                    Assert.That(spriteSource.sourcePath, Is.Not.Null.And.Not.Empty);
+                }
+            }
+
+            var discovered = parsed.captures.Single(record => record.name == "discovered-prefill");
+            Assert.That(discovered.roomCode, Is.EqualTo("654321"));
+            Assert.That(discovered.members, Is.Empty);
         }
 
         [Test]
@@ -107,5 +123,10 @@ namespace ArknoNights.Lobby.Tests
             Assert.That((bool)validator.Invoke(null, copiedPlayerArguments), Is.False);
             StringAssert.Contains("project root", copiedPlayerArguments[4] as string);
         }
+
+        [Serializable] private sealed class CaptureManifestProbe { public CaptureRecordProbe[] captures; }
+        [Serializable] private sealed class CaptureRecordProbe { public string name; public string roomCode; public CaptureMemberProbe[] members; public SpriteSourceProbe[] spriteSources; }
+        [Serializable] private sealed class CaptureMemberProbe { public string playerId; }
+        [Serializable] private sealed class SpriteSourceProbe { public string spriteName; public string sourcePath; }
     }
 }
