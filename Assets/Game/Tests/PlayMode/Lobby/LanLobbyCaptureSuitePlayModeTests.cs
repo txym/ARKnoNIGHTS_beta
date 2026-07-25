@@ -63,5 +63,23 @@ namespace ArknoNights.Lobby.Tests
             StringAssert.Contains("\"spriteSources\"", manifest);
             StringAssert.Contains("[uc]autochessouter/", manifest);
         }
+
+        [Test]
+        public void PlayerOutputValidation_RejectsProjectAssetsBeforeAnyCaptureWrite()
+        {
+            var suiteType = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("LanLobbyCaptureSuite"))
+                .FirstOrDefault(type => type != null);
+            Assert.That(suiteType, Is.Not.Null);
+            var validator = suiteType.GetMethod("TryGetPlayerOutputDirectoryForTests", BindingFlags.Public | BindingFlags.Static);
+            Assert.That(validator, Is.Not.Null, "Player capture output needs an explicit safe-directory validator.");
+
+            var forbidden = Path.Combine(Application.dataPath, "LanLobbyCaptureForbidden");
+            var arguments = new object[] { forbidden, null, null };
+            Assert.That((bool)validator.Invoke(null, arguments), Is.False);
+            Assert.That(arguments[1] as string, Is.Empty);
+            StringAssert.Contains("Temp", arguments[2] as string);
+            Assert.That(Directory.Exists(forbidden), Is.False);
+        }
     }
 }

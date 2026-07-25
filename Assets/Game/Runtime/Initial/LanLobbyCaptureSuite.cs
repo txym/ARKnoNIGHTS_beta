@@ -27,7 +27,12 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             return;
         }
 
-        outputDirectory = Path.GetFullPath(CommandLineValue(OutputFlag) ?? Path.Combine(Application.dataPath, "..", "Artifacts", "LAN-LOBBY", "Captures"));
+        if (!TryGetPlayerOutputDirectory(CommandLineValue(OutputFlag), out outputDirectory, out var error))
+        {
+            Debug.LogError("[LanLobby][capture.output.rejected] " + error, this);
+            Application.Quit(1);
+            return;
+        }
         StartCoroutine(Capture(outputDirectory, true, true));
     }
 
@@ -40,9 +45,20 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         Destroy(root);
     }
 
+    /// <summary>Test seam for the Player-only ignored-output restriction.</summary>
+    public static bool TryGetPlayerOutputDirectoryForTests(string requestedDirectory, out string normalizedDirectory, out string error)
+    {
+        return TryGetPlayerOutputDirectory(requestedDirectory, out normalizedDirectory, out error);
+    }
+
     private IEnumerator Capture(string directory, bool quitWhenComplete, bool captureScreen)
     {
-        outputDirectory = directory;
+        if (captureScreen && !TryGetPlayerOutputDirectory(directory, out outputDirectory, out var error))
+        {
+            FailCapture(error, true);
+            yield break;
+        }
+        if (!captureScreen) outputDirectory = Path.GetFullPath(directory);
         Directory.CreateDirectory(outputDirectory);
         var disabledViews = DisableExistingLobbyViews();
         var viewRoot = new GameObject("LanLobbyCaptureFixture");
@@ -264,6 +280,40 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         for (var index = 0; index + 1 < args.Length; index++)
             if (string.Equals(args[index], flag, StringComparison.OrdinalIgnoreCase)) return args[index + 1];
         return null;
+    }
+
+    private static bool TryGetPlayerOutputDirectory(string requestedDirectory, out string normalizedDirectory, out string error)
+    {
+        normalizedDirectory = string.Empty;
+        error = string.Empty;
+        try
+        {
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var candidate = Path.GetFullPath(requestedDirectory ?? Path.Combine(projectRoot, "Artifacts", "LAN-LOBBY", "Captures"));
+            var temporaryRoot = Path.Combine(projectRoot, "Temp");
+            var artifactsRoot = Path.Combine(projectRoot, "Artifacts");
+            if (!IsWithinDirectory(candidate, temporaryRoot) && !IsWithinDirectory(candidate, artifactsRoot))
+            {
+                error = "Capture output must be inside the ignored project Temp/ or Artifacts/ directory; rejected: " + candidate;
+                return false;
+            }
+
+            normalizedDirectory = candidate;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = "Capture output path is invalid: " + exception.Message;
+            return false;
+        }
+    }
+
+    private static bool IsWithinDirectory(string candidate, string root)
+    {
+        var normalizedCandidate = Path.GetFullPath(candidate).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(normalizedCandidate, normalizedRoot, StringComparison.OrdinalIgnoreCase)) return true;
+        return normalizedCandidate.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     [Serializable] private sealed class CaptureManifest { public CaptureRecord[] captures; }

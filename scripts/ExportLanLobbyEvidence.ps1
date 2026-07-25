@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)] [string] $CaptureDirectory,
-    [string] $OutputDirectory
+    [string] $OutputDirectory,
+    [string[]] $ReferenceDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,6 +10,39 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $captureDirectory = [IO.Path]::GetFullPath($CaptureDirectory)
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $captureDirectory 'Evidence' }
 $outputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
+$temporaryRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'Temp'))
+$artifactsRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'Artifacts'))
+
+function Test-IsWithinDirectory([string] $Candidate, [string] $Root)
+{
+    $candidatePath = [IO.Path]::GetFullPath($Candidate).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    return $candidatePath -ceq $rootPath -or $candidatePath.StartsWith($rootPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Resolve-ExactReference([string] $Suffix, [string[]] $Directories)
+{
+    $expectedName = ([char]0x56FE).ToString() + $Suffix + '.png'
+    $matches = @(
+        foreach ($directory in $Directories)
+        {
+            if (-not (Test-Path -LiteralPath $directory)) { throw "Reference directory not found: $directory" }
+            Get-ChildItem -LiteralPath $directory -File -Filter '*.png' | Where-Object { $_.Name -ceq $expectedName }
+        }
+    )
+    if ($matches.Count -ne 1)
+    {
+        throw "Expected exactly one reference $Suffix named $expectedName; found $($matches.Count)."
+    }
+    return $matches[0].FullName
+}
+
+if (-not (Test-IsWithinDirectory $outputDirectory $temporaryRoot) -and -not (Test-IsWithinDirectory $outputDirectory $artifactsRoot))
+{
+    throw "Evidence output must be inside the safe ignored project directory Temp/ or Artifacts/: $outputDirectory"
+}
+
+$referenceDirectories = if ($ReferenceDirectory -and $ReferenceDirectory.Count -gt 0) { @($ReferenceDirectory | ForEach-Object { [IO.Path]::GetFullPath($_) }) } else { @(Join-Path $projectRoot 'docs/references/ui/battle_hud') }
 $manifestPath = Join-Path $captureDirectory 'manifest.json'
 $assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Capture manifest not found: $manifestPath" }
@@ -29,16 +63,14 @@ foreach ($capture in $manifest.captures) {
     }
 }
 
+$referenceHome = Resolve-ExactReference '9' $referenceDirectories
+$referenceRoom = Resolve-ExactReference '10' $referenceDirectories
+
 Add-Type -AssemblyName System.Drawing
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
-$referenceDirectory = Join-Path $projectRoot 'docs/references/ui/battle_hud'
-# Resolve by the numeric suffix so Windows PowerShell 5 never interprets the Chinese filename
-# using the active console code page. The user-provided reference contract is 图9 / 图10.
-$referenceHome = @(Get-ChildItem -LiteralPath $referenceDirectory -File -Filter '*.png' | Where-Object { $_.BaseName -match '9$' }) | Select-Object -First 1 -ExpandProperty FullName
-$referenceRoom = @(Get-ChildItem -LiteralPath $referenceDirectory -File -Filter '*.png' | Where-Object { $_.BaseName -match '10$' }) | Select-Object -First 1 -ExpandProperty FullName
+# References were already resolved by exact Unicode filename and cardinality before any output write.
 foreach ($capture in $manifest.captures) {
     $reference = if ($capture.name -like 'room-*') { $referenceRoom } else { $referenceHome }
-    if ([string]::IsNullOrWhiteSpace($reference) -or -not (Test-Path -LiteralPath $reference)) { throw "Reference image missing for capture '$($capture.name)': expected numeric reference suffix 9 or 10 in $referenceDirectory" }
     $actual = [Drawing.Bitmap]::FromFile($capture.path)
     $expectedReference = [Drawing.Bitmap]::FromFile($reference)
     try {

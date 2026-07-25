@@ -498,6 +498,6 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 
 1. 定向 EditMode：运行 `LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、`LanSocketIntegrationEditModeTests` 和 `LobbyAssetMapEditModeTests`，确认每个 NUnit XML 的测试数大于零且失败为零。
 2. 定向 PlayMode：运行 `LanLobbyViewPlayModeTests`、`LanLobbyControllerPlayModeTests`、`AndroidMulticastLockPlayModeTests` 和 `LanLobbyCaptureSuitePlayModeTests`；最后一个实际写出五个 PNG 和包含 Canvas scale、房间、成员/ready、延迟、rect 和 Sprite 来源的 JSON 清单。
-3. Windows Player：以固定 Unity `D:\2022.3.62f1c1\Editor\Unity.exe` 执行 `Task006StandaloneBuild.BuildWindowsX64`；随后从产物启动 `ARKnoNIGHTS.exe -lanLobbyCaptureSuite -lanLobbyCaptureOutput <ignored-output>`，等待退出码 0、五张可解码 PNG 和 manifest。
-4. 本地导出：执行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\ExportLanLobbyEvidence.ps1 -CaptureDirectory <ignored-output>`。脚本必须拒绝任一未映射 Sprite，并生成五张实际/参考并排图；逐图检查布局、文本、顶部延迟、四人卡片、预填房间号和没有 IP/端口输入。
+3. Windows Player：以固定 Unity `D:\2022.3.62f1c1\Editor\Unity.exe` 执行 `Task006StandaloneBuild.BuildWindowsX64`；随后从产物启动 `ARKnoNIGHTS.exe -lanLobbyCaptureSuite -lanLobbyCaptureOutput Temp/LAN-LOBBY/Captures`，等待退出码 0、五张可解码 PNG 和 manifest。只有项目忽略的 `Temp/` 或 `Artifacts/` 输出可用；不得传入 `Assets/`、项目根或外部目录。
+4. 本地导出：执行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\ExportLanLobbyEvidence.ps1 -CaptureDirectory Temp/LAN-LOBBY/Captures -OutputDirectory Temp/LAN-LOBBY/Evidence`。脚本必须在创建输出目录前拒绝任一未映射 Sprite、非忽略输出和缺失/多重精确参考图，并生成五张实际/参考并排图；逐图检查布局、文本、顶部延迟、四人卡片、预填房间号和没有 IP/端口输入。
 5. 真实局域网：在同一非隔离 Wi-Fi 上让 Windows 与 Android Player 按 `docs/LAN-LOBBY-REPORT.md` 的五步流程完成创建、发现、预填、明确加入、延迟、双端准备、开始及断连恢复。Editor loopback、截图或单机 Player 不能替代此验收；没有两台实体设备时必须标记为未验证。
