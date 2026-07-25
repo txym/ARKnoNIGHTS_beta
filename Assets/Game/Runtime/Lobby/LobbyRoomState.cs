@@ -67,12 +67,7 @@ namespace ArknoNights.Lobby
             return true;
         }
 
-        public bool TrySetReady(string playerId, bool isReady, out LobbyJoinFailure failure)
-        {
-            return TrySetReady(playerId, playerId, isReady, out failure);
-        }
-
-        public bool TrySetReady(string requestingPlayerId, string playerId, bool isReady, out LobbyJoinFailure failure)
+        public bool TrySetReady(string callerPlayerId, string playerId, bool isReady, out LobbyJoinFailure failure)
         {
             if (snapshot.HasStarted)
             {
@@ -80,7 +75,7 @@ namespace ArknoNights.Lobby
                 return false;
             }
 
-            if (requestingPlayerId != playerId)
+            if (!string.Equals(callerPlayerId, playerId, StringComparison.Ordinal))
             {
                 failure = LobbyJoinFailure.UnknownPlayer;
                 return false;
@@ -120,7 +115,9 @@ namespace ArknoNights.Lobby
                 return false;
             }
 
-            if (snapshot.HostPlayerId != playerId)
+            if (members.Count == 0
+                || string.IsNullOrWhiteSpace(snapshot.HostPlayerId)
+                || snapshot.HostPlayerId != playerId)
             {
                 failure = LobbyJoinFailure.NotHost;
                 return false;
