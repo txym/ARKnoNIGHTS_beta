@@ -199,6 +199,12 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var root = Rect("LanLobbyRoot", transform);
         Stretch(root);
+        var blockerRoot = new GameObject("OpaqueBlocker", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        blockerRoot.transform.SetParent(root, false);
+        var blocker = blockerRoot.GetComponent<Image>();
+        blocker.color = new Color(.025f, .06f, .08f, 1f);
+        blocker.raycastTarget = false;
+        Stretch(blocker.rectTransform);
         var background = Image("Terrain", root, "bg_terrain");
         Stretch(background.rectTransform);
         background.preserveAspect = false;

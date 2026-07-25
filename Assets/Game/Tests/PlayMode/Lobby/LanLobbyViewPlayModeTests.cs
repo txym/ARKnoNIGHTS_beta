@@ -163,6 +163,28 @@ namespace ArknoNights.Lobby.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator LobbyRoot_HasOpaqueFullCanvasBlockerBehindTransparentTerrain()
+        {
+            var lobbyRoot = view.transform.Find("LanLobbyRoot");
+            var blockerTransform = lobbyRoot.Find("OpaqueBlocker");
+            Assert.That(blockerTransform, Is.Not.Null);
+            if (blockerTransform == null) yield break;
+
+            var blocker = blockerTransform.GetComponent<UnityEngine.UI.Image>();
+            var terrain = lobbyRoot.Find("Terrain");
+            var blockerRect = blocker.rectTransform;
+
+            Assert.That(blocker.sprite, Is.Null);
+            Assert.That(blocker.color.a, Is.EqualTo(1f));
+            Assert.That(blockerRect.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(blockerRect.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(blockerRect.offsetMin, Is.EqualTo(Vector2.zero));
+            Assert.That(blockerRect.offsetMax, Is.EqualTo(Vector2.zero));
+            Assert.That(blocker.transform.GetSiblingIndex(), Is.LessThan(terrain.GetSiblingIndex()));
+            yield return null;
+        }
+
         private void OnJoinRequested(string roomCode)
         {
             joinRequests++;
