@@ -138,7 +138,8 @@ namespace ArknoNights.Lobby
                 return false;
             }
 
-            if (!Enum.TryParse(message.kind, false, out LobbyMessageKind kind))
+            if (!Enum.TryParse(message.kind, false, out LobbyMessageKind kind)
+                || !Enum.IsDefined(typeof(LobbyMessageKind), kind))
             {
                 error = LobbyProtocolError.UnknownMessageKind;
                 return false;

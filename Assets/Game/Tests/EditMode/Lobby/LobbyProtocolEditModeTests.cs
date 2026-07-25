@@ -65,6 +65,13 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
+        public void Decode_RejectsNumericMessageKind()
+        {
+            Assert.That(LobbyProtocol.TryDecode(CreateFrame("{\"protocolVersion\":1,\"kind\":\"999\",\"roomCode\":\"123456\",\"playerId\":\"player-1\"}"), out _, out var error), Is.False);
+            Assert.That(error, Is.EqualTo(LobbyProtocolError.UnknownMessageKind));
+        }
+
+        [Test]
         public void Decode_RejectsInvalidRoomCode()
         {
             Assert.That(LobbyProtocol.TryDecode(CreateFrame("{\"protocolVersion\":1,\"kind\":\"JoinRequest\",\"roomCode\":\"12a456\",\"playerId\":\"player-1\",\"displayName\":\"Doctor\",\"avatarIndex\":2}"), out _, out var error), Is.False);
@@ -96,6 +103,18 @@ namespace ArknoNights.Lobby.Tests
 
             Assert.That(LobbyProtocol.TryDecode(CreateFrame(json), out _, out var error), Is.False);
             Assert.That(error, Is.EqualTo(LobbyProtocolError.SnapshotTooLarge));
+        }
+
+        [Test]
+        public void RoomSnapshot_RejectsMoreThanFourMembers()
+        {
+            var members = new LobbyMemberSnapshot[LobbyRoomSnapshot.MaximumMembers + 1];
+            for (var index = 0; index < members.Length; index++)
+            {
+                members[index] = new LobbyMemberSnapshot(new LobbyProfile("player-" + index, "Doctor", 0), false, 0);
+            }
+
+            Assert.That(() => new LobbyRoomSnapshot("123456", "player-0", members, false, 1), Throws.ArgumentException);
         }
 
         private static byte[] CreateFrame(string json)

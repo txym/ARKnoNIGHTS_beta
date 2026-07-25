@@ -68,11 +68,17 @@ namespace ArknoNights.Lobby
 
         public LobbyRoomSnapshot(string roomCode, string hostPlayerId, IEnumerable<LobbyMemberSnapshot> members, bool hasStarted, long revision)
         {
+            var memberList = new List<LobbyMemberSnapshot>(members ?? Array.Empty<LobbyMemberSnapshot>());
+            if (memberList.Count > MaximumMembers)
+            {
+                throw new ArgumentException("A lobby room cannot contain more than four members.", nameof(members));
+            }
+
             RoomCode = roomCode;
             HostPlayerId = hostPlayerId;
             HasStarted = hasStarted;
             Revision = revision;
-            Members = new ReadOnlyCollection<LobbyMemberSnapshot>(new List<LobbyMemberSnapshot>(members ?? Array.Empty<LobbyMemberSnapshot>()));
+            Members = new ReadOnlyCollection<LobbyMemberSnapshot>(memberList);
         }
 
         public string RoomCode { get; }
