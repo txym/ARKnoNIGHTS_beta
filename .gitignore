@@ -22,5 +22,6 @@ UserSettings/
 *.unityproj
 .DS_Store
 Thumbs.db
+.worktrees/
 *.tar.7z
 *.zip
