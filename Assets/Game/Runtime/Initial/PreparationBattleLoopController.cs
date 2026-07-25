@@ -32,12 +32,22 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
     private int roundNumber;
     private PreparationSealResult activeSeal;
     private bool initialized;
+    private bool lobbyGateActive;
 
     public LocalBattlePhase Phase => machine.Phase;
     public float RemainingPreparationSeconds => machine.RemainingPreparationSeconds;
     public string LastError => machine.LastError;
     public PreparationSealResult ActiveSeal => activeSeal;
     public string LastBattleSummary { get; private set; } = string.Empty;
+    public bool IsLobbyGateActive => lobbyGateActive;
+
+    /// <summary>Reversible LAN-lobby gate. It neither reads nor mutates PlayerState.</summary>
+    public void SetLobbyGate(bool active)
+    {
+        lobbyGateActive = active;
+        if (!active && initialized && machine.Phase == LocalBattlePhase.Preparation)
+            machine.EnterPreparation();
+    }
 
     private IEnumerator Start()
     {
@@ -61,7 +71,8 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
 
     public void AdvanceForTests(float unscaledSeconds)
     {
-        if (initialized) Advance(unscaledSeconds);
+        // Existing scene tests use this as a deterministic clock driver; the runtime Update path remains lobby-gated.
+        if (initialized) Advance(unscaledSeconds, true);
     }
 
     private void Initialize()
@@ -106,6 +117,12 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
 
     private void Advance(float unscaledSeconds)
     {
+        Advance(unscaledSeconds, false);
+    }
+
+    private void Advance(float unscaledSeconds, bool ignoreLobbyGate)
+    {
+        if (lobbyGateActive && !ignoreLobbyGate) return;
         if (machine.Phase == LocalBattlePhase.Preparation && machine.Advance(unscaledSeconds)) BeginBattle();
         if (machine.Phase != LocalBattlePhase.Battle || demo == null) return;
         if (demo.State == BattleDemoState.Error)

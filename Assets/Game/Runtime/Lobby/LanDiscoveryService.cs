@@ -53,6 +53,21 @@ namespace ArknoNights.Lobby
         public IReadOnlyList<LobbyDiscoveryEntry> DiscoveredRooms => discoveredRooms;
         public string LocalRoomCode => localAnnouncement == null ? null : localAnnouncement.RoomCode;
 
+        /// <summary>Returns the TCP endpoint announced by a discovered LAN room code.</summary>
+        public bool TryGetEndpoint(string roomCode, out IPEndPoint endpoint)
+        {
+            endpoint = null;
+            if (!LobbyRoomCode.IsValid(roomCode)) return false;
+            foreach (var seen in discoveries.Values)
+            {
+                if (!string.Equals(seen.Entry.RoomCode, roomCode, StringComparison.Ordinal)) continue;
+                endpoint = new IPEndPoint(seen.Endpoint.Address, seen.Entry.TcpPort);
+                return true;
+            }
+
+            return false;
+        }
+
         public void Start()
         {
             if (receiver != null) return;

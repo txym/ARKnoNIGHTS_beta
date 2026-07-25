@@ -27,7 +27,7 @@ namespace ArknoNights.Lobby.Tests
 
                 Run(() => client.SetReadyAsync(true));
                 WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady; }, TimeSpan.FromSeconds(2));
-                host.SetReadyForTests("host", true);
+                Assert.That(host.TrySetReady("host", true, out var hostReadyFailure), Is.True, hostReadyFailure.ToString());
                 Assert.That(host.TryStart("host", out var failure), Is.True, failure.ToString());
 
                 Run(() => client.WaitForStartAsync(TimeSpan.FromSeconds(2)));
@@ -71,6 +71,9 @@ namespace ArknoNights.Lobby.Tests
                         discovery.Tick(clock);
                         return discovery.DiscoveredRooms.Any(entry => entry.RoomCode == "654321");
                     }, TimeSpan.FromSeconds(2));
+                    Assert.That(discovery.TryGetEndpoint("654321", out var endpoint), Is.True);
+                    Assert.That(endpoint.Address, Is.EqualTo(IPAddress.Loopback));
+                    Assert.That(endpoint.Port, Is.EqualTo(34568));
 
                     discovery.Tick(clock.AddMilliseconds(LanDiscoveryService.DiscoveryExpiryMilliseconds + 1));
                     Assert.That(discovery.DiscoveredRooms, Is.Empty);

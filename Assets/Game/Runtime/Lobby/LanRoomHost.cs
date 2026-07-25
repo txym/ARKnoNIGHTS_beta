@@ -24,6 +24,7 @@ namespace ArknoNights.Lobby
         private readonly Task heartbeatTask;
         private readonly ConcurrentQueue<LobbyRoomSnapshot> pendingSnapshots = new ConcurrentQueue<LobbyRoomSnapshot>();
         private LobbyRoomSnapshot publishedSnapshot;
+        private Task startBroadcastTask = Task.CompletedTask;
         private bool stopped;
 
         private LanRoomHost(LobbyProfile hostProfile, int tcpPort, bool acceptsAnyRoomCode)
@@ -45,6 +46,7 @@ namespace ArknoNights.Lobby
         public string RoomCode => Snapshot.RoomCode;
         public int TcpPort => ((IPEndPoint)listener.LocalEndpoint).Port;
         public IPEndPoint LoopbackEndpoint => new IPEndPoint(IPAddress.Loopback, TcpPort);
+        public Task StartBroadcastTask => startBroadcastTask;
 
         public void Tick()
         {
@@ -91,10 +93,29 @@ namespace ArknoNights.Lobby
             if (started)
             {
                 PublishSnapshot(snapshot);
-                _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.Start));
+                startBroadcastTask = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.Start));
             }
 
             return started;
+        }
+
+        public bool TrySetReady(string playerId, bool isReady, out LobbyJoinFailure failure)
+        {
+            bool changed;
+            LobbyRoomSnapshot snapshot;
+            lock (gate)
+            {
+                changed = room.TrySetReady(playerId, playerId, isReady, out failure);
+                snapshot = changed ? CreateSnapshotWithLatency() : null;
+            }
+
+            if (changed)
+            {
+                PublishSnapshot(snapshot);
+                _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
+            }
+
+            return changed;
         }
 
         public async Task StopAsync()
@@ -127,20 +148,8 @@ namespace ArknoNights.Lobby
 
         public void SetReadyForTests(string playerId, bool isReady)
         {
-            bool changed;
-            LobbyRoomSnapshot snapshot;
-            lock (gate)
-            {
-                changed = room.TrySetReady(playerId, playerId, isReady, out var failure);
-                if (!changed) throw new InvalidOperationException("Could not update readiness: " + failure + ".");
-                snapshot = CreateSnapshotWithLatency();
-            }
-
-            if (changed)
-            {
-                PublishSnapshot(snapshot);
-                _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
-            }
+            if (!TrySetReady(playerId, isReady, out var failure))
+                throw new InvalidOperationException("Could not update readiness: " + failure + ".");
         }
 
         private async Task AcceptLoopAsync()

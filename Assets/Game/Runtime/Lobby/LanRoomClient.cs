@@ -27,6 +27,7 @@ namespace ArknoNights.Lobby
         private LobbyRoomSnapshot snapshot;
         private long latencyMilliseconds = -1;
         private bool stopped;
+        private volatile bool disconnected;
 
         private LanRoomClient(TcpClient tcpClient, LobbyProfile profile, string requestedRoomCode)
         {
@@ -40,7 +41,7 @@ namespace ArknoNights.Lobby
 
         public LobbyRoomSnapshot Snapshot => snapshot;
         public long LatencyMilliseconds => latencyMilliseconds;
-        public bool IsConnected => !stopped && tcpClient.Connected;
+        public bool IsConnected => !stopped && !disconnected && tcpClient.Connected;
 
         public void Tick()
         {
@@ -170,6 +171,10 @@ namespace ArknoNights.Lobby
             catch (Exception exception)
             {
                 if (!stopped) joinCompletion.TrySetException(exception);
+            }
+            finally
+            {
+                disconnected = true;
             }
         }
 
