@@ -28,6 +28,23 @@ function Assert-FailsWithoutOutput([scriptblock] $Action, [string] $OutputPath, 
     Assert-True (-not (Test-Path -LiteralPath $OutputPath)) "output must not exist after validation failure: $OutputPath"
 }
 
+function Assert-FailsPreservingOutput([scriptblock] $Action, [string] $OutputPath, [string] $SentinelPath, [string] $ExpectedMessage)
+{
+    $failed = $false
+    try { & $Action }
+    catch
+    {
+        $failed = $true
+        if ($_.Exception.Message -notlike ('*' + $ExpectedMessage + '*'))
+        {
+            throw "Expected failure containing '$ExpectedMessage', actual: $($_.Exception.Message)"
+        }
+    }
+    if (-not $failed) { throw "Expected visual-diff failure: $ExpectedMessage" }
+    Assert-True (Test-Path -LiteralPath $OutputPath) 'caller pre-existing output directory must remain'
+    Assert-True ((Get-Content -Raw -LiteralPath $SentinelPath) -eq 'preserve me') 'caller sentinel output must remain unchanged'
+}
+
 function New-SolidPng([string] $Path, [int] $Width, [int] $Height, [Drawing.Color] $Color, [scriptblock] $Draw)
 {
     $bitmap = New-Object Drawing.Bitmap $Width, $Height
@@ -106,6 +123,18 @@ try
         & $exportScript -CaptureDirectory $invalidCaptureDirectory -OutputDirectory $invalidOutput -ReferenceDirectory $referenceDirectory
     } $invalidOutput '1920x1080'
 
+    $malformedReferences = Join-Path $scratch 'malformed-references'
+    New-Item -ItemType Directory -Force -Path $malformedReferences | Out-Null
+    Set-Content -LiteralPath (Join-Path $malformedReferences $figure9) -Value 'not an image' -Encoding UTF8
+    Copy-Item -LiteralPath (Join-Path $referenceDirectory $figure10) -Destination (Join-Path $malformedReferences $figure10)
+    $preexistingOutput = Join-Path $scratch 'preexisting-output'
+    New-Item -ItemType Directory -Force -Path $preexistingOutput | Out-Null
+    $sentinel = Join-Path $preexistingOutput 'sentinel.txt'
+    Set-Content -LiteralPath $sentinel -Value 'preserve me' -NoNewline -Encoding UTF8
+    Assert-FailsPreservingOutput {
+        & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $preexistingOutput -ReferenceDirectory $malformedReferences
+    } $preexistingOutput $sentinel 'reference image'
+
     $output = Join-Path $scratch 'output'
     & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $output -ReferenceDirectory $referenceDirectory | Out-Null
     $report = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.json') | ConvertFrom-Json
@@ -134,5 +163,9 @@ try
 }
 finally
 {
-    if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Force -Recurse }
+    if (Test-Path -LiteralPath $scratch)
+    {
+        try { Remove-Item -LiteralPath $scratch -Force -Recurse -ErrorAction Stop }
+        catch { Write-Warning "Smoke fixture cleanup deferred: $scratch" }
+    }
 }

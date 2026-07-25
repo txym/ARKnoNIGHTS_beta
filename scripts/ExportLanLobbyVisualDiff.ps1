@@ -72,6 +72,20 @@ function Get-RoomCardGeometry($Capture)
     return @($cards | ForEach-Object { [pscustomobject][ordered]@{ name=[string]$_.name; x=[double]$_.x; y=[double]$_.y; width=[double]$_.width; height=[double]$_.height } })
 }
 
+function Test-LanLobbyReferenceImage([string] $ReferencePath)
+{
+    try
+    {
+        $probe = [Drawing.Bitmap]::FromFile($ReferencePath)
+        try { return [pscustomobject]@{ Width = $probe.Width; Height = $probe.Height } }
+        finally { $probe.Dispose() }
+    }
+    catch
+    {
+        throw "Could not decode reference image: $ReferencePath. $($_.Exception.Message)"
+    }
+}
+
 $captureDirectory = [IO.Path]::GetFullPath($CaptureDirectory)
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $captureDirectory 'VisualDiff' }
 $outputDirectory = Assert-LanLobbySafeOutputDirectory -ProjectRoot $projectRoot -OutputDirectory $OutputDirectory
@@ -82,6 +96,8 @@ $assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
 $spriteUsage = Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $manifest -AssetMapPath $assetMapPath
 $referenceHome = Resolve-LanLobbyReferenceImage -Suffix '9' -ReferenceDirectory $referenceDirectories
 $referenceRoom = Resolve-LanLobbyReferenceImage -Suffix '10' -ReferenceDirectory $referenceDirectories
+$referenceHomeProbe = Test-LanLobbyReferenceImage -ReferencePath $referenceHome
+$referenceRoomProbe = Test-LanLobbyReferenceImage -ReferencePath $referenceRoom
 
 # Dimension validation deliberately occurs before New-Item so failed captures cannot leave evidence output behind.
 foreach ($capture in @($manifest.captures))
@@ -91,12 +107,19 @@ foreach ($capture in @($manifest.captures))
     finally { $probe.Dispose() }
 }
 
+# The exporter never overwrites or removes caller output. A report destination must be absent;
+# all generated files are staged beside it and moved in only after successful report generation.
+if (Test-Path -LiteralPath $outputDirectory) { throw "Visual-diff output directory must not already exist: $outputDirectory" }
+$outputParent = Split-Path -Parent $outputDirectory
+New-Item -ItemType Directory -Force -Path $outputParent | Out-Null
+$stagingDirectory = Join-Path $outputParent ('.lan-lobby-visual-diff-staging-' + [Guid]::NewGuid().ToString('N'))
+
 $assets = @($spriteUsage | Group-Object SpriteName | Sort-Object Name | ForEach-Object {
     $first = $_.Group[0]
     [pscustomobject][ordered]@{ spriteName=$first.SpriteName; captures=@($_.Group.CaptureName | Sort-Object -Unique); resourcesPath=$first.ResourcesPath; sourcePath=$first.SourcePath; importedSha256=$first.ImportedSha256; occurrenceCount=[int](($_.Group | Measure-Object OccurrenceCount -Sum).Sum) }
 })
 $reportCaptures = @()
-New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
     foreach ($capture in @($manifest.captures))
@@ -104,13 +127,18 @@ try
         $isRoom = $capture.name -like 'room-*'
         $referencePath = if ($isRoom) { $referenceRoom } else { $referenceHome }
         $regionSpecs = if ($isRoom) { $roomRegions } else { $homeRegions }
-        $actual = [Drawing.Bitmap]::FromFile($capture.path)
-        $nativeReference = [Drawing.Bitmap]::FromFile($referencePath)
-        $normalizedReference = New-Object Drawing.Bitmap 1920, 1080
-        $overlay = New-Object Drawing.Bitmap 1920, 1080
-        $heatmap = New-Object Drawing.Bitmap 1920, 1080
+        $actual = $null
+        $nativeReference = $null
+        $normalizedReference = $null
+        $overlay = $null
+        $heatmap = $null
         try
         {
+            $actual = [Drawing.Bitmap]::FromFile($capture.path)
+            $nativeReference = [Drawing.Bitmap]::FromFile($referencePath)
+            $normalizedReference = New-Object Drawing.Bitmap 1920, 1080
+            $overlay = New-Object Drawing.Bitmap 1920, 1080
+            $heatmap = New-Object Drawing.Bitmap 1920, 1080
             $graphics = [Drawing.Graphics]::FromImage($normalizedReference)
             try { $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear; $graphics.DrawImage($nativeReference, 0, 0, 1920, 1080) } finally { $graphics.Dispose() }
             $overlayGraphics = [Drawing.Graphics]::FromImage($overlay)
@@ -140,24 +168,26 @@ try
             [double]$weightedDifference = if ($compared -eq 0) { 0.0 } else { (($measured | ForEach-Object { $_.pixelDifferenceRatio * $_.comparedPixels } | Measure-Object -Sum).Sum / $compared) }
             [double]$weightedError = if ($compared -eq 0) { 0.0 } else { (($measured | ForEach-Object { $_.averageAbsoluteRgbError * $_.comparedPixels } | Measure-Object -Sum).Sum / $compared) }
             $reportCaptures += [pscustomobject][ordered]@{ name=[string]$capture.name; actualWidth=1920; actualHeight=1080; referenceWidth=$nativeReference.Width; referenceHeight=$nativeReference.Height; referenceNormalization='independent-xy'; referenceFigure=if ($isRoom) { '图10.png' } else { '图9.png' }; regions=$regions; maskedPixels=$maskedPixels; comparedPixels=$compared; pixelDifferenceRatio=$weightedDifference; averageAbsoluteRgbError=$weightedError; attention=($weightedDifference -gt 0.25 -or $weightedError -gt 48); roomCards=if ($isRoom) { Get-RoomCardGeometry $capture } else { @() }; referenceCardLayoutRegion=if ($isRoom) { $regions | Where-Object name -eq 'player-card-layout' } else { $null } }
-            $actual.Save((Join-Path $outputDirectory ($capture.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
-            $normalizedReference.Save((Join-Path $outputDirectory ($capture.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
-            $overlay.Save((Join-Path $outputDirectory ($capture.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
-            $heatmap.Save((Join-Path $outputDirectory ($capture.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $actual.Save((Join-Path $stagingDirectory ($capture.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $normalizedReference.Save((Join-Path $stagingDirectory ($capture.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $overlay.Save((Join-Path $stagingDirectory ($capture.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $heatmap.Save((Join-Path $stagingDirectory ($capture.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
         }
-        finally { $actual.Dispose(); $nativeReference.Dispose(); $normalizedReference.Dispose(); $overlay.Dispose(); $heatmap.Dispose() }
+        finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($normalizedReference) { $normalizedReference.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     }
     $report = [ordered]@{ generatedAtUtc=[DateTime]::UtcNow.ToString('o'); referenceNormalization='independent-xy'; captures=$reportCaptures; assets=$assets }
-    $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $outputDirectory 'visual-diff-report.json') -Encoding UTF8
+    $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $stagingDirectory 'visual-diff-report.json') -Encoding UTF8
     $markdown = @('# LAN Lobby Visual Difference Report', '', 'Reference figures are native 2048×1118 evidence independently normalized on X and Y to 1920×1080. This is non-blocking layout/color reporting, not a pixel-equality claim.', '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
     $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Approved sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
     foreach ($asset in $assets) { $markdown += "| $($asset.spriteName) | $($asset.captures -join ', ') | $($asset.resourcesPath) | $($asset.sourcePath) | $($asset.importedSha256) | $($asset.occurrenceCount) |" }
-    Set-Content -LiteralPath (Join-Path $outputDirectory 'visual-diff-report.md') -Value $markdown -Encoding UTF8
-    Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $outputDirectory 'manifest.json') -Force
+    Set-Content -LiteralPath (Join-Path $stagingDirectory 'visual-diff-report.md') -Value $markdown -Encoding UTF8
+    Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $stagingDirectory 'manifest.json') -Force
+    Move-Item -LiteralPath $stagingDirectory -Destination $outputDirectory
+    $stagingDirectory = $null
 }
-catch { if (Test-Path -LiteralPath $outputDirectory) { Remove-Item -LiteralPath $outputDirectory -Force -Recurse }; throw }
+catch { if ($stagingDirectory -and (Test-Path -LiteralPath $stagingDirectory)) { Remove-Item -LiteralPath $stagingDirectory -Force -Recurse }; throw }
 
 Write-Output "LAN lobby visual difference report exported: $outputDirectory"
