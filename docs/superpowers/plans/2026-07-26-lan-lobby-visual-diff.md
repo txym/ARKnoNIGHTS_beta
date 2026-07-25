@@ -80,7 +80,7 @@ Expected: the common smoke script/functions are absent and the new manifest asse
 
 - [ ] **Step 3: Implement the shared input contract**
 
-Create the helper with pre-write validation in this exact order: determine this worktree root, normalize output candidate, reject anything outside `Temp/`/`Artifacts/`, load manifest, require exactly the five approved names, verify every capture file is exactly 1920×1080, parse `ASSET_MAP.md`, validate every manifest sprite, calculate each imported PNG SHA-256, then resolve exact unique references. Keep the exporter’s current `New-Item` strictly after helper success.
+Create the helper with pre-write validation in this exact order: determine this worktree root, normalize output candidate, reject anything outside `Temp/`/`Artifacts/`, load manifest, require exactly the five approved names, verify every capture file exists, parse `ASSET_MAP.md`, validate every manifest sprite, calculate each imported PNG SHA-256, then resolve exact unique references. Keep the exporter’s current `New-Item` strictly after helper success. Do not impose the 1920×1080 visual-diff constraint here: the pre-existing side-by-side exporter’s synthetic smoke fixture intentionally uses a smaller approved PNG.
 
 The mapping parser must expose the intended Resources path:
 
@@ -144,7 +144,7 @@ Expected: no visual-diff exporter/report/heatmap exists.
 
 - [ ] **Step 3: Implement normalization, regions and output**
 
-Use `System.Drawing.Bitmap` and lock/read pixels in 1920×1080 actual space. Resample each reference to actual width/height with nearest-neighbor or high-quality bilinear interpolation, record native reference dimensions, and never overwrite the original reference.
+Use `System.Drawing.Bitmap` and lock/read pixels in 1920×1080 actual space. Before any `New-Item`, reject every actual capture that is not exactly 1920×1080; this visual-diff-only rule deliberately does not alter the existing side-by-side exporter. Resample each reference to actual width/height with nearest-neighbor or high-quality bilinear interpolation, record native reference dimensions, and never overwrite the original reference.
 
 Use these normalized region names and rectangles (`x`, `y`, `width`, `height`, each in 0..1):
 
