@@ -586,6 +586,75 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.AreEqual(zeroResult.Events.Select(EventSummary), threeResult.Events.Select(EventSummary));
         }
 
+        [Test]
+        public void SpawnEvents_CarryImmutableInstanceSnapshotsAndResultIdentity()
+        {
+            var loaded = LocalBattleLoader.LoadFromResources(CatalogPath, RealBattlePath);
+            Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
+
+            var result = new BattleRunner(loaded.Input).RunToCompletion();
+            Assert.AreEqual(loaded.Input.BattleId, result.BattleId);
+            Assert.AreEqual(
+                loaded.Input.Players.Single(player => player.Side == BattleSide.Home).PlayerId,
+                result.HomePlayerId);
+            Assert.AreEqual(
+                loaded.Input.Players.Single(player => player.Side == BattleSide.Away).PlayerId,
+                result.AwayPlayerId);
+
+            foreach (var spawn in result.Events.Where(item => item.Type == BattleEventType.Spawn))
+            {
+                Assert.NotNull(spawn.SpawnSnapshot);
+                Assert.AreEqual(spawn.UnitId, spawn.SpawnSnapshot.UnitId);
+                Assert.AreEqual(spawn.UnitTypeId, spawn.SpawnSnapshot.TypeId);
+                Assert.AreEqual(spawn.UnitSide, spawn.SpawnSnapshot.Side);
+                Assert.AreEqual(spawn.ToPosition, spawn.SpawnSnapshot.Position);
+                Assert.Greater(spawn.SpawnSnapshot.MaxHitPoints, 0);
+                Assert.AreEqual(spawn.SpawnSnapshot.MaxHitPoints, spawn.SpawnSnapshot.CurrentHitPoints);
+                Assert.AreEqual(0, spawn.SpawnSnapshot.CurrentShield);
+            }
+        }
+
+        [Test]
+        public void InitialInput_RejectsAnyNegativeNumericUnitId()
+        {
+            var definition = new UnitDefinition(
+                "unit", 100, 10, 0, 0, 100, 20, 20,
+                DamageType.Physical, AttackMethod.Melee, 1, false);
+            var specification = new BattleInputSpecification(
+                BattleInput.LocalBattleSchemaVersion,
+                "negative-initial-id",
+                20,
+                new[] { definition },
+                new[]
+                {
+                    new PlayerSnapshot("home", BattleSide.Home, new[]
+                    {
+                        new UnitSnapshot("-01", "unit", UnitZone.Deployed,
+                            new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>())
+                    }),
+                    new PlayerSnapshot("away", BattleSide.Away, new[]
+                    {
+                        new UnitSnapshot("away-1", "unit", UnitZone.Deployed,
+                            new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>())
+                    })
+                });
+
+            Assert.IsFalse(BattleInputFactory.TryCreate(specification, out _, out var errors));
+            Assert.That(errors, Has.Some.Matches<ValidationError>(
+                error => error.Code == "unitId.reserved.dynamic"));
+        }
+
+        [Test]
+        public void DynamicUnitIdAllocator_IsPerBattleCanonicalAndDeterministic()
+        {
+            var firstBattle = new DynamicUnitIdAllocator();
+            CollectionAssert.AreEqual(new[] { "-1", "-2", "-3" },
+                new[] { firstBattle.Allocate(), firstBattle.Allocate(), firstBattle.Allocate() });
+
+            var secondBattle = new DynamicUnitIdAllocator();
+            Assert.AreEqual("-1", secondBattle.Allocate());
+        }
+
         private static UnitDefinition Definition(string typeId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1, int tauntLevel = 0)
             => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true);
 

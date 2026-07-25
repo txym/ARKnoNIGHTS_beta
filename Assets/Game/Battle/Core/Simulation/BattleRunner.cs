@@ -13,7 +13,7 @@ namespace ArknoNights.Battle.Core
     {
         private readonly List<string> blockedUnitIds = new List<string>();
 
-        internal RuntimeUnitState(string unitId, string playerId, BattleSide side, UnitDefinition definition, BattlefieldCoordinate coordinate)
+        internal RuntimeUnitState(string unitId, string playerId, BattleSide side, UnitDefinition definition, UnitSnapshot source, BattlefieldCoordinate coordinate)
         {
             UnitId = unitId;
             PlayerId = playerId;
@@ -22,6 +22,8 @@ namespace ArknoNights.Battle.Core
             CurrentHitPoints = definition.MaxHitPoints;
             Position = FixedPosition.FromCell(coordinate);
             Definition = definition;
+            EliteLevel = source.EliteLevel;
+            Buffs = source.Buffs;
             BlockedUnitIds = new ReadOnlyCollection<string>(blockedUnitIds);
         }
 
@@ -29,6 +31,8 @@ namespace ArknoNights.Battle.Core
         public string PlayerId { get; }
         public BattleSide Side { get; }
         public string TypeId { get; }
+        public int EliteLevel { get; }
+        public IReadOnlyList<BuffPlaceholder> Buffs { get; }
         public int CurrentHitPoints { get; internal set; }
         public FixedPosition Position { get; internal set; }
         public bool IsAlive { get; internal set; } = true;
@@ -87,8 +91,13 @@ namespace ArknoNights.Battle.Core
 
     public sealed class BattleRunResult
     {
-        internal BattleRunResult(int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, string stableSummary)
+        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, string stableSummary)
         {
+            BattleId = battleId;
+            HomePlayerId = homePlayerId;
+            AwayPlayerId = awayPlayerId;
+            InputCanonicalSummary = inputCanonicalSummary;
+            KnownUnitTypeIds = knownUnitTypeIds;
             CompletedTicks = completedTicks;
             StopReason = stopReason;
             Winner = winner;
@@ -99,6 +108,11 @@ namespace ArknoNights.Battle.Core
         }
 
         public int CompletedTicks { get; }
+        public string BattleId { get; }
+        public string HomePlayerId { get; }
+        public string AwayPlayerId { get; }
+        public string InputCanonicalSummary { get; }
+        public IReadOnlyList<string> KnownUnitTypeIds { get; }
         public BattleStopReason StopReason { get; }
         public BattleSide? Winner { get; }
         public bool IsResolved => Winner.HasValue;
@@ -156,7 +170,14 @@ namespace ArknoNights.Battle.Core
             while (Status != BattleRunnerStatus.Stopped) Step();
             var immutableTrace = new ReadOnlyCollection<BattleStepTrace>(trace.ToArray());
             var finalUnits = new ReadOnlyCollection<BattleUnitFinalState>(runtimeUnits.OrderBy(item => item.UnitId, StringComparer.Ordinal).Select(item => new BattleUnitFinalState(item)).ToArray());
-            return new BattleRunResult(CurrentTick, StopReason, Winner, immutableTrace, new ReadOnlyCollection<BattleEvent>(events.ToArray()), finalUnits, BuildStableSummary());
+            var homePlayerId = Input.Players.Single(player => player.Side == BattleSide.Home).PlayerId;
+            var awayPlayerId = Input.Players.Single(player => player.Side == BattleSide.Away).PlayerId;
+            var knownUnitTypeIds = new ReadOnlyCollection<string>(Input.UnitDefinitions
+                .Select(definition => definition.TypeId)
+                .OrderBy(typeId => typeId, StringComparer.Ordinal)
+                .ToArray());
+            return new BattleRunResult(Input.BattleId, homePlayerId, awayPlayerId, Input.CanonicalSummary, knownUnitTypeIds,
+                CurrentTick, StopReason, Winner, immutableTrace, new ReadOnlyCollection<BattleEvent>(events.ToArray()), finalUnits, BuildStableSummary());
         }
 
         public BattleSide? Winner { get; private set; }
@@ -405,13 +426,13 @@ namespace ArknoNights.Battle.Core
         private void Emit(BattleEventType type, string unitId, string unitTypeId, string relatedUnitId, FixedPosition? from, FixedPosition? to, DamageType? damageType, int amount, int hpBefore, int hpAfter, int damageTick, int originalTicks, int effectiveTicks, BattleSide? winner, BattleStopReason reason)
         {
             if (eventTick != CurrentTick) { eventTick = CurrentTick; eventSequence = 0; }
-            events.Add(new BattleEvent(type, CurrentTick, ++eventSequence, unitId, unitTypeId, null, relatedUnitId, from, to, damageType, amount, hpBefore, hpAfter, damageTick, originalTicks, effectiveTicks, winner, reason));
+            events.Add(new BattleEvent(type, CurrentTick, ++eventSequence, unitId, unitTypeId, null, relatedUnitId, from, to, damageType, amount, hpBefore, hpAfter, damageTick, originalTicks, effectiveTicks, winner, reason, null));
         }
 
         private void EmitSpawn(RuntimeUnitState unit)
         {
             if (eventTick != CurrentTick) { eventTick = CurrentTick; eventSequence = 0; }
-            events.Add(new BattleEvent(BattleEventType.Spawn, CurrentTick, ++eventSequence, unit.UnitId, unit.TypeId, unit.Side, null, null, unit.Position, null, 0, unit.CurrentHitPoints, unit.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None));
+            events.Add(new BattleEvent(BattleEventType.Spawn, CurrentTick, ++eventSequence, unit.UnitId, unit.TypeId, unit.Side, null, null, unit.Position, null, 0, unit.CurrentHitPoints, unit.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None, CreateInitialSpawnSnapshot(unit)));
         }
 
         private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to) { Unit = unit; From = from; To = to; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } }
@@ -428,9 +449,36 @@ namespace ArknoNights.Battle.Core
             {
                 if (unit.Zone != UnitZone.Deployed) continue;
                 var coordinate = player.Side == BattleSide.Home ? BattlefieldRules.MapHome(unit.Formation.Value) : BattlefieldRules.MapAway(unit.Formation.Value);
-                result.Add(new RuntimeUnitState(unit.UnitId, player.PlayerId, player.Side, definitions[unit.TypeId], coordinate));
+                result.Add(new RuntimeUnitState(unit.UnitId, player.PlayerId, player.Side, definitions[unit.TypeId], unit, coordinate));
             }
             return result.OrderBy(item => item.UnitId, StringComparer.Ordinal).ToList();
+        }
+
+        private static BattleUnitInstanceSnapshot CreateInitialSpawnSnapshot(RuntimeUnitState unit)
+        {
+            var definition = unit.Definition;
+            return new BattleUnitInstanceSnapshot(
+                unit.UnitId,
+                unit.TypeId,
+                unit.PlayerId,
+                unit.Side,
+                false,
+                unit.Position,
+                unit.EliteLevel,
+                definition.MaxHitPoints,
+                unit.CurrentHitPoints,
+                0,
+                definition.Attack,
+                definition.Defense,
+                definition.MagicResistance,
+                definition.MoveSpeedCentimetresPerSecond,
+                definition.AttackIntervalTicks,
+                definition.AttackAnimationDurationTicks,
+                definition.DamageType,
+                definition.AttackMethod,
+                definition.BlockCapacity,
+                definition.TauntLevel,
+                unit.Buffs);
         }
 
         private string BuildStableSummary()

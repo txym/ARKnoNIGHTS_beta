@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -214,6 +215,7 @@ namespace ArknoNights.Battle.Core
                 {
                     if (unit == null) { validationErrors.Add(new ValidationError("unit.missing", "Unit snapshot is missing.")); continue; }
                     if (string.IsNullOrWhiteSpace(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.invalid", "Unit ID is required."));
+                    else if (IsReservedDynamicUnitId(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.reserved.dynamic", "Initial unit ID is reserved for dynamic units: " + unit.UnitId));
                     else if (!unitIds.Add(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.duplicate", "Duplicate unit ID: " + unit.UnitId));
                     if (unit.EliteLevel < 0 || unit.EliteLevel > 3) validationErrors.Add(new ValidationError("unit.elite.invalid", "Unit elite level must be within 0..3: " + unit.UnitId));
                     if (string.IsNullOrWhiteSpace(unit.TypeId) || !typeIds.Contains(unit.TypeId)) validationErrors.Add(new ValidationError("unit.type.unknown", "Unit has an unknown type ID: " + (unit.TypeId ?? "<missing>")));
@@ -238,6 +240,11 @@ namespace ArknoNights.Battle.Core
             if (validationErrors.Count != 0) return false;
             input = new BattleInput(specification);
             return true;
+        }
+
+        private static bool IsReservedDynamicUnitId(string value)
+        {
+            return long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed < 0;
         }
     }
 }
