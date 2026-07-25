@@ -51,6 +51,12 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         return TryGetPlayerOutputDirectory(requestedDirectory, out normalizedDirectory, out error);
     }
 
+    /// <summary>Test seam for Player data-directory and current-directory root discovery.</summary>
+    public static bool TryGetPlayerOutputDirectoryForTests(string requestedDirectory, string simulatedDataPath, string simulatedCurrentDirectory, out string normalizedDirectory, out string error)
+    {
+        return TryGetPlayerOutputDirectory(requestedDirectory, simulatedDataPath, simulatedCurrentDirectory, out normalizedDirectory, out error);
+    }
+
     private IEnumerator Capture(string directory, bool quitWhenComplete, bool captureScreen)
     {
         if (captureScreen && !TryGetPlayerOutputDirectory(directory, out outputDirectory, out var error))
@@ -284,12 +290,24 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
 
     private static bool TryGetPlayerOutputDirectory(string requestedDirectory, out string normalizedDirectory, out string error)
     {
+        return TryGetPlayerOutputDirectory(requestedDirectory, Application.dataPath, Directory.GetCurrentDirectory(), out normalizedDirectory, out error);
+    }
+
+    private static bool TryGetPlayerOutputDirectory(string requestedDirectory, string applicationDataPath, string currentDirectory, out string normalizedDirectory, out string error)
+    {
         normalizedDirectory = string.Empty;
         error = string.Empty;
         try
         {
-            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            var candidate = Path.GetFullPath(requestedDirectory ?? Path.Combine(projectRoot, "Artifacts", "LAN-LOBBY", "Captures"));
+            if (!TryFindUnityProjectRoot(applicationDataPath, currentDirectory, out var projectRoot))
+            {
+                error = "Unity project root with Assets/, Packages/, and ProjectSettings/ was not found; capture output is rejected.";
+                return false;
+            }
+
+            var candidate = Path.GetFullPath(Path.IsPathRooted(requestedDirectory ?? string.Empty)
+                ? requestedDirectory
+                : Path.Combine(projectRoot, requestedDirectory ?? Path.Combine("Artifacts", "LAN-LOBBY", "Captures")));
             var temporaryRoot = Path.Combine(projectRoot, "Temp");
             var artifactsRoot = Path.Combine(projectRoot, "Artifacts");
             if (!IsWithinDirectory(candidate, temporaryRoot) && !IsWithinDirectory(candidate, artifactsRoot))
@@ -306,6 +324,26 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             error = "Capture output path is invalid: " + exception.Message;
             return false;
         }
+    }
+
+    private static bool TryFindUnityProjectRoot(string applicationDataPath, string currentDirectory, out string projectRoot)
+    {
+        foreach (var startPath in new[] { currentDirectory, applicationDataPath })
+        {
+            if (string.IsNullOrWhiteSpace(startPath)) continue;
+            var directory = new DirectoryInfo(Path.GetFullPath(startPath));
+            for (; directory != null; directory = directory.Parent)
+            {
+                if (!Directory.Exists(Path.Combine(directory.FullName, "Assets"))) continue;
+                if (!Directory.Exists(Path.Combine(directory.FullName, "Packages"))) continue;
+                if (!Directory.Exists(Path.Combine(directory.FullName, "ProjectSettings"))) continue;
+                projectRoot = directory.FullName;
+                return true;
+            }
+        }
+
+        projectRoot = string.Empty;
+        return false;
     }
 
     private static bool IsWithinDirectory(string candidate, string root)

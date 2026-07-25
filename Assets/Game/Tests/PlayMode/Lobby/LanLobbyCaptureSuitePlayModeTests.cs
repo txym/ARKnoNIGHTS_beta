@@ -71,7 +71,8 @@ namespace ArknoNights.Lobby.Tests
                 .Select(assembly => assembly.GetType("LanLobbyCaptureSuite"))
                 .FirstOrDefault(type => type != null);
             Assert.That(suiteType, Is.Not.Null);
-            var validator = suiteType.GetMethod("TryGetPlayerOutputDirectoryForTests", BindingFlags.Public | BindingFlags.Static);
+            var validator = suiteType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .SingleOrDefault(method => method.Name == "TryGetPlayerOutputDirectoryForTests" && method.GetParameters().Length == 3);
             Assert.That(validator, Is.Not.Null, "Player capture output needs an explicit safe-directory validator.");
 
             var forbidden = Path.Combine(Application.dataPath, "LanLobbyCaptureForbidden");
@@ -80,6 +81,31 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(arguments[1] as string, Is.Empty);
             StringAssert.Contains("Temp", arguments[2] as string);
             Assert.That(Directory.Exists(forbidden), Is.False);
+        }
+
+        [Test]
+        public void PlayerOutputValidation_FindsActualProjectRootInsteadOfTreatingPlayerDataParentAsProject()
+        {
+            var suiteType = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("LanLobbyCaptureSuite"))
+                .FirstOrDefault(type => type != null);
+            Assert.That(suiteType, Is.Not.Null);
+            var validator = suiteType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .SingleOrDefault(method => method.Name == "TryGetPlayerOutputDirectoryForTests" && method.GetParameters().Length == 5);
+            Assert.That(validator, Is.Not.Null, "The test seam must model Player data and current directories separately.");
+
+            var projectRoot = Directory.GetCurrentDirectory();
+            var simulatedPlayerData = Path.Combine(projectRoot, "Temp", "PlayerBuild", "ARKnoNIGHTS_Data");
+            var externalDirectory = Path.Combine(Application.temporaryCachePath, "LanLobbyExternalPlayer", "ARKnoNIGHTS_Data");
+            var relativeOutput = Path.Combine("Temp", "LAN-LOBBY", "Captures");
+
+            var inProjectArguments = new object[] { relativeOutput, simulatedPlayerData, externalDirectory, null, null };
+            Assert.That((bool)validator.Invoke(null, inProjectArguments), Is.True);
+            Assert.That(inProjectArguments[3] as string, Is.EqualTo(Path.Combine(projectRoot, relativeOutput)));
+
+            var copiedPlayerArguments = new object[] { relativeOutput, externalDirectory, externalDirectory, null, null };
+            Assert.That((bool)validator.Invoke(null, copiedPlayerArguments), Is.False);
+            StringAssert.Contains("project root", copiedPlayerArguments[4] as string);
         }
     }
 }
