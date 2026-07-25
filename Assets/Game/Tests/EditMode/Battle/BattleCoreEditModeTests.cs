@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Infrastructure;
 using NUnit.Framework;
@@ -589,29 +590,73 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void SpawnEvents_CarryImmutableInstanceSnapshotsAndResultIdentity()
         {
-            var loaded = LocalBattleLoader.LoadFromResources(CatalogPath, RealBattlePath);
-            Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
-
-            var result = new BattleRunner(loaded.Input).RunToCompletion();
-            Assert.AreEqual(loaded.Input.BattleId, result.BattleId);
-            Assert.AreEqual(
-                loaded.Input.Players.Single(player => player.Side == BattleSide.Home).PlayerId,
-                result.HomePlayerId);
-            Assert.AreEqual(
-                loaded.Input.Players.Single(player => player.Side == BattleSide.Away).PlayerId,
-                result.AwayPlayerId);
-
-            foreach (var spawn in result.Events.Where(item => item.Type == BattleEventType.Spawn))
+            var homeBuffs = new[]
             {
-                Assert.NotNull(spawn.SpawnSnapshot);
-                Assert.AreEqual(spawn.UnitId, spawn.SpawnSnapshot.UnitId);
-                Assert.AreEqual(spawn.UnitTypeId, spawn.SpawnSnapshot.TypeId);
-                Assert.AreEqual(spawn.UnitSide, spawn.SpawnSnapshot.Side);
-                Assert.AreEqual(spawn.ToPosition, spawn.SpawnSnapshot.Position);
-                Assert.Greater(spawn.SpawnSnapshot.MaxHitPoints, 0);
-                Assert.AreEqual(spawn.SpawnSnapshot.MaxHitPoints, spawn.SpawnSnapshot.CurrentHitPoints);
-                Assert.AreEqual(0, spawn.SpawnSnapshot.CurrentShield);
-            }
+                new BuffPlaceholder("buff.alpha", "{\"value\":1}"),
+                new BuffPlaceholder("buff.beta", "{\"value\":2}")
+            };
+            var specification = new BattleInputSpecification(
+                BattleInput.SupportedSchemaVersion,
+                "spawn-contract-battle",
+                20,
+                new[]
+                {
+                    new UnitDefinition("Zeta-type", 913, 83, 27, 41, 135, 17, 9,
+                        DamageType.Magic, AttackMethod.Ranged, 3, 2, true),
+                    new UnitDefinition("alpha-type", 731, 46, 19, 12, 90, 20, 4,
+                        DamageType.Physical, AttackMethod.Melee, 1, 0, true),
+                    new UnitDefinition("middle-type", 600, 50, 10, 5, 80, 20, 2,
+                        DamageType.True, AttackMethod.Ranged, 2, 1, true)
+                },
+                new[]
+                {
+                    new PlayerSnapshot("home-player", BattleSide.Home, new[]
+                    {
+                        new UnitSnapshot("home-unit-1", "Zeta-type", UnitZone.Deployed,
+                            new FormationCoordinate(4, 2), homeBuffs, 2)
+                    }),
+                    new PlayerSnapshot("away-player", BattleSide.Away, new[]
+                    {
+                        new UnitSnapshot("away-unit-1", "alpha-type", UnitZone.Deployed,
+                            new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>(), 1)
+                    })
+                });
+            Assert.IsTrue(BattleInputFactory.TryCreate(specification, out var input, out var errors), Errors(errors));
+
+            var result = new BattleRunner(input).RunToCompletion();
+            Assert.AreEqual("spawn-contract-battle", result.BattleId);
+            Assert.AreEqual("home-player", result.HomePlayerId);
+            Assert.AreEqual("away-player", result.AwayPlayerId);
+            Assert.AreEqual(input.CanonicalSummary, result.InputCanonicalSummary);
+            CollectionAssert.AreEqual(new[] { "Zeta-type", "alpha-type", "middle-type" }, result.KnownUnitTypeIds);
+
+            var spawn = result.Events.Single(item => item.Type == BattleEventType.Spawn && item.UnitId == "home-unit-1");
+            var snapshot = spawn.SpawnSnapshot;
+            Assert.NotNull(snapshot);
+            Assert.AreEqual("home-unit-1", snapshot.UnitId);
+            Assert.AreEqual("Zeta-type", snapshot.TypeId);
+            Assert.AreEqual("home-player", snapshot.PlayerId);
+            Assert.AreEqual(BattleSide.Home, snapshot.Side);
+            Assert.IsFalse(snapshot.IsDynamicallyGenerated);
+            Assert.AreEqual(FixedPosition.FromCell(new BattlefieldCoordinate(4, 2)), snapshot.Position);
+            Assert.AreEqual(2, snapshot.EliteLevel);
+            Assert.AreEqual(913, snapshot.MaxHitPoints);
+            Assert.AreEqual(913, snapshot.CurrentHitPoints);
+            Assert.AreEqual(0, snapshot.CurrentShield);
+            Assert.AreEqual(83, snapshot.Attack);
+            Assert.AreEqual(27, snapshot.Defense);
+            Assert.AreEqual(41, snapshot.MagicResistance);
+            Assert.AreEqual(135, snapshot.MoveSpeedCentimetresPerSecond);
+            Assert.AreEqual(17, snapshot.AttackIntervalTicks);
+            Assert.AreEqual(9, snapshot.AttackAnimationDurationTicks);
+            Assert.AreEqual(DamageType.Magic, snapshot.DamageType);
+            Assert.AreEqual(AttackMethod.Ranged, snapshot.AttackMethod);
+            Assert.AreEqual(3, snapshot.BlockCapacity);
+            Assert.AreEqual(2, snapshot.TauntLevel);
+            CollectionAssert.AreEqual(homeBuffs, snapshot.Buffs);
+            Assert.AreNotSame(input.Players.Single(player => player.PlayerId == "home-player").Units.Single().Buffs, snapshot.Buffs);
+            var immutableBuffs = (System.Collections.Generic.IList<BuffPlaceholder>)snapshot.Buffs;
+            Assert.Throws<NotSupportedException>(() => immutableBuffs.Add(new BuffPlaceholder("unexpected", "{}")));
         }
 
         [Test]
@@ -645,14 +690,55 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void InitialInput_AcceptsOrdinaryHyphenatedUnitIds()
+        {
+            var definition = new UnitDefinition(
+                "unit", 100, 10, 0, 0, 100, 20, 20,
+                DamageType.Physical, AttackMethod.Melee, 1, false);
+            var specification = new BattleInputSpecification(
+                BattleInput.LocalBattleSchemaVersion,
+                "ordinary-hyphenated-id",
+                20,
+                new[] { definition },
+                new[]
+                {
+                    new PlayerSnapshot("home", BattleSide.Home, new[]
+                    {
+                        new UnitSnapshot("home-unit-1", "unit", UnitZone.Deployed,
+                            new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>())
+                    }),
+                    new PlayerSnapshot("away", BattleSide.Away, new[]
+                    {
+                        new UnitSnapshot("away-unit-1", "unit", UnitZone.Deployed,
+                            new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>())
+                    })
+                });
+
+            Assert.IsTrue(BattleInputFactory.TryCreate(specification, out var input, out var errors), Errors(errors));
+            CollectionAssert.AreEqual(new[] { "home-unit-1", "away-unit-1" }, input.Players.SelectMany(player => player.Units).Select(unit => unit.UnitId));
+        }
+
+        [Test]
         public void DynamicUnitIdAllocator_IsPerBattleCanonicalAndDeterministic()
         {
             var firstBattle = new DynamicUnitIdAllocator();
             CollectionAssert.AreEqual(new[] { "-1", "-2", "-3" },
                 new[] { firstBattle.Allocate(), firstBattle.Allocate(), firstBattle.Allocate() });
+            Assert.AreEqual("-4", firstBattle.Allocate());
 
             var secondBattle = new DynamicUnitIdAllocator();
             Assert.AreEqual("-1", secondBattle.Allocate());
+        }
+
+        [Test]
+        public void DynamicUnitIdAllocator_ThrowsInsteadOfWrappingAtInt64Minimum()
+        {
+            var allocator = new DynamicUnitIdAllocator();
+            var nextField = typeof(DynamicUnitIdAllocator).GetField("next", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(nextField, "The allocator must retain its next canonical negative ID until it is allocated.");
+            nextField.SetValue(allocator, long.MinValue);
+
+            Assert.Throws<InvalidOperationException>(() => allocator.Allocate());
         }
 
         private static UnitDefinition Definition(string typeId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1, int tauntLevel = 0)
