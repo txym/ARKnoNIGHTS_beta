@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace ArknoNights.Lobby
 {
@@ -190,7 +190,7 @@ namespace ArknoNights.Lobby
                 tcpPort = entry.TcpPort,
                 sequence = entry.Sequence
             };
-            return Encoding.UTF8.GetBytes(JsonUtility.ToJson(wire));
+            return Encoding.UTF8.GetBytes(LobbyJson.Serialize(wire));
         }
 
         private static bool TryDecodeAnnouncement(byte[] bytes, out LobbyDiscoveryEntry entry)
@@ -198,7 +198,7 @@ namespace ArknoNights.Lobby
             entry = null;
             try
             {
-                var wire = JsonUtility.FromJson<DiscoveryWire>(Encoding.UTF8.GetString(bytes));
+                var wire = LobbyJson.Deserialize<DiscoveryWire>(Encoding.UTF8.GetString(bytes));
                 if (wire == null || !LobbyRoomCode.IsValid(wire.roomCode) || string.IsNullOrWhiteSpace(wire.hostDisplayName)
                     || wire.memberCount < 0 || wire.capacity < 1 || wire.memberCount > wire.capacity || wire.tcpPort < 1 || wire.tcpPort > 65535)
                 {
@@ -224,15 +224,22 @@ namespace ArknoNights.Lobby
             return new System.Random().Next(0, 1000000).ToString("D6");
         }
 
-        [Serializable]
+        [DataContract]
         private sealed class DiscoveryWire
         {
+            [DataMember(Name = "roomCode")]
             public string roomCode;
+            [DataMember(Name = "hostDisplayName")]
             public string hostDisplayName;
+            [DataMember(Name = "memberCount")]
             public int memberCount;
+            [DataMember(Name = "capacity")]
             public int capacity;
+            [DataMember(Name = "isJoinable")]
             public bool isJoinable;
+            [DataMember(Name = "tcpPort")]
             public int tcpPort;
+            [DataMember(Name = "sequence")]
             public long sequence;
         }
 

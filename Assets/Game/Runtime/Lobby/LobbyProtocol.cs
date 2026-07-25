@@ -1,6 +1,8 @@
 using System;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 using System.Text;
-using UnityEngine;
 
 namespace ArknoNights.Lobby
 {
@@ -32,18 +34,28 @@ namespace ArknoNights.Lobby
         SnapshotTooLarge
     }
 
-    [Serializable]
+    [DataContract]
     public sealed class LobbyWireMessage
     {
+        [DataMember(Name = "protocolVersion")]
         public int protocolVersion;
+        [DataMember(Name = "kind")]
         public string kind;
+        [DataMember(Name = "roomCode")]
         public string roomCode;
+        [DataMember(Name = "playerId")]
         public string playerId;
+        [DataMember(Name = "displayName")]
         public string displayName;
+        [DataMember(Name = "avatarIndex")]
         public int avatarIndex;
+        [DataMember(Name = "isReady")]
         public bool isReady;
+        [DataMember(Name = "sentUnixMilliseconds")]
         public long sentUnixMilliseconds;
+        [DataMember(Name = "snapshotJson")]
         public string snapshotJson;
+        [DataMember(Name = "rejectionCode")]
         public string rejectionCode;
     }
 
@@ -63,7 +75,7 @@ namespace ArknoNights.Lobby
                 throw new ArgumentException("The lobby message is invalid: " + error + ".", nameof(message));
             }
 
-            var payload = StrictUtf8.GetBytes(JsonUtility.ToJson(message));
+            var payload = StrictUtf8.GetBytes(LobbyJson.Serialize(message));
             if (payload.Length + LengthPrefixBytes > MaximumMessageBytes)
             {
                 throw new ArgumentException("The lobby message exceeds the maximum frame size.", nameof(message));
@@ -107,7 +119,7 @@ namespace ArknoNights.Lobby
             try
             {
                 json = StrictUtf8.GetString(frame, LengthPrefixBytes, payloadLength);
-                message = JsonUtility.FromJson<LobbyWireMessage>(json);
+                message = LobbyJson.Deserialize<LobbyWireMessage>(json);
             }
             catch (Exception)
             {
@@ -206,6 +218,28 @@ namespace ArknoNights.Lobby
                 | (frame[1] << 16)
                 | (frame[2] << 8)
                 | frame[3];
+        }
+    }
+
+    internal static class LobbyJson
+    {
+        public static string Serialize<T>(T value)
+        {
+            var serializer = new DataContractJsonSerializer(typeof(T));
+            using (var stream = new MemoryStream())
+            {
+                serializer.WriteObject(stream, value);
+                return Encoding.UTF8.GetString(stream.ToArray());
+            }
+        }
+
+        public static T Deserialize<T>(string json)
+        {
+            var serializer = new DataContractJsonSerializer(typeof(T));
+            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
+            {
+                return (T)serializer.ReadObject(stream);
+            }
         }
     }
 }

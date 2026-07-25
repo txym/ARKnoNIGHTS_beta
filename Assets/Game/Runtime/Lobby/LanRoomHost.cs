@@ -13,7 +13,7 @@ namespace ArknoNights.Lobby
         private const int MaximumMissedPongs = 3;
 
         private readonly object gate = new object();
-        private readonly LobbyRoomState room;
+        private LobbyRoomState room;
         private readonly TcpListener listener;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly Dictionary<string, GuestConnection> guestsByPlayerId = new Dictionary<string, GuestConnection>();
@@ -56,6 +56,17 @@ namespace ArknoNights.Lobby
         public static Task<LanRoomHost> StartForTestsAsync(LobbyProfile hostProfile, int tcpPort)
         {
             return Task.FromResult(new LanRoomHost(hostProfile, tcpPort, true));
+        }
+
+        public LanDiscoveryService CreateDiscoveryService()
+        {
+            lock (gate)
+            {
+                var snapshot = CreateSnapshotWithLatency();
+                return new LanDiscoveryService(
+                    new LobbyDiscoveryEntry(snapshot.RoomCode, snapshot.Members[0].Profile.DisplayName, snapshot.Members.Count, LobbyRoomSnapshot.MaximumMembers, !snapshot.HasStarted && snapshot.Members.Count < LobbyRoomSnapshot.MaximumMembers, TcpPort, snapshot.Revision),
+                    RegenerateAuthoritativeRoomCode);
+            }
         }
 
         public bool TryStart(string playerId, out LobbyJoinFailure failure)
@@ -303,6 +314,41 @@ namespace ArknoNights.Lobby
             }
 
             return new LobbyRoomSnapshot(source.RoomCode, source.HostPlayerId, members, source.HasStarted, source.Revision);
+        }
+
+        private string RegenerateAuthoritativeRoomCode()
+        {
+            LobbyRoomSnapshot before;
+            string replacement;
+            lock (gate)
+            {
+                before = room.Snapshot;
+                if (before.HasStarted || before.Members.Count == 0) return before.RoomCode;
+                do { replacement = CreateRoomCode(); }
+                while (string.Equals(replacement, before.RoomCode, StringComparison.Ordinal));
+                room = RecreateRoomWithCode(before, replacement);
+            }
+
+            _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
+            return replacement;
+        }
+
+        private static LobbyRoomState RecreateRoomWithCode(LobbyRoomSnapshot snapshot, string roomCode)
+        {
+            var replacement = LobbyRoomState.CreateHost(snapshot.Members[0].Profile, roomCode);
+            for (var index = 1; index < snapshot.Members.Count; index++)
+            {
+                replacement.TryJoin(snapshot.Members[index].Profile, out _);
+            }
+
+            for (var index = 0; index < snapshot.Members.Count; index++)
+            {
+                var member = snapshot.Members[index];
+                if (member.IsReady) replacement.TrySetReady(member.PlayerId, member.PlayerId, true, out _);
+            }
+
+            if (snapshot.HasStarted) replacement.TryStart(snapshot.HostPlayerId, out _);
+            return replacement;
         }
 
         private LobbyWireMessage CreateMessage(LobbyMessageKind kind, string playerId, long sentUnixMilliseconds, LobbyRoomSnapshot snapshot = null, string rejection = null)

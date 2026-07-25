@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace ArknoNights.Lobby
 {
@@ -22,6 +23,7 @@ namespace ArknoNights.Lobby
         private readonly TaskCompletionSource<bool> startCompletion = new TaskCompletionSource<bool>();
         private readonly Task readTask;
         private readonly Task heartbeatTask;
+        private readonly ConcurrentQueue<ClientEvent> receivedEvents = new ConcurrentQueue<ClientEvent>();
         private LobbyRoomSnapshot snapshot;
         private long latencyMilliseconds = -1;
         private bool stopped;
@@ -39,6 +41,15 @@ namespace ArknoNights.Lobby
         public LobbyRoomSnapshot Snapshot => snapshot;
         public long LatencyMilliseconds => latencyMilliseconds;
         public bool IsConnected => !stopped && tcpClient.Connected;
+
+        public void Tick()
+        {
+            while (receivedEvents.TryDequeue(out var received))
+            {
+                if (received.Snapshot != null) snapshot = received.Snapshot;
+                if (received.LatencyMilliseconds >= 0) latencyMilliseconds = received.LatencyMilliseconds;
+            }
+        }
 
         public static async Task<LanRoomClient> JoinAsync(IPEndPoint endpoint, string roomCode, LobbyProfile profile)
         {
@@ -137,7 +148,7 @@ namespace ArknoNights.Lobby
                     {
                         if (LanRoomTransport.TryDeserializeSnapshot(message.snapshotJson, out var roomSnapshot))
                         {
-                            snapshot = roomSnapshot;
+                            receivedEvents.Enqueue(new ClientEvent(roomSnapshot, -1));
                             if (kind == LobbyMessageKind.JoinAccepted) joinCompletion.TrySetResult(roomSnapshot);
                             if (kind == LobbyMessageKind.Start || roomSnapshot.HasStarted) startCompletion.TrySetResult(true);
                         }
@@ -148,7 +159,7 @@ namespace ArknoNights.Lobby
                     }
                     else if (kind == LobbyMessageKind.Pong)
                     {
-                        latencyMilliseconds = Math.Max(0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.sentUnixMilliseconds);
+                        receivedEvents.Enqueue(new ClientEvent(null, Math.Max(0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.sentUnixMilliseconds)));
                     }
                     else if (kind == LobbyMessageKind.Reject)
                     {
@@ -193,6 +204,18 @@ namespace ArknoNights.Lobby
             try { await LanRoomTransport.WriteMessageAsync(stream, message); }
             finally { sendGate.Release(); }
         }
+
+        private sealed class ClientEvent
+        {
+            public ClientEvent(LobbyRoomSnapshot snapshot, long latencyMilliseconds)
+            {
+                Snapshot = snapshot;
+                LatencyMilliseconds = latencyMilliseconds;
+            }
+
+            public LobbyRoomSnapshot Snapshot { get; }
+            public long LatencyMilliseconds { get; }
+        }
     }
 
     internal static class LanRoomTransport
@@ -233,7 +256,7 @@ namespace ArknoNights.Lobby
                 };
             }
 
-            return JsonUtility.ToJson(new SnapshotWire
+            return LobbyJson.Serialize(new SnapshotWire
             {
                 roomCode = snapshot.RoomCode,
                 hostPlayerId = snapshot.HostPlayerId,
@@ -248,7 +271,7 @@ namespace ArknoNights.Lobby
             snapshot = null;
             try
             {
-                var wire = JsonUtility.FromJson<SnapshotWire>(json);
+                var wire = LobbyJson.Deserialize<SnapshotWire>(json);
                 if (wire == null || !LobbyRoomCode.IsValid(wire.roomCode) || wire.members == null || wire.members.Length > LobbyRoomSnapshot.MaximumMembers) return false;
                 var members = new LobbyMemberSnapshot[wire.members.Length];
                 for (var index = 0; index < members.Length; index++)
@@ -281,23 +304,33 @@ namespace ArknoNights.Lobby
             return true;
         }
 
-        [Serializable]
+        [DataContract]
         private sealed class SnapshotWire
         {
+            [DataMember(Name = "roomCode")]
             public string roomCode;
+            [DataMember(Name = "hostPlayerId")]
             public string hostPlayerId;
+            [DataMember(Name = "hasStarted")]
             public bool hasStarted;
+            [DataMember(Name = "revision")]
             public long revision;
+            [DataMember(Name = "members")]
             public SnapshotMemberWire[] members;
         }
 
-        [Serializable]
+        [DataContract]
         private sealed class SnapshotMemberWire
         {
+            [DataMember(Name = "playerId")]
             public string playerId;
+            [DataMember(Name = "displayName")]
             public string displayName;
+            [DataMember(Name = "avatarIndex")]
             public int avatarIndex;
+            [DataMember(Name = "isReady")]
             public bool isReady;
+            [DataMember(Name = "latencyMilliseconds")]
             public long latencyMilliseconds;
         }
     }
