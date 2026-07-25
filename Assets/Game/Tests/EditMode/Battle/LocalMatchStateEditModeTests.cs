@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Player;
 using NUnit.Framework;
@@ -47,11 +48,27 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(result.Success);
             Assert.AreEqual(before.LocalPlayer.Gold - 1, result.Snapshot.LocalPlayer.Gold);
             Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[0].IsEmpty);
-            Assert.AreEqual("local-ui-player-shop-0001", result.PurchasedUnitId);
+            Assert.AreEqual("local-ui-player-shop-0002", result.PurchasedUnitId);
             var added = result.Snapshot.LocalPlayer.PlayerState.Units.Single(unit => unit.UnitId == result.PurchasedUnitId);
             Assert.AreEqual("1000", added.TypeId);
             Assert.AreEqual(PlayerUnitZone.Staging, added.Zone);
             CollectionAssert.AllItemsAreUnique(result.Snapshot.Players.SelectMany(player => player.PlayerState.Units).Select(unit => unit.UnitId));
+        }
+
+        [Test]
+        public void Purchase_SkipsLoadedMatchWideShopIdCollisionDeterministically()
+        {
+            var state = Load();
+            Assert.IsTrue(state.Snapshot.Players.SelectMany(player => player.PlayerState.Units).Any(unit => unit.UnitId == "local-ui-player-shop-0001"));
+
+            var first = state.TryPurchase(0);
+            var second = state.TryPurchase(1);
+
+            Assert.IsTrue(first.Success);
+            Assert.IsTrue(second.Success);
+            Assert.AreEqual("local-ui-player-shop-0002", first.PurchasedUnitId);
+            Assert.AreEqual("local-ui-player-shop-0003", second.PurchasedUnitId);
+            CollectionAssert.AllItemsAreUnique(state.Snapshot.Players.SelectMany(player => player.PlayerState.Units).Select(unit => unit.UnitId));
         }
 
         [Test]
@@ -129,11 +146,103 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(before, loaded.State.Snapshot.CanonicalSummary);
         }
 
+        [Test]
+        public void Purchase_WhenThirteenNonStackingStagingSlotsAlreadyExist_AddsTheNewUnitToOverflow()
+        {
+            var state = LoadPlayerState(13, PlayerUnitZone.Staging);
+            var before = state.Snapshot;
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            var result = state.TryAddPurchasedUnit("overflow-purchase", "1000");
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(before.Version + 1, result.Snapshot.Version);
+            Assert.AreEqual(1, notifications);
+            Assert.AreEqual(PlayerUnitZone.Overflow, result.Snapshot.Units.Single(unit => unit.UnitId == "overflow-purchase").Zone);
+            Assert.AreEqual(13, result.Snapshot.StagingSlots.Count);
+        }
+
+        [Test]
+        public void Purchase_WhenPlayerHasFortyEightUnits_RejectsWithoutChangingPlayerVersionOrEventCount()
+        {
+            var state = LoadPlayerState(48, PlayerUnitZone.Overflow);
+            var before = state.Snapshot;
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            var result = state.TryAddPurchasedUnit("capacity-purchase", "1000");
+
+            Assert.AreEqual(PlayerOperationCode.UnitCapacityExceeded, result.Code);
+            Assert.AreEqual(before.Version, result.Snapshot.Version);
+            Assert.AreEqual(before.CanonicalSummary, result.Snapshot.CanonicalSummary);
+            Assert.AreEqual(0, notifications);
+        }
+
+        [Test]
+        public void Purchase_WhenPlayerUnitIdConflicts_RejectsWithoutChangingPlayerVersionOrEventCount()
+        {
+            var state = LocalPlayerStateLoader.LoadFromResources(CatalogPath, "PlayerData/local-player-state-v1").State;
+            var before = state.Snapshot;
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            var result = state.TryAddPurchasedUnit("local-1000-alpha", "1000");
+
+            Assert.AreEqual(PlayerOperationCode.UnitIdDuplicate, result.Code);
+            Assert.AreEqual(before.Version, result.Snapshot.Version);
+            Assert.AreEqual(before.CanonicalSummary, result.Snapshot.CanonicalSummary);
+            Assert.AreEqual(0, notifications);
+        }
+
+        [Test]
+        public void Purchase_WhenGoldIsInsufficient_LeavesMatchAndPlayerVersionsAndEventCountsUnchanged()
+        {
+            var state = Load();
+            Assert.IsTrue(state.TryPurchase(0).Success);
+            Assert.IsTrue(state.TryPurchase(1).Success);
+            Assert.IsTrue(state.TryPurchase(2).Success);
+            Assert.IsTrue(state.TryPurchase(3).Success);
+            Assert.IsTrue(state.TryPurchase(4).Success);
+            Assert.IsTrue(state.TryRefresh().Success);
+            Assert.IsTrue(state.TryRefresh().Success);
+            var before = state.Snapshot;
+            var matchNotifications = 0;
+            state.Changed += _ => matchNotifications++;
+
+            var result = state.TryPurchase(0);
+
+            Assert.AreEqual(LocalMatchOperationCode.InsufficientGold, result.Code);
+            Assert.AreEqual(before.Version, result.Snapshot.Version);
+            Assert.AreEqual(before.CanonicalSummary, result.Snapshot.CanonicalSummary);
+            Assert.AreEqual(before.LocalPlayer.PlayerState.Version, result.Snapshot.LocalPlayer.PlayerState.Version);
+            Assert.AreEqual(0, matchNotifications);
+        }
+
         private static LocalMatchState Load()
         {
             var result = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath);
             Assert.IsTrue(result.Success, Errors(result.Errors));
             return result.State;
+        }
+
+        private static PlayerState LoadPlayerState(int unitCount, PlayerUnitZone zone)
+        {
+            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
+            var units = new StringBuilder();
+            for (var index = 0; index < unitCount; index++)
+            {
+                if (index > 0) units.Append(',');
+                units.Append("{\"unitId\":\"purchase-fixture-").Append(index)
+                    .Append("\",\"typeId\":\"1000\",\"zone\":\"").Append(zone)
+                    .Append("\",\"eliteLevel\":0,\"buffs\":[{\"id\":\"nonstacking-").Append(index)
+                    .Append("\",\"rawPayload\":\"\"}],\"formationX\":0,\"formationY\":0}");
+            }
+
+            var json = "{\"schemaVersion\":\"local-player-state-v1\",\"playerId\":\"purchase-fixture\",\"deploymentCost\":99,\"units\":[" + units + "]}";
+            var loaded = LocalPlayerStateLoader.LoadFromJson(catalog, json);
+            Assert.IsTrue(loaded.Success, string.Join("; ", loaded.Errors.Select(error => error.ToString())));
+            return loaded.State;
         }
 
         private static string Errors(System.Collections.Generic.IReadOnlyList<LocalMatchValidationError> errors) => string.Join("; ", errors.Select(error => error.ToString()));

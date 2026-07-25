@@ -146,6 +146,7 @@ namespace ArknoNights.Player
 
         private readonly UnitCatalog catalog;
         private readonly Dictionary<string, LocalMatchPlayerData> playersById;
+        private readonly HashSet<string> knownUnitIds;
         private readonly string[][] shopPages;
         private readonly ShopSlotData[] shopSlots;
         private readonly string localPlayerId;
@@ -162,6 +163,7 @@ namespace ArknoNights.Player
             this.catalog = catalog;
             this.localPlayerId = localPlayerId;
             playersById = players.ToDictionary(player => player.PlayerId, StringComparer.Ordinal);
+            knownUnitIds = new HashSet<string>(playersById.Values.SelectMany(player => player.PlayerState.Snapshot.Units).Select(unit => unit.UnitId), StringComparer.Ordinal);
             this.shopPages = shopPages.Select(page => page.ToArray()).ToArray();
             shopSlots = this.shopPages[0].Select((typeId, index) => new ShopSlotData(index, typeId, false)).ToArray();
             observedPlayerId = localPlayerId;
@@ -181,11 +183,20 @@ namespace ArknoNights.Player
             if (!catalog.TryGet(slot.UnitTypeId, out var type)) return Result(LocalMatchOperationCode.PlayerUnitRejected);
             if (gold < type.Rarity) return Result(LocalMatchOperationCode.InsufficientGold);
 
-            var purchasedUnitId = localPlayerId + "-shop-" + (purchasedUnitSequence + 1).ToString("D4");
+            var nextSequence = purchasedUnitSequence;
+            string purchasedUnitId;
+            do
+            {
+                nextSequence++;
+                purchasedUnitId = localPlayerId + "-shop-" + nextSequence.ToString("D4");
+            }
+            while (knownUnitIds.Contains(purchasedUnitId));
+
             var playerResult = playersById[localPlayerId].PlayerState.TryAddPurchasedUnit(purchasedUnitId, slot.UnitTypeId);
             if (!playerResult.Success) return Result(LocalMatchOperationCode.PlayerUnitRejected);
 
-            purchasedUnitSequence++;
+            purchasedUnitSequence = nextSequence;
+            knownUnitIds.Add(purchasedUnitId);
             gold -= type.Rarity;
             slot.UnitTypeId = string.Empty;
             slot.IsFrozen = false;
