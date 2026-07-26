@@ -99,6 +99,41 @@ This is the current authoritative retained evidence. Current proof is limited to
   - Code-generated non-bitmap geometry remains six grouped rows.
 - The manifest contains no forbidden `$0`/`#0` Unpacked source. Manual inspection opened `CapturesFinal/home.png`, `CapturesFinal/discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `VisualDiff/home-join-action-overlay.png`; the bars are unobstructed, and the local overlays retain both captured/reference contours. Metrics remain non-blocking, and other decoration placement remains outside this iteration's acceptance.
 
+## Home action icon/text visual-center calibration (current authoritative, 2026-07-26)
+
+The prior action-bar evidence remains the provenance and background-Rect baseline. This calibration supersedes it for the visible placement of the two action icons and the “创建同盟” / “加入同盟” labels. It does not claim that the rest of the Home decoration is fully reproduced.
+
+- Final focused XML is retained under `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Verification-Final-20260726-183809/`: Layout `6/6`, View `14/14`, Capture `3/3`, and Controller `3/3`, for `26/26` passed with failed `0` and skipped `0`. The first earlier Controller attempt in `Verification-20260726-182355/Controller/` was marked unverified because the wrapper observed a partially written XML before `test-run` existed; its completed XML later contained `3/3` passed. A clean `Controller-Retry1` passed normally, and the final authoritative Controller run also passed normally.
+- TDD evidence:
+  - The first layout red run failed because the Create icon still exposed the shared anchor `(0.08,0.50)` instead of the approved top-left local placement.
+  - The first visual-report red run failed because `contentVisuals` did not exist.
+  - A real-capture diagnosis found that raw luminance bounds included detached thin action-background texture. A smoke fixture reproduces that contamination; the corrected icon measurement merges only compact four-neighbour components while label measurement remains unchanged.
+  - The final Join-shift red run expected local X `47` but observed `45`; moving only that icon by `2 px` made the full View suite pass.
+- Final retained runtime evidence is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Calibration2/`:
+  - Windows x86_64 BuildReport: `Succeeded`, `errors=0`, `warnings=0`, total size `184752794`.
+  - Visible D3D11 Player: exit `0`, five non-empty `1920x1080` captures, `manifest.json`, and `[LanLobby][capture.completed] count=5`.
+  - Create action actual/target Rect: `(1154,453,717,99)`; position and size deviations `0 px`.
+  - Join action actual/target Rect: `(1154,876,717,99)`; position and size deviations `0 px`.
+- `Calibration2/VisualDiff/visual-diff-report.{json,md}` records fixed-threshold visible bounds. Coordinates are local to each `717×99` action crop:
+
+  | Element | Expected | Figure 9 measured | Player measured | Center delta | Size delta | Result |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Create icon | `47,25,36,37` | `46,25,37,37` | `47,25,36,36` | `dx=0, dy=-0.5` | `dw=0, dh=-1` | PASS |
+  | Create label | `109,28,148,32` | `108,27,149,34` | `109,27,149,34` | `dx=0.5, dy=0` | `dw=1, dh=2` | PASS |
+  | Join icon | `47,20,44,50` | `47,20,44,50` | `47,20,44,50` | `dx=0, dy=0` | `dw=0, dh=0` | PASS |
+  | Join label | `104,31,150,34` | `104,31,150,34` | `104,30,150,35` | `dx=0, dy=-0.5` | `dw=0, dh=1` | PASS |
+
+- Measurement details: actual and reference use integer luminance `<45`. Icon rows union four-neighbour components with at least `40` pixels and component aspect ratio no greater than `4.0`; this removes detached thin bar texture without cropping the disconnected Join glyph. Label rows use all dark pixels in their dedicated search regions. Passing requires center error at most `1 px` per axis and width/height error at most `2 px`.
+- Material use is unchanged and capture-derived:
+  - `create_icon`: Resources `UI/Lobby/create_icon`; source `[uc]autochessouter/create_icon.png`; SHA-256 `AE047958EE4E7D43F368D3205110307200D30F79BCF393B36CBBDE37A8A00BA7`; two occurrences across `home` and `discovered-prefill`.
+  - `join_icon`: Resources `UI/Lobby/join_icon`; source `[uc]autochessouter/join_icon.png`; SHA-256 `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09`; four occurrences because each Home state also renders the Simulation Invite icon.
+  - `room_select_create_btn_bg_down`: source `[uc]autochessouter/room_select_create_btn_bg_down.png`; SHA-256 `8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149`.
+  - `room_select_join_btn_bg_down`: source `[uc]autochessouter/room_select_join_btn_bg_down.png`; SHA-256 `71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468`.
+  - “创建同盟” and “加入同盟” are Unity Text, use runtime font `Novecento wide Normal Regular.woff2`, and report `hasBitmapSource=false`; they are not represented as material-library bitmaps.
+  - The complete report contains `34` bitmap rows from `128` rendered Sprite instances, `37` Unity Text rows from `59` instances, and `6` code-generated geometry rows. No source contains forbidden Unpacked `$0` or `#0`.
+- Manual inspection opened `Calibration2/CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`. The corrected icons and labels are not enlarged, both bar contours remain unobstructed, and the discovered room/prefill UI stays above the Join action rather than covering it. The other Create/Join decoration still requires later visual calibration.
+- `scripts/TestLanLobbyVisualDiffSmoke.ps1`, `scripts/TestExportLanLobbyEvidenceSmoke.ps1`, and `scripts/TestLanLobbyEvidenceCommonSmoke.ps1` all print `PASS` and exit `0`.
+
 ## Automated result (historical context)
 
 All `Temp/UnityTests/...` XML paths in the following four bullets were parsed at run time, have since been cleaned, and are non-persistent historical output. They cannot be cited as current proof; only `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/` are current authoritative evidence.

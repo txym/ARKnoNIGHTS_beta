@@ -526,6 +526,30 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 9. Open `CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`; confirm the bars are unobstructed and both captured/reference contours are visible. Other decoration placement and non-blocking difference metrics remain outside visual acceptance.
 10. Run `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, `TestLanLobbyEvidenceCommonSmoke.ps1`, `git diff --check`, `git status --short`, and `git ls-files 'Artifacts/*' 'Temp/*'`. Generated evidence must remain ignored and untracked.
 
+## Home action-content visual-center verification (current authoritative, 2026-07-26)
+
+1. Current focused test proof is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Verification-Final-20260726-183809/`. Run sequentially with Unity `D:\2022.3.62f1c1\Editor\Unity.exe` and project `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`:
+   - EditMode `ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests`: `6/6/0/0`, `result=Passed`; valid XML was retained before forced shutdown after the 20-second grace period.
+   - PlayMode `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests`: `14/14/0/0`, `result=Passed`, normal exit.
+   - PlayMode `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests`: `3/3/0/0`, `result=Passed`, normal exit.
+   - PlayMode `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests`: `3/3/0/0`, `result=Passed`, normal exit.
+   - Total: `26/26` passed, failed `0`, skipped `0`.
+2. `HomeRoomSelect_ActionBarsUseMeasuredRectsStretchSpritesAndOwnCreateInput` additionally locks the icon RectTransforms and independent label offsets. Create icon uses top-left local `(47,25)` and width `38`; Join icon uses `(47,19)` and width `47`, both preserving source aspect. Create label offsets are `(108,5)` / `(-220,5)` and Join label offsets are `(103,2)` / `(-220,2)`, both at font size `38`.
+3. The retained final build/capture/report is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Calibration2/`. `WindowsStandaloneBuild.log` records `result=Succeeded`, `errors=0`, `warnings=0`, size `184752794`. The visible D3D11 Player exited `0`, logged `[LanLobby][capture.completed] count=5`, and retained five non-empty `1920x1080` PNGs plus `manifest.json`.
+4. Export with explicit read-only `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud` to `Calibration2/VisualDiff/`. Create and Join background actual/target Rects remain `(1154,453,717,99)` and `(1154,876,717,99)`, with position and size deltas all `0 px`.
+5. The exporter measures actual and locally resized Figure 9 crops with integer luminance `<45`. Icons merge only four-neighbour dark components with at least `40` pixels and component aspect ratio at most `4.0`, excluding thin background texture; labels use all qualifying dark pixels. The four final rows must be:
+
+   | Element | Expected | Reference measured | Actual measured | Center delta | Size delta | Passed |
+   | --- | --- | --- | --- | --- | --- | --- |
+   | Create icon | `47,25,36,37` | `46,25,37,37` | `47,25,36,36` | `0,-0.5` | `0,-1` | `true` |
+   | Create label | `109,28,148,32` | `108,27,149,34` | `109,27,149,34` | `0.5,0` | `1,2` | `true` |
+   | Join icon | `47,20,44,50` | `47,20,44,50` | `47,20,44,50` | `0,0` | `0,0` | `true` |
+   | Join label | `104,31,150,34` | `104,31,150,34` | `104,30,150,35` | `0,-0.5` | `0,1` | `true` |
+
+6. The smoke fixture includes detached thin dark strips and proves they do not enlarge icon bounds. `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, and `TestLanLobbyEvidenceCommonSmoke.ps1` must each print `PASS` and exit `0`.
+7. Material provenance remains capture-derived: `128` Sprite instances aggregate to `34` bitmap rows, `59` Text instances to `37` Unity Text rows, and code-generated geometry to `6` rows. `create_icon`, `join_icon`, and both action backgrounds use their registered non-`$0/#0` `[uc]autochessouter` sources; Create/Join labels remain `UnityEngine.UI.Text` with `hasBitmapSource=false`.
+8. Inspect `Calibration2/CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`. Both bars must remain unobstructed. Decoration outside the two bars remains outside this iteration’s acceptance and must not be described as fully reproduced.
+
 ## 32. UI-INFO-001 验证（2026-07-24）
 
 - Focused EditMode：42 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135249/EditModeResults.xml`。
