@@ -205,6 +205,8 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - 为支持未来 Buff 临时生成单位，`Spawn` 事件现公开不可变的 `unitId`、`unitTypeId`、`unitSide` 和初始定点位置。表现层以 `unitId → ViewRecord` 建立唯一映射；重复 Spawn、未知单位、缺少 Spawn 字段或工厂无映射均产生结构化诊断，不会猜测资源。
 - `BattlefieldWorldProjection` 使用主场直投影与客场 180 度变换；连续定点位置按同一中心变换，`1` 个 Core 厘米单位对应 `1` 个 Unity 世界坐标单位，即 `1m = 100` Unity 单位。
 - 回放在相邻 Move 事件的一个 Tick 区间内插值 Transform，并在事件 Tick 对齐权威最终位置。Attack、Damage、Death 分别驱动攻击、受击、死亡命令；攻击局部倍速使用 `originalAnimationTicks / effectiveAnimationTicks`。`UnitSkelPresentationView` 缺少动画时记录诊断，死亡动画缺失时采用隐藏这个已由事件确认死亡的对象的降级策略。
+- Track 点采样的 `ShouldDisplay` 表示从该 Tick 切入时的视图创建资格：死亡单位仍保留权威终态、HP、位置和 `Death` 动作采样，但初次绑定、重新绑定或回退重建不会为其创建视图。连续播放中已经存在的视图不受创建过滤影响，仍会在跨过 Death 时接收一次死亡命令。
+- 真实 Spine 视图保留本次死亡 `TrackEntry` 并监听完成回调；动画完成后以 `0.5` 秒现实时间把 Skeleton RGB 线性变为纯黑，再停用整个单位 GameObject。状态条不参与着色但随对象停用；Replay、重新绑定和清理仍由播放控制器统一 Dispose，Dispose 会先立即隐藏再在帧末销毁，避免旧视图与新视图短暂重叠。
 - 同一单位的连续 Move 事件只启动一次循环移动动画，不会每 Tick 重置 Spine Track。Attack 从其事件 Tick 持续到 `effectiveAnimationTicks` 结束，期间仍可按 Core 结果更新 Transform，但后续 Move 事件不得覆盖攻击动画；暂停将视图播放倍率置为 `0`，恢复时才还原当前演示倍率。上述演示策略不改变事件、坐标、阻挡、伤害或 winner。
 - `UnitSkelPresentationView` 与 `MappedBattlePresentationViewFactory` 位于 `Assembly-CSharp`，作为旧 `DefaultUnit`、`UnitIdentity`、`UnitSkelBase`/Spine 原型对隔离 Presentation 程序集的单向桥接。后者只接受 Inspector 明确配置的 `coreTypeId → prefab / SkeletonDataAsset / legacy type ID` 绑定；未配置时返回 `resource.mapping.missing`，不会猜测绑定。没有反向把 Unity 对象、Transform 或动画状态带入 Core。
 - `task003-minimal-v1` 的 `home-striker`、`away-guard` 是合成算法测试类型，仍没有也不应被猜测为 `gopro`/`arcslma` 资源映射。因此实际 Spine/Prefab 创建与视觉播放保持未验证；规划中的 TASK-004A 必须先建立真实单位目录与玩家对战快照的连接并完成真实资源回归，TASK-005 才能接场景。

@@ -603,3 +603,12 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 最终全量 EditMode：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath D:\2022.3.62f1c1\Editor\Unity.exe -TestPlatform EditMode -OutputDirectory Temp\AttackInterval\Full-EditMode-Final -NoGraphics`。`Temp/AttackInterval/Full-EditMode-Final/EditModeResults.xml` 为 `168 passed / 0 failed / 0 skipped`，Unity 正常退出；日志为同目录 `EditMode.log`。
 - 最终全量 PlayMode：同一脚本使用 `-TestPlatform PlayMode -OutputDirectory Temp\AttackInterval\Full-PlayMode-2 -NoGraphics`。`Temp/AttackInterval/Full-PlayMode-2/PlayModeResults.xml` 为 `22 passed / 0 failed / 0 skipped`，Unity 正常退出；日志为同目录 `PlayMode.log`。PlayMode 启动会清理项目 `Temp`，因此在 PlayMode 后重新运行 EditMode，并在最后再次执行生成器；生成目录内容没有新增 diff，两份最终 XML/日志和生成日志得以同时保留。
 - 最终日志未命中 C# 编译错误、编译失败或未处理异常。未执行 Windows Standalone 构建、交互式 Unity Editor/Player 人工观感检查、真实鼠标检查或不同 DPI/分辨率检查；攻击间隔文本与真实 Spine 压速已由自动化覆盖，但这些未执行项仍标记为“未验证”。
+
+## 46. 单位死亡动画、变黑隐藏与 Track 切入（2026-07-27）
+
+- Track TDD：先只增加死亡点采样、死亡 Tick 切入、连续跨过 Death 和回退重建断言。定向 EditMode 当场结果为 `36 total / 3 failed / 0 skipped`；三项失败分别证明旧采样的 `ShouldDisplay` 在死亡后仍为 `true`、切入死亡 Tick 仍创建死亡单位，以及回退用例的初始死亡节点仍错误创建。把死亡后点采样改为 `ShouldDisplay=false`，并只在“尚无视图记录”时应用创建过滤后，定向结果为 `36 passed / 0 failed / 0 skipped`；已有视图连续跨过 Death 仍只收到一次死亡命令。
+- 真实 Spine TDD：`Temp/UnitDeathPresentation/Task2-Red/PlayModeResults.xml` 为 `9 total / 2 failed / 0 skipped`，分别确认旧视图在死亡动画结束后 RGB 不变化、`Dispose` 在帧末销毁前仍保持激活。实现保留死亡 `TrackEntry`、监听 `Complete`、用 `Time.unscaledDeltaTime` 在 `0.5` 秒内线性降低 Skeleton RGB、保持 Alpha，并在结束后停用 GameObject；`Task2-Green/PlayModeResults.xml` 为 `9 passed / 0 failed / 0 skipped`。真实 5504 测试还确认变黑期间状态条保持可见，单位隐藏后状态条随之隐藏，以及重复 `PlayDeath` 不重启动画。
+- 最终全量 EditMode：PlayMode 启动按项目既有行为清理了第一次位于 `Temp` 的 EditMode 结果，因此在 PlayMode 后重新运行并保留 `Temp/UnitDeathPresentation/Full-EditMode-AfterPlay/EditModeResults.xml`；结果为 `171 passed / 0 failed / 0 skipped`，Unity 在结果写入后正常退出。
+- 最终全量 PlayMode：`Temp/UnitDeathPresentation/Full-PlayMode/PlayModeResults.xml` 为 `24 passed / 0 failed / 0 skipped`，Unity 在结果写入后正常退出。两份最终日志均未命中 `error CS`、`Compilation failed`、`Scripts have compiler errors`、未处理异常、`NullReferenceException` 或本次新增的死亡中断/缺 Skeleton 诊断。
+- 范围检查：没有修改 Core、Death 事件格式、目录 JSON、场景、Prefab、Shader、Package 或 ProjectSettings；`.superpowers/` 与 `docs/bonds/` 仍是用户的无关未跟踪内容。
+- 未验证：未执行 Windows Standalone 构建，未在交互式 Unity Editor/Player 中人工观察死亡动画最后一帧、`0.5` 秒变黑速度、多单位同时死亡、Home/Away 切换瞬间和状态条残留观感。自动 RGB、激活状态与 Track 断言不能替代这些视觉检查。
