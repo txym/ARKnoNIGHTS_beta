@@ -128,13 +128,19 @@ namespace ArknoNights.Battle.Presentation
                 return false;
             }
 
+            if (!TryCompressPositions(result, events, builders, errors, out var compressedPositions, out var metrics))
+            {
+                diagnostics = ReadOnly(errors);
+                return false;
+            }
+
             var units = builders.Values
                 .OrderBy(item => item.SpawnTick)
                 .ThenBy(item => item.SpawnSequence)
                 .ThenBy(item => item.Snapshot.UnitId, StringComparer.Ordinal)
-                .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, item.Positions, item.HitPoints, item.Attacks))
+                .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, compressedPositions[item.Snapshot.UnitId], item.HitPoints, item.Attacks))
                 .ToArray();
-            track = new BattlePresentationTrack(result, units, CreateEventDigest(events));
+            track = new BattlePresentationTrack(result, units, CreateEventDigest(events), metrics);
             diagnostics = ReadOnly(errors);
             return true;
         }
@@ -239,6 +245,218 @@ namespace ArknoNights.Battle.Presentation
                     return;
                 }
             }
+        }
+
+        private static bool TryCompressPositions(
+            BattleRunResult result,
+            IReadOnlyList<BattleEvent> events,
+            IReadOnlyDictionary<string, UnitBuilder> builders,
+            ICollection<BattlePresentationDiagnostic> errors,
+            out IReadOnlyDictionary<string, IReadOnlyList<UnitPresentationTrack.PositionSegment>> compressedPositions,
+            out BattlePresentationCompressionMetrics metrics)
+        {
+            var output = new Dictionary<string, IReadOnlyList<UnitPresentationTrack.PositionSegment>>(StringComparer.Ordinal);
+            var compressor = new PositionTrackCompressor();
+            var maximumErrorUnits = 0d;
+            var positionKeyCount = 0;
+            var originalMoveCount = events.Count(item => item.Type == BattleEventType.Move);
+
+            foreach (var item in builders.Values.OrderBy(value => value.Snapshot.UnitId, StringComparer.Ordinal))
+            {
+                if (!TryCompressUnitPositions(result, events, item, compressor, errors, out var positions, out var unitMaximumError))
+                {
+                    compressedPositions = new ReadOnlyDictionary<string, IReadOnlyList<UnitPresentationTrack.PositionSegment>>(output);
+                    metrics = null;
+                    return false;
+                }
+
+                output.Add(item.Snapshot.UnitId, positions);
+                positionKeyCount += positions.SelectMany(segment => new[] { segment.Start, segment.End }).Distinct().Count();
+                maximumErrorUnits = Math.Max(maximumErrorUnits, unitMaximumError);
+            }
+
+            compressedPositions = new ReadOnlyDictionary<string, IReadOnlyList<UnitPresentationTrack.PositionSegment>>(output);
+            metrics = new BattlePresentationCompressionMetrics(originalMoveCount, positionKeyCount, maximumErrorUnits);
+            return true;
+        }
+
+        private static bool TryCompressUnitPositions(
+            BattleRunResult result,
+            IReadOnlyList<BattleEvent> events,
+            UnitBuilder builder,
+            PositionTrackCompressor compressor,
+            ICollection<BattlePresentationDiagnostic> errors,
+            out IReadOnlyList<UnitPresentationTrack.PositionSegment> positions,
+            out double maximumErrorUnits)
+        {
+            maximumErrorUnits = 0d;
+            var rawMoves = builder.Positions.Where(segment => segment.End > segment.Start).ToArray();
+            if (rawMoves.Length == 0)
+            {
+                positions = new ReadOnlyCollection<UnitPresentationTrack.PositionSegment>(builder.Positions.ToArray());
+                return true;
+            }
+
+            var forcedTicks = CollectForcedTicks(events, builder.Snapshot.UnitId, builder.SpawnTick, result.CompletedTicks);
+            var resultSegments = new List<UnitPresentationTrack.PositionSegment>();
+            resultSegments.AddRange(builder.Positions.Where(segment => segment.End == segment.Start));
+            var run = new List<RawPositionPoint>();
+            UnitPresentationTrack.PositionSegment previous = default(UnitPresentationTrack.PositionSegment);
+            var hasPrevious = false;
+
+            foreach (var move in rawMoves)
+            {
+                if (!hasPrevious || move.Start != previous.End)
+                {
+                    if (run.Count != 0 && !TryCompressRun(run, forcedTicks, compressor, result.BattleId, builder.Snapshot.UnitId, errors, resultSegments, ref maximumErrorUnits))
+                    {
+                        positions = Array.Empty<UnitPresentationTrack.PositionSegment>();
+                        return false;
+                    }
+
+                    run.Clear();
+                    run.Add(new RawPositionPoint(move.Start, move.From));
+                }
+
+                run.Add(new RawPositionPoint(move.End, move.To));
+                previous = move;
+                hasPrevious = true;
+            }
+
+            if (!TryCompressRun(run, forcedTicks, compressor, result.BattleId, builder.Snapshot.UnitId, errors, resultSegments, ref maximumErrorUnits))
+            {
+                positions = Array.Empty<UnitPresentationTrack.PositionSegment>();
+                return false;
+            }
+
+            if (!ValidateCompressedPositions(events, builder.Snapshot.UnitId, forcedTicks, resultSegments, result.BattleId, errors, ref maximumErrorUnits))
+            {
+                positions = Array.Empty<UnitPresentationTrack.PositionSegment>();
+                return false;
+            }
+
+            positions = new ReadOnlyCollection<UnitPresentationTrack.PositionSegment>(resultSegments.OrderBy(segment => segment.Start).ThenBy(segment => segment.End).ToArray());
+            return true;
+        }
+
+        private static bool TryCompressRun(
+            IReadOnlyList<RawPositionPoint> run,
+            ISet<int> forcedTicks,
+            PositionTrackCompressor compressor,
+            string battleId,
+            string unitId,
+            ICollection<BattlePresentationDiagnostic> errors,
+            ICollection<UnitPresentationTrack.PositionSegment> output,
+            ref double maximumErrorUnits)
+        {
+            if (!compressor.TryCompress(run, forcedTicks, out var compressed, out _, out var diagnostic))
+            {
+                errors.Add(diagnostic ?? new BattlePresentationDiagnostic("track.position.error.exceeded", "Position compression failed.", battleId, unitId));
+                return false;
+            }
+
+            foreach (var segment in compressed) output.Add(segment);
+            foreach (var point in run)
+            {
+                if (!TrySample(compressed, point.Tick, out var x, out var y))
+                {
+                    errors.Add(new BattlePresentationDiagnostic("track.position.error.exceeded", "A source movement tick was lost.", battleId, unitId, point.Tick));
+                    return false;
+                }
+
+                var dx = x - point.Position.XUnits;
+                var dy = y - point.Position.YUnits;
+                maximumErrorUnits = Math.Max(maximumErrorUnits, Math.Sqrt(dx * dx + dy * dy));
+                if (dx * dx + dy * dy > PositionTrackCompressor.MaximumErrorUnits * PositionTrackCompressor.MaximumErrorUnits + 0.0000001d)
+                {
+                    errors.Add(new BattlePresentationDiagnostic("track.position.error.exceeded", "Position compression exceeded one unit.", battleId, unitId, point.Tick));
+                    return false;
+                }
+
+                if (forcedTicks.Contains(point.Tick) && (dx != 0d || dy != 0d))
+                {
+                    errors.Add(new BattlePresentationDiagnostic("track.position.forcedKey.inexact", "A forced position key was not exact.", battleId, unitId, point.Tick));
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool ValidateCompressedPositions(
+            IReadOnlyList<BattleEvent> events,
+            string unitId,
+            ISet<int> forcedTicks,
+            IReadOnlyList<UnitPresentationTrack.PositionSegment> segments,
+            string battleId,
+            ICollection<BattlePresentationDiagnostic> errors,
+            ref double maximumErrorUnits)
+        {
+            foreach (var move in events.Where(item => item.Type == BattleEventType.Move && item.UnitId == unitId))
+            {
+                if (!TrySample(segments, move.Tick, out var x, out var y))
+                {
+                    errors.Add(new BattlePresentationDiagnostic("track.position.error.exceeded", "A source move cannot be sampled.", battleId, unitId, move.Tick, move.Sequence));
+                    return false;
+                }
+
+                var dx = x - move.ToPosition.Value.XUnits;
+                var dy = y - move.ToPosition.Value.YUnits;
+                maximumErrorUnits = Math.Max(maximumErrorUnits, Math.Sqrt(dx * dx + dy * dy));
+                if (dx * dx + dy * dy > PositionTrackCompressor.MaximumErrorUnits * PositionTrackCompressor.MaximumErrorUnits + 0.0000001d)
+                {
+                    errors.Add(new BattlePresentationDiagnostic("track.position.error.exceeded", "A source move exceeded the compression bound.", battleId, unitId, move.Tick, move.Sequence));
+                    return false;
+                }
+            }
+
+            foreach (var forcedTick in forcedTicks)
+            {
+                var source = events.LastOrDefault(item => item.Type == BattleEventType.Move && item.UnitId == unitId && item.Tick == forcedTick);
+                if (source == null) continue;
+                if (!TrySample(segments, forcedTick, out var x, out var y) || x != source.ToPosition.Value.XUnits || y != source.ToPosition.Value.YUnits)
+                {
+                    errors.Add(new BattlePresentationDiagnostic("track.position.forcedKey.inexact", "A forced movement tick was not exact.", battleId, unitId, forcedTick, source.Sequence));
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static ISet<int> CollectForcedTicks(IReadOnlyList<BattleEvent> events, string unitId, int spawnTick, int endTick)
+        {
+            var ticks = new HashSet<int> { spawnTick, endTick };
+            foreach (var item in events)
+            {
+                if (item.Type == BattleEventType.BattleEnded ||
+                    (item.UnitId == unitId && (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Attack || item.Type == BattleEventType.BlockStarted || item.Type == BattleEventType.BlockEnded || item.Type == BattleEventType.Death)) ||
+                    (item.RelatedUnitId == unitId && (item.Type == BattleEventType.BlockStarted || item.Type == BattleEventType.BlockEnded)))
+                {
+                    ticks.Add(item.Tick);
+                }
+            }
+
+            return ticks;
+        }
+
+        private static bool TrySample(IReadOnlyList<UnitPresentationTrack.PositionSegment> segments, int tick, out double x, out double y)
+        {
+            var candidates = segments.Where(item => tick >= item.Start && tick <= item.End).OrderByDescending(item => item.Start).ToArray();
+            if (candidates.Length == 0)
+            {
+                x = 0d;
+                y = 0d;
+                return false;
+            }
+
+            var segment = candidates[0];
+
+            var duration = Math.Max(1, segment.End - segment.Start);
+            var progress = (tick - segment.Start) / (double)duration;
+            x = segment.From.XUnits + (segment.To.XUnits - segment.From.XUnits) * progress;
+            y = segment.From.YUnits + (segment.To.YUnits - segment.From.YUnits) * progress;
+            return true;
         }
 
         private static bool IsNegative(string unitId) => long.TryParse(unitId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value < 0;

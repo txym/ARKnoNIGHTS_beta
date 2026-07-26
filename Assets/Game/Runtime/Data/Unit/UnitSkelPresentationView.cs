@@ -66,9 +66,17 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     }
 
     public void SetStatusBarState(string unitId, bool isEnemy, int currentHitPoints, int currentShield)
+        => SetStatusBarState(unitId, isEnemy, configuredMaximumHitPoints, currentHitPoints, currentShield);
+
+    public void SetStatusBarState(string unitId, bool isEnemy, int maxHitPoints, int currentHitPoints, int currentShield)
     {
         if (!statusBar) statusBar = GetComponent<UnitWorldStatusBar>();
-        if (statusBar) statusBar.SetState(unitId, isEnemy, configuredMaximumHitPoints, currentHitPoints, currentShield);
+        if (statusBar) statusBar.SetState(unitId, isEnemy, maxHitPoints, currentHitPoints, currentShield);
+    }
+
+    public void PlayIdle()
+    {
+        if (unitSkel) unitSkel.PlayDefaultPresentationAnimation();
     }
 
     public void PlayMove() => PlayOrReport(moveAnimation, true, 1f, "move");

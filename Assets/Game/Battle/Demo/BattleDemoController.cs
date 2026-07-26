@@ -30,7 +30,7 @@ public sealed class BattleDemoController : MonoBehaviour
     {
         coordinator = new BattleDemoCoordinator();
         lastLoggedState = coordinator.State;
-        if (!TryGetFactory(out _))
+        if (!TryGetPresentationFactory(out _))
         {
             Debug.LogError("[BattleDemo][scene.reference.missing] MappedBattlePresentationViewFactory is not assigned.", this);
             return;
@@ -141,7 +141,7 @@ public sealed class BattleDemoController : MonoBehaviour
 
     private bool EnsureSceneReady()
     {
-        if (coordinator == null || !TryGetFactory(out _))
+        if (coordinator == null || !TryGetPresentationFactory(out _))
         {
             Debug.LogError("[BattleDemo][scene.reference.invalid] Demo cannot run because required serialized references are missing.", this);
             return false;
@@ -151,11 +151,12 @@ public sealed class BattleDemoController : MonoBehaviour
 
     private IBattlePresentationViewFactory GetFactory()
     {
-        TryGetFactory(out var factory);
+        TryGetPresentationFactory(out var factory);
         return factory;
     }
 
-    private bool TryGetFactory(out IBattlePresentationViewFactory factory)
+    /// <summary>Provides the serialized scene factory to the formal multi-battle bridge without duplicating a view root.</summary>
+    public bool TryGetPresentationFactory(out IBattlePresentationViewFactory factory)
     {
         factory = presentationFactoryComponent as IBattlePresentationViewFactory;
         return factory != null;

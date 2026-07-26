@@ -500,3 +500,11 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 定向 PlayMode：`Temp/PREP-DEPLOY-001-indicator/green-review/PlayModeResults.xml`，同一筛选共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。覆盖拖动开始隐藏选择框、成功换位与同格 no-op 后恢复、门格失败后恢复、UI 上松手与失焦取消后恢复，以及交互锁仍清除选择框。
 - Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001-indicator\compile-final.log` 退出码 `0`；日志含 `Tundra build success` 并以 `Exiting batchmode successfully now!` 结束，未发现 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
 - 未验证：无可靠的交互式 Unity Editor/Player GUI 驱动，尚未以真实鼠标拖动目视检查隐藏和恢复的逐帧表现；自动场景断言验证的是实际控制器生命周期而非人工视觉体验。
+
+## 34. UI-009 四玩家双战斗场景集成验证（2026-07-26）
+
+- EditMode：通过 `scripts/Invoke-UnityTests.ps1` 对本 worktree 运行全量 EditMode，结果为 `130 passed / 0 failed / 0 skipped`，结果文件为 `Temp/UI-009/full-edit-final-replay/EditModeResults.xml`。新增覆盖四玩家固定配对、每名玩家只封存一次、严格相同最高费用堆叠按 `unitId` 稳定选取、输入单位 ID 不交叉、结果不回写 PlayerState，以及两份独立结果/Track 的稳定摘要。
+- Presentation 回归：`BattlePresentationEditModeTests.TrackPlayback_ViewStatesSampleTheCurrentPresentationTickInsteadOfTheFinalResult` 先以当前 Tick 和最终 Tick 的 HP 差异复现失败，修正后通过；`MultiBattlePresentationCoordinatorEditModeTests` 还先复现“重播只改 Tick、不重建视图”的失败，再在 `Temp/UI-009/green-replay-rebind/EditModeResults.xml` 通过。两项断言分别防止场景 HUD 在 Tick 0 提前显示最终死亡/HP，以及重播时画面停留在结尾。
+- PlayMode：同一脚本的全量 PlayMode 结果为 `19 passed / 0 failed / 0 skipped`，文件为 `Temp/UI-009/full-play-final-replay/PlayModeResults.xml`。`PreparationBattleLoopPlayModeTests` 实际加载 `SampleScene`，覆盖 Preparation 到双 Battle、`MatchAB`/`MatchCD`、共同 Tick、P4 Away 观察、结果对象不重算、两场结束后只返回一次 Preparation，及四名玩家的持久局内状态不被战斗结果覆盖。`StagingHudScenePlayModeTests` 回归了战斗单位选择和正式 HUD 的信息互斥。
+- Windows Standalone：执行 `Task006StandaloneBuild.BuildWindowsX64`，日志 `Temp/UI-009/WindowsStandaloneBuild-final-replay.log` 记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=2`，输出目录为忽略的 `Temp/TASK-006/WindowsStandalone/`。本次没有改动场景、Prefab、Package 或项目设置。
+- 未验证：没有在交互式 Editor 或 Windows Player 中人工观察 `MatchAB`/`MatchCD` Home/Away 的相机、朝向、动画速度、世界状态条和最终视觉布局；尚未由左侧玩家列表的真实按钮触发 `TryObserveBattlePlayer`，因为该图形挂接和截图 manifest 扩展属于 UI-010。自动断言与构建成功不替代上述视觉和鼠标流程检查。

@@ -29,14 +29,32 @@ namespace ArknoNights.Battle.Tests
             yield return null;
             var demo = Object.FindObjectOfType<BattleDemoController>();
             Assert.NotNull(demo);
-            Assert.AreEqual(BattleDemoState.Playing, demo.State, demo.Coordinator.LastError);
+            var multiProperty = loopType.GetProperty("MultiBattle");
+            Assert.NotNull(multiProperty, "UI-009 scene integration must expose the active multi-battle coordinator.");
+            var multi = multiProperty.GetValue(loop);
+            Assert.NotNull(multi);
+            Assert.AreEqual("Playing", multi.GetType().GetProperty("State").GetValue(multi).ToString());
+            var matches = (System.Collections.IEnumerable)multi.GetType().GetProperty("Matches").GetValue(multi);
+            Assert.AreEqual(2, matches.Cast<object>().Count());
             Assert.IsFalse((bool)hud.GetComponent("ArknoNights.Deployment.StateDrivenDeploymentController").GetType().GetProperty("InteractionEnabled").GetValue(hud.GetComponent("ArknoNights.Deployment.StateDrivenDeploymentController")));
-            Assert.AreEqual("local-5503-alpha", demo.Coordinator.Input.Players.Single(player => player.Side == ArknoNights.Battle.Core.BattleSide.Home).Units.Single(unit => unit.Zone == ArknoNights.Battle.Core.UnitZone.Deployed).UnitId);
+            var first = matches.Cast<object>().Single(item => (string)item.GetType().GetProperty("MatchId").GetValue(item) == "match-ab");
+            var firstInput = (ArknoNights.Battle.Core.BattleInput)first.GetType().GetProperty("Input").GetValue(first);
+            Assert.AreEqual("local-5503-alpha", firstInput.Players.Single(player => player.Side == ArknoNights.Battle.Core.BattleSide.Home).Units.Single(unit => unit.Zone == ArknoNights.Battle.Core.UnitZone.Deployed).UnitId);
+            loopType.GetMethod("AdvanceForTests").Invoke(loop, new object[] { 0.05f });
+            var sharedTick = (double)multi.GetType().GetProperty("PresentationTick").GetValue(multi);
+            Assert.That(sharedTick, Is.GreaterThan(0d));
+            var results = matches.Cast<object>().Select(item => item.GetType().GetProperty("Result").GetValue(item)).ToArray();
+            var observe = loopType.GetMethod("TryObserveBattlePlayer");
+            Assert.NotNull(observe, "UI-009 must expose a battle-only observer switch for the player-list binding.");
+            Assert.IsTrue((bool)observe.Invoke(loop, new object[] { "local-ui-player-4" }));
+            Assert.AreEqual("match-cd", multi.GetType().GetProperty("SelectedMatchId").GetValue(multi));
+            Assert.AreEqual(ArknoNights.Battle.Presentation.BattleObserverView.Away, multi.GetType().GetProperty("Observer").GetValue(multi));
+            Assert.AreEqual(sharedTick, (double)multi.GetType().GetProperty("PresentationTick").GetValue(multi));
+            CollectionAssert.AreEqual(results, matches.Cast<object>().Select(item => item.GetType().GetProperty("Result").GetValue(item)).ToArray());
             Assert.AreEqual(87, hud.PlayerState.DeploymentCost);
             Assert.IsFalse(hud.PlayerState.Snapshot.Units.Any(unit => unit.UnitId == "local-1000-overflow"));
 
-            demo.Coordinator.Advance(1200f);
-            Assert.AreEqual(BattleDemoState.Completed, demo.State, demo.Coordinator.LastError);
+            loopType.GetMethod("AdvanceForTests").Invoke(loop, new object[] { 1200f });
             yield return null;
             yield return null;
 

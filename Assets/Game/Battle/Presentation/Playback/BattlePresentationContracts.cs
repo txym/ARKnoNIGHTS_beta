@@ -9,11 +9,13 @@ namespace ArknoNights.Battle.Presentation
         void SetWorldPosition(Vector3 position);
         void SetFacing(Vector3 direction);
         void SetPlaybackSpeed(float playbackSpeed);
+        void PlayIdle() { }
         void PlayMove();
         void PlayAttack(float animationSpeedMultiplier);
         void PlayHit();
         void PlayDeath();
         void SetStatusBarState(string unitId, bool isEnemy, int currentHitPoints, int currentShield);
+        void SetStatusBarState(string unitId, bool isEnemy, int maxHitPoints, int currentHitPoints, int currentShield) => SetStatusBarState(unitId, isEnemy, currentHitPoints, currentShield);
     }
 
     public interface IBattlePresentationViewFactory
@@ -50,13 +52,23 @@ namespace ArknoNights.Battle.Presentation
     public sealed class BattlePresentationViewState
     {
         internal BattlePresentationViewState(string unitId, string typeId, BattleSide side, FixedPosition position, int hitPoints, bool isAlive, int eliteLevel)
+            : this(unitId, typeId, side, position, new PresentationPosition(position.XUnits / 100d, position.YUnits / 100d), hitPoints, hitPoints, 0, true, isAlive, UnitPresentationAction.Idle, eliteLevel)
+        {
+        }
+
+        internal BattlePresentationViewState(string unitId, string typeId, BattleSide side, FixedPosition position, PresentationPosition continuousPosition, int maxHitPoints, int hitPoints, int currentShield, bool hasSpawned, bool isAlive, UnitPresentationAction action, int eliteLevel)
         {
             UnitId = unitId;
             TypeId = typeId;
             Side = side;
             Position = position;
+            ContinuousPosition = continuousPosition;
+            MaxHitPoints = maxHitPoints;
             HitPoints = hitPoints;
+            CurrentShield = currentShield;
+            HasSpawned = hasSpawned;
             IsAlive = isAlive;
+            Action = action;
             EliteLevel = eliteLevel;
         }
 
@@ -64,8 +76,13 @@ namespace ArknoNights.Battle.Presentation
         public string TypeId { get; }
         public BattleSide Side { get; }
         public FixedPosition Position { get; }
+        public PresentationPosition ContinuousPosition { get; }
+        public int MaxHitPoints { get; }
         public int HitPoints { get; }
+        public int CurrentShield { get; }
+        public bool HasSpawned { get; }
         public bool IsAlive { get; }
+        public UnitPresentationAction Action { get; }
         public int EliteLevel { get; }
     }
 }

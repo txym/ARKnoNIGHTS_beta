@@ -153,9 +153,9 @@ namespace ArknoNights.Battle.Tests
             yield return null;
             Assert.AreSame(Resources.Load<Font>("Fonts/Novecento wide Normal Regular.woff2"), hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/BattleStatusPanel/Left").GetComponent<Text>().font);
             Assert.IsFalse(hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/BattleStatusPanel/Left").GetComponent<Text>().text.Contains(" "));
-            var demo = GameObject.Find("BattleDemoRoot").GetComponent("BattleDemoController");
-            var coordinator = demo.GetType().GetProperty("Coordinator").GetValue(demo);
-            var states = (IEnumerable)coordinator.GetType().GetProperty("PresentationViewStates").GetValue(coordinator);
+            var multi = loop.GetType().GetProperty("MultiBattle").GetValue(loop);
+            Assert.NotNull(multi);
+            var states = (IEnumerable)multi.GetType().GetProperty("PresentationViewStates").GetValue(multi);
             string enemyId = null;
             foreach (var state in states)
             {

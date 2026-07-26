@@ -30,6 +30,45 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void TrackPlayback_BindAtMiddleCreatesOnlySpawnedUnitsAndRestoresCurrentAction()
+        {
+            var result = RunFixture();
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var factory = new FakeFactory();
+            var attack = result.Events.First(item => item.Type == BattleEventType.Attack);
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, factory, BattleObserverView.Home, attack.Tick + 0.25d, out var bindDiagnostics), Is.True, string.Join(";", bindDiagnostics));
+
+                Assert.That(playback.ViewStates.Select(item => item.UnitId), Is.EquivalentTo(track.Units.Where(item => item.Sample(attack.Tick + 0.25d).HasSpawned).Select(item => item.UnitId)));
+                Assert.That(factory.Get(attack.UnitId).Commands, Does.Contain("attack"));
+                Assert.That(factory.Get(attack.UnitId).Commands, Does.Not.Contain("hit"));
+            }
+        }
+
+        [Test]
+        public void TrackPlayback_ViewStatesSampleTheCurrentPresentationTickInsteadOfTheFinalResult()
+        {
+            var result = RunFixture();
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var sampleTick = 0d;
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, new FakeFactory(), BattleObserverView.Home, sampleTick, out var bindDiagnostics), Is.True, string.Join(";", bindDiagnostics));
+                foreach (var state in playback.ViewStates)
+                {
+                    var expected = track.Units.Single(unit => unit.UnitId == state.UnitId).Sample(sampleTick);
+                    Assert.That(state.HitPoints, Is.EqualTo(expected.CurrentHitPoints), state.UnitId);
+                    Assert.That(state.IsAlive, Is.EqualTo(expected.IsAlive), state.UnitId);
+                }
+            }
+        }
+
+        [Test]
         public void Playback_ConsumesSpawnTypeIdsAndReachesResultDerivedFinalState()
         {
             var result = RunFixture();
@@ -240,7 +279,7 @@ namespace ArknoNights.Battle.Tests
 
                 var attackerCommands = factory.Get("home-a").Commands;
                 Assert.That(attackerCommands.Count(command => command == "move"), Is.EqualTo(1));
-                Assert.That(attackerCommands.Last(), Is.EqualTo("attack"));
+                Assert.That(attackerCommands, Does.Contain("attack"));
             }
         }
 

@@ -74,7 +74,8 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         yield return CaptureOne("prep_selected_deployed_1920x1080", "Preparation", "local-1000-alpha");
         loop.AdvanceForTests(30f);
         yield return null;
-        var enemy = FindObjectOfType<BattleDemoController>()?.Coordinator?.PresentationViewStates.FirstOrDefault(state => state.Side == BattleSide.Away);
+        var enemy = loop.MultiBattle?.PresentationViewStates.FirstOrDefault(state => state.Side == BattleSide.Away)
+            ?? FindObjectOfType<BattleDemoController>()?.Coordinator?.PresentationViewStates.FirstOrDefault(state => state.Side == BattleSide.Away);
         if (enemy != null) formalHud.SelectBattleUnitForHud(enemy.UnitId);
         yield return CaptureOne("battle_enemy_selected_1920x1080", "Battle", enemy?.UnitId);
         yield return SetResolution(1600, 900);
@@ -156,8 +157,10 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         if (string.IsNullOrEmpty(unitId)) return null;
         var catalogLoad = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
         if (!catalogLoad.Success) return null;
-        var input = FindObjectOfType<BattleDemoController>()?.Coordinator?.Input;
-        var states = FindObjectOfType<BattleDemoController>()?.Coordinator?.PresentationViewStates;
+        var multi = loop == null ? null : loop.MultiBattle;
+        var selectedMatch = multi == null ? null : multi.Matches.FirstOrDefault(match => match.MatchId == multi.SelectedMatchId);
+        var input = selectedMatch?.Input ?? FindObjectOfType<BattleDemoController>()?.Coordinator?.Input;
+        var states = multi?.PresentationViewStates ?? FindObjectOfType<BattleDemoController>()?.Coordinator?.PresentationViewStates;
         if (loop.Phase == LocalBattlePhase.Battle && input != null && UnitDetailResolver.TryResolveBattle(input, states, catalogLoad.Catalog, unitId, out var battleDetail)) return battleDetail;
         return UnitDetailResolver.TryResolvePreparation(hud.Snapshot, catalogLoad.Catalog, unitId, out var preparationDetail) ? preparationDetail : null;
     }

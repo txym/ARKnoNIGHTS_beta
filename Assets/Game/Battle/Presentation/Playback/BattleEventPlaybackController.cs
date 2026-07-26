@@ -14,6 +14,7 @@ namespace ArknoNights.Battle.Presentation
     public sealed class BattleEventPlaybackController : IDisposable
     {
         private readonly BattlefieldWorldProjection projection;
+        private readonly BattleTrackPlaybackController trackPlayback;
         private readonly Dictionary<string, ViewRecord> views = new Dictionary<string, ViewRecord>(StringComparer.Ordinal);
         private readonly List<BattlePresentationDiagnostic> diagnostics = new List<BattlePresentationDiagnostic>();
         private BattleRunResult result;
@@ -23,10 +24,12 @@ namespace ArknoNights.Battle.Presentation
         private float displayTicks;
         private bool hasValidatedCompletion;
         private IReadOnlyDictionary<string, int> eliteLevels = new Dictionary<string, int>(StringComparer.Ordinal);
+        private BattlePresentationTrack compiledTrack;
 
         public BattleEventPlaybackController(BattlefieldWorldProjection projection = null)
         {
             this.projection = projection ?? BattlefieldWorldProjection.Default;
+            trackPlayback = new BattleTrackPlaybackController(this.projection);
         }
 
         public BattleObserverView Observer { get; private set; } = BattleObserverView.Home;
@@ -35,10 +38,10 @@ namespace ArknoNights.Battle.Presentation
         public bool IsPlaying { get; private set; }
         public bool IsPaused { get; private set; }
         public bool IsCompleted { get; private set; }
-        public int ConsumedEventCount => nextEventIndex;
+        public int ConsumedEventCount => events.Count(item => item.Tick <= Mathf.FloorToInt(displayTicks));
         public float DisplayTicks => displayTicks;
         public IReadOnlyList<BattlePresentationDiagnostic> Diagnostics => new ReadOnlyCollection<BattlePresentationDiagnostic>(diagnostics);
-        public IReadOnlyList<BattlePresentationViewState> ViewStates => new ReadOnlyCollection<BattlePresentationViewState>(views.Values.OrderBy(item => item.UnitId, StringComparer.Ordinal).Select(item => item.ToState()).ToArray());
+        public IReadOnlyList<BattlePresentationViewState> ViewStates => compiledTrack == null ? new ReadOnlyCollection<BattlePresentationViewState>(views.Values.OrderBy(item => item.UnitId, StringComparer.Ordinal).Select(item => item.ToState()).ToArray()) : new ReadOnlyCollection<BattlePresentationViewState>(trackPlayback.ViewStates.Select(WithEliteOverride).ToArray());
 
         public bool Load(BattleRunResult source, IBattlePresentationViewFactory viewFactory, out IReadOnlyList<BattlePresentationDiagnostic> loadDiagnostics)
         {
@@ -56,8 +59,9 @@ namespace ArknoNights.Battle.Presentation
             if (diagnostics.Count == 0)
             {
                 events = source.Events;
-                ValidateEventOrder();
-                if (diagnostics.Count == 0) ConsumeEventsThrough(0);
+                var compiler = new BattlePresentationTrackCompiler();
+                if (!compiler.TryCompile(source, out compiledTrack, out var compileDiagnostics)) diagnostics.AddRange(compileDiagnostics);
+                else if (!trackPlayback.Bind(compiledTrack, viewFactory, Observer, 0d, out var bindDiagnostics)) diagnostics.AddRange(bindDiagnostics);
             }
 
             if (diagnostics.Count != 0)
@@ -70,7 +74,6 @@ namespace ArknoNights.Battle.Presentation
                 return false;
             }
 
-            ApplyInterpolatedPositions();
             loadDiagnostics = Diagnostics;
             return true;
         }
@@ -108,6 +111,7 @@ namespace ArknoNights.Battle.Presentation
         public void SetObserver(BattleObserverView observer)
         {
             Observer = observer;
+            if (compiledTrack != null && !trackPlayback.SetObserver(observer, displayTicks, out var trackDiagnostics)) diagnostics.AddRange(trackDiagnostics);
             ApplyStatusBarObserver();
             ApplyInterpolatedPositions();
         }
@@ -115,20 +119,33 @@ namespace ArknoNights.Battle.Presentation
         public void Advance(float unscaledDeltaSeconds)
         {
             if (!IsPlaying || IsPaused || IsCompleted || unscaledDeltaSeconds <= 0f) return;
+            var previousTicks = displayTicks;
             displayTicks += unscaledDeltaSeconds * PlaybackSpeed * BattleInput.TicksPerSecond;
-            ConsumeEventsThrough(Mathf.FloorToInt(displayTicks));
-            ApplyInterpolatedPositions();
-            if (nextEventIndex == events.Count)
+            if (compiledTrack != null)
+            {
+                foreach (var action in events.Where(item => (item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack) && item.Tick > previousTicks && item.Tick <= displayTicks))
+                    if (!trackPlayback.RenderAt(action.Tick, out var actionDiagnostics)) diagnostics.AddRange(actionDiagnostics);
+                if (!trackPlayback.RenderAt(displayTicks, out var trackDiagnostics)) diagnostics.AddRange(trackDiagnostics);
+            }
+            if (compiledTrack != null && displayTicks >= compiledTrack.EndTick)
             {
                 IsPlaying = false;
                 IsCompleted = true;
-                ValidateCompletion();
             }
         }
 
         public bool Replay(out IReadOnlyList<BattlePresentationDiagnostic> replayDiagnostics)
         {
             if (result == null || factory == null) { replayDiagnostics = Diagnostics; return false; }
+            if (compiledTrack != null)
+            {
+                displayTicks = 0f;
+                IsCompleted = false;
+                IsPlaying = false;
+                IsPaused = false;
+                var rebound = trackPlayback.Bind(compiledTrack, factory, Observer, 0d, out replayDiagnostics);
+                return rebound;
+            }
             var retainedResult = result;
             var retainedFactory = factory;
             return Load(retainedResult, retainedFactory, out replayDiagnostics);
@@ -147,6 +164,8 @@ namespace ArknoNights.Battle.Presentation
             events = Array.Empty<BattleEvent>();
             result = null;
             factory = null;
+            compiledTrack = null;
+            trackPlayback.Clear();
         }
 
         public void Dispose() => StopAndClear();
@@ -282,6 +301,12 @@ namespace ArknoNights.Battle.Presentation
 
         private static BattleSide ToBattleSide(BattleObserverView observer) => observer == BattleObserverView.Away ? BattleSide.Away : BattleSide.Home;
 
+        private BattlePresentationViewState WithEliteOverride(BattlePresentationViewState source)
+        {
+            var elite = eliteLevels.TryGetValue(source.UnitId, out var value) ? value : source.EliteLevel;
+            return new BattlePresentationViewState(source.UnitId, source.TypeId, source.Side, source.Position, source.ContinuousPosition, source.MaxHitPoints, source.HitPoints, source.CurrentShield, source.HasSpawned, source.IsAlive, source.Action, elite);
+        }
+
         private void ValidateCompletion()
         {
             if (hasValidatedCompletion) return;
@@ -308,6 +333,7 @@ namespace ArknoNights.Battle.Presentation
         private void ApplyViewPlaybackSpeed()
         {
             var viewSpeed = IsPaused ? 0f : PlaybackSpeed;
+            if (compiledTrack != null) trackPlayback.SetPlaybackSpeed(viewSpeed);
             foreach (var record in views.Values) record.View.SetPlaybackSpeed(viewSpeed);
         }
 

@@ -69,6 +69,44 @@ namespace ArknoNights.Round
         public BattleInput Input { get; }
     }
 
+    /// <summary>One player's irreversible preparation-end changes before a pair is converted into a BattleInput.</summary>
+    public sealed class PreparationPlayerSealResult
+    {
+        internal PreparationPlayerSealResult(PlayerStateSnapshot before, PlayerStateSnapshot after, IEnumerable<string> overflowRemovedUnitIds, string autoDeployedUnitId)
+        {
+            Before = before;
+            After = after;
+            OverflowRemovedUnitIds = new ReadOnlyCollection<string>((overflowRemovedUnitIds ?? Enumerable.Empty<string>()).ToArray());
+            AutoDeployedUnitId = autoDeployedUnitId ?? string.Empty;
+        }
+
+        public PlayerStateSnapshot Before { get; }
+        public PlayerStateSnapshot After { get; }
+        public IReadOnlyList<string> OverflowRemovedUnitIds { get; }
+        public string AutoDeployedUnitId { get; }
+    }
+
+    /// <summary>An immutable input for one confirmed UI-009 battle pairing.</summary>
+    public sealed class FourPlayerBattleMatchSeal
+    {
+        internal FourPlayerBattleMatchSeal(string matchId, BattleInput input) { MatchId = matchId ?? string.Empty; Input = input; }
+        public string MatchId { get; }
+        public BattleInput Input { get; }
+    }
+
+    /// <summary>All preparation commits and pair inputs for one four-player local battle phase.</summary>
+    public sealed class FourPlayerBattleRoundSealResult
+    {
+        internal FourPlayerBattleRoundSealResult(IEnumerable<PreparationPlayerSealResult> playerSeals, IEnumerable<FourPlayerBattleMatchSeal> matches)
+        {
+            PlayerSeals = new ReadOnlyCollection<PreparationPlayerSealResult>((playerSeals ?? Enumerable.Empty<PreparationPlayerSealResult>()).ToArray());
+            Matches = new ReadOnlyCollection<FourPlayerBattleMatchSeal>((matches ?? Enumerable.Empty<FourPlayerBattleMatchSeal>()).ToArray());
+        }
+
+        public IReadOnlyList<PreparationPlayerSealResult> PlayerSeals { get; }
+        public IReadOnlyList<FourPlayerBattleMatchSeal> Matches { get; }
+    }
+
     /// <summary>Converts the persistent local state into a validated, immutable local-battle-v1 input.</summary>
     public static class PlayerStateBattleInputAdapter
     {
@@ -154,54 +192,14 @@ namespace ArknoNights.Round
                 return false;
             }
 
-            var before = home.Snapshot;
-            var awaySnapshot = away.Snapshot;
-            if (!TryValidateUniqueUnitIds(before, awaySnapshot, out error)) return false;
-
-            var removed = home.RemoveOverflowUnits();
-            if (!removed.Success)
-            {
-                error = "round.seal.overflow.remove.failed:" + removed.Code;
-                return false;
-            }
-
-            var afterOverflow = home.Snapshot;
-            string autoDeployedUnitId = null;
-            if (!afterOverflow.Units.Any(unit => unit.Zone == PlayerUnitZone.Deployed))
-            {
-                var candidates = afterOverflow.Units
-                    .Where(unit => unit.Zone == PlayerUnitZone.Staging)
-                    .Select(unit => new { Unit = unit, Entry = Find(catalog, unit.TypeId) })
-                    .Where(item => item.Entry != null && item.Entry.DeploymentCost <= afterOverflow.DeploymentCost)
-                    .OrderByDescending(item => item.Entry.DeploymentCost)
-                    .ThenBy(item => item.Unit.UnitId, StringComparer.Ordinal)
-                    .ToArray();
-                if (candidates.Length > 0)
-                {
-                    var highestCost = candidates[0].Entry.DeploymentCost;
-                    if (candidates.Count(item => item.Entry.DeploymentCost == highestCost) > 1)
-                    {
-                        error = "round.seal.autoDeploy.ambiguousHighestCost:" + highestCost;
-                        return false;
-                    }
-
-                    var deploy = home.TryDeploy(candidates[0].Unit.UnitId, 5, 2);
-                    if (!deploy.Success)
-                    {
-                        error = "round.seal.autoDeploy.failed:" + deploy.Code;
-                        return false;
-                    }
-                    autoDeployedUnitId = candidates[0].Unit.UnitId;
-                }
-            }
-
-            var after = home.Snapshot;
-            if (!PlayerStateBattleInputAdapter.TryCreate(after, awaySnapshot, catalog, battleId, maxTicks, out var input, out var validationErrors))
+            if (!TryValidateUniqueUnitIds(new[] { home.Snapshot, away.Snapshot }, out error)) return false;
+            if (!TryPreparePlayer(home, catalog, out var preparedHome, out error)) return false;
+            if (!PlayerStateBattleInputAdapter.TryCreate(preparedHome.After, away.Snapshot, catalog, battleId, maxTicks, out var input, out var validationErrors))
             {
                 error = "round.seal.input.invalid:" + string.Join(" | ", validationErrors.Select(item => item.ToString()).ToArray());
                 return false;
             }
-            result = new PreparationSealResult(before, after, removed.RemovedUnitIds, autoDeployedUnitId, input);
+            result = new PreparationSealResult(preparedHome.Before, preparedHome.After, preparedHome.OverflowRemovedUnitIds, preparedHome.AutoDeployedUnitId, input);
             return true;
         }
 
@@ -210,6 +208,27 @@ namespace ArknoNights.Round
             result = null;
             error = string.Empty;
             if (state == null || catalog == null || fixedAway == null)
+            {
+                error = "round.seal.dependencies.missing";
+                return false;
+            }
+
+            if (!TryPreparePlayer(state, catalog, out var preparedPlayer, out error)) return false;
+            if (!PlayerStateBattleInputAdapter.TryCreate(preparedPlayer.After, catalog, fixedAway, battleId, maxTicks, out var input, out var validationErrors))
+            {
+                error = "round.seal.input.invalid:" + string.Join(" | ", validationErrors.Select(item => item.ToString()).ToArray());
+                return false;
+            }
+            result = new PreparationSealResult(preparedPlayer.Before, preparedPlayer.After, preparedPlayer.OverflowRemovedUnitIds, preparedPlayer.AutoDeployedUnitId, input);
+            return true;
+        }
+
+        /// <summary>Commits one player's overflow cleanup and automatic deployment without choosing an opposing side.</summary>
+        public static bool TryPreparePlayer(PlayerState state, UnitCatalog catalog, out PreparationPlayerSealResult result, out string error)
+        {
+            result = null;
+            error = string.Empty;
+            if (state == null || catalog == null)
             {
                 error = "round.seal.dependencies.missing";
                 return false;
@@ -237,7 +256,8 @@ namespace ArknoNights.Round
                 if (candidates.Length > 0)
                 {
                     var highestCost = candidates[0].Entry.DeploymentCost;
-                    if (candidates.Count(item => item.Entry.DeploymentCost == highestCost) > 1)
+                    var highestCandidates = candidates.Where(item => item.Entry.DeploymentCost == highestCost).ToArray();
+                    if (highestCandidates.Length > 1 && highestCandidates.Skip(1).Any(item => !AreStrictStackEquivalent(highestCandidates[0].Unit, item.Unit)))
                     {
                         error = "round.seal.autoDeploy.ambiguousHighestCost:" + highestCost;
                         return false;
@@ -253,13 +273,7 @@ namespace ArknoNights.Round
                 }
             }
 
-            var after = state.Snapshot;
-            if (!PlayerStateBattleInputAdapter.TryCreate(after, catalog, fixedAway, battleId, maxTicks, out var input, out var validationErrors))
-            {
-                error = "round.seal.input.invalid:" + string.Join(" | ", validationErrors.Select(item => item.ToString()).ToArray());
-                return false;
-            }
-            result = new PreparationSealResult(before, after, removed.RemovedUnitIds, autoDeployedUnitId, input);
+            result = new PreparationPlayerSealResult(before, state.Snapshot, removed.RemovedUnitIds, autoDeployedUnitId);
             return true;
         }
 
@@ -269,17 +283,91 @@ namespace ArknoNights.Round
             return entry;
         }
 
-        private static bool TryValidateUniqueUnitIds(PlayerStateSnapshot home, PlayerStateSnapshot away, out string error)
+        private static bool AreStrictStackEquivalent(PlayerUnitSnapshot first, PlayerUnitSnapshot second)
         {
-            foreach (var id in home.Units.Select(unit => unit.UnitId))
+            if (first == null || second == null) return false;
+            if (!string.Equals(first.TypeId, second.TypeId, StringComparison.Ordinal) || first.EliteLevel != second.EliteLevel) return false;
+            var firstBuffs = first.Buffs.OrderBy(buff => buff.Id, StringComparer.Ordinal).ThenBy(buff => buff.RawPayload, StringComparer.Ordinal);
+            var secondBuffs = second.Buffs.OrderBy(buff => buff.Id, StringComparer.Ordinal).ThenBy(buff => buff.RawPayload, StringComparer.Ordinal);
+            return firstBuffs.SequenceEqual(secondBuffs);
+        }
+
+        internal static bool TryValidateUniqueUnitIds(IEnumerable<PlayerStateSnapshot> players, out string error)
+        {
+            var owners = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var player in players ?? Enumerable.Empty<PlayerStateSnapshot>())
             {
-                if (away.Units.Any(unit => string.Equals(unit.UnitId, id, StringComparison.Ordinal)))
+                if (player == null) continue;
+                foreach (var id in player.Units.Select(unit => unit.UnitId))
                 {
-                    error = "player.unitId.conflict; unitId=" + id + "; homePlayerId=" + home.PlayerId + "; awayPlayerId=" + away.PlayerId;
-                    return false;
+                    if (owners.TryGetValue(id, out var existingOwner))
+                    {
+                        error = "player.unitId.conflict; unitId=" + id + "; homePlayerId=" + existingOwner + "; awayPlayerId=" + player.PlayerId;
+                        return false;
+                    }
+                    owners.Add(id, player.PlayerId);
                 }
             }
             error = string.Empty;
+            return true;
+        }
+    }
+
+    /// <summary>Pure UI-009 pairing: fixture Player1/Home vs Player2/Away and Player3/Home vs Player4/Away.</summary>
+    public static class FourPlayerBattleRoundSealer
+    {
+        public static bool TrySealRound(LocalMatchState match, UnitCatalog catalog, int maxTicks, string roundId, out FourPlayerBattleRoundSealResult result, out string error)
+        {
+            result = null;
+            error = string.Empty;
+            if (match == null || catalog == null || maxTicks <= 0 || string.IsNullOrWhiteSpace(roundId))
+            {
+                error = "round.fourPlayer.dependencies.invalid";
+                return false;
+            }
+
+            var playerIds = match.OrderedPlayerIds.ToArray();
+            if (playerIds.Length != LocalMatchState.PlayerCount)
+            {
+                error = "round.fourPlayer.players.count.invalid:" + playerIds.Length;
+                return false;
+            }
+
+            var states = new List<PlayerState>(playerIds.Length);
+            foreach (var playerId in playerIds)
+            {
+                if (!match.TryGetPlayerState(playerId, out var state))
+                {
+                    error = "round.fourPlayer.player.missing:" + playerId;
+                    return false;
+                }
+                states.Add(state);
+            }
+            if (!PreparationBattleSealer.TryValidateUniqueUnitIds(states.Select(state => state.Snapshot), out error)) return false;
+
+            var playerSeals = new List<PreparationPlayerSealResult>(states.Count);
+            foreach (var state in states)
+            {
+                if (!PreparationBattleSealer.TryPreparePlayer(state, catalog, out var playerSeal, out error)) return false;
+                playerSeals.Add(playerSeal);
+            }
+
+            if (!PlayerStateBattleInputAdapter.TryCreate(playerSeals[0].After, playerSeals[1].After, catalog, roundId + "-ab", maxTicks, out var matchAb, out var abErrors))
+            {
+                error = "round.fourPlayer.match-ab.input.invalid:" + string.Join(" | ", abErrors.Select(item => item.ToString()).ToArray());
+                return false;
+            }
+            if (!PlayerStateBattleInputAdapter.TryCreate(playerSeals[2].After, playerSeals[3].After, catalog, roundId + "-cd", maxTicks, out var matchCd, out var cdErrors))
+            {
+                error = "round.fourPlayer.match-cd.input.invalid:" + string.Join(" | ", cdErrors.Select(item => item.ToString()).ToArray());
+                return false;
+            }
+
+            result = new FourPlayerBattleRoundSealResult(playerSeals, new[]
+            {
+                new FourPlayerBattleMatchSeal("match-ab", matchAb),
+                new FourPlayerBattleMatchSeal("match-cd", matchCd)
+            });
             return true;
         }
     }

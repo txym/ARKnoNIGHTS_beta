@@ -277,3 +277,13 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - UI-INFO-002 将 `UnitInformationPanelLayout` 作为上半部统一缩放的几何来源；`FormalBattleHudUi005` 构建时缓存九个图标，并为默认导入的独立 PNG 一次性创建 Sprite。
 - `PreparationBattleLoopController` 是 `FormalBattleHudRoot` 的运行时幂等桥。它等待 UI-002/003 初始化，加载 Player-safe catalog 与固定 `task004a-real-1v1` 的 Away 快照，锁定输入并隐藏 `PreparationUnitViews` 后启动运行时战斗；Completed 时释放 `BattleDemoViews`、恢复准备投影/交互并重置时钟。场景重载通过 `SceneManager.sceneLoaded` 重新附加，且不会创建多个桥。
 - `BattleDemoCoordinator.StartRuntimeBattle` 是固定 Resources 入口之外的加法入口：它接收已验证 `BattleInput + UnitCatalog`，仍由局部 `BattleRunner` 先计算再复用原 Playback 生命周期。正式循环模式会阻止调试 Start/Recalculate 重载固定输入，但保留暂停、速度、观察视角和同一封存结果 Replay。Core 的 HP、死亡和 winner 未回写 PlayerState。
+
+## 22. UI-009 四玩家双战斗场景接线（2026-07-26）
+
+- `LocalMatchState` 现在保留 fixture 中的玩家源顺序，并提供按玩家 ID 的只读查询。`PreparationBattleLoopController` 把正式 HUD 已创建的本地 `PlayerState` 作为本地覆盖项传给 `LocalMatchStateLoader`；因此没有为本地玩家创建第二份权威状态，其他三名玩家仍是 fixture 快照。
+- `FourPlayerBattleRoundSealer` 在一次准备阶段转换中按源顺序封存四名玩家，并固定配对 `P1/P2 -> MatchAB`、`P3/P4 -> MatchCD`。每名玩家只执行一次 Overflow 清理和自动部署，然后以该封存快照构造两份独立的 `BattleInput`。最高费用候选若在 `typeId`、精英化等级及完整 Buff 集合上严格相同，按稳定 `unitId` 选择首项；其他并列最高候选仍返回结构化歧义错误。该规则只解决已确认的严格堆叠实例，不扩展部署规则。
+- `MultiBattlePresentationCoordinator` 是 UI-009 的场景外协调层：它对每份输入仅运行一次 `BattleRunner`，保存不可变结果及其 Presentation Track，并把四名玩家稳定映射到 `(matchId, BattleObserverView)`。它只为当前观察目标绑定场景视图，以一个共享演示 Tick、暂停/倍速和重播控制两场已完成结果；切换观察目标不会重跑 Core 或写回任何 `PlayerState`。两场 Track 都完成后仅报告一次完成转换。
+- `PreparationBattleLoopController` 在 `Preparation -> Battle` 时调用四玩家 sealer 和多战斗协调器，复用现有 `BattleDemoRoot` 的已序列化 Presentation Factory 及视图根，不创建第二套相机、Demo 根或权威 runner。`TryObserveBattlePlayer` 仅在战斗阶段接受已知玩家 ID，并把 `LocalMatchState` 的观察变化转交给协调器；完整玩家列表按钮的图形绑定仍属于 UI-010。
+- `FormalBattleHudUi005` 与 `UI005CaptureSuite` 优先读取当前多战斗 Track 的观察侧和状态，保留旧单场 `BattleDemoCoordinator` 作为兼容回退。因此状态栏敌人数、战斗单位选择和详情面板不会把旧 Demo 的 Idle 状态误当作当前战斗。
+- `BattleTrackPlaybackController.ViewStates` 按当前 `PresentationTick` 采样 Track，而非采样最终 Tick；这保证了血量、死亡、动作和位置在共享时间轴上的场景投影与已封存结果一致。演示层仍没有修改战斗结果的路径。
+- 本任务没有修改 `SampleScene`、Prefab、Package 或项目设置；既有 `FormalBattleHudRoot`、`PreparationBattleLoopController` 和 `BattleDemoRoot` 的接线已足以自动进入此流程。商店/准备按钮、完整左侧玩家列表的可点击组件、截图 manifest 扩展和人工视觉拟合仍由 UI-010 负责，不能据此声称已完成最终 UI 验收。
