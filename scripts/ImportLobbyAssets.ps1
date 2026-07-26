@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $approvedSourceRoot = [IO.Path]::GetFullPath(('G:\' + [char]0x7D20 + [char]0x6750 + '\11.14\Unpacked_1763129662\Android\ui\autochess')).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+$approvedCombinedRoot = [IO.Path]::GetFullPath(('G:\' + [char]0x7D20 + [char]0x6750 + '\11.14\Combined_1763139377\Android\ui\autochess')).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 $resolvedSourceRoot = (Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop).Path.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 if (-not [string]::Equals($resolvedSourceRoot, $approvedSourceRoot, [StringComparison]::OrdinalIgnoreCase))
 {
@@ -27,8 +28,17 @@ $assetNames = @(
     'team_icon_frame', 'team_hp_back', 'btn_match_host_normal', 'btn_match_host_grey', 'btn_match_grey', 'btn_match_cancel'
 )
 
+$roomSelectAssetNames = @(
+    'room_select_right_bg', 'room_select_title_icon', 'room_select_dot', 'room_select_img_startroom',
+    'room_select_create_btn_bg_down', 'room_select_create_left_line', 'room_select_create_logo', 'room_select_create_middleicon', 'room_select_create_text_01', 'room_select_create_text_02',
+    'room_select_join_ban', 'room_select_join_blank', 'room_select_join_btn_bg_down', 'room_select_join_left_block', 'room_select_join_logo', 'room_select_join_middle_block', 'room_select_join_middle_block_mask', 'room_select_join_right_block', 'room_select_join_text_01', 'room_select_join_text_02', 'room_select_join_text_bg', 'room_select_join_triangle'
+)
+
+$avatarAssetNames = @('icon_amiy', 'icon_clementi', 'icon_kirar', 'icon_zumam')
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $destinationDirectory = Join-Path $projectRoot 'Assets\Resources\UI\Lobby'
+$homeDestinationDirectory = Join-Path $destinationDirectory 'Home'
 if (Test-Path -LiteralPath $destinationDirectory)
 {
     $unexpected = Get-ChildItem -LiteralPath $destinationDirectory -File -Filter '*.png' |
@@ -48,10 +58,50 @@ foreach ($assetName in $assetNames)
     }
 }
 
+foreach ($assetName in $roomSelectAssetNames)
+{
+    if ($assetName.EndsWith('0', [StringComparison]::Ordinal))
+    {
+        throw "Unpacked room-select assets ending in 0 are forbidden: $assetName"
+    }
+
+    $sourceFile = Join-Path $sourceDirectory ($assetName + '.png')
+    if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf))
+    {
+        throw "Required approved room-select source asset is missing: $sourceFile"
+    }
+}
+
+$combinedAvatarDirectory = Join-Path $approvedCombinedRoot '[uc]autochesscommon'
+if (-not (Test-Path -LiteralPath $combinedAvatarDirectory -PathType Container))
+{
+    throw "Approved Combined avatar directory is missing: $combinedAvatarDirectory"
+}
+
+foreach ($assetName in $avatarAssetNames)
+{
+    $sourceFile = Join-Path $combinedAvatarDirectory ($assetName + '.png')
+    if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf))
+    {
+        throw "Required approved Combined avatar source asset is missing: $sourceFile"
+    }
+}
+
 New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
 foreach ($assetName in $assetNames)
 {
     Copy-Item -LiteralPath (Join-Path $sourceDirectory ($assetName + '.png')) -Destination (Join-Path $destinationDirectory ($assetName + '.png')) -Force
 }
 
-Write-Host "Imported $($assetNames.Count) approved LAN lobby UI PNGs from [uc]autochessouter."
+New-Item -ItemType Directory -Path $homeDestinationDirectory -Force | Out-Null
+foreach ($assetName in $roomSelectAssetNames)
+{
+    Copy-Item -LiteralPath (Join-Path $sourceDirectory ($assetName + '.png')) -Destination (Join-Path $homeDestinationDirectory ($assetName + '.png')) -Force
+}
+
+foreach ($assetName in $avatarAssetNames)
+{
+    Copy-Item -LiteralPath (Join-Path $combinedAvatarDirectory ($assetName + '.png')) -Destination (Join-Path $homeDestinationDirectory ($assetName + '.png')) -Force
+}
+
+Write-Host "Imported $($assetNames.Count) lobby, $($roomSelectAssetNames.Count) room-select, and $($avatarAssetNames.Count) Combined avatar PNGs."
