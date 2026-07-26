@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using ArknoNights.Lobby;
 using NUnit.Framework;
 using UnityEngine;
@@ -167,6 +168,9 @@ namespace ArknoNights.Lobby.Tests
             var backing = backingNode.GetComponent<UnityEngine.UI.Image>();
             var backingRect = backing.rectTransform;
             Assert.That(backing.sprite, Is.Null);
+            var materialField = typeof(Graphic).GetField("m_Material", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(materialField, Is.Not.Null, "Unity Graphic must expose its serialized custom-material field.");
+            Assert.IsNull(materialField.GetValue(backing), "InteriorBacking must not use a custom serialized material.");
             Assert.That(backing.color, Is.EqualTo(new Color(0f, 0f, 0f, .78f)));
             Assert.That(backing.raycastTarget, Is.False);
             AssertTopLeftRect(backingRect, 128f, -12f, 705f, 217f, .05f);

@@ -106,7 +106,8 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
                 Assert.That(homeState.spriteSources.Any(sprite =>
                     sprite.node == "LanLobbyRoot/Home/RoomSelect/Create/CreateAction"), Is.True,
-                    homeState.name + " must retain the frozen CreateAction after its decorations.");
+                    homeState.name + " must include the frozen CreateAction sprite-source row; "
+                    + "last-sibling order is verified by the View hierarchy assertion.");
 
                 const string interiorBackingPath = "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking";
                 Assert.That(homeState.codeNativeGeometry.Any(geometry => geometry.name == interiorBackingPath), Is.True,
