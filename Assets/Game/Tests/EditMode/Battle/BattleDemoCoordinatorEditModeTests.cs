@@ -51,7 +51,7 @@ namespace ArknoNights.Battle.Tests
                     .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504" && item.SpawnSnapshot.IsDynamicallyGenerated)
                     .ToArray();
                 Assert.AreEqual(7, authoredSpawns.Length);
-                Assert.AreEqual(42, dynamicJellySpawns.Length);
+                Assert.AreEqual(27, dynamicJellySpawns.Length);
                 Assert.That(dynamicJellySpawns, Has.All.Matches<BattleEvent>(item => item.Tick >= 100));
                 Assert.AreEqual(authoredSpawns.Length + dynamicJellySpawns.Length, factory.Created);
 

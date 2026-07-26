@@ -67,7 +67,7 @@ namespace ArknoNights.Battle.Tests
                 .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504" && item.SpawnSnapshot.IsDynamicallyGenerated)
                 .ToArray();
             Assert.AreEqual(7, authoredSpawns.Length);
-            Assert.AreEqual(42, dynamicJellySpawns.Length);
+            Assert.AreEqual(27, dynamicJellySpawns.Length);
             Assert.That(dynamicJellySpawns, Has.All.Matches<BattleEvent>(item => item.Tick >= 100));
             var authoredViews = authoredSpawns.Select(item => GameObject.Find("BattleView_" + item.UnitId)).ToArray();
             Assert.That(authoredViews, Has.All.Not.Null, "A Tick-0 authored unit view was not created.");

@@ -188,6 +188,8 @@ namespace ArknoNights.Battle.Tests
                 .Select(unit => unit.UnitId)
                 .ToArray();
             var attack = result.Events.First(item => item.Type == BattleEventType.Attack && arcslmaUnitIds.Contains(item.UnitId));
+            Assert.AreEqual(54, attack.OriginalAnimationTicks);
+            Assert.AreEqual(40, attack.EffectiveAnimationTicks);
             var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
             Assert.IsNotNull(factoryType, "Assembly-CSharp real presentation bridge is unavailable.");
             var factoryObject = new GameObject("TASK003_AttackTimingFactory");
@@ -211,7 +213,7 @@ namespace ArknoNights.Battle.Tests
                 var entry = state.GetType().GetMethod("GetCurrent").Invoke(state, new object[] { 0 });
                 Assert.IsNotNull(entry);
                 var entryTimeScale = (float)entry.GetType().GetProperty("TimeScale").GetValue(entry, null);
-                Assert.AreEqual(1f, entryTimeScale, 0.0001f, "Playback speed is already applied by SkeletonAnimation.timeScale and must not be multiplied into the attack entry again.");
+                Assert.AreEqual(1.35f, entryTimeScale, 0.0001f, "TrackEntry must contain only the 54/40 attack compression; global playback speed is applied by SkeletonAnimation.timeScale and must not be multiplied into the attack entry again.");
             }
 
             UnityEngine.Object.Destroy(factoryObject);
