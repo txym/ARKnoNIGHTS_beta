@@ -317,7 +317,7 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var createFrame = Rect("CreateFrame", parent);
         Stretch(createFrame);
-        var frameTint = new Color(.42f, .82f, .76f, .62f);
+        var frameTint = new Color(.42f, .82f, .76f, .72f);
         CreateOrientedDecorationSprite("Top_0", createFrame, "Home/doc_frame_line", 252f, -18f, 260f, 12f, 0f, false, frameTint);
         CreateOrientedDecorationSprite("Top_1", createFrame, "Home/doc_frame_line", 491f, -18f, 260f, 12f, 0f, false, frameTint);
         CreateOrientedDecorationSprite("Top_2", createFrame, "Home/doc_frame_line", 730f, -18f, 260f, 12f, 0f, false, frameTint);
