@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Unit_Innate_Ability_Database
   m_EditorClassIdentifier: 
   indexToName:
-  - SPLIT_THREE
+  - SUMMON_JELLY_MINIONS
   ignoreCase: 0
   trimWhitespace: 1
   freezeAppend: 0

@@ -92,6 +92,7 @@ public static class UnitCatalogGenerator
             tauntLevel = source.tauntLevel,
             lifeDeduct = source.lifeDeduct,
             isSyntheticFixtureData = false,
+            innateAbilityIds = (source.innateAbilityIds ?? new System.Collections.Generic.List<string>()).ToArray(),
             prefabResourcePath = "Prefabs/DefaultUnit",
             skeletonDataResourcePath = skeletonResourcePath,
             unitSkelType = source.unitSkeletonType,
@@ -148,5 +149,5 @@ public static class UnitCatalogGenerator
     }
 
     [Serializable] private sealed class UnitCatalogDocument { public string schemaVersion; public string catalogId; public UnitCatalogEntry[] units; }
-    [Serializable] private sealed class UnitCatalogEntry { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; }
+    [Serializable] private sealed class UnitCatalogEntry { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string[] innateAbilityIds; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; }
 }

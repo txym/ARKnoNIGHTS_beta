@@ -5,6 +5,7 @@ using System.Reflection;
 using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Infrastructure;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace ArknoNights.Battle.Tests
 {
@@ -13,7 +14,89 @@ namespace ArknoNights.Battle.Tests
         private const string FixturePath = "BattleFixtures/task002-minimal-v1";
         private const string CombatFixturePath = "BattleFixtures/task003-minimal-v1";
         private const string CatalogPath = "BattleData/unit-catalog-v1";
+        private const string AbilityCatalogPath = "BattleData/ability-catalog-v1";
         private const string RealBattlePath = "BattleData/task004a-real-1v1";
+
+        [Test]
+        public void AbilityCatalog_LoadsJellySummonDefinitionWithSealedValues()
+        {
+            var unitCatalog = UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(unitCatalog.Success, Is.True, Errors(unitCatalog.Errors));
+
+            var loaded = AbilityCatalogLoader.LoadFromResources(AbilityCatalogPath, unitCatalog.Catalog);
+
+            Assert.That(loaded.Success, Is.True, Errors(loaded.Errors));
+            var ability = loaded.Catalog.Abilities.Single();
+            Assert.That(ability.AbilityId, Is.EqualTo("SUMMON_JELLY_MINIONS"));
+            Assert.That(ability.DisplayNameZhHans, Is.Empty);
+            Assert.That(ability.DescriptionZhHans, Is.EqualTo("每隔一段时间，分裂出三个果冻。"));
+            Assert.That(ability.InitialSkillPoints, Is.EqualTo(5));
+            Assert.That(ability.RequiredSkillPoints, Is.EqualTo(15));
+            Assert.That(ability.SkillPointGeneration, Is.EqualTo(SkillPointGeneration.Automatic));
+            Assert.That(ability.SummonEffect.SummonTypeId, Is.EqualTo("5504"));
+            Assert.That(ability.SummonEffect.Count, Is.EqualTo(3));
+            Assert.That(ability.SummonEffect.SideLengthCentimetres, Is.EqualTo(100));
+            Assert.That(ability.SummonEffect.InheritPathFromCaster, Is.False);
+        }
+
+        [TestCase("\"abilityId\":\"\"", "ability.id.invalid")]
+        [TestCase("\"initialSkillPoints\":-1", "ability.skillPoints.initial.invalid")]
+        [TestCase("\"initialSkillPoints\":16", "ability.skillPoints.order.invalid")]
+        [TestCase("\"requiredSkillPoints\":0", "ability.skillPoints.required.invalid")]
+        [TestCase("\"summonTypeId\":\"missing\"", "ability.summon.type.unknown")]
+        [TestCase("\"count\":0", "ability.summon.count.invalid")]
+        [TestCase("\"sideLengthCentimetres\":0", "ability.summon.sideLength.invalid")]
+        [TestCase("\"inheritPathFromCaster\":true", "ability.summon.inheritPath.invalid")]
+        public void AbilityCatalog_RejectsInvalidDefinitions(string replacement, string expectedCode)
+        {
+            var unitCatalog = UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(unitCatalog.Success, Is.True, Errors(unitCatalog.Errors));
+            var json = Resources.Load<UnityEngine.TextAsset>(AbilityCatalogPath).text;
+            var marker = replacement.Split(':')[0] + ":";
+            var start = json.IndexOf(marker, StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), "Fixture marker is missing: " + marker);
+            var end = json.IndexOfAny(new[] { ',', '}' }, start);
+            json = json.Substring(0, start) + replacement + json.Substring(end);
+
+            var loaded = AbilityCatalogLoader.LoadFromJson(json, unitCatalog.Catalog);
+
+            Assert.That(loaded.Success, Is.False);
+            Assert.That(loaded.Errors, Has.Some.Matches<ValidationError>(error => error.Code == expectedCode));
+        }
+
+        [Test]
+        public void AbilityCatalog_RejectsDuplicateAbilityIds()
+        {
+            var unitCatalog = UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(unitCatalog.Success, Is.True, Errors(unitCatalog.Errors));
+            var json = Resources.Load<TextAsset>(AbilityCatalogPath).text;
+            var start = json.IndexOf('{', json.IndexOf("\"abilities\"", StringComparison.Ordinal));
+            var end = json.LastIndexOf(']');
+            var ability = json.Substring(start, end - start);
+
+            var loaded = AbilityCatalogLoader.LoadFromJson(json.Substring(0, end) + "," + ability + "]}", unitCatalog.Catalog);
+
+            Assert.That(loaded.Success, Is.False);
+            Assert.That(loaded.Errors, Has.Some.Matches<ValidationError>(error => error.Code == "ability.id.duplicate"));
+        }
+
+        [Test]
+        public void BattleInput_RejectsUnitWithUnknownInnateAbilityId()
+        {
+            var definitions = new[]
+            {
+                new UnitDefinition("known", 100, 10, 0, 0, 100, 20, 20, DamageType.Physical, AttackMethod.Melee, 1, 0, true, new[] { "MISSING" })
+            };
+            var players = new[]
+            {
+                new PlayerSnapshot("home", BattleSide.Home, new[] { Unit("home", "known", 4, 2) }),
+                new PlayerSnapshot("away", BattleSide.Away, new[] { Unit("away", "known", 4, 2) })
+            };
+            var specification = new BattleInputSpecification(BattleInput.LocalBattleSchemaVersion, "missing-innate", 20, definitions, Array.Empty<AbilityDefinition>(), players);
+
+            Assert.That(BattleInputFactory.TryCreate(specification, out _, out var errors), Is.False);
+            Assert.That(errors, Has.Some.Matches<ValidationError>(error => error.Code == "unit.innateAbility.unknown"));
+        }
 
         [Test]
         public void Coordinates_UseOneBasedNineByFourAndNineByEightBounds()
@@ -474,7 +557,7 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
             Assert.AreEqual(BattleInput.LocalBattleSchemaVersion, loaded.Input.SchemaVersion);
             Assert.AreEqual(2, loaded.Input.Players.Count);
-            Assert.AreEqual(2, loaded.Input.UnitDefinitions.Count);
+            Assert.AreEqual(3, loaded.Input.UnitDefinitions.Count);
             CollectionAssert.AreEquivalent(
                 new[] { "home-1000-alpha", "home-5503-alpha", "home-1000-bravo", "away-5503-alpha", "away-1000-alpha", "away-5503-bravo", "away-1000-bravo" },
                 loaded.Input.Players.SelectMany(player => player.Units).Select(unit => unit.UnitId).ToArray());

@@ -25,7 +25,7 @@
   "lifeDeduct": 1,
   "damageType": "Physical",
   "innateAbilityIds": [
-    "SPLIT_THREE"
+    "SUMMON_JELLY_MINIONS"
   ],
   "skeletonDataResourceName": "enemy_5503_arcslma_SkeletonData",
   "profilePictureResourceName": "UIImage_arcslma",

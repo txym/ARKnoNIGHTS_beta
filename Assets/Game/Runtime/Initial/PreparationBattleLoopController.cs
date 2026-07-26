@@ -29,6 +29,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
     private StateDrivenDeploymentController deployment;
     private BattleDemoController demo;
     private UnitCatalog catalog;
+    private AbilityCatalog abilityCatalog;
     private LocalMatchState matchState;
     private MultiBattlePresentationCoordinator multiBattle;
     private int roundNumber;
@@ -85,6 +86,12 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
             Fail("round.catalog.load.failed:" + string.Join(" | ", catalogLoad.Errors.Select(error => error.ToString()).ToArray()));
             return;
         }
+        var abilityCatalogLoad = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalogLoad.Catalog);
+        if (!abilityCatalogLoad.Success)
+        {
+            Fail("round.abilityCatalog.load.failed:" + string.Join(" | ", abilityCatalogLoad.Errors.Select(error => error.ToString()).ToArray()));
+            return;
+        }
         var matchLoad = LocalMatchStateLoader.LoadFromResources(catalogLoad.Catalog, LocalMatchPath, hud.PlayerState);
         if (!matchLoad.Success)
         {
@@ -93,6 +100,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
         }
 
         catalog = catalogLoad.Catalog;
+        abilityCatalog = abilityCatalogLoad.Catalog;
         matchState = matchLoad.State;
         matchState.Changed += HandleMatchChanged;
         multiBattle = new MultiBattlePresentationCoordinator();
@@ -133,7 +141,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
         deployment.SetInteractionEnabled(false);
         deployment.SetPreparationViewsVisible(false);
         var battleId = "ui009-round-" + (++roundNumber);
-        if (!FourPlayerBattleRoundSealer.TrySealRound(matchState, catalog, BattleMaxTicks, battleId, out activeSeal, out var error))
+        if (!FourPlayerBattleRoundSealer.TrySealRound(matchState, catalog, abilityCatalog, BattleMaxTicks, battleId, out activeSeal, out var error))
         {
             Fail(error);
             return;

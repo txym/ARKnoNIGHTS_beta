@@ -26,6 +26,7 @@
             "tauntLevel": 0,
             "lifeDeduct": 1,
             "isSyntheticFixtureData": false,
+            "innateAbilityIds": [],
             "prefabResourcePath": "Prefabs/DefaultUnit",
             "skeletonDataResourcePath": "Characters/gopro/enemy_1000_gopro_3_SkeletonData",
             "unitSkelType": 1,
@@ -58,6 +59,9 @@
             "tauntLevel": 0,
             "lifeDeduct": 1,
             "isSyntheticFixtureData": false,
+            "innateAbilityIds": [
+                "SUMMON_JELLY_MINIONS"
+            ],
             "prefabResourcePath": "Prefabs/DefaultUnit",
             "skeletonDataResourcePath": "Characters/arcslma/enemy_5503_arcslma_SkeletonData",
             "unitSkelType": 2,
@@ -90,6 +94,7 @@
             "tauntLevel": 0,
             "lifeDeduct": 1,
             "isSyntheticFixtureData": false,
+            "innateAbilityIds": [],
             "prefabResourcePath": "Prefabs/DefaultUnit",
             "skeletonDataResourcePath": "Characters/arcslmi/enemy_5504_arcslmi_SkeletonData",
             "unitSkelType": 2,
