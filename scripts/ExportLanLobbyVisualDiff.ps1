@@ -19,8 +19,23 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 public class LanLobbyVisualDiffMetric { public long ComparedPixels; public long DifferentPixels; public long ErrorSum; }
+public class LanLobbyVisualBounds { public int X; public int Y; public int Width; public int Height; }
 public static class LanLobbyVisualDiff {
     static bool Inside(Rectangle r, int x, int y) { return x >= r.X && y >= r.Y && x < r.Right && y < r.Bottom; }
+    public static LanLobbyVisualBounds FindDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive) {
+        if (bitmap == null) throw new ArgumentNullException("bitmap");
+        if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height || search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
+        int minX=search.Right, minY=search.Bottom, maxX=-1, maxY=-1;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            Color pixel=bitmap.GetPixel(x,y);
+            int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
+            if(pixel.A>0 && luminance<maximumLuminanceExclusive) {
+                if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;
+            }
+        }
+        if(maxX<minX || maxY<minY) throw new InvalidOperationException("No dark visible pixels found in search rectangle " + search + ".");
+        return new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 };
+    }
     public static LanLobbyVisualDiffMetric[] Compare(Bitmap actual, Bitmap reference, Rectangle[] masks, Rectangle[] regions, bool[] regionMasks, Bitmap heatmap, out long maskedPixels) {
         int width = actual.Width, height = actual.Height, count = width * height;
         var masked = new bool[count]; maskedPixels = 0;
@@ -51,6 +66,16 @@ $homeActionBars = @(
   @{ name='home-create-action'; label='Create'; manifestRectName='LanLobbyRoot/Home/RoomSelect/Create/CreateAction'; approvedTarget=@{x=1154;y=453;width=717;height=99}; reference=@{x=1257;y=482;width=763;height=105} },
   @{ name='home-join-action'; label='Join'; manifestRectName='LanLobbyRoot/Home/RoomSelect/Join/JoinAction'; approvedTarget=@{x=1154;y=876;width=717;height=99}; reference=@{x=1257;y=932;width=763;height=105} }
 )
+$actionContentSpecs = @{
+  'home-create-action' = @(
+    @{ name='icon'; search=@{x=40;y=15;width=55;height=60}; expected=@{x=47;y=25;width=36;height=37} },
+    @{ name='label'; search=@{x=100;y=20;width=170;height=50}; expected=@{x=109;y=28;width=148;height=32} }
+  )
+  'home-join-action' = @(
+    @{ name='icon'; search=@{x=40;y=15;width=60;height=60}; expected=@{x=47;y=20;width=44;height=50} },
+    @{ name='label'; search=@{x=95;y=20;width=170;height=50}; expected=@{x=104;y=31;width=150;height=34} }
+  )
+}
 $figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
   @{ name='ignored-top-left'; x=0.00; y=0.00; width=0.22; height=0.15; mask=$true },
@@ -107,6 +132,11 @@ function Resize-LanLobbyBitmap([Drawing.Bitmap] $Source, [int] $Width, [int] $He
     try { $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear; $graphics.DrawImage($Source, 0, 0, $Width, $Height) }
     finally { $graphics.Dispose() }
     return $result
+}
+
+function ConvertTo-LanLobbyBoundsObject($Bounds)
+{
+    return [ordered]@{ x=$Bounds.X; y=$Bounds.Y; width=$Bounds.Width; height=$Bounds.Height }
 }
 
 function New-LanLobbyActionOverlay([Drawing.Bitmap] $Actual, [Drawing.Bitmap] $Reference)
@@ -395,6 +425,36 @@ try
             $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height
             [long]$maskedPixels = 0
             $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $comparisonReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
+            $contentVisuals = @()
+            foreach ($contentSpec in @($actionContentSpecs[$spec.name]))
+            {
+                $search = New-Object Drawing.Rectangle $contentSpec.search.x, $contentSpec.search.y, $contentSpec.search.width, $contentSpec.search.height
+                $actualBounds = [LanLobbyVisualDiff]::FindDarkBounds($actualCrop, $search, 45)
+                $referenceBounds = [LanLobbyVisualDiff]::FindDarkBounds($locallyResizedReferenceCrop, $search, 45)
+                $expected = $contentSpec.expected
+                $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
+                $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
+                $expectedCenterX = $expected.x + ($expected.width - 1) / 2.0
+                $expectedCenterY = $expected.y + ($expected.height - 1) / 2.0
+                $centerDeltaX = $actualCenterX - $expectedCenterX
+                $centerDeltaY = $actualCenterY - $expectedCenterY
+                $widthDelta = $actualBounds.Width - $expected.width
+                $heightDelta = $actualBounds.Height - $expected.height
+                $passed = [Math]::Abs($centerDeltaX) -le 1 `
+                    -and [Math]::Abs($centerDeltaY) -le 1 `
+                    -and [Math]::Abs($widthDelta) -le 2 `
+                    -and [Math]::Abs($heightDelta) -le 2
+                $contentVisuals += [pscustomobject][ordered]@{
+                    name = $contentSpec.name
+                    thresholdLumaExclusive = 45
+                    expectedBounds = [ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
+                    referenceBounds = ConvertTo-LanLobbyBoundsObject $referenceBounds
+                    actualBounds = ConvertTo-LanLobbyBoundsObject $actualBounds
+                    centerDeviationPx = [ordered]@{ unit='px'; deltaX=$centerDeltaX; deltaY=$centerDeltaY }
+                    sizeDeviationPx = [ordered]@{ unit='px'; deltaWidth=$widthDelta; deltaHeight=$heightDelta }
+                    passed = $passed
+                }
+            }
             $actionBarReports += [pscustomobject][ordered]@{
                 name = $spec.name
                 capture = 'home'
@@ -409,6 +469,7 @@ try
                 comparedPixels = $metric.ComparedPixels
                 pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
                 averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
+                contentVisuals = $contentVisuals
             }
             $actualCrop.Save((Join-Path $stagingDirectory ($spec.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
             $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($spec.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
@@ -438,6 +499,14 @@ try
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
     $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The manifest-derived actual crop and approved target use 1920×1080 screen coordinates with a top-left origin. The native reference crop is locally resized to the approved target size; a separately reported comparison copy is resized to the actual crop only for pixel metrics and overlays. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect (px) | Approved target Rect (px) | Native reference Rect (px) | Locally resized reference | Comparison reference | Position deviation (px) | Size deviation after local resize (px) | Difference ratio | Avg RGB error |', '| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: |')
     foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.approvedTargetRectPx1920x1080.x),$($item.approvedTargetRectPx1920x1080.y),$($item.approvedTargetRectPx1920x1080.width),$($item.approvedTargetRectPx1920x1080.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | $($item.locallyResizedReferenceSizePx.width)x$($item.locallyResizedReferenceSizePx.height) px | $($item.comparisonReferenceSizePx.width)x$($item.comparisonReferenceSizePx.height) px | dx=$($item.positionDeviationPx1920x1080.deltaX), dy=$($item.positionDeviationPx1920x1080.deltaY) | dw=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
+    $markdown += @('', '## Home action content visible bounds', '', 'Actual and locally resized Figure 9 reference crops use the same luminance threshold. Acceptance is based on the four fixed expected visible bounds, not on full Sprite or Text Rect centers.', '', '| Element | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Passed |', '| --- | --- | --- | --- | --- | --- | --- |')
+    foreach ($item in $actionBarReports)
+    {
+        foreach ($content in @($item.contentVisuals))
+        {
+            $markdown += "| $($item.name)/$($content.name) | $($content.expectedBounds.x),$($content.expectedBounds.y),$($content.expectedBounds.width),$($content.expectedBounds.height) | $($content.referenceBounds.x),$($content.referenceBounds.y),$($content.referenceBounds.width),$($content.referenceBounds.height) | $($content.actualBounds.x),$($content.actualBounds.y),$($content.actualBounds.width),$($content.actualBounds.height) | dx=$($content.centerDeviationPx.deltaX), dy=$($content.centerDeviationPx.deltaY) | dw=$($content.sizeDeviationPx.deltaWidth), dh=$($content.sizeDeviationPx.deltaHeight) | $($content.passed) |"
+        }
+    }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Bitmap Sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')

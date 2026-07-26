@@ -71,7 +71,19 @@ try
 
     $figure9 = ([char]0x56FE).ToString() + '9.png'
     $figure10 = ([char]0x56FE).ToString() + '10.png'
-    New-SolidPng (Join-Path $referenceDirectory $figure9) 2048 1118 ([Drawing.Color]::FromArgb(255, 40, 50, 60)) $null
+    New-SolidPng (Join-Path $referenceDirectory $figure9) 2048 1118 ([Drawing.Color]::FromArgb(255, 40, 50, 60)) {
+        param($graphics)
+        $contentBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
+        try
+        {
+            # Native fixture coordinates that become the approved visible bounds after each 745x104 action crop is resized to 717x99.
+            $graphics.FillRectangle($contentBrush, 1224 + 49, 468 + 26, 37, 39)
+            $graphics.FillRectangle($contentBrush, 1224 + 113, 468 + 29, 154, 34)
+            $graphics.FillRectangle($contentBrush, 1224 + 49, 906 + 21, 46, 53)
+            $graphics.FillRectangle($contentBrush, 1224 + 108, 906 + 33, 156, 36)
+        }
+        finally { $contentBrush.Dispose() }
+    }
     New-SolidPng (Join-Path $referenceDirectory $figure10) 2048 1118 ([Drawing.Color]::FromArgb(255, 65, 75, 85)) $null
 
     $names = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full')
@@ -86,14 +98,21 @@ try
                 param($graphics)
                 $maskedBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::White)
                 $differenceBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Red)
+                $contentBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
                 try
                 {
                     # Masked radar: x=0.00,y=0.18,w=0.57,h=0.66.
                     $graphics.FillRectangle($maskedBrush, 100, 300, 120, 80)
                     # create-room: x=0.60,y=0.42,w=0.36,h=0.11.
                     $graphics.FillRectangle($differenceBrush, 1200, 480, 100, 60)
+                    # Create actual crop is (1161,449); its icon is deliberately 2 px right.
+                    $graphics.FillRectangle($contentBrush, 1161 + 49, 449 + 25, 36, 37)
+                    $graphics.FillRectangle($contentBrush, 1161 + 109, 449 + 28, 148, 32)
+                    # Join actual crop is (1154,876) and matches all approved visible bounds.
+                    $graphics.FillRectangle($contentBrush, 1154 + 47, 876 + 20, 44, 50)
+                    $graphics.FillRectangle($contentBrush, 1154 + 104, 876 + 31, 150, 34)
                 }
-                finally { $maskedBrush.Dispose(); $differenceBrush.Dispose() }
+                finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose() }
             }
         }
         New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 40, 50, 60)) $draw
@@ -292,6 +311,24 @@ try
     Assert-True (($joinAction.locallyResizedReferenceSizePx.width -eq 717) -and ($joinAction.locallyResizedReferenceSizePx.height -eq 99)) 'Join local reference target must be 717x99'
     Assert-True (($joinAction.comparisonReferenceSizePx.width -eq 717) -and ($joinAction.comparisonReferenceSizePx.height -eq 99)) 'Join metric comparison size must be explicit'
     Assert-True (($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0) -and ($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0)) 'Join size delta must remain zero'
+    $expectedContent = @(
+        @{ bar='home-create-action'; name='icon';  x=47;  y=25; width=36;  height=37; actualX=49; passed=$false },
+        @{ bar='home-create-action'; name='label'; x=109; y=28; width=148; height=32; actualX=109; passed=$true },
+        @{ bar='home-join-action';   name='icon';  x=47;  y=20; width=44;  height=50; actualX=47; passed=$true },
+        @{ bar='home-join-action';   name='label'; x=104; y=31; width=150; height=34; actualX=104; passed=$true }
+    )
+    foreach ($expected in $expectedContent)
+    {
+        $bar = $actionBars | Where-Object name -eq $expected.bar
+        $content = @($bar.contentVisuals | Where-Object name -eq $expected.name)
+        Assert-True ($content.Count -eq 1) "$($expected.bar)/$($expected.name) visible bounds must occur once"
+        $content = $content[0]
+        Assert-True (($content.expectedBounds.x -eq $expected.x) -and ($content.expectedBounds.y -eq $expected.y) -and ($content.expectedBounds.width -eq $expected.width) -and ($content.expectedBounds.height -eq $expected.height)) "$($expected.bar)/$($expected.name) expected bounds"
+        Assert-True (($content.actualBounds.x -eq $expected.actualX) -and ($content.actualBounds.y -eq $expected.y) -and ($content.actualBounds.width -eq $expected.width) -and ($content.actualBounds.height -eq $expected.height)) "$($expected.bar)/$($expected.name) actual bounds"
+        Assert-True ($content.passed -eq $expected.passed) "$($expected.bar)/$($expected.name) pass state"
+    }
+    $createIconVisual = @($createAction.contentVisuals | Where-Object name -eq 'icon')[0]
+    Assert-True (($createIconVisual.centerDeviationPx.deltaX -eq 2) -and ($createIconVisual.centerDeviationPx.deltaY -eq 0)) 'Create icon fixture must prove a +2 px center failure'
     Assert-True (@($report.materialUsage.bitmapSprites).Count -gt 0) 'material usage must separately list bitmap Sprites'
     Assert-True (($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'join_icon').occurrenceCount -eq 2) 'Sprite occurrence count must sum rendered instances, not capture presence'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction/Label' -and $_.text -eq '创建同盟' }).Count -eq 1) 'Create action Unity Text must come from captured manifest data'
@@ -316,6 +353,8 @@ try
     Assert-True ($markdown.Contains('717x99')) 'Markdown must explicitly list the locally resized reference size'
     Assert-True ($markdown.Contains('711x95')) 'Markdown must explicitly list the comparison reference size'
     Assert-True ($markdown.Contains('dw=-6, dh=-4')) 'Markdown must contain the exact Create size delta'
+    Assert-True ($markdown.Contains('## Home action content visible bounds')) 'Markdown must expose action-content visible bounds'
+    foreach ($expected in $expectedContent) { Assert-True ($markdown.Contains("$($expected.bar)/$($expected.name)")) "Markdown missing $($expected.bar)/$($expected.name)" }
     Assert-True ($markdown.Contains('## Unity Text usage')) 'Markdown must separate Unity Text usage from bitmap Sprites'
     Assert-True ($markdown.Contains('## Code-generated geometry usage')) 'Markdown must separate code-generated geometry from bitmap Sprites'
     Assert-True ((@($report.captures | Where-Object { $_.name -like 'room-*' } | ForEach-Object { @($_.roomCards).Count } | Measure-Object -Sum).Sum -eq 12)) 'room reports must retain four actual RoomCard rectangles each'
