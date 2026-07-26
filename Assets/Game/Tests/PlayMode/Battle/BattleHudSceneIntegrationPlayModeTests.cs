@@ -300,7 +300,14 @@ namespace ArknoNights.Battle.Tests
             Assert.That(multi.GetType().GetProperty("SelectedMatchId").GetValue(multi), Is.EqualTo("match-cd"));
 
             loop.GetType().GetMethod("AdvanceForTests").Invoke(loop, new object[] { 1200f });
-            yield return null;
+            Assert.That(loop.GetType().GetProperty("Phase").GetValue(loop).ToString(), Is.EqualTo("Battle"),
+                "The formal HUD must remain in battle while terminal death presentation is pending.");
+            var completionDeadline = Time.realtimeSinceStartup + 5f;
+            while (loop.GetType().GetProperty("Phase").GetValue(loop).ToString() == "Battle" &&
+                   Time.realtimeSinceStartup < completionDeadline)
+                yield return null;
+            Assert.That(loop.GetType().GetProperty("Phase").GetValue(loop).ToString(), Is.EqualTo("Preparation"),
+                "Terminal death presentation did not settle before the formal HUD timeout.");
             yield return null;
             var match = loop.GetType().GetProperty("MatchState").GetValue(loop);
             var snapshot = match.GetType().GetProperty("Snapshot").GetValue(match);
