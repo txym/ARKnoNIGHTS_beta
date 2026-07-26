@@ -111,7 +111,7 @@ public static class UnitFactory
             else
             {
 
-                var resPath = BuildResPath(j.resourceKey, j.skeletonDataResourceName);
+                var resPath = UnitResourcePaths.BuildSkeletonDataResourcePath(j.typeId, j.resourceKey, j.skeletonDataResourceName);
                 var sda = Resources.Load<SkeletonDataAsset>(resPath);
                 if (!sda)
                 {
@@ -139,17 +139,6 @@ public static class UnitFactory
             idMap[tpl.typeID] = go;
         }
         return result;
-    }
-
-    // 清洗并拼接 Resources 路径： "unitName/file"
-    private static string BuildResPath(string unitName, string file)
-    {
-        if (string.IsNullOrEmpty(file)) return null;
-        string u = (unitName ?? string.Empty).Trim().Replace('\\', '/').Trim('/');
-        string f = file.Trim().Replace('\\', '/').Trim('/');
-        return string.IsNullOrEmpty(u) 
-            ? $"Characters/{f}"
-            : $"Characters/{u}/{f}";
     }
 
     // 原样拷贝（不做数值兜底）

@@ -28,7 +28,7 @@
     "SUMMON_JELLY_MINIONS"
   ],
   "skeletonDataResourceName": "enemy_5503_arcslma_SkeletonData",
-  "profilePictureResourceName": "UIImage_arcslma",
+  "profilePictureResourceName": "UIImage_5503_arcslma",
   "moveAnimation": "Move",
   "attackAnimation": "Attack",
   "hitAnimation": "",

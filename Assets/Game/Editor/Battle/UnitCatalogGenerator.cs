@@ -55,8 +55,12 @@ public static class UnitCatalogGenerator
         var attackAnimationTicks = ConvertSecondsToTicks(source.attackAnimationDurationSeconds, sourcePath + ":attackAnimationDurationSeconds");
         var damageType = ParseDamageType(source.damageType, sourcePath);
         var attackMethod = ConvertAttackMethod(source.attackMethod, sourcePath);
-        var skeletonResourcePath = "Characters/" + source.resourceKey + "/" + source.skeletonDataResourceName;
-        var portraitResourcePath = "ProfilePicture/" + source.profilePictureResourceName;
+        var expectedPortraitResourceName = UnitResourcePaths.BuildProfilePictureResourceName(source.typeId, source.resourceKey);
+        if (!string.Equals(source.profilePictureResourceName, expectedPortraitResourceName, StringComparison.Ordinal))
+            throw new InvalidOperationException("UNIT_RESOURCE_PROFILE_NAME_INVALID path=" + sourcePath + " expected=" + expectedPortraitResourceName + " actual=" + source.profilePictureResourceName);
+
+        var skeletonResourcePath = UnitResourcePaths.BuildSkeletonDataResourcePath(source.typeId, source.resourceKey, source.skeletonDataResourceName);
+        var portraitResourcePath = UnitResourcePaths.BuildProfilePictureResourcePath(source.typeId, source.resourceKey);
 
         if (string.IsNullOrEmpty(source.displayNameZhHans)) Debug.LogWarning("UNIT_DATA_001_DISPLAY_NAME_UNCONFIGURED path=" + sourcePath + " typeId=" + source.typeId);
 

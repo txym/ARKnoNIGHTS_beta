@@ -22,7 +22,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.IsTrue(result.Catalog.TryGet("1000", out var gopro));
             Assert.AreEqual(2, gopro.DeploymentCost);
-            Assert.AreEqual("ProfilePicture/UIImage_gopro", gopro.PortraitResourcePath);
+            Assert.AreEqual("ProfilePicture/UIImage_1000_gopro", gopro.PortraitResourcePath);
             Assert.AreEqual(1, gopro.Rarity);
             Assert.AreEqual(0, gopro.InitialEliteLevel);
             Assert.AreEqual("gopro", gopro.ResourceKey);
@@ -32,7 +32,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.IsTrue(result.Catalog.TryGet("5503", out var arcslma));
             Assert.AreEqual(12, arcslma.DeploymentCost);
-            Assert.AreEqual("ProfilePicture/UIImage_arcslma", arcslma.PortraitResourcePath);
+            Assert.AreEqual("ProfilePicture/UIImage_5503_arcslma", arcslma.PortraitResourcePath);
             Assert.AreEqual(4, arcslma.Rarity);
             Assert.AreEqual(0, arcslma.InitialEliteLevel);
             Assert.AreEqual("arcslma", arcslma.ResourceKey);

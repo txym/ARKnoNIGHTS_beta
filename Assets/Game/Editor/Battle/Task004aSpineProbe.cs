@@ -9,8 +9,9 @@ public static class Task004aSpineProbe
 {
     public static void Run()
     {
-        Probe("gopro", "Characters/gopro/enemy_1000_gopro_3_SkeletonData");
-        Probe("arcslma", "Characters/arcslma/enemy_5503_arcslma_SkeletonData");
+        Probe("gopro", UnitResourcePaths.BuildSkeletonDataResourcePath(1000, "gopro", "enemy_1000_gopro_3_SkeletonData"));
+        Probe("arcslma", UnitResourcePaths.BuildSkeletonDataResourcePath(5503, "arcslma", "enemy_5503_arcslma_SkeletonData"));
+        Probe("arcslmi", UnitResourcePaths.BuildSkeletonDataResourcePath(5504, "arcslmi", "enemy_5504_arcslmi_SkeletonData"));
     }
 
     private static void Probe(string unitName, string resourcePath)

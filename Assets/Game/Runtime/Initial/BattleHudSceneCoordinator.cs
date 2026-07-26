@@ -268,9 +268,9 @@ public sealed class PlayerListHudController : MonoBehaviour
 {
     private static readonly string[] FallbackAvatarPaths =
     {
-        "ProfilePicture/UIImage_gopro",
-        "ProfilePicture/UIImage_arcslma",
-        "ProfilePicture/UIImage_5504_arcslmi"
+        UnitResourcePaths.BuildProfilePictureResourcePath(1000, "gopro"),
+        UnitResourcePaths.BuildProfilePictureResourcePath(5503, "arcslma"),
+        UnitResourcePaths.BuildProfilePictureResourcePath(5504, "arcslmi")
     };
 
     private PlayerListObserverCoordinator coordinator;

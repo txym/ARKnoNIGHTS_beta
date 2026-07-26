@@ -18,6 +18,25 @@ namespace ArknoNights.Battle.Tests
         private const string AbilityCatalogPath = "BattleData/ability-catalog-v1";
         private const string RealBattlePath = "BattleData/task004a-real-1v1";
 
+        [TestCase(1000, "gopro", "1000_gopro")]
+        [TestCase(5503, "arcslma", "5503_arcslma")]
+        [TestCase(5504, "arcslmi", "5504_arcslmi")]
+        public void UnitResourcePaths_BuildsCanonicalTypeIdAndShortKeyPaths(int typeId, string resourceKey, string expectedFolder)
+        {
+            var pathsType = Type.GetType("UnitResourcePaths, Assembly-CSharp");
+            Assert.IsNotNull(pathsType, "Unit resource paths must have one shared composition rule.");
+
+            var folder = (string)pathsType.GetMethod("BuildCharacterFolderName").Invoke(null, new object[] { typeId, resourceKey });
+            var skeleton = (string)pathsType.GetMethod("BuildSkeletonDataResourcePath").Invoke(null, new object[] { typeId, resourceKey, "model_SkeletonData" });
+            var portraitName = (string)pathsType.GetMethod("BuildProfilePictureResourceName").Invoke(null, new object[] { typeId, resourceKey });
+            var portrait = (string)pathsType.GetMethod("BuildProfilePictureResourcePath").Invoke(null, new object[] { typeId, resourceKey });
+
+            Assert.AreEqual(expectedFolder, folder);
+            Assert.AreEqual("Characters/" + expectedFolder + "/model_SkeletonData", skeleton);
+            Assert.AreEqual("UIImage_" + expectedFolder, portraitName);
+            Assert.AreEqual("ProfilePicture/UIImage_" + expectedFolder, portrait);
+        }
+
         [Test]
         public void AbilityCatalog_LoadsJellySummonDefinitionWithSealedValues()
         {
@@ -534,7 +553,8 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(AttackMethod.Melee, gopro.Definition.AttackMethod);
             Assert.AreEqual(1, gopro.Definition.BlockCapacity);
             Assert.AreEqual(0, gopro.Definition.TauntLevel);
-            Assert.AreEqual("Characters/gopro/enemy_1000_gopro_3_SkeletonData", gopro.SkeletonDataResourcePath);
+            Assert.AreEqual("Characters/1000_gopro/enemy_1000_gopro_3_SkeletonData", gopro.SkeletonDataResourcePath);
+            Assert.AreEqual("ProfilePicture/UIImage_1000_gopro", gopro.PortraitResourcePath);
 
             Assert.IsTrue(first.Catalog.TryGet("5503", out var arcslma));
             Assert.AreEqual(20, arcslma.Definition.MoveSpeedCentimetresPerSecond);
@@ -544,6 +564,8 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("Attack", arcslma.AttackAnimation);
             Assert.AreEqual("Die", arcslma.DeathAnimation);
             Assert.IsFalse(arcslma.Definition.IsSyntheticFixtureData);
+            Assert.AreEqual("Characters/5503_arcslma/enemy_5503_arcslma_SkeletonData", arcslma.SkeletonDataResourcePath);
+            Assert.AreEqual("ProfilePicture/UIImage_5503_arcslma", arcslma.PortraitResourcePath);
 
             Assert.That(first.Catalog.Entries.Select(entry => entry.Definition.TypeId), Is.EqualTo(new[] { "1000", "5503", "5504" }));
             Assert.That(first.Catalog.TryGet("5504", out var arcslmi), Is.True);
@@ -555,6 +577,8 @@ namespace ArknoNights.Battle.Tests
             Assert.That(arcslmi.MoveAnimation, Is.EqualTo("Move"));
             Assert.That(arcslmi.AttackAnimation, Is.EqualTo("Attack"));
             Assert.That(arcslmi.DeathAnimation, Is.EqualTo("Die"));
+            Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/5504_arcslmi/enemy_5504_arcslmi_SkeletonData"));
+            Assert.That(arcslmi.PortraitResourcePath, Is.EqualTo("ProfilePicture/UIImage_5504_arcslmi"));
 
             var sourceGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/gopro.json"));
             var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/arcslma.json"));
@@ -702,7 +726,7 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void RealCatalog_MissingPresentationResourceReturnsStructuredError()
         {
-            var json = UnityEngine.Resources.Load<UnityEngine.TextAsset>(CatalogPath).text.Replace("Characters/gopro/enemy_1000_gopro_3_SkeletonData", "Characters/missing/not-present");
+            var json = UnityEngine.Resources.Load<UnityEngine.TextAsset>(CatalogPath).text.Replace("Characters/1000_gopro/enemy_1000_gopro_3_SkeletonData", "Characters/missing/not-present");
             var loaded = UnitCatalogLoader.LoadFromJson(json);
             Assert.IsFalse(loaded.Success);
             Assert.That(loaded.Errors.Select(error => error.Code), Does.Contain("catalog.skeleton.resource.missing"));
