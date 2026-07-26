@@ -29,8 +29,9 @@
 - `Assets/Game/UI/UIManager.cs`
 - `Assets/Game/UI/DataUISwitch.cs`
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/arcslma.json`
-- `Assets/GameData/Units/Json/gopro.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Scenes/SampleScene.unity` 中与 InitButton、ButtonTest、FoldButton、UICamera、UnitDeployment、ButtonDebug、MoveTest 和 UITest 有关的文本区域
 - 已提供的 TASK-001 首次完成报告及其中引用的日志（若日志仍存在）
 

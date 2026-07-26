@@ -553,6 +553,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(AttackMethod.Melee, gopro.Definition.AttackMethod);
             Assert.AreEqual(1, gopro.Definition.BlockCapacity);
             Assert.AreEqual(0, gopro.Definition.TauntLevel);
+            Assert.AreEqual("1000_gopro.json", gopro.SourceFile);
             Assert.AreEqual("Characters/1000_gopro/enemy_1000_gopro_3_SkeletonData", gopro.SkeletonDataResourcePath);
             Assert.AreEqual("ProfilePicture/UIImage_1000_gopro", gopro.PortraitResourcePath);
 
@@ -564,6 +565,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("Attack", arcslma.AttackAnimation);
             Assert.AreEqual("Die", arcslma.DeathAnimation);
             Assert.IsFalse(arcslma.Definition.IsSyntheticFixtureData);
+            Assert.AreEqual("5503_arcslma.json", arcslma.SourceFile);
             Assert.AreEqual("Characters/5503_arcslma/enemy_5503_arcslma_SkeletonData", arcslma.SkeletonDataResourcePath);
             Assert.AreEqual("ProfilePicture/UIImage_5503_arcslma", arcslma.PortraitResourcePath);
 
@@ -577,11 +579,13 @@ namespace ArknoNights.Battle.Tests
             Assert.That(arcslmi.MoveAnimation, Is.EqualTo("Move"));
             Assert.That(arcslmi.AttackAnimation, Is.EqualTo("Attack"));
             Assert.That(arcslmi.DeathAnimation, Is.EqualTo("Die"));
+            Assert.That(arcslmi.SourceFile, Is.EqualTo("5504_arcslmi.json"));
             Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/5504_arcslmi/enemy_5504_arcslmi_SkeletonData"));
             Assert.That(arcslmi.PortraitResourcePath, Is.EqualTo("ProfilePicture/UIImage_5504_arcslmi"));
 
-            var sourceGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/gopro.json"));
-            var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/arcslma.json"));
+            var sourceGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/1000_gopro.json"));
+            var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/5503_arcslma.json"));
+            var sourceArcslmi = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/5504_arcslmi.json"));
             StringAssert.Contains("\"schemaVersion\": \"unit-source-v1\"", sourceGopro);
             StringAssert.Contains("\"resourceKey\": \"gopro\"", sourceGopro);
             StringAssert.Contains("\"displayNameZhHans\": \"狂暴的猎狗pro\"", sourceGopro);
@@ -593,6 +597,7 @@ namespace ArknoNights.Battle.Tests
             StringAssert.Contains("\"tauntLevel\": 0", sourceGopro);
             StringAssert.Contains("\"lifeDeduct\": 1", sourceArcslma);
             StringAssert.Contains("\"innateAbilityIds\": [", sourceArcslma);
+            StringAssert.Contains("\"resourceKey\": \"arcslmi\"", sourceArcslmi);
             StringAssert.DoesNotContain("\"uintName\"", sourceGopro);
             StringAssert.DoesNotContain("\"HP\"", sourceGopro);
             StringAssert.DoesNotContain("\"FixedAbility\"", sourceArcslma);

@@ -23,8 +23,9 @@
 - `Packages/manifest.json`
 - `Packages/packages-lock.json`（若存在）
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/gopro.json`
-- `Assets/GameData/Units/Json/arcslma.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Game/Runtime/Initial/UnitFactory.cs`
 - `Assets/Game/Runtime/Data/Unit/UnitTemplate.cs`
 - `Assets/Game/Runtime/Data/Unit/UnitIdentity.cs`
@@ -48,7 +49,7 @@
 
 - TASK-002 的 `battle-fixture-v1` 同时包含单位类型定义和 Home/Away 玩家快照；
 - TASK-003 的 1v1 fixture 使用 `home-striker` 与 `away-guard`，其数值是算法测试用合成数据；
-- `Assets/GameData/Units/Json/gopro.json` 与 `arcslma.json` 才包含当前真实单位 ID、HP、攻击、防御、法抗、移动速度、攻击间隔和 Spine 资源标识；
+- `Assets/GameData/Units/Json/1000_gopro.json`、`5503_arcslma.json` 与 `5504_arcslmi.json` 包含当前真实单位 ID、HP、攻击、防御、法抗、移动速度、攻击间隔和 Spine 资源标识；
 - 真实单位 JSON 目前缺少战斗计算需要的独立 `damageType`、`blockCapacity` 和 `attackAnimationDuration` 字段；
 - 旧 `UnitFactory` 通过 `Application.dataPath/GameData/Units/Json` 枚举源文件，不是可靠的 Player 数据入口；
 - `MappedBattlePresentationViewFactory` 目前只接受 Inspector 手工配置的 Core type ID 到资源绑定；合成 type ID 没有真实资源映射；
@@ -180,8 +181,9 @@ Player-safe 载体优先使用项目已有 `Resources.Load<TextAsset>` 能力下
 候选范围：
 
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/gopro.json`
-- `Assets/GameData/Units/Json/arcslma.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Game/Battle/Infrastructure/` 下的真实单位目录、对战快照加载与适配代码
 - `Assets/Game/Battle/Core/Input/`：只允许必要且兼容的验证/模型修正，不得重写已有输入
 - `Assets/Game/Battle/Presentation/`：只允许真实资源元数据所需的只读契约修正
