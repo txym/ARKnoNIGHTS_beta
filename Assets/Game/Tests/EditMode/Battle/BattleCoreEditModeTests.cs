@@ -547,7 +547,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(first.Catalog.CanonicalSummary, second.Catalog.CanonicalSummary);
             Assert.IsTrue(first.Catalog.TryGet("1000", out var gopro));
             Assert.AreEqual(190, gopro.Definition.MoveSpeedCentimetresPerSecond);
-            Assert.AreEqual(28, gopro.Definition.AttackIntervalTicks);
+            Assert.AreEqual(14, gopro.Definition.AttackIntervalTicks);
             Assert.AreEqual(20, gopro.Definition.AttackAnimationDurationTicks);
             Assert.AreEqual(DamageType.Physical, gopro.Definition.DamageType);
             Assert.AreEqual(AttackMethod.Melee, gopro.Definition.AttackMethod);
@@ -559,7 +559,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.IsTrue(first.Catalog.TryGet("5503", out var arcslma));
             Assert.AreEqual(20, arcslma.Definition.MoveSpeedCentimetresPerSecond);
-            Assert.AreEqual(80, arcslma.Definition.AttackIntervalTicks);
+            Assert.AreEqual(40, arcslma.Definition.AttackIntervalTicks);
             Assert.AreEqual(54, arcslma.Definition.AttackAnimationDurationTicks);
             Assert.AreEqual("Move", arcslma.MoveAnimation);
             Assert.AreEqual("Attack", arcslma.AttackAnimation);
@@ -574,6 +574,7 @@ namespace ArknoNights.Battle.Tests
             Assert.That(arcslmi.DisplayNameZhHans, Is.EqualTo("果冻丁"));
             Assert.That(arcslmi.Definition.MaxHitPoints, Is.EqualTo(2500));
             Assert.That(arcslmi.Definition.Attack, Is.EqualTo(290));
+            Assert.That(arcslmi.Definition.AttackIntervalTicks, Is.EqualTo(15));
             Assert.That(arcslmi.Definition.DamageType, Is.EqualTo(DamageType.Physical));
             Assert.That(arcslmi.UnitSkelType, Is.EqualTo(2));
             Assert.That(arcslmi.MoveAnimation, Is.EqualTo("Move"));
@@ -637,7 +638,7 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void RealCatalog_ArcslmaDamageArrivesOnlyAfterItsFullEffectiveAnimationDuration()
+        public void RealCatalog_ArcslmaDamageUsesHalvedBaseIntervalAsEffectiveDuration()
         {
             var loaded = LocalBattleLoader.LoadFromResources(CatalogPath, RealBattlePath);
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
@@ -652,8 +653,8 @@ namespace ArknoNights.Battle.Tests
             foreach (var attack in arcslmaAttacks)
             {
                 Assert.AreEqual(54, attack.OriginalAnimationTicks);
-                Assert.AreEqual(54, attack.EffectiveAnimationTicks);
-                Assert.AreEqual(attack.Tick + attack.EffectiveAnimationTicks, attack.PlannedDamageTick);
+                Assert.AreEqual(40, attack.EffectiveAnimationTicks);
+                Assert.AreEqual(attack.Tick + 40, attack.PlannedDamageTick);
                 var matchingDamage = result.Events.Where(item => item.Type == BattleEventType.Damage && item.UnitId == attack.UnitId && item.RelatedUnitId == attack.RelatedUnitId && item.Tick == attack.PlannedDamageTick).ToArray();
                 Assert.That(matchingDamage.Length, Is.LessThanOrEqualTo(1));
             }
@@ -675,14 +676,19 @@ namespace ArknoNights.Battle.Tests
             var loaded = LocalBattleLoader.LoadFromResources(CatalogPath, RealBattlePath);
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
             var result = new BattleRunner(loaded.Input).RunToCompletion();
-            const string arcslmaUnitId = "away-5503-alpha";
+            var arcslmaUnitIds = new HashSet<string>(loaded.Input.Players
+                .SelectMany(player => player.Units)
+                .Where(item => item.TypeId == "5503")
+                .Select(item => item.UnitId), StringComparer.Ordinal);
             var block = result.Events.First(item =>
                 item.Type == BattleEventType.BlockStarted
-                && (item.UnitId == arcslmaUnitId || item.RelatedUnitId == arcslmaUnitId));
+                && (arcslmaUnitIds.Contains(item.UnitId) || arcslmaUnitIds.Contains(item.RelatedUnitId)));
+            var arcslmaUnitId = arcslmaUnitIds.Contains(block.UnitId) ? block.UnitId : block.RelatedUnitId;
             var blockerId = block.UnitId == arcslmaUnitId ? block.RelatedUnitId : block.UnitId;
 
+            Assert.That(result.TryGetUnitSnapshot(arcslmaUnitId, out var arcslmaSnapshot), Is.True);
             Assert.That(result.TryGetUnitSnapshot(blockerId, out var blockerSnapshot), Is.True);
-            Assert.That(blockerSnapshot.Side, Is.Not.EqualTo(BattleSide.Away));
+            Assert.That(blockerSnapshot.Side, Is.Not.EqualTo(arcslmaSnapshot.Side));
             Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.BlockEnded
                 && ((item.UnitId == arcslmaUnitId && item.RelatedUnitId == blockerId)

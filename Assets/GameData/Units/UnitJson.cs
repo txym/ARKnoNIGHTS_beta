@@ -1,6 +1,8 @@
 [System.Serializable]
 public class UnitJson
 {
+    public const float BaseAttackIntervalMultiplier = 0.5f;
+
     // unit-source-v1. This is the sole source-data contract; UnitFactory maps it to legacy UnitTemplate fields.
     public string schemaVersion;
     public int typeId;
@@ -22,6 +24,7 @@ public class UnitJson
     public int magicResistance;
     public float moveSpeedMetresPerSecond;
     public float attackIntervalSeconds;
+    public float BaseAttackIntervalSeconds => attackIntervalSeconds * BaseAttackIntervalMultiplier;
     public float attackAnimationDurationSeconds;
     public float attackRadiusMetres;
     public float blockRadiusMetres;

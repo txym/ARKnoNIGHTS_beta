@@ -51,7 +51,7 @@ public static class UnitCatalogGenerator
         if (source.maxHitPoints <= 0 || source.attack < 0 || source.defense < 0 || source.magicResistance < 0 || source.magicResistance > 100 || source.blockCapacity <= 0 || source.tauntLevel < 0 || source.lifeDeduct < 0 || source.deploymentCost < 0 || source.rarity < 1 || source.rarity > 6 || source.initialEliteLevel < 0 || source.initialEliteLevel > 3 || string.IsNullOrWhiteSpace(source.profilePictureResourceName)) throw new InvalidOperationException("UNIT_DATA_001_SOURCE_VALUES_INVALID path=" + sourcePath + " typeId=" + source.typeId);
 
         var moveSpeed = ConvertMetresPerSecondToCentimetres(source.moveSpeedMetresPerSecond, sourcePath);
-        var attackIntervalTicks = ConvertSecondsToTicks(source.attackIntervalSeconds, sourcePath + ":attackIntervalSeconds");
+        var attackIntervalTicks = ConvertSecondsToTicks(source.BaseAttackIntervalSeconds, sourcePath + ":baseAttackIntervalSeconds");
         var attackAnimationTicks = ConvertSecondsToTicks(source.attackAnimationDurationSeconds, sourcePath + ":attackAnimationDurationSeconds");
         var damageType = ParseDamageType(source.damageType, sourcePath);
         var attackMethod = ConvertAttackMethod(source.attackMethod, sourcePath);
