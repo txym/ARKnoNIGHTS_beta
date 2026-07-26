@@ -99,6 +99,30 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_RejectsUnknownSummonTypeWithoutOverwritingOutput()
+        {
+            var generatorType = AppDomain.CurrentDomain.GetAssemblies().Select(assembly => assembly.GetType("AbilityCatalogGenerator", false)).FirstOrDefault(type => type != null);
+            Assert.That(generatorType, Is.Not.Null, "The ability catalog generator must be loaded in the EditMode domain.");
+            var generate = generatorType.GetMethod("Generate", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(string) }, null);
+            Assert.That(generate, Is.Not.Null, "The generator must expose a path-scoped implementation for source validation tests.");
+
+            var evidenceDirectory = Path.Combine(UnityEngine.Application.dataPath, "..", ".superpowers", "sdd", "2026-07-26-mainline-jelly-summon", "evidence", "task2", "fix-round-1", "generator-negative");
+            var sourceDirectory = Path.Combine(evidenceDirectory, "source");
+            var outputDirectory = Path.Combine(evidenceDirectory, "output");
+            Directory.CreateDirectory(sourceDirectory);
+            Directory.CreateDirectory(outputDirectory);
+            var sourcePath = Path.Combine(sourceDirectory, "unknown-summon.json");
+            var outputPath = Path.Combine(outputDirectory, "ability-catalog.json");
+            File.WriteAllText(sourcePath, "{\"schemaVersion\":\"ability-source-v1\",\"abilityId\":\"UNKNOWN_SUMMON\",\"displayNameZhHans\":\"\",\"descriptionZhHans\":\"\",\"activationKind\":\"Timed\",\"silencePolicy\":\"Unaffected\",\"skillPoints\":{\"initial\":0,\"required\":1,\"generation\":\"Automatic\"},\"effects\":[{\"kind\":\"Summon\",\"summonTypeId\":\"does-not-exist\",\"count\":1,\"spawnArea\":{\"shape\":\"Square\",\"center\":\"CasterPosition\",\"sideLengthMetres\":1.0},\"inheritPathFromCaster\":false}]}");
+            File.WriteAllText(outputPath, "must-not-change");
+
+            var exception = Assert.Throws<TargetInvocationException>(() => generate.Invoke(null, new object[] { sourceDirectory, outputPath }));
+
+            StringAssert.Contains("ABILITY_CATALOG_SOURCE_SUMMON_TYPE_UNKNOWN", exception.InnerException.Message);
+            Assert.That(File.ReadAllText(outputPath), Is.EqualTo("must-not-change"));
+        }
+
+        [Test]
         public void Coordinates_UseOneBasedNineByFourAndNineByEightBounds()
         {
             Assert.IsTrue(FormationCoordinate.TryCreate(1, 1, out _));

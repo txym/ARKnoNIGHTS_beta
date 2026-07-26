@@ -82,7 +82,10 @@ namespace ArknoNights.Battle.Tests
         {
             var sealerType = typeof(PreparationBattleSealer).Assembly.GetType("ArknoNights.Round.FourPlayerBattleRoundSealer");
             Assert.That(sealerType, Is.Not.Null, "UI-009 requires a pure four-player round sealer.");
-            var method = sealerType.GetMethod("TrySealRound", BindingFlags.Public | BindingFlags.Static);
+            var method = sealerType.GetMethod("TrySealRound", BindingFlags.Public | BindingFlags.Static, null, new[]
+            {
+                typeof(LocalMatchState), typeof(UnitCatalog), typeof(int), typeof(string), typeof(FourPlayerBattleRoundSealResult).MakeByRefType(), typeof(string).MakeByRefType()
+            }, null);
             Assert.That(method, Is.Not.Null, "UI-009 requires a public TrySealRound entry point.");
             var arguments = new object[] { match, catalog, 12000, roundId, null, string.Empty };
 
