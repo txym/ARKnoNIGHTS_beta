@@ -161,7 +161,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(create.Find("LogoRight"), Is.Null);
             Assert.That(create.Find("CreateFrame").GetComponent<Graphic>(), Is.Null);
             Assert.That(create.Find("Wings").GetComponent<Graphic>(), Is.Null);
-            var expectedWingTint = new Color(.35f, .65f, .58f, .65f);
+            var expectedWingTint = new Color(.35f, .65f, .58f, .45f);
             foreach (var wing in create.Find("Wings").GetComponentsInChildren<UnityEngine.UI.Image>())
             {
                 Assert.That(wing.color, Is.EqualTo(expectedWingTint), wing.name);

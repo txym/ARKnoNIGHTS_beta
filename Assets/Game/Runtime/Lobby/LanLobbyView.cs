@@ -325,7 +325,7 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var wings = Rect("Wings", parent);
         Stretch(wings);
-        var wingTint = new Color(.35f, .65f, .58f, .65f);
+        var wingTint = new Color(.35f, .65f, .58f, .45f);
         CreateOrientedDecorationSprite("WingLeftUpper", wings, "Home/img_pointer", 330f, 86f, 108f, 108f * 23f / 324f, 162f, true, wingTint);
         CreateOrientedDecorationSprite("WingLeftLower", wings, "Home/img_pointer", 330f, 147f, 108f, 108f * 23f / 324f, 198f, true, wingTint);
         CreateOrientedDecorationSprite("WingRightUpper", wings, "Home/img_pointer", 603f, 86f, 108f, 108f * 23f / 324f, 18f, true, wingTint);
