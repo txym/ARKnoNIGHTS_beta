@@ -74,6 +74,8 @@ namespace ArknoNights.Lobby.Tests
                     Assert.That(spriteSource.spriteName, Is.Not.Null.And.Not.Empty);
                     Assert.That(spriteSource.sourcePath, Is.Not.Null.And.Not.Empty);
                 }
+                Assert.That(captureRecord.codeNativeGeometry.Any(geometry => geometry.name == "LanLobbyRoot/OpaqueBlocker"), Is.True,
+                    captureRecord.name + " must report the visible non-bitmap OpaqueBlocker.");
             }
 
             var discovered = parsed.captures.Single(record => record.name == "discovered-prefill");
@@ -93,8 +95,8 @@ namespace ArknoNights.Lobby.Tests
                 "The Home capture manifest must prove it rendered an approved Combined avatar source.");
             Assert.That(home.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.False,
                 "The Home provenance table must exclude inactive legacy foreground sprites.");
-            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(5),
-                "The Home manifest must report the five rendered non-bitmap frame lines separately from sprite provenance.");
+            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(6),
+                "The Home manifest must report every active non-bitmap Image: OpaqueBlocker plus five frame lines.");
             foreach (var geometry in home.codeNativeGeometry)
             {
                 Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
@@ -104,11 +106,24 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry.width, Is.GreaterThan(0f));
                 Assert.That(geometry.height, Is.GreaterThan(0f));
             }
-            CollectionAssert.AreEquivalent(new[] { "PanelFrame/Top", "PanelFrame/Bottom", "PanelFrame/Left", "PanelFrame/Right", "PanelFrame/Divider" },
+            CollectionAssert.AreEquivalent(new[]
+                {
+                    "LanLobbyRoot/OpaqueBlocker",
+                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Top",
+                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Bottom",
+                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Left",
+                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Right",
+                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Divider"
+                },
                 home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
             var roomHost = parsed.captures.Single(record => record.name == "room-host");
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");
+            Assert.That(roomHost.codeNativeGeometry.Select(geometry => geometry.name), Is.EquivalentTo(new[] { "LanLobbyRoot/OpaqueBlocker" }),
+                "Room must report the visible blocker but no Home-only frame geometry.");
+            foreach (var room in parsed.captures.Where(record => record.name.StartsWith("room-", StringComparison.Ordinal)))
+                Assert.That(room.codeNativeGeometry.Any(geometry => geometry.name.Contains("PanelFrame")), Is.False,
+                    room.name + " must not report inactive Home-only frame geometry.");
         }
 
         [Test]

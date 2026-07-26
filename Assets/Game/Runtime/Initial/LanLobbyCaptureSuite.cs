@@ -193,18 +193,17 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
 
     private CodeNativeGeometry[] CodeNativeGeometries()
     {
-        var frame = view.transform.Find("LanLobbyRoot/Home/RoomSelect/PanelFrame");
-        if (frame == null || !frame.gameObject.activeInHierarchy) return Array.Empty<CodeNativeGeometry>();
-
-        return frame.GetComponentsInChildren<Image>(false)
-            .Where(image => image.sprite == null)
+        return view.GetComponentsInChildren<Image>(false)
+            // Sprite-backed images are audited in spriteSources. Fully transparent Images are hit targets,
+            // not rendered geometry, so they must not inflate this actual-visual-provenance table.
+            .Where(image => image.isActiveAndEnabled && image.sprite == null && image.color.a > 0f)
             .Select(image =>
             {
                 var corners = new Vector3[4];
                 image.rectTransform.GetWorldCorners(corners);
                 return new CodeNativeGeometry
                 {
-                    name = "PanelFrame/" + image.name,
+                    name = HierarchyPath(image.transform, view.transform),
                     kind = "code-native-geometry",
                     isBitmap = false,
                     color = "#" + ColorUtility.ToHtmlStringRGBA(image.color),
@@ -216,6 +215,15 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             })
             .OrderBy(value => value.name, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static string HierarchyPath(Transform value, Transform root)
+    {
+        var names = new List<string>();
+        for (var current = value; current != null && current != root; current = current.parent)
+            names.Add(current.name);
+        names.Reverse();
+        return string.Join("/", names);
     }
 
     private static bool TryGetApprovedSource(string spriteName, out string source)
