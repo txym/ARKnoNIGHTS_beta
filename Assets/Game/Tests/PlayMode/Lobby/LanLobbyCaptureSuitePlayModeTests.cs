@@ -131,6 +131,15 @@ namespace ArknoNights.Lobby.Tests
                 "The Home provenance table must exclude inactive legacy foreground sprites.");
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
                 "Home must count both rendered join_icon instances.");
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.EqualTo(2));
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_left_line"), Is.EqualTo(2));
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_dot"), Is.EqualTo(5));
+            Assert.That(home.spriteSources
+                    .Where(sprite => sprite.spriteName.StartsWith("room_select_create_", StringComparison.Ordinal)
+                        || sprite.spriteName == "room_select_dot"
+                        || sprite.spriteName == "room_select_img_startroom")
+                    .All(sprite => sprite.sourcePath.StartsWith("[uc]autochessouter/", StringComparison.Ordinal)
+                        && !sprite.sourcePath.Contains("$0")), Is.True);
             Assert.That(discovered.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
                 "Discovered Home must count both rendered join_icon instances.");
             Assert.That(parsed.captures.Sum(record => record.spriteSources.Count(sprite => sprite.spriteName == "join_icon")), Is.EqualTo(4),

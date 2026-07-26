@@ -71,7 +71,7 @@ namespace ArknoNights.Lobby.Tests
                 "The legacy shallow_main HUD overlay must not be stretched over the room-select Home.");
             AssertMappedRoomSelectSprites(home);
             Assert.That(join.Find("MiddleBlockMask"), Is.Null, "The source mask is a compositor mask, not a visible Home Image.");
-            Assert.That(ChildrenWithPrefix(create, "Line_").Count, Is.EqualTo(2));
+            Assert.That(ChildrenWithPrefix(create, "Line").Count, Is.EqualTo(2));
             Assert.That(ChildrenWithPrefix(join, "LeftBlock_").Count, Is.EqualTo(2));
             Assert.That(ChildrenWithPrefix(join, "MiddleBlock_").Count, Is.EqualTo(4));
             Assert.That(ChildrenWithPrefix(join, "RightBlock_").Count, Is.EqualTo(2));
@@ -112,7 +112,7 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
-        public IEnumerator HomeRoomSelect_ActionBarsUseMeasuredRectsStretchSpritesAndOwnCreateInput()
+        public IEnumerator HomeRoomSelect_CreateDecorationUsesMeasuredRepeatedSpritesBehindFrozenAction()
         {
             var home = view.transform.Find("LanLobbyRoot/Home");
             var layout = global::LanLobbyLayout.ForSize(1920, 1080, 4);
@@ -125,6 +125,21 @@ namespace ArknoNights.Lobby.Tests
             var joinActionRect = joinAction.GetComponent<RectTransform>();
             var createActionImage = createAction.GetComponent<UnityEngine.UI.Image>();
             var joinActionImage = joinAction.GetComponent<UnityEngine.UI.Image>();
+            var expected = new[]
+            {
+                new DecorationExpectation("LogoLeft", "room_select_create_logo", 272f, 30f, 107f, 135f, 180f, false),
+                new DecorationExpectation("LogoRight", "room_select_create_logo", 539f, 30f, 109f, 133f, 0f, false),
+                new DecorationExpectation("DotTopLeft", "room_select_dot", 381f, 21f, 19f, 19f, 0f, true),
+                new DecorationExpectation("DotTopRight", "room_select_dot", 516f, 21f, 19f, 19f, 0f, true),
+                new DecorationExpectation("DotBottomLeft", "room_select_dot", 381f, 157f, 19f, 19f, 0f, true),
+                new DecorationExpectation("DotBottomRight", "room_select_dot", 516f, 157f, 19f, 19f, 0f, true),
+                new DecorationExpectation("LineLeft", "room_select_create_left_line", 393f, 54f, 20f, 20f * 40f / 12f, 0f, true),
+                new DecorationExpectation("LineRight", "room_select_create_left_line", 506f, 54f, 20f, 20f * 40f / 12f, 180f, true),
+                new DecorationExpectation("MiddleIcon", "room_select_create_middleicon", 415f, 44f, 89f, 89f * 62f / 63f, 0f, true),
+                new DecorationExpectation("Text01", "room_select_create_text_01", 415f, 137f, 89f, 89f * 9f / 63f, 0f, true),
+                new DecorationExpectation("Text02", "room_select_create_text_02", 428f, 151f, 66f, 66f * 5f / 46f, 0f, true),
+                new DecorationExpectation("StartRoomDecoration", "room_select_img_startroom", 416f, 16f, 87f, 87f * 8f / 64f, 0f, true)
+            };
 
             Assert.That(create.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
             Assert.That(join.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
@@ -134,7 +149,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(join.anchoredPosition.x, Is.EqualTo(layout.RoomSelectJoin.Left));
             Assert.That(background.preserveAspect, Is.True);
             Assert.That(Aspect(background.rectTransform), Is.EqualTo(Aspect(background.sprite)).Within(.01f));
-            AssertActionRect(createActionRect, create, layout.RoomSelectCreateAction, 2f);
+            AssertActionRect(createActionRect, create, layout.RoomSelectCreateAction, .05f);
             AssertActionRect(joinActionRect, join, layout.RoomSelectJoinAction, 2f);
             Assert.That(createActionImage.preserveAspect, Is.False);
             Assert.That(joinActionImage.preserveAspect, Is.False);
@@ -147,10 +162,8 @@ namespace ArknoNights.Lobby.Tests
             var joinLabel = joinAction.Find("Label").GetComponent<UnityEngine.UI.Text>();
             Assert.That(createLabel.text, Is.EqualTo("创建同盟"));
             Assert.That(joinLabel.text, Is.EqualTo("加入同盟"));
-            Assert.That(createLabel.rectTransform.offsetMin.x, Is.EqualTo(108f).Within(.05f));
-            Assert.That(createLabel.rectTransform.offsetMin.y, Is.EqualTo(5f).Within(.05f));
-            Assert.That(createLabel.rectTransform.offsetMax.x, Is.EqualTo(-220f).Within(.05f));
-            Assert.That(createLabel.rectTransform.offsetMax.y, Is.EqualTo(5f).Within(.05f));
+            Assert.That(createLabel.rectTransform.offsetMin, Is.EqualTo(new Vector2(108f, 5f)));
+            Assert.That(createLabel.rectTransform.offsetMax, Is.EqualTo(new Vector2(-220f, 5f)));
             Assert.That(joinLabel.rectTransform.offsetMin.x, Is.EqualTo(103f).Within(.05f));
             Assert.That(joinLabel.rectTransform.offsetMin.y, Is.EqualTo(2f).Within(.05f));
             Assert.That(joinLabel.rectTransform.offsetMax.x, Is.EqualTo(-220f).Within(.05f));
@@ -165,6 +178,20 @@ namespace ArknoNights.Lobby.Tests
             view.CreateRequested += () => createRequests++;
             createAction.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             Assert.That(createRequests, Is.EqualTo(1));
+
+            foreach (var item in expected)
+            {
+                var decoration = create.Find(item.Name);
+                Assert.That(decoration, Is.Not.Null, item.Name);
+                var image = decoration.GetComponent<Image>();
+                Assert.That(image, Is.Not.Null, item.Name);
+                AssertTopLeftRect(image.rectTransform, item.Left, item.Top, item.Width, item.Height, .05f);
+                Assert.That(image.sprite.name, Is.EqualTo(item.SpriteName));
+                Assert.That(Mathf.DeltaAngle(image.rectTransform.localEulerAngles.z, item.Rotation), Is.EqualTo(0f).Within(.05f));
+                Assert.That(image.preserveAspect, Is.EqualTo(item.PreserveAspect));
+                Assert.That(image.raycastTarget, Is.False);
+                Assert.That(image.transform.GetSiblingIndex(), Is.LessThan(createAction.GetSiblingIndex()));
+            }
             yield return null;
         }
 
@@ -357,6 +384,38 @@ namespace ArknoNights.Lobby.Tests
             joinRequests++;
         }
 
+        private sealed class DecorationExpectation
+        {
+            public DecorationExpectation(
+                string name,
+                string spriteName,
+                float left,
+                float top,
+                float width,
+                float height,
+                float rotation,
+                bool preserveAspect)
+            {
+                Name = name;
+                SpriteName = spriteName;
+                Left = left;
+                Top = top;
+                Width = width;
+                Height = height;
+                Rotation = rotation;
+                PreserveAspect = preserveAspect;
+            }
+
+            public string Name { get; }
+            public string SpriteName { get; }
+            public float Left { get; }
+            public float Top { get; }
+            public float Width { get; }
+            public float Height { get; }
+            public float Rotation { get; }
+            public bool PreserveAspect { get; }
+        }
+
         private static void AssertMappedRoomSelectSprites(Transform home)
         {
             var expected = new Dictionary<string, string>
@@ -364,9 +423,14 @@ namespace ArknoNights.Lobby.Tests
                 { "RoomSelect/RightBackground", "room_select_right_bg" },
                 { "RoomSelect/TitleIcon", "room_select_title_icon" },
                 { "RoomSelect/TitleDot", "room_select_dot" },
-                { "RoomSelect/Create/Line_0", "room_select_create_left_line" },
-                { "RoomSelect/Create/Line_1", "room_select_create_left_line" },
-                { "RoomSelect/Create/Logo", "room_select_create_logo" },
+                { "RoomSelect/Create/LogoLeft", "room_select_create_logo" },
+                { "RoomSelect/Create/LogoRight", "room_select_create_logo" },
+                { "RoomSelect/Create/DotTopLeft", "room_select_dot" },
+                { "RoomSelect/Create/DotTopRight", "room_select_dot" },
+                { "RoomSelect/Create/DotBottomLeft", "room_select_dot" },
+                { "RoomSelect/Create/DotBottomRight", "room_select_dot" },
+                { "RoomSelect/Create/LineLeft", "room_select_create_left_line" },
+                { "RoomSelect/Create/LineRight", "room_select_create_left_line" },
                 { "RoomSelect/Create/MiddleIcon", "room_select_create_middleicon" },
                 { "RoomSelect/Create/Text01", "room_select_create_text_01" },
                 { "RoomSelect/Create/Text02", "room_select_create_text_02" },
@@ -403,7 +467,10 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(image, Is.Not.Null, item.Key);
                 Assert.That(image.sprite, Is.Not.Null, item.Key);
                 Assert.That(image.sprite.name, Is.EqualTo(item.Value), item.Key);
-                if (item.Key != "RoomSelect/Create/CreateAction" && item.Key != "RoomSelect/Join/JoinAction")
+                if (item.Key != "RoomSelect/Create/CreateAction"
+                    && item.Key != "RoomSelect/Join/JoinAction"
+                    && item.Key != "RoomSelect/Create/LogoLeft"
+                    && item.Key != "RoomSelect/Create/LogoRight")
                 {
                     Assert.That(image.preserveAspect, Is.True, item.Key);
                 }

@@ -322,20 +322,27 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void BuildCreateSection(RectTransform parent, LanLobbyRect actionRect)
     {
-        var firstLine = Image("Line_0", parent, "Home/room_select_create_left_line");
-        PositionSprite(firstLine, new Vector2(.18f, .62f), 24f);
-        var secondLine = Image("Line_1", parent, "Home/room_select_create_left_line");
-        PositionSprite(secondLine, new Vector2(.62f, .62f), 24f);
-        var logo = Image("Logo", parent, "Home/room_select_create_logo");
-        PositionSprite(logo, new Vector2(.5f, .33f), 172f);
-        var middle = Image("MiddleIcon", parent, "Home/room_select_create_middleicon");
-        PositionSprite(middle, new Vector2(.5f, .63f), 126f);
-        var text01 = Image("Text01", parent, "Home/room_select_create_text_01");
-        PositionSprite(text01, new Vector2(.5f, .25f), 126f);
-        var text02 = Image("Text02", parent, "Home/room_select_create_text_02");
-        PositionSprite(text02, new Vector2(.5f, .19f), 92f);
-        var startRoom = Image("StartRoomDecoration", parent, "Home/room_select_img_startroom");
-        PositionSprite(startRoom, new Vector2(.5f, .88f), 128f);
+        var logoLeft = Image("LogoLeft", parent, "Home/room_select_create_logo");
+        PositionTopLeft(logoLeft.rectTransform, 272f, 30f, 107f, 135f);
+        logoLeft.preserveAspect = false;
+        logoLeft.raycastTarget = false;
+        logoLeft.rectTransform.localEulerAngles = new Vector3(0f, 0f, 180f);
+
+        var logoRight = Image("LogoRight", parent, "Home/room_select_create_logo");
+        PositionTopLeft(logoRight.rectTransform, 539f, 30f, 109f, 133f);
+        logoRight.preserveAspect = false;
+        logoRight.raycastTarget = false;
+
+        CreateDecorationSprite("DotTopLeft", parent, "Home/room_select_dot", 381f, 21f, 19f, 0f);
+        CreateDecorationSprite("DotTopRight", parent, "Home/room_select_dot", 516f, 21f, 19f, 0f);
+        CreateDecorationSprite("DotBottomLeft", parent, "Home/room_select_dot", 381f, 157f, 19f, 0f);
+        CreateDecorationSprite("DotBottomRight", parent, "Home/room_select_dot", 516f, 157f, 19f, 0f);
+        CreateDecorationSprite("LineLeft", parent, "Home/room_select_create_left_line", 393f, 54f, 20f, 0f);
+        CreateDecorationSprite("LineRight", parent, "Home/room_select_create_left_line", 506f, 54f, 20f, 180f);
+        CreateDecorationSprite("MiddleIcon", parent, "Home/room_select_create_middleicon", 415f, 44f, 89f, 0f);
+        CreateDecorationSprite("Text01", parent, "Home/room_select_create_text_01", 415f, 137f, 89f, 0f);
+        CreateDecorationSprite("Text02", parent, "Home/room_select_create_text_02", 428f, 151f, 66f, 0f);
+        CreateDecorationSprite("StartRoomDecoration", parent, "Home/room_select_img_startroom", 416f, 16f, 87f, 0f);
         var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
         PositionBottomLeft(create.GetComponent<RectTransform>(), actionRect);
         create.GetComponent<Image>().preserveAspect = false;
@@ -679,6 +686,30 @@ public sealed class LanLobbyView : MonoBehaviour
         rect.anchoredPosition = new Vector2(left, -top);
         rect.sizeDelta = new Vector2(width, width * sprite.rect.height / sprite.rect.width);
         value.preserveAspect = true;
+    }
+
+    private static Image CreateDecorationSprite(
+        string name,
+        Transform parent,
+        string resource,
+        float left,
+        float top,
+        float width,
+        float rotation)
+    {
+        var image = Image(name, parent, resource);
+        PositionSpriteTopLeft(image, left, top, width);
+        image.rectTransform.localEulerAngles = new Vector3(0f, 0f, rotation);
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static void PositionTopLeft(RectTransform value, float left, float top, float width, float height)
+    {
+        value.anchorMin = value.anchorMax = new Vector2(0f, 1f);
+        value.pivot = new Vector2(0f, 1f);
+        value.anchoredPosition = new Vector2(left, -top);
+        value.sizeDelta = new Vector2(width, height);
     }
 
     private static Image FrameLine(string name, Transform parent, Vector2 anchor, Vector2 size)
