@@ -21,8 +21,33 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 public class LanLobbyVisualDiffMetric { public long ComparedPixels; public long DifferentPixels; public long ErrorSum; }
 public class LanLobbyVisualBounds { public int X; public int Y; public int Width; public int Height; }
+public sealed class FrameContinuity {
+    public int QualifyingPixelCount { get; set; }
+    public int CoveredAxisPixels { get; set; }
+    public int AxisLength { get; set; }
+    public double CoverageRatio { get; set; }
+    public int LargestGapPixels { get; set; }
+}
 public static class LanLobbyVisualDiff {
+    sealed class CyanComponent {
+        public int Count;
+        public int MinX;
+        public int MinY;
+        public int MaxX;
+        public int MaxY;
+    }
     static bool Inside(Rectangle r, int x, int y) { return x >= r.X && y >= r.Y && x < r.Right && y < r.Bottom; }
+    static void ValidateSearch(Bitmap bitmap, Rectangle search) {
+        if (bitmap == null) throw new ArgumentNullException("bitmap");
+        if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height ||
+            search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
+    }
+    static bool IsCyan(Color pixel, int minimumGreen, int minimumGreenOverRed, int minimumBlueOverRed) {
+        return pixel.A > 0 &&
+            pixel.G >= minimumGreen &&
+            pixel.G >= pixel.R + minimumGreenOverRed &&
+            pixel.B >= pixel.R + minimumBlueOverRed;
+    }
     public static LanLobbyVisualBounds FindDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
         if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height || search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
@@ -61,6 +86,116 @@ public static class LanLobbyVisualDiff {
         if (maxX < minX || maxY < minY)
             throw new InvalidOperationException("No cyan visible pixels found in search rectangle " + search + ".");
         return new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 };
+    }
+    public static Rectangle FindLargestCyanComponentsBounds(
+        Bitmap source,
+        Rectangle search,
+        int minimumGreen,
+        int minimumGreenOverRed,
+        int minimumBlueOverRed,
+        int componentCount,
+        int minimumComponentPixels)
+    {
+        ValidateSearch(source, search);
+        if (componentCount <= 0) throw new ArgumentOutOfRangeException("componentCount");
+        if (minimumComponentPixels <= 0) throw new ArgumentOutOfRangeException("minimumComponentPixels");
+        var qualifying = new bool[search.Width, search.Height];
+        for (int y=0; y<search.Height; y++)
+        for (int x=0; x<search.Width; x++)
+            qualifying[x,y] = IsCyan(source.GetPixel(search.X+x,search.Y+y), minimumGreen, minimumGreenOverRed, minimumBlueOverRed);
+
+        var components = new List<CyanComponent>();
+        var queue = new Queue<Point>();
+        for (int seedY=0; seedY<search.Height; seedY++)
+        for (int seedX=0; seedX<search.Width; seedX++)
+        {
+            if (!qualifying[seedX,seedY]) continue;
+            qualifying[seedX,seedY]=false;
+            queue.Enqueue(new Point(seedX,seedY));
+            var component = new CyanComponent { MinX=seedX, MinY=seedY, MaxX=seedX, MaxY=seedY };
+            while (queue.Count > 0)
+            {
+                Point point=queue.Dequeue();
+                component.Count++;
+                component.MinX=Math.Min(component.MinX,point.X);
+                component.MinY=Math.Min(component.MinY,point.Y);
+                component.MaxX=Math.Max(component.MaxX,point.X);
+                component.MaxY=Math.Max(component.MaxY,point.Y);
+                for (int dy=-1; dy<=1; dy++)
+                for (int dx=-1; dx<=1; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    int nextX=point.X+dx,nextY=point.Y+dy;
+                    if (nextX < 0 || nextY < 0 || nextX >= search.Width || nextY >= search.Height ||
+                        !qualifying[nextX,nextY]) continue;
+                    qualifying[nextX,nextY]=false;
+                    queue.Enqueue(new Point(nextX,nextY));
+                }
+            }
+            if (component.Count >= minimumComponentPixels) components.Add(component);
+        }
+        components.Sort(delegate(CyanComponent left, CyanComponent right) {
+            int byCount=right.Count.CompareTo(left.Count);
+            if (byCount != 0) return byCount;
+            int byY=left.MinY.CompareTo(right.MinY);
+            return byY != 0 ? byY : left.MinX.CompareTo(right.MinX);
+        });
+        if (components.Count < componentCount)
+            throw new InvalidOperationException(
+                "Found " + components.Count + " cyan components with at least " + minimumComponentPixels +
+                " pixels in search rectangle " + search + "; " + componentCount + " required.");
+
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1;
+        for (int i=0; i<componentCount; i++)
+        {
+            CyanComponent component=components[i];
+            minX=Math.Min(minX,search.X+component.MinX);
+            minY=Math.Min(minY,search.Y+component.MinY);
+            maxX=Math.Max(maxX,search.X+component.MaxX);
+            maxY=Math.Max(maxY,search.Y+component.MaxY);
+        }
+        return new Rectangle(minX,minY,maxX-minX+1,maxY-minY+1);
+    }
+    public static FrameContinuity MeasureCyanContinuity(
+        Bitmap source,
+        Rectangle search,
+        bool horizontal,
+        int minimumGreen,
+        int minimumGreenOverRed,
+        int minimumBlueOverRed)
+    {
+        ValidateSearch(source, search);
+        int axisLength=horizontal ? search.Width : search.Height;
+        var covered=new bool[axisLength];
+        int qualifyingPixelCount=0;
+        for (int y=search.Y; y<search.Bottom; y++)
+        for (int x=search.X; x<search.Right; x++)
+        {
+            if (!IsCyan(source.GetPixel(x,y), minimumGreen, minimumGreenOverRed, minimumBlueOverRed)) continue;
+            qualifyingPixelCount++;
+            covered[horizontal ? x-search.X : y-search.Y]=true;
+        }
+        int coveredAxisPixels=0,largestGapPixels=0,currentGap=0;
+        for (int i=0; i<axisLength; i++)
+        {
+            if (covered[i])
+            {
+                coveredAxisPixels++;
+                currentGap=0;
+            }
+            else
+            {
+                currentGap++;
+                largestGapPixels=Math.Max(largestGapPixels,currentGap);
+            }
+        }
+        return new FrameContinuity {
+            QualifyingPixelCount=qualifyingPixelCount,
+            CoveredAxisPixels=coveredAxisPixels,
+            AxisLength=axisLength,
+            CoverageRatio=(double)coveredAxisPixels/axisLength,
+            LargestGapPixels=largestGapPixels
+        };
     }
     public static LanLobbyVisualBounds FindCompactDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive, int minimumComponentPixels, double maximumAspectRatio) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
@@ -141,18 +276,30 @@ $homeCreateDecoration = @{
   reference=@{x=1419;y=268;width=427;height=191}
 }
 $createDecorationContentSpecs = @(
-  @{name='logo-left'; threshold=20; search=@{x=0;y=20;width=116;height=145}; expected=@{x=8;y=26;width=106;height=126}},
-  @{name='logo-right'; threshold=20; search=@{x=270;y=20;width=120;height=145}; expected=@{x=276;y=27;width=108;height=124}},
-  @{name='start-room'; threshold=35; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
-  @{name='dot-top-left'; threshold=35; search=@{x=116;y=15;width=24;height=27}; expected=@{x=118;y=18;width=17;height=17}},
-  @{name='dot-top-right'; threshold=35; search=@{x=249;y=15;width=24;height=27}; expected=@{x=253;y=19;width=17;height=16}},
-  @{name='middle-icon'; threshold=35; search=@{x=150;y=34;width=92;height=100}; expected=@{x=152;y=41;width=87;height=86}},
-  @{name='left-bracket'; threshold=35; search=@{x=124;y=50;width=28;height=75}; expected=@{x=130;y=58;width=18;height=54}},
-  @{name='right-bracket'; threshold=35; search=@{x=240;y=50;width=25;height=75}; expected=@{x=243;y=58;width=18;height=54}},
-  @{name='text-01'; threshold=35; search=@{x=145;y=128;width=100;height=19}; expected=@{x=152;y=134;width=88;height=13}},
-  @{name='text-02'; threshold=35; search=@{x=160;y=147;width=75;height=10}; expected=@{x=164;y=147;width=66;height=7}},
-  @{name='dot-bottom-left'; threshold=35; search=@{x=116;y=152;width=24;height=27}; expected=@{x=118;y=155;width=16;height=17}},
-  @{name='dot-bottom-right'; threshold=35; search=@{x=249;y=152;width=24;height=27}; expected=@{x=253;y=155;width=17;height=17}}
+  @{name='wing-left'; mode='two-largest-components'; threshold=20; greenOverRed=4; blueOverRed=3; componentCount=2; minimumComponentPixels=500; search=@{x=0;y=35;width=116;height=105}; expected=@{x=7;y=35;width=107;height=105}},
+  @{name='wing-right'; mode='two-largest-components'; threshold=20; greenOverRed=4; blueOverRed=3; componentCount=2; minimumComponentPixels=500; search=@{x=270;y=35;width=120;height=105}; expected=@{x=283;y=35;width=101;height=105}},
+  @{name='start-room'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
+  @{name='dot-top-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=116;y=15;width=24;height=27}; expected=@{x=118;y=18;width=17;height=17}},
+  @{name='dot-top-right'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=249;y=15;width=24;height=27}; expected=@{x=253;y=19;width=17;height=16}},
+  @{name='middle-icon'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=150;y=34;width=92;height=100}; expected=@{x=152;y=41;width=87;height=86}},
+  @{name='left-bracket'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=124;y=50;width=28;height=75}; expected=@{x=130;y=58;width=18;height=54}},
+  @{name='right-bracket'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=240;y=50;width=25;height=75}; expected=@{x=243;y=58;width=18;height=54}},
+  @{name='text-01'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=145;y=128;width=100;height=19}; expected=@{x=152;y=134;width=88;height=13}},
+  @{name='text-02'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=160;y=147;width=75;height=10}; expected=@{x=164;y=147;width=66;height=7}},
+  @{name='dot-bottom-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=116;y=152;width=24;height=27}; expected=@{x=118;y=155;width=16;height=17}},
+  @{name='dot-bottom-right'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=249;y=152;width=24;height=27}; expected=@{x=253;y=155;width=17;height=17}}
+)
+$homeCreateFrame = @{
+  name='home-create-frame'
+  approvedTarget=@{x=1154;y=224;width=717;height=374}
+  reference=@{x=1257;y=239;width=763;height=397}
+}
+$createFrameEdges = @(
+  @{name='top'; axis='x'; search=@{x=0;y=0;width=690;height=18}; minimumCoverage=.90; maximumGap=6},
+  @{name='bottom'; axis='x'; search=@{x=0;y=356;width=717;height=18}; minimumCoverage=.90; maximumGap=6},
+  @{name='left'; axis='y'; search=@{x=0;y=0;width=18;height=374}; minimumCoverage=.90; maximumGap=6},
+  @{name='right'; axis='y'; search=@{x=699;y=18;width=18;height=356}; minimumCoverage=.90; maximumGap=6},
+  @{name='top-right-chamfer'; axis='diagonal'; search=@{x=680;y=0;width=37;height=37}; minimumPixelCount=80}
 )
 $figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
@@ -426,6 +573,7 @@ $codeGeneratedGeometry = @($geometryOccurrences | Group-Object Name, Kind, IsBit
 $reportCaptures = @()
 $actionBarReports = @()
 $createDecorationReport = $null
+$createFrameReport = $null
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
@@ -599,8 +747,22 @@ try
         foreach ($contentSpec in $createDecorationContentSpecs)
         {
             $search = New-Object Drawing.Rectangle $contentSpec.search.x, $contentSpec.search.y, $contentSpec.search.width, $contentSpec.search.height
-            $actualBounds = [LanLobbyVisualDiff]::FindCyanBounds($actualCrop, $search, $contentSpec.threshold, 8, 5)
-            $referenceBounds = [LanLobbyVisualDiff]::FindCyanBounds($locallyResizedReferenceCrop, $search, $contentSpec.threshold, 8, 5)
+            if ($contentSpec.mode -eq 'two-largest-components')
+            {
+                $actualBounds = [LanLobbyVisualDiff]::FindLargestCyanComponentsBounds(
+                    $actualCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed,
+                    $contentSpec.componentCount, $contentSpec.minimumComponentPixels)
+                $referenceBounds = [LanLobbyVisualDiff]::FindLargestCyanComponentsBounds(
+                    $locallyResizedReferenceCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed,
+                    $contentSpec.componentCount, $contentSpec.minimumComponentPixels)
+            }
+            else
+            {
+                $actualBounds = [LanLobbyVisualDiff]::FindCyanBounds(
+                    $actualCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed)
+                $referenceBounds = [LanLobbyVisualDiff]::FindCyanBounds(
+                    $locallyResizedReferenceCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed)
+            }
             $expected = $contentSpec.expected
             $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
             $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
@@ -616,9 +778,12 @@ try
                 -and [Math]::Abs($heightDelta) -le 2
             $components += [pscustomobject][ordered]@{
                 name = $contentSpec.name
+                measurementMode = $contentSpec.mode
                 thresholdMinimumGreen = $contentSpec.threshold
-                minimumGreenOverRed = 8
-                minimumBlueOverRed = 5
+                minimumGreenOverRed = $contentSpec.greenOverRed
+                minimumBlueOverRed = $contentSpec.blueOverRed
+                componentCount = $(if ($contentSpec.mode -eq 'two-largest-components') { $contentSpec.componentCount } else { $null })
+                minimumComponentPixels = $(if ($contentSpec.mode -eq 'two-largest-components') { $contentSpec.minimumComponentPixels } else { $null })
                 expectedBounds = [ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
                 referenceBounds = ConvertTo-LanLobbyBoundsObject $referenceBounds
                 actualBounds = ConvertTo-LanLobbyBoundsObject $actualBounds
@@ -645,12 +810,92 @@ try
         $heatmap.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
     }
     finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
+    $actual = $null
+    $nativeReference = $null
+    $actualCrop = $null
+    $nativeReferenceCrop = $null
+    $locallyResizedReferenceCrop = $null
+    $overlay = $null
+    $heatmap = $null
+    try
+    {
+        $actual = [Drawing.Bitmap]::FromFile($homeCapture.path)
+        $nativeReference = [Drawing.Bitmap]::FromFile($referenceHome)
+        $actualSpec = $homeCreateFrame.approvedTarget
+        $actualRectangle = New-Object Drawing.Rectangle $actualSpec.x, $actualSpec.y, $actualSpec.width, $actualSpec.height
+        $scaledReference = Convert-ActionReferenceRectangle $homeCreateFrame.reference $nativeReference.Width $nativeReference.Height
+        $actualCrop = New-LanLobbyBitmapCrop $actual $actualRectangle
+        $nativeReferenceCrop = New-LanLobbyBitmapCrop $nativeReference $scaledReference
+        $locallyResizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualSpec.width $actualSpec.height ([Drawing.Drawing2D.InterpolationMode]::NearestNeighbor)
+        $overlay = New-LanLobbyActionOverlay $actualCrop $locallyResizedReferenceCrop
+        $heatmap = New-Object Drawing.Bitmap $actualCrop.Width, $actualCrop.Height
+        $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height
+        [long]$maskedPixels = 0
+        $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $locallyResizedReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
+        $edges = @()
+        foreach ($edgeSpec in $createFrameEdges)
+        {
+            $search = New-Object Drawing.Rectangle $edgeSpec.search.x, $edgeSpec.search.y, $edgeSpec.search.width, $edgeSpec.search.height
+            $horizontal = $edgeSpec.axis -ne 'y'
+            $actualContinuity = [LanLobbyVisualDiff]::MeasureCyanContinuity($actualCrop, $search, $horizontal, 12, 3, 2)
+            $referenceContinuity = [LanLobbyVisualDiff]::MeasureCyanContinuity($locallyResizedReferenceCrop, $search, $horizontal, 12, 3, 2)
+            $passed = if ($edgeSpec.axis -eq 'diagonal') {
+                $actualContinuity.QualifyingPixelCount -ge $edgeSpec.minimumPixelCount
+            } else {
+                $actualContinuity.CoverageRatio -ge $edgeSpec.minimumCoverage -and
+                    $actualContinuity.LargestGapPixels -le $edgeSpec.maximumGap
+            }
+            $edges += [pscustomobject][ordered]@{
+                name = $edgeSpec.name
+                axis = $edgeSpec.axis
+                search = [ordered]@{ x=$edgeSpec.search.x; y=$edgeSpec.search.y; width=$edgeSpec.search.width; height=$edgeSpec.search.height }
+                thresholdMinimumGreen = 12
+                minimumGreenOverRed = 3
+                minimumBlueOverRed = 2
+                minimumCoverage = $(if ($edgeSpec.axis -eq 'diagonal') { $null } else { $edgeSpec.minimumCoverage })
+                maximumGap = $(if ($edgeSpec.axis -eq 'diagonal') { $null } else { $edgeSpec.maximumGap })
+                minimumPixelCount = $(if ($edgeSpec.axis -eq 'diagonal') { $edgeSpec.minimumPixelCount } else { $null })
+                qualifyingPixelCount = $actualContinuity.QualifyingPixelCount
+                coveredAxisPixels = $actualContinuity.CoveredAxisPixels
+                axisLength = $actualContinuity.AxisLength
+                coverageRatio = $actualContinuity.CoverageRatio
+                largestGapPixels = $actualContinuity.LargestGapPixels
+                referenceMeasurement = [ordered]@{
+                    qualifyingPixelCount=$referenceContinuity.QualifyingPixelCount
+                    coveredAxisPixels=$referenceContinuity.CoveredAxisPixels
+                    axisLength=$referenceContinuity.AxisLength
+                    coverageRatio=$referenceContinuity.CoverageRatio
+                    largestGapPixels=$referenceContinuity.LargestGapPixels
+                }
+                passed = $passed
+            }
+        }
+        $createFrameReport = [pscustomobject][ordered]@{
+            name = $homeCreateFrame.name
+            capture = 'home'
+            actualRect = [ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$actualSpec.x; y=$actualSpec.y; width=$actualSpec.width; height=$actualSpec.height }
+            referenceRect = [ordered]@{ x=$scaledReference.X; y=$scaledReference.Y; width=$scaledReference.Width; height=$scaledReference.Height }
+            referenceMeasurementCanvas = [ordered]@{ width=$figure9MeasurementSize.width; height=$figure9MeasurementSize.height }
+            locallyResizedReferenceSizePx = [ordered]@{ unit='px'; width=$locallyResizedReferenceCrop.Width; height=$locallyResizedReferenceCrop.Height }
+            comparedPixels = $metric.ComparedPixels
+            pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
+            averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
+            edges = $edges
+            passed = @($edges | Where-Object { -not $_.passed }).Count -eq 0
+        }
+        $actualCrop.Save((Join-Path $stagingDirectory ($homeCreateFrame.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($homeCreateFrame.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $overlay.Save((Join-Path $stagingDirectory ($homeCreateFrame.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $heatmap.Save((Join-Path $stagingDirectory ($homeCreateFrame.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     $report = [ordered]@{
         generatedAtUtc=[DateTime]::UtcNow.ToString('o')
         referenceNormalization='independent-xy'
         captures=$reportCaptures
         actionBars=$actionBarReports
         createDecoration=$createDecorationReport
+        createFrame=$createFrameReport
         assets=$assets
         materialUsage=[ordered]@{
             bitmapSprites=$assets
@@ -675,10 +920,16 @@ try
             $markdown += "| $($item.name)/$($content.name) | $($content.expectedBounds.x),$($content.expectedBounds.y),$($content.expectedBounds.width),$($content.expectedBounds.height) | $($content.referenceBounds.x),$($content.referenceBounds.y),$($content.referenceBounds.width),$($content.referenceBounds.height) | $($content.actualBounds.x),$($content.actualBounds.y),$($content.actualBounds.width),$($content.actualBounds.height) | dx=$($content.centerDeviationPx.deltaX), dy=$($content.centerDeviationPx.deltaY) | dw=$($content.sizeDeviationPx.deltaWidth), dh=$($content.sizeDeviationPx.deltaHeight) | $($content.passed) |"
         }
     }
-    $markdown += @('', '## Home Create upper decoration', '', "Actual crop (1920×1080 top-left px): $($createDecorationReport.actualRect.x),$($createDecorationReport.actualRect.y),$($createDecorationReport.actualRect.width),$($createDecorationReport.actualRect.height). Native Figure 9 crop: $($createDecorationReport.referenceRect.x),$($createDecorationReport.referenceRect.y),$($createDecorationReport.referenceRect.width),$($createDecorationReport.referenceRect.height).", '', '| Component | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Passed |', '| --- | --- | --- | --- | --- | --- | --- |')
+    $markdown += @('', '## Home Create upper decoration', '', "Actual crop (1920×1080 top-left px): $($createDecorationReport.actualRect.x),$($createDecorationReport.actualRect.y),$($createDecorationReport.actualRect.width),$($createDecorationReport.actualRect.height). Native Figure 9 crop: $($createDecorationReport.referenceRect.x),$($createDecorationReport.referenceRect.y),$($createDecorationReport.referenceRect.width),$($createDecorationReport.referenceRect.height).", '', '| Component | Measurement mode | Cyan thresholds (G/G-R/B-R) | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($component in @($createDecorationReport.components))
     {
-        $markdown += "| $($component.name) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height) | $($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height) | dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY) | dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight) | $($component.passed) |"
+        $markdown += "| $($component.name) | $($component.measurementMode) | $($component.thresholdMinimumGreen)/$($component.minimumGreenOverRed)/$($component.minimumBlueOverRed) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height) | $($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height) | dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY) | dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight) | $($component.passed) |"
+    }
+    $markdown += @('', '## Home Create frame continuity', '', "Actual crop (1920×1080 top-left px): $($createFrameReport.actualRect.x),$($createFrameReport.actualRect.y),$($createFrameReport.actualRect.width),$($createFrameReport.actualRect.height). Native Figure 9 crop: $($createFrameReport.referenceRect.x),$($createFrameReport.referenceRect.y),$($createFrameReport.referenceRect.width),$($createFrameReport.referenceRect.height). Overall passed: $($createFrameReport.passed).", '', '| Edge | Axis | Search | Cyan thresholds (G/G-R/B-R) | Reference pixels/coverage/gap | Actual pixels/coverage/gap | Acceptance | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- |')
+    foreach ($edge in @($createFrameReport.edges))
+    {
+        $acceptance = if ($edge.axis -eq 'diagonal') { "pixels>=$($edge.minimumPixelCount)" } else { "coverage>=$($edge.minimumCoverage), gap<=$($edge.maximumGap)" }
+        $markdown += "| $($edge.name) | $($edge.axis) | $($edge.search.x),$($edge.search.y),$($edge.search.width),$($edge.search.height) | $($edge.thresholdMinimumGreen)/$($edge.minimumGreenOverRed)/$($edge.minimumBlueOverRed) | $($edge.referenceMeasurement.qualifyingPixelCount)/$([Math]::Round($edge.referenceMeasurement.coverageRatio, 4))/$($edge.referenceMeasurement.largestGapPixels) | $($edge.qualifyingPixelCount)/$([Math]::Round($edge.coverageRatio, 4))/$($edge.largestGapPixels) | $acceptance | $($edge.passed) |"
     }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
