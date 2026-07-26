@@ -61,6 +61,7 @@ namespace ArknoNights.Lobby.Tests
             StringAssert.Contains("\"localLatencyMilliseconds\"", manifest);
             StringAssert.Contains("\"rects\"", manifest);
             StringAssert.Contains("\"spriteSources\"", manifest);
+            StringAssert.Contains("\"codeNativeGeometry\"", manifest);
             StringAssert.Contains("[uc]autochessouter/", manifest);
 
             var parsed = JsonUtility.FromJson<CaptureManifestProbe>(manifest);
@@ -92,6 +93,19 @@ namespace ArknoNights.Lobby.Tests
                 "The Home capture manifest must prove it rendered an approved Combined avatar source.");
             Assert.That(home.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.False,
                 "The Home provenance table must exclude inactive legacy foreground sprites.");
+            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(5),
+                "The Home manifest must report the five rendered non-bitmap frame lines separately from sprite provenance.");
+            foreach (var geometry in home.codeNativeGeometry)
+            {
+                Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
+                Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
+                Assert.That(geometry.isBitmap, Is.False);
+                Assert.That(geometry.color, Is.Not.Null.And.Not.Empty);
+                Assert.That(geometry.width, Is.GreaterThan(0f));
+                Assert.That(geometry.height, Is.GreaterThan(0f));
+            }
+            CollectionAssert.AreEquivalent(new[] { "PanelFrame/Top", "PanelFrame/Bottom", "PanelFrame/Left", "PanelFrame/Right", "PanelFrame/Divider" },
+                home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
             var roomHost = parsed.captures.Single(record => record.name == "room-host");
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");
@@ -142,8 +156,9 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Serializable] private sealed class CaptureManifestProbe { public CaptureRecordProbe[] captures; }
-        [Serializable] private sealed class CaptureRecordProbe { public string name; public string roomCode; public CaptureMemberProbe[] members; public SpriteSourceProbe[] spriteSources; }
+        [Serializable] private sealed class CaptureRecordProbe { public string name; public string roomCode; public CaptureMemberProbe[] members; public SpriteSourceProbe[] spriteSources; public CodeNativeGeometryProbe[] codeNativeGeometry; }
         [Serializable] private sealed class CaptureMemberProbe { public string playerId; }
         [Serializable] private sealed class SpriteSourceProbe { public string spriteName; public string sourcePath; }
+        [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public float x; public float y; public float width; public float height; }
     }
 }

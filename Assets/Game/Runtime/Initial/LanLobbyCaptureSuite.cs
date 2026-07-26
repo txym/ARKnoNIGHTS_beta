@@ -156,7 +156,8 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             members = ToMembers(room),
             localLatencyMilliseconds = latency,
             rects = KeyRects(),
-            spriteSources = SpriteSources()
+            spriteSources = SpriteSources(),
+            codeNativeGeometry = CodeNativeGeometries()
         });
     }
 
@@ -188,6 +189,33 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             result[spriteName] = new SpriteSource { spriteName = spriteName, sourcePath = source };
         }
         return result.Values.OrderBy(value => value.spriteName, StringComparer.Ordinal).ToArray();
+    }
+
+    private CodeNativeGeometry[] CodeNativeGeometries()
+    {
+        var frame = view.transform.Find("LanLobbyRoot/Home/RoomSelect/PanelFrame");
+        if (frame == null || !frame.gameObject.activeInHierarchy) return Array.Empty<CodeNativeGeometry>();
+
+        return frame.GetComponentsInChildren<Image>(false)
+            .Where(image => image.sprite == null)
+            .Select(image =>
+            {
+                var corners = new Vector3[4];
+                image.rectTransform.GetWorldCorners(corners);
+                return new CodeNativeGeometry
+                {
+                    name = "PanelFrame/" + image.name,
+                    kind = "code-native-geometry",
+                    isBitmap = false,
+                    color = "#" + ColorUtility.ToHtmlStringRGBA(image.color),
+                    x = corners[0].x,
+                    y = corners[0].y,
+                    width = corners[2].x - corners[0].x,
+                    height = corners[2].y - corners[0].y
+                };
+            })
+            .OrderBy(value => value.name, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static bool TryGetApprovedSource(string spriteName, out string source)
@@ -367,10 +395,11 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     }
 
     [Serializable] private sealed class CaptureManifest { public CaptureRecord[] captures; }
-    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public float canvasScale; public string roomCode; public CaptureMember[] members; public long localLatencyMilliseconds; public CaptureRect[] rects; public SpriteSource[] spriteSources; }
+    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public float canvasScale; public string roomCode; public CaptureMember[] members; public long localLatencyMilliseconds; public CaptureRect[] rects; public SpriteSource[] spriteSources; public CodeNativeGeometry[] codeNativeGeometry; }
     [Serializable] private sealed class CaptureMember { public string playerId; public string displayName; public int avatarIndex; public bool isReady; public long latencyMilliseconds; }
     [Serializable] private sealed class CaptureRect { public string name; public float x; public float y; public float width; public float height; }
     [Serializable] private sealed class SpriteSource { public string spriteName; public string sourcePath; }
+    [Serializable] private sealed class CodeNativeGeometry { public string name; public string kind; public bool isBitmap; public string color; public float x; public float y; public float width; public float height; }
 }
 
 internal static class LanLobbyCaptureSuiteBootstrap
