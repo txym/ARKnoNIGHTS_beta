@@ -16,7 +16,7 @@
 - Missing/duplicate `图9.png` or `图10.png`, invalid manifest, unmapped sprite, invalid capture dimensions, or unsafe output path must fail before the requested output directory exists.
 - Outputs are allowed only under the verified Unity project root’s ignored `Temp/` or `Artifacts/` directories.
 - Existing `LanLobbyCaptureSuite`, `LanLobbyView`, battle HUD, scene, Prefab, protocol, and PlayerState behavior must not change for this feature.
-- Actual captures are `1920×1080`; reference native dimensions are recorded and `2048×1118` references are independently X/Y normalized for non-blocking layout/color reporting only.
+- Actual captures are `1920×1080`; each decoded reference's native dimensions are recorded before independent X/Y normalization for non-blocking layout/color reporting only. Current real evidence is `图9.png` `2102×1149` and `图10.png` `2107×1153`.
 
 ---
 
@@ -193,7 +193,7 @@ git commit -m "feat: report LAN lobby visual differences"
 **Interfaces:**
 
 - Consumes Task 2’s script with `-CaptureDirectory`, `-OutputDirectory`, and `-ReferenceDirectory`.
-- Produces a real ignored evidence folder under `Temp/LAN-LOBBY/VisualDiff/` and documented user-facing interpretation.
+- Produces a real retained ignored evidence folder under `Artifacts/LAN-LOBBY/VisualDiff/` and documented user-facing interpretation.
 
 - [ ] **Step 1: Add a failing command-contract smoke assertion**
 
@@ -209,8 +209,8 @@ Document the command below, including the note that the primary working tree is 
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ExportLanLobbyVisualDiff.ps1 `
-  -CaptureDirectory .\Temp\LAN-LOBBY\CapturesFinal `
-  -OutputDirectory .\Temp\LAN-LOBBY\VisualDiff `
+  -CaptureDirectory .\Artifacts\LAN-LOBBY\CapturesFinal `
+  -OutputDirectory .\Artifacts\LAN-LOBBY\VisualDiff `
   -ReferenceDirectory 'G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud'
 ```
 
