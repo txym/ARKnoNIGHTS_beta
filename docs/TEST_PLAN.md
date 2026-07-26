@@ -549,6 +549,10 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 6. The smoke fixture includes detached thin dark strips and proves they do not enlarge icon bounds. `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, and `TestLanLobbyEvidenceCommonSmoke.ps1` must each print `PASS` and exit `0`.
 7. Material provenance remains capture-derived: `128` Sprite instances aggregate to `34` bitmap rows, `59` Text instances to `37` Unity Text rows, and code-generated geometry to `6` rows. `create_icon`, `join_icon`, and both action backgrounds use their registered non-`$0/#0` `[uc]autochessouter` sources; Create/Join labels remain `UnityEngine.UI.Text` with `hasBitmapSource=false`.
 8. Inspect `Calibration2/CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`. Both bars must remain unobstructed. Decoration outside the two bars remains outside this iteration’s acceptance and must not be described as fully reproduced.
+9. Fresh full-suite evidence is retained under `Artifacts/LAN-LOBBY/ActionContentVisualCenters/FullSuiteFinal-20260726-184300/`; the repository-wide suite is not green and must not be reported as passed:
+   - EditMode: total `118`, failed `2`, skipped `0`. The unchanged failures are `BattleCoreEditModeTests.Fixture_InvalidInputMatrixReturnsStructuredErrors` and `BattleCoreEditModeTests.RealCatalog_ParsesSourceValuesAndLoadsDeterministicallyFromResources`; the latter still expects an empty `displayNameZhHans` while unchanged source `gopro.json` contains `狂暴的猎狗pro`.
+   - PlayMode: total `39`, failed `1`, skipped `0`. The unchanged failure is `PreparationBattleLoopPlayModeTests.SampleScene_AutoLoopsPreparationToBattleAndBackWithoutWritingCombatResultToPlayerState`, which expected `Preparation` and observed `Battle`.
+   - These tests and their Battle/source-data inputs are outside this action-content diff. They block treating the whole branch as integration-ready but do not invalidate the focused `26/26`, successful Player build, or screenshot acceptance above.
 
 ## 32. UI-INFO-001 验证（2026-07-24）
 
