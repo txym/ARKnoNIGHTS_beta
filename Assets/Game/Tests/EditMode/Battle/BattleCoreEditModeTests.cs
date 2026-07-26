@@ -418,8 +418,6 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(first.Success, Errors(first.Errors));
             Assert.IsTrue(second.Success, Errors(second.Errors));
             Assert.AreEqual(first.Catalog.CanonicalSummary, second.Catalog.CanonicalSummary);
-            CollectionAssert.AreEqual(new[] { "1000", "5503" }, first.Catalog.Entries.Select(entry => entry.Definition.TypeId).ToArray());
-
             Assert.IsTrue(first.Catalog.TryGet("1000", out var gopro));
             Assert.AreEqual(190, gopro.Definition.MoveSpeedCentimetresPerSecond);
             Assert.AreEqual(28, gopro.Definition.AttackIntervalTicks);
@@ -438,6 +436,16 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("Attack", arcslma.AttackAnimation);
             Assert.AreEqual("Die", arcslma.DeathAnimation);
             Assert.IsFalse(arcslma.Definition.IsSyntheticFixtureData);
+
+            Assert.That(first.Catalog.Entries.Select(entry => entry.Definition.TypeId), Is.EqualTo(new[] { "1000", "5503", "5504" }));
+            Assert.That(first.Catalog.TryGet("5504", out var arcslmi), Is.True);
+            Assert.That(arcslmi.Definition.MaxHitPoints, Is.EqualTo(2500));
+            Assert.That(arcslmi.Definition.Attack, Is.EqualTo(290));
+            Assert.That(arcslmi.Definition.DamageType, Is.EqualTo(DamageType.Physical));
+            Assert.That(arcslmi.UnitSkelType, Is.EqualTo(2));
+            Assert.That(arcslmi.MoveAnimation, Is.EqualTo("Move"));
+            Assert.That(arcslmi.AttackAnimation, Is.EqualTo("Attack"));
+            Assert.That(arcslmi.DeathAnimation, Is.EqualTo("Die"));
 
             var sourceGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/gopro.json"));
             var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/arcslma.json"));
