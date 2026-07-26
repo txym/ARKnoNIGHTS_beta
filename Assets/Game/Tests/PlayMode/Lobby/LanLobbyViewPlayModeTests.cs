@@ -141,8 +141,22 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(createActionRect.sizeDelta, Is.EqualTo(joinActionRect.sizeDelta));
             Assert.That(createAction.Find("ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name, Is.EqualTo("create_icon"));
             Assert.That(joinAction.Find("ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name, Is.EqualTo("join_icon"));
-            Assert.That(createAction.Find("Label").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo("创建同盟"));
-            Assert.That(joinAction.Find("Label").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo("加入同盟"));
+            AssertTopLeftRect(createAction.Find("ActionIcon").GetComponent<RectTransform>(), 47f, 25f, 38f, 38f, .05f);
+            AssertTopLeftRect(joinAction.Find("ActionIcon").GetComponent<RectTransform>(), 45f, 19f, 47f, 47f * 41f / 36f, .05f);
+            var createLabel = createAction.Find("Label").GetComponent<UnityEngine.UI.Text>();
+            var joinLabel = joinAction.Find("Label").GetComponent<UnityEngine.UI.Text>();
+            Assert.That(createLabel.text, Is.EqualTo("创建同盟"));
+            Assert.That(joinLabel.text, Is.EqualTo("加入同盟"));
+            Assert.That(createLabel.rectTransform.offsetMin.x, Is.EqualTo(108f).Within(.05f));
+            Assert.That(createLabel.rectTransform.offsetMin.y, Is.EqualTo(5f).Within(.05f));
+            Assert.That(createLabel.rectTransform.offsetMax.x, Is.EqualTo(-220f).Within(.05f));
+            Assert.That(createLabel.rectTransform.offsetMax.y, Is.EqualTo(5f).Within(.05f));
+            Assert.That(joinLabel.rectTransform.offsetMin.x, Is.EqualTo(103f).Within(.05f));
+            Assert.That(joinLabel.rectTransform.offsetMin.y, Is.EqualTo(2f).Within(.05f));
+            Assert.That(joinLabel.rectTransform.offsetMax.x, Is.EqualTo(-220f).Within(.05f));
+            Assert.That(joinLabel.rectTransform.offsetMax.y, Is.EqualTo(2f).Within(.05f));
+            Assert.That(createLabel.fontSize, Is.EqualTo(38));
+            Assert.That(joinLabel.fontSize, Is.EqualTo(38));
             Assert.That(create.GetComponent<UnityEngine.UI.Button>(), Is.Null, "The whole decoration container must not replace the action-bar hit area.");
             Assert.That(createActionRect.GetSiblingIndex(), Is.EqualTo(create.childCount - 1));
             Assert.That(joinActionRect.GetSiblingIndex(), Is.EqualTo(join.childCount - 1));
@@ -402,6 +416,23 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(container.anchoredPosition.y + action.anchoredPosition.y, Is.EqualTo(expected.Bottom).Within(tolerance));
             Assert.That(action.sizeDelta.x, Is.EqualTo(expected.Width).Within(tolerance));
             Assert.That(action.sizeDelta.y, Is.EqualTo(expected.Height).Within(tolerance));
+        }
+
+        private static void AssertTopLeftRect(
+            RectTransform rect,
+            float left,
+            float top,
+            float width,
+            float height,
+            float tolerance)
+        {
+            Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(rect.anchorMax, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(rect.pivot, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(rect.anchoredPosition.x, Is.EqualTo(left).Within(tolerance));
+            Assert.That(rect.anchoredPosition.y, Is.EqualTo(-top).Within(tolerance));
+            Assert.That(rect.sizeDelta.x, Is.EqualTo(width).Within(tolerance));
+            Assert.That(rect.sizeDelta.y, Is.EqualTo(height).Within(tolerance));
         }
 
         private static Rect DesignRect(RectTransform target, RectTransform designRoot)

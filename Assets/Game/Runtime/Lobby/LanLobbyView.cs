@@ -340,12 +340,12 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionBottomLeft(create.GetComponent<RectTransform>(), actionRect);
         create.GetComponent<Image>().preserveAspect = false;
         var createIcon = Image("ActionIcon", create.transform, "create_icon");
-        PositionSprite(createIcon, new Vector2(.08f, .5f), 48f);
+        PositionSpriteTopLeft(createIcon, 47f, 25f, 38f);
         var createLabel = create.GetComponentInChildren<Text>();
         createLabel.color = new Color(.02f, .12f, .12f);
         createLabel.alignment = TextAnchor.MiddleLeft;
-        createLabel.rectTransform.offsetMin = new Vector2(112f, 0f);
-        createLabel.rectTransform.offsetMax = new Vector2(-220f, 0f);
+        createLabel.rectTransform.offsetMin = new Vector2(108f, 5f);
+        createLabel.rectTransform.offsetMax = new Vector2(-220f, 5f);
         createLabel.fontSize = 38;
         create.onClick.AddListener(() => CreateRequested?.Invoke());
     }
@@ -398,11 +398,11 @@ public sealed class LanLobbyView : MonoBehaviour
         var joinLabel = joinButton.GetComponentInChildren<Text>();
         joinLabel.color = new Color(.12f, .06f, .01f);
         joinLabel.alignment = TextAnchor.MiddleLeft;
-        joinLabel.rectTransform.offsetMin = new Vector2(112f, 0f);
-        joinLabel.rectTransform.offsetMax = new Vector2(-220f, 0f);
+        joinLabel.rectTransform.offsetMin = new Vector2(103f, 2f);
+        joinLabel.rectTransform.offsetMax = new Vector2(-220f, 2f);
         joinLabel.fontSize = 38;
         var joinIcon = Image("ActionIcon", joinButton.transform, "join_icon");
-        PositionSprite(joinIcon, new Vector2(.08f, .5f), 48f);
+        PositionSpriteTopLeft(joinIcon, 45f, 19f, 47f);
         joinButton.onClick.AddListener(RequestJoin);
     }
 
@@ -666,6 +666,18 @@ public sealed class LanLobbyView : MonoBehaviour
         if (sprite == null) throw new InvalidOperationException("Room-select sprite must be assigned before positioning.");
         var height = width * sprite.rect.height / sprite.rect.width;
         Position(value.rectTransform, anchor, new Vector2(width, height));
+        value.preserveAspect = true;
+    }
+
+    private static void PositionSpriteTopLeft(Image value, float left, float top, float width)
+    {
+        var sprite = value == null ? null : value.sprite;
+        if (sprite == null) throw new InvalidOperationException("Room-select sprite must be assigned before positioning.");
+        var rect = value.rectTransform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(left, -top);
+        rect.sizeDelta = new Vector2(width, width * sprite.rect.height / sprite.rect.width);
         value.preserveAspect = true;
     }
 
