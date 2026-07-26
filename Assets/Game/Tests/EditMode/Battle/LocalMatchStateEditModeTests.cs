@@ -110,6 +110,38 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void BulkFreeze_MixedOccupiedSlotsChangeAtomicallyAndEmptySlotsStayUnfrozen()
+        {
+            var state = Load();
+            Assert.IsTrue(state.TryToggleFrozen(0).Success);
+            Assert.IsTrue(state.TryPurchase(4).Success);
+            var changes = 0;
+            state.Changed += _ => changes++;
+            var result = state.TrySetOccupiedShopSlotsFrozen(true);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(1, changes);
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots.Take(4).All(slot => slot.IsFrozen));
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[4].IsEmpty);
+            Assert.IsFalse(result.Snapshot.LocalPlayer.ShopSlots[4].IsFrozen);
+        }
+
+        [Test]
+        public void BulkFreeze_AllOccupiedFrozenSlotsUnfreezeWithOneNotification()
+        {
+            var state = Load();
+            foreach (var slot in state.Snapshot.LocalPlayer.ShopSlots)
+                Assert.IsTrue(state.TryToggleFrozen(slot.ShopSlotId).Success);
+            var changes = 0;
+            state.Changed += _ => changes++;
+            var result = state.TrySetOccupiedShopSlotsFrozen(false);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(1, changes);
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots.All(slot => !slot.IsFrozen));
+        }
+
+        [Test]
         public void UpgradeReadyAndObservation_ChangeOnlyLocalSessionState()
         {
             var state = Load();

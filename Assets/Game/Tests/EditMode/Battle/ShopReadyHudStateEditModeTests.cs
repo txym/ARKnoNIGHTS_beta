@@ -4,6 +4,7 @@ using ArknoNights.Player;
 using ArknoNights.UI.FormalHud.ShopReady;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ArknoNights.Battle.Tests
 {
@@ -52,11 +53,10 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void RequestConfirmation_RequiresTheSameRefreshOrUpgradeActionTwice()
+        public void RequestConfirmation_RequiresTheSameUpgradeActionTwice()
         {
-            Assert.AreEqual(ShopReadyConfirmation.Refresh, ShopReadyHudState.RequestConfirmation(ShopReadyConfirmation.None, ShopReadyConfirmation.Refresh));
-            Assert.AreEqual(ShopReadyConfirmation.None, ShopReadyHudState.RequestConfirmation(ShopReadyConfirmation.Refresh, ShopReadyConfirmation.Refresh));
-            Assert.AreEqual(ShopReadyConfirmation.Upgrade, ShopReadyHudState.RequestConfirmation(ShopReadyConfirmation.Refresh, ShopReadyConfirmation.Upgrade));
+            Assert.AreEqual(ShopReadyConfirmation.Upgrade, ShopReadyHudState.RequestConfirmation(ShopReadyConfirmation.None, ShopReadyConfirmation.Upgrade));
+            Assert.AreEqual(ShopReadyConfirmation.None, ShopReadyHudState.RequestConfirmation(ShopReadyConfirmation.Upgrade, ShopReadyConfirmation.Upgrade));
         }
 
 
@@ -73,7 +73,7 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(pending.RequestPurchase(3));
             Assert.AreEqual(ShopReadyConfirmation.None, pending.Kind);
 
-            Assert.IsFalse(pending.RequestFixed(ShopReadyConfirmation.Refresh));
+            Assert.IsFalse(pending.RequestFixed(ShopReadyConfirmation.Upgrade));
             pending.Clear();
             Assert.AreEqual(ShopReadyConfirmation.None, pending.Kind);
         }
@@ -123,6 +123,65 @@ namespace ArknoNights.Battle.Tests
                 Assert.AreEqual(ShopReadyConfirmation.None, controller.State.PendingConfirmation);
                 Assert.AreEqual(1, match.Snapshot.LocalPlayer.Level);
                 Assert.AreEqual(1, match.Snapshot.LocalPlayer.Gold);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void Controller_FreezeButtonTogglesEveryOccupiedSlotWithOneStateChange()
+        {
+            var match = Load();
+            Assert.IsTrue(match.TryToggleFrozen(0).Success);
+            Assert.IsTrue(match.TryPurchase(4).Success);
+            var root = new GameObject("BulkShopFreezeTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+                controller.SetShopVisible(true);
+                var changes = 0;
+                match.Changed += _ => changes++;
+
+                root.transform.Find("ShopPanel/FreezeButton").GetComponent<Button>().onClick.Invoke();
+
+                Assert.AreEqual(1, changes);
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.Take(4).All(slot => slot.IsFrozen));
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots[4].IsEmpty);
+                Assert.IsFalse(match.Snapshot.LocalPlayer.ShopSlots[4].IsFrozen);
+
+                changes = 0;
+                root.transform.Find("ShopPanel/FreezeButton").GetComponent<Button>().onClick.Invoke();
+
+                Assert.AreEqual(1, changes);
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.All(slot => !slot.IsFrozen));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void Controller_RefreshExecutesOnFirstClickWithoutPendingConfirmation()
+        {
+            var match = Load();
+            var root = new GameObject("ImmediateShopRefreshTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+                var before = match.Snapshot;
+
+                controller.RequestRefresh();
+
+                Assert.AreEqual(before.LocalPlayer.Gold - LocalMatchState.RefreshCost, match.Snapshot.LocalPlayer.Gold);
+                CollectionAssert.AreEqual(
+                    new[] { "5503", "5503", "5503", "5503", "5503" },
+                    match.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
+                Assert.AreEqual(ShopReadyConfirmation.None, controller.State.PendingConfirmation);
             }
             finally
             {

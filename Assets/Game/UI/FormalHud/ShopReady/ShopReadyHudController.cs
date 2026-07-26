@@ -111,7 +111,6 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         public void RequestRefresh()
         {
             if (!preparationPhase || match == null || state == null || state.Gold < RefreshCost) return;
-            if (!EnsureConfirmation(ShopReadyConfirmation.Refresh)) return;
             Complete(match.TryRefresh());
         }
 
@@ -147,20 +146,18 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             Complete(match.TryToggleFrozen(shopSlotId));
         }
 
+        public void ToggleAllFrozen()
+        {
+            if (!preparationPhase || match == null || state == null) return;
+            var occupied = state.Slots.Where(slot => !slot.IsEmpty).ToArray();
+            if (occupied.Length == 0) return;
+            var freeze = occupied.Any(slot => !slot.IsFrozen);
+            Complete(match.TrySetOccupiedShopSlotsFrozen(freeze));
+        }
+
         public void ToggleReady()
         {
             if (preparationPhase && match != null) Complete(match.TryToggleReady());
-        }
-
-        private void ToggleFocusedFrozen()
-        {
-            if (state == null) return;
-            var selected = state.Slots.FirstOrDefault(slot =>
-                slot.ShopSlotId == pendingCommand.ShopSlotId && slot.CanToggleFrozen);
-            var target = selected
-                ?? state.Slots.FirstOrDefault(slot => slot.IsFrozen && slot.CanToggleFrozen)
-                ?? state.Slots.FirstOrDefault(slot => slot.CanToggleFrozen);
-            if (target != null) ToggleFrozen(target.ShopSlotId);
         }
 
         private void OnDestroy()
@@ -225,12 +222,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             for (var index = 0; index < state.Slots.Count; index++)
                 BindSlot(slotWidgets[index], state.Slots[index]);
 
-            var frozenTarget = state.Slots.FirstOrDefault(slot =>
-                slot.ShopSlotId == pendingCommand.ShopSlotId && slot.CanToggleFrozen)
-                ?? state.Slots.FirstOrDefault(slot => slot.IsFrozen && slot.CanToggleFrozen)
-                ?? state.Slots.FirstOrDefault(slot => slot.CanToggleFrozen);
-            freezeButton.interactable = frozenTarget != null;
-            var unfreezing = frozenTarget != null && frozenTarget.IsFrozen;
+            var occupiedSlots = state.Slots.Where(slot => !slot.IsEmpty).ToArray();
+            freezeButton.interactable = occupiedSlots.Length > 0;
+            var unfreezing = occupiedSlots.Length > 0 && occupiedSlots.All(slot => slot.IsFrozen);
             freezeBackground.sprite = FormalHudSpriteLoader.Load(
                 unfreezing ? "UI/Texture/shop/frozen_bg_unselect" : "UI/Texture/shop/frozen_bg_normal");
             freezeIcon.sprite = FormalHudSpriteLoader.Load(
@@ -269,7 +263,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             upgradeLevelText = Label("Level", upgradeRoot, 42, TextAnchor.MiddleCenter, Color.white);
             upgradeCostText = Label("Cost", upgradeRoot, 18, TextAnchor.MiddleCenter, new Color(1f, .82f, .08f));
 
-            var freezeRoot = ButtonRoot("FreezeButton", shopPanel, ToggleFocusedFrozen, out freezeButton);
+            var freezeRoot = ButtonRoot("FreezeButton", shopPanel, ToggleAllFrozen, out freezeButton);
             freezeBackground = Image("Background", freezeRoot, "UI/Texture/shop/frozen_bg_normal");
             Stretch(freezeBackground.rectTransform);
             freezeIcon = Image("Icon", freezeRoot, "UI/Texture/shop/frozen_icon");

@@ -75,7 +75,7 @@ public sealed class BattleHudCaptureRunner : MonoBehaviour
 
         shop.Purchase(0);
         yield return CaptureOne("05_shop_purchase_confirmation");
-        shop.ToggleFrozen(1);
+        shop.ToggleAllFrozen();
         yield return CaptureOne("06_shop_frozen");
         shop.Purchase(0);
         shop.Purchase(0);

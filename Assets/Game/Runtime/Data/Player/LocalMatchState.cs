@@ -256,6 +256,20 @@ namespace ArknoNights.Player
             return Result(LocalMatchOperationCode.Success);
         }
 
+        public LocalMatchOperationResult TrySetOccupiedShopSlotsFrozen(bool frozen)
+        {
+            var changed = false;
+            foreach (var slot in shopSlots)
+            {
+                if (slot.IsEmpty || slot.IsFrozen == frozen) continue;
+                slot.IsFrozen = frozen;
+                changed = true;
+            }
+
+            if (changed) NotifyChanged();
+            return Result(LocalMatchOperationCode.Success);
+        }
+
         public LocalMatchOperationResult TryUpgrade()
         {
             if (level >= MaximumLevel) return Result(LocalMatchOperationCode.MaximumLevelReached);

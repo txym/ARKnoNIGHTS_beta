@@ -9,7 +9,6 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     public enum ShopReadyConfirmation
     {
         None,
-        Refresh,
         Purchase,
         Upgrade
     }
@@ -36,7 +35,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         public bool RequestFixed(ShopReadyConfirmation requested)
         {
-            if (requested != ShopReadyConfirmation.Refresh && requested != ShopReadyConfirmation.Upgrade)
+            if (requested != ShopReadyConfirmation.Upgrade)
                 throw new ArgumentOutOfRangeException(nameof(requested));
             if (Kind == requested)
             {
