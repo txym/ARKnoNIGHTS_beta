@@ -156,6 +156,7 @@ namespace ArknoNights.Battle.Core
         public const string SupportedSchemaVersion = "battle-fixture-v1";
         public const string LocalBattleSchemaVersion = "local-battle-v1";
         public const int TicksPerSecond = 20;
+        public const int AutomaticSkillPointsPerSecond = 2;
         public string SchemaVersion { get; }
         public string BattleId { get; }
         public int MaxTicks { get; }

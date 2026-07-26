@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -599,7 +600,10 @@ namespace ArknoNights.Battle.Tests
                 Assert.IsTrue(result.IsResolved);
                 Assert.AreEqual(BattleStopReason.Victory, result.StopReason);
                 Assert.AreEqual(BattleSide.Away, result.Winner);
-                Assert.AreEqual(7, result.FinalUnits.Count);
+                var initialDeployedCount = loaded.Input.Players.SelectMany(player => player.Units).Count(unit => unit.Zone == UnitZone.Deployed);
+                var dynamicSpawnCount = result.Events.Count(item => item.Type == BattleEventType.Spawn && item.SpawnSnapshot.IsDynamicallyGenerated);
+                Assert.That(dynamicSpawnCount, Is.GreaterThan(0));
+                Assert.AreEqual(initialDeployedCount + dynamicSpawnCount, result.FinalUnits.Count);
             }
         }
 
@@ -637,18 +641,44 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void RealBattle_BlockedAwayArcslmaAttacksItsGoproBlocker()
+        public void RealBattle_ArcslmaRuntimeBlockerHasAuthoritativeSnapshotAndCleanup()
         {
             var loaded = LocalBattleLoader.LoadFromResources(CatalogPath, RealBattlePath);
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
             var result = new BattleRunner(loaded.Input).RunToCompletion();
             const string arcslmaUnitId = "away-5503-alpha";
             var block = result.Events.First(item =>
-                item.Type == BattleEventType.BlockStarted &&
-                (item.UnitId == arcslmaUnitId || item.RelatedUnitId == arcslmaUnitId));
+                item.Type == BattleEventType.BlockStarted
+                && (item.UnitId == arcslmaUnitId || item.RelatedUnitId == arcslmaUnitId));
+            var blockerId = block.UnitId == arcslmaUnitId ? block.RelatedUnitId : block.UnitId;
+
+            Assert.That(result.TryGetUnitSnapshot(blockerId, out var blockerSnapshot), Is.True);
+            Assert.That(blockerSnapshot.Side, Is.Not.EqualTo(BattleSide.Away));
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.BlockEnded
+                && ((item.UnitId == arcslmaUnitId && item.RelatedUnitId == blockerId)
+                    || (item.UnitId == blockerId && item.RelatedUnitId == arcslmaUnitId))
+                && item.Tick >= block.Tick));
+        }
+
+        [Test]
+        public void NoAbilityDefinitions_RealBattlePreservesArcslmaGoproBlockingRegression()
+        {
+            var loaded = LocalBattleLoader.LoadFromResources(CatalogPath, RealBattlePath);
+            Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
+            var result = new BattleRunner(WithoutAbilities(loaded.Input)).RunToCompletion();
+            const string arcslmaUnitId = "away-5503-alpha";
+            var initialGoproIds = loaded.Input.Players.SelectMany(player => player.Units)
+                .Where(item => item.TypeId == "1000")
+                .Select(item => item.UnitId)
+                .ToArray();
+            var block = result.Events.First(item =>
+                item.Type == BattleEventType.BlockStarted
+                && (item.UnitId == arcslmaUnitId || item.RelatedUnitId == arcslmaUnitId)
+                && (initialGoproIds.Contains(item.UnitId) || initialGoproIds.Contains(item.RelatedUnitId)));
             var goproBlockerId = block.UnitId == arcslmaUnitId ? block.RelatedUnitId : block.UnitId;
 
-            Assert.That(loaded.Input.Players.SelectMany(player => player.Units), Has.Some.Matches<UnitSnapshot>(item => item.UnitId == goproBlockerId && item.TypeId == "1000"));
+            Assert.That(initialGoproIds, Does.Contain(goproBlockerId));
             Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.Attack &&
                 item.UnitId == arcslmaUnitId &&
@@ -857,19 +887,246 @@ namespace ArknoNights.Battle.Tests
             Assert.Throws<InvalidOperationException>(() => allocator.Allocate());
         }
 
+        [Test]
+        public void AutomaticAbility_CastsThreeSummonsAtTicks100And250AfterSpendingPrivateSkillPoints()
+        {
+            var input = CreateJellySummonInput("ability-cadence", 260);
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            var dynamicSpawns = result.Events.Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504").ToArray();
+            Assert.That(dynamicSpawns.Select(item => item.Tick), Is.EqualTo(new[] { 100, 100, 100, 250, 250, 250 }));
+            Assert.That(dynamicSpawns.GroupBy(item => item.Tick).Select(group => group.Count()), Is.EqualTo(new[] { 3, 3 }));
+            Assert.That(dynamicSpawns, Has.None.Matches<BattleEvent>(item => item.Tick < 100 || item.Tick > 100 && item.Tick < 250));
+        }
+
+        [Test]
+        public void AutomaticAbility_MultipleCastersKeepIndependentSkillPointAndCastState()
+        {
+            var caster = DefinitionWithAbility("5503", "SUMMON_JELLY_MINIONS", 0, 100000, 1, 1000, 1, 1);
+            var input = CreateInput(
+                "private-ability-state",
+                100,
+                new[] { caster, Definition("5504", 0, 1000, 1, 1000, 1, 1), Definition("enemy", 0, 100000, 1, 1000, 1, 1) },
+                new[] { JellySummonAbility() },
+                new[] { Unit("caster-a", "5503", 3, 2), Unit("caster-b", "5503", 5, 2) },
+                new[] { Unit("enemy", "enemy", 4, 2) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var dynamicSpawns = result.Events.Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504").ToArray();
+
+            Assert.That(dynamicSpawns, Has.None.Matches<BattleEvent>(item => item.Tick < 100));
+            Assert.That(dynamicSpawns.Count(item => item.Tick == 100), Is.EqualTo(6));
+            Assert.That(dynamicSpawns.Select(item => item.UnitId), Is.EqualTo(new[] { "-1", "-2", "-3", "-4", "-5", "-6" }));
+        }
+
+        [Test]
+        public void DynamicSummons_HaveDeterministicCanonicalIdsBoundedPositionsAndImmutableIndexedSnapshots()
+        {
+            var input = CreateJellySummonInput("dynamic-snapshot-contract", 101);
+
+            var first = new BattleRunner(input).RunToCompletion();
+            var second = new BattleRunner(input).RunToCompletion();
+            var firstSpawns = first.Events.Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504").ToArray();
+            var secondSpawns = second.Events.Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504").ToArray();
+            var casterPosition = first.Events.Single(item => item.Type == BattleEventType.Spawn && item.UnitId == "caster").ToPosition.Value;
+
+            Assert.That(firstSpawns.Select(item => item.UnitId), Is.EqualTo(new[] { "-1", "-2", "-3" }));
+            Assert.That(secondSpawns.Select(item => item.UnitId), Is.EqualTo(new[] { "-1", "-2", "-3" }));
+            Assert.That(firstSpawns.Select(SpawnDigest), Is.EqualTo(secondSpawns.Select(SpawnDigest)));
+            Assert.That(first.StableSummary, Is.EqualTo(second.StableSummary));
+
+            var snapshotsProperty = typeof(BattleRunResult).GetProperty("UnitSnapshots");
+            Assert.NotNull(snapshotsProperty, "BattleRunResult must expose the immutable instance snapshot index.");
+            var snapshots = snapshotsProperty.GetValue(first) as IReadOnlyDictionary<string, BattleUnitInstanceSnapshot>;
+            Assert.NotNull(snapshots);
+            Assert.That(snapshots.Count, Is.EqualTo(5));
+            foreach (var spawn in firstSpawns)
+            {
+                Assert.That(spawn.ToPosition.HasValue, Is.True);
+                var offsetX = spawn.ToPosition.Value.XUnits - casterPosition.XUnits;
+                var offsetY = spawn.ToPosition.Value.YUnits - casterPosition.YUnits;
+                Assert.That(offsetX, Is.InRange(-50, 50));
+                Assert.That(offsetY, Is.InRange(-50, 50));
+                Assert.That(spawn.SpawnSnapshot, Is.Not.Null);
+                Assert.That(spawn.SpawnSnapshot.UnitId, Is.EqualTo(spawn.UnitId));
+                Assert.That(spawn.SpawnSnapshot.TypeId, Is.EqualTo(spawn.UnitTypeId));
+                Assert.That(spawn.SpawnSnapshot.Side, Is.EqualTo(spawn.UnitSide));
+                Assert.That(spawn.SpawnSnapshot.Position, Is.EqualTo(spawn.ToPosition.Value));
+                Assert.That(spawn.SpawnSnapshot.IsDynamicallyGenerated, Is.True);
+                Assert.That(snapshots[spawn.UnitId], Is.SameAs(spawn.SpawnSnapshot));
+                var activationTick = typeof(BattleUnitInstanceSnapshot).GetProperty("ActivationTick");
+                Assert.NotNull(activationTick, "Spawn snapshots must retain their activation boundary.");
+                Assert.That(activationTick.GetValue(spawn.SpawnSnapshot), Is.EqualTo(101));
+            }
+
+            Assert.Throws<NotSupportedException>(() =>
+                ((IDictionary<string, BattleUnitInstanceSnapshot>)snapshots).Add("unexpected", firstSpawns[0].SpawnSnapshot));
+        }
+
+        [Test]
+        public void DynamicSummons_WaitOneTickThenAcquireFreshNormalTargets()
+        {
+            var input = CreateJellySummonInput("activation-and-retarget", 102);
+            var runner = new BattleRunner(input);
+            for (var tick = 0; tick < 100; tick++) runner.Step();
+
+            var dynamicUnits = runner.RuntimeUnits.Where(item => item.TypeId == "5504").OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray();
+            Assert.That(dynamicUnits.Length, Is.EqualTo(3));
+            Assert.That(dynamicUnits, Has.All.Matches<RuntimeUnitState>(item => item.TargetUnitId == null && item.BlockedUnitIds.Count == 0));
+            Assert.That(runner.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Tick == 100
+                && item.UnitId != null
+                && item.UnitId.StartsWith("-", StringComparison.Ordinal)
+                && (item.Type == BattleEventType.TargetChanged
+                    || item.Type == BattleEventType.Move
+                    || item.Type == BattleEventType.BlockStarted
+                    || item.Type == BattleEventType.Attack)));
+
+            runner.Step();
+
+            foreach (var unit in dynamicUnits)
+            {
+                var firstTarget = runner.Events.First(item => item.Type == BattleEventType.TargetChanged && item.UnitId == unit.UnitId);
+                Assert.That(firstTarget.Tick, Is.EqualTo(101));
+                Assert.That(firstTarget.RelatedUnitId, Is.EqualTo("enemy"));
+                Assert.That(unit.TargetUnitId, Is.EqualTo("enemy"));
+            }
+        }
+
+        [Test]
+        public void TerminalTick_FinishesDeathCleanupAndBattleEndWithoutRecoveringOrCasting()
+        {
+            var caster = DefinitionWithAbility("5503", "SUMMON_JELLY_MINIONS", 0, 100, 1, 200, 99, 1);
+            var minion = Definition("5504", 0, 100, 1, 200, 1, 1);
+            var executioner = Definition("enemy", 2000, 1000, 1000, 200, 99, 1);
+            var ability = JellySummonAbility();
+            var input = CreateInput(
+                "terminal-cadence",
+                120,
+                new[] { caster, minion, executioner },
+                new[] { ability },
+                new[] { Unit("caster", "5503", 4, 4) },
+                new[] { Unit("enemy", "enemy", 6, 4) });
+            var controlInput = CreateInput(
+                "nonterminal-cadence-control",
+                100,
+                new[] { caster, minion, Definition("enemy", 2000, 1000, 1, 200, 99, 1) },
+                new[] { ability },
+                new[] { Unit("caster", "5503", 4, 4) },
+                new[] { Unit("enemy", "enemy", 6, 4) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var control = new BattleRunner(controlInput).RunToCompletion();
+
+            var tick100 = result.Events.Where(item => item.Tick == 100).ToArray();
+            Assert.That(control.Events.Count(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504" && item.Tick == 100), Is.EqualTo(3),
+                "The non-terminal control must cast at the same cadence boundary.");
+            Assert.That(tick100, Has.Some.Matches<BattleEvent>(item => item.Type == BattleEventType.Death && item.UnitId == "caster"));
+            Assert.That(tick100, Has.Some.Matches<BattleEvent>(item => item.Type == BattleEventType.BlockEnded));
+            Assert.That(tick100, Has.Some.Matches<BattleEvent>(item => item.Type == BattleEventType.TargetChanged && item.UnitId == "enemy" && item.RelatedUnitId == null));
+            Assert.That(tick100.Last().Type, Is.EqualTo(BattleEventType.BattleEnded));
+            Assert.That(tick100.Where(item => item.Type == BattleEventType.Death || item.Type == BattleEventType.BlockEnded || item.Type == BattleEventType.TargetChanged)
+                .All(item => item.Sequence < tick100.Last().Sequence), Is.True);
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504"));
+            Assert.That(result.FinalUnits, Has.None.Matches<BattleUnitFinalState>(item => item.UnitId.StartsWith("-", StringComparison.Ordinal)));
+            Assert.That(result.StopReason, Is.EqualTo(BattleStopReason.Victory));
+            Assert.That(result.Winner, Is.EqualTo(BattleSide.Away));
+        }
+
+        [Test]
+        public void NoAbilityDefinitions_PreserveLegacyFixtureWithoutDynamicUnits()
+        {
+            var input = CreateInput(
+                20,
+                new[] { Definition("unit", 0) },
+                new[] { Unit("home", "unit", 4, 2) },
+                new[] { Unit("away", "unit", 4, 2) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            Assert.That(result.FinalUnits.Count, Is.EqualTo(2));
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.Spawn && item.UnitId.StartsWith("-", StringComparison.Ordinal)));
+        }
+
         private static UnitDefinition Definition(string typeId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1, int tauntLevel = 0)
             => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true);
+
+        private static UnitDefinition DefinitionWithAbility(string typeId, string abilityId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1)
+            => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, 0, true, new[] { abilityId });
 
         private static UnitSnapshot Unit(string id, string typeId, int x, int y)
             => new UnitSnapshot(id, typeId, UnitZone.Deployed, new FormationCoordinate(x, y), Array.Empty<BuffPlaceholder>());
 
-        private static BattleInput CreateInput(int maxTicks, UnitDefinition[] definitions, UnitSnapshot[] homeUnits, UnitSnapshot[] awayUnits)
+        private static AbilityDefinition JellySummonAbility()
+            => new AbilityDefinition(
+                "SUMMON_JELLY_MINIONS",
+                string.Empty,
+                "每隔一段时间，分裂出三个果冻。",
+                AbilityActivationKind.Timed,
+                SilencePolicy.Unaffected,
+                5,
+                15,
+                SkillPointGeneration.Automatic,
+                new SummonEffectDefinition("5504", 3, 100, false));
+
+        private static BattleInput CreateJellySummonInput(string battleId, int maxTicks)
         {
-            var specification = new BattleInputSpecification(BattleInput.SupportedSchemaVersion, "test-battle", maxTicks, definitions,
+            return CreateInput(
+                battleId,
+                maxTicks,
+                new[]
+                {
+                    DefinitionWithAbility("5503", "SUMMON_JELLY_MINIONS", 0, 100000, 1, 1000, 1, 1),
+                    Definition("5504", 0, 1000, 1, 1000, 1, 1),
+                    Definition("enemy", 0, 100000, 1, 1000, 1, 1)
+                },
+                new[] { JellySummonAbility() },
+                new[] { Unit("caster", "5503", 4, 2) },
+                new[] { Unit("enemy", "enemy", 4, 2) });
+        }
+
+        private static BattleInput WithoutAbilities(BattleInput source)
+        {
+            var definitions = source.UnitDefinitions.Select(item => new UnitDefinition(
+                item.TypeId,
+                item.MaxHitPoints,
+                item.Attack,
+                item.Defense,
+                item.MagicResistance,
+                item.MoveSpeedCentimetresPerSecond,
+                item.AttackIntervalTicks,
+                item.AttackAnimationDurationTicks,
+                item.DamageType,
+                item.AttackMethod,
+                item.BlockCapacity,
+                item.TauntLevel,
+                item.IsSyntheticFixtureData,
+                Array.Empty<string>())).ToArray();
+            var specification = new BattleInputSpecification(
+                source.SchemaVersion,
+                source.BattleId + "-without-abilities",
+                source.MaxTicks,
+                definitions,
+                source.Players);
+            Assert.That(BattleInputFactory.TryCreate(specification, out var input, out var errors), Is.True, Errors(errors));
+            return input;
+        }
+
+        private static BattleInput CreateInput(int maxTicks, UnitDefinition[] definitions, UnitSnapshot[] homeUnits, UnitSnapshot[] awayUnits)
+            => CreateInput("test-battle", maxTicks, definitions, Array.Empty<AbilityDefinition>(), homeUnits, awayUnits);
+
+        private static BattleInput CreateInput(string battleId, int maxTicks, UnitDefinition[] definitions, AbilityDefinition[] abilities, UnitSnapshot[] homeUnits, UnitSnapshot[] awayUnits)
+        {
+            var specification = new BattleInputSpecification(BattleInput.SupportedSchemaVersion, battleId, maxTicks, definitions, abilities,
                 new[] { new PlayerSnapshot("home", BattleSide.Home, homeUnits), new PlayerSnapshot("away", BattleSide.Away, awayUnits) });
             Assert.IsTrue(BattleInputFactory.TryCreate(specification, out var input, out var errors), string.Join(";", errors.Select(item => item.ToString())));
             return input;
         }
+
+        private static string SpawnDigest(BattleEvent item)
+            => item.UnitId + ":" + item.Tick + ":" + item.ToPosition.Value.XUnits + ":" + item.ToPosition.Value.YUnits;
 
         private static string EventSummary(BattleEvent item) => item.Type + "," + item.Tick + "," + item.Sequence + "," + item.UnitId + "," + item.RelatedUnitId + "," + item.DamageAmount + "," + item.HitPointsBefore + "," + item.HitPointsAfter + "," + item.PlannedDamageTick + "," + item.OriginalAnimationTicks + "," + item.EffectiveAnimationTicks + "," + item.Winner + "," + item.Reason;
 

@@ -9,21 +9,100 @@ namespace ArknoNights.Battle.Core
     public enum BattleRunnerStatus { Ready, Running, Stopped }
     public enum BattleStopReason { None, Victory, MutualAnnihilation, MaxTicksReached, UnsupportedBlockingContention }
 
+    public sealed class RuntimeAbilityState
+    {
+        private int currentSkillPoints;
+        private int castCount;
+
+        internal RuntimeAbilityState(AbilityDefinition definition)
+        {
+            Definition = definition ?? throw new ArgumentNullException(nameof(definition));
+            currentSkillPoints = definition.InitialSkillPoints;
+        }
+
+        public AbilityDefinition Definition { get; }
+
+        internal bool RecoverAndTryCast(out int castOrdinal)
+        {
+            currentSkillPoints++;
+            if (currentSkillPoints < Definition.RequiredSkillPoints)
+            {
+                castOrdinal = 0;
+                return false;
+            }
+
+            currentSkillPoints -= Definition.RequiredSkillPoints;
+            castCount++;
+            castOrdinal = castCount;
+            return true;
+        }
+
+        internal void AppendStableSummary(StringBuilder builder)
+        {
+            builder.Append(',').Append(Definition.AbilityId).Append(':').Append(currentSkillPoints).Append(':').Append(castCount);
+        }
+    }
+
     public sealed class RuntimeUnitState
     {
         private readonly List<string> blockedUnitIds = new List<string>();
+        private readonly List<RuntimeAbilityState> abilityStates;
 
-        internal RuntimeUnitState(string unitId, string playerId, BattleSide side, UnitDefinition definition, UnitSnapshot source, BattlefieldCoordinate coordinate)
+        internal RuntimeUnitState(
+            string unitId,
+            string playerId,
+            BattleSide side,
+            UnitDefinition definition,
+            UnitSnapshot source,
+            BattlefieldCoordinate coordinate)
+            : this(unitId, playerId, side, definition, source, coordinate, Enumerable.Empty<RuntimeAbilityState>())
+        {
+        }
+
+        internal RuntimeUnitState(
+            string unitId,
+            string playerId,
+            BattleSide side,
+            UnitDefinition definition,
+            UnitSnapshot source,
+            BattlefieldCoordinate coordinate,
+            IEnumerable<RuntimeAbilityState> abilities)
+            : this(
+                unitId,
+                playerId,
+                side,
+                definition,
+                FixedPosition.FromCell(coordinate),
+                source.EliteLevel,
+                source.Buffs,
+                0,
+                abilities)
+        {
+        }
+
+        internal RuntimeUnitState(
+            string unitId,
+            string playerId,
+            BattleSide side,
+            UnitDefinition definition,
+            FixedPosition position,
+            int eliteLevel,
+            IEnumerable<BuffPlaceholder> buffs,
+            int activationTick,
+            IEnumerable<RuntimeAbilityState> abilities)
         {
             UnitId = unitId;
             PlayerId = playerId;
             Side = side;
             TypeId = definition.TypeId;
             CurrentHitPoints = definition.MaxHitPoints;
-            Position = FixedPosition.FromCell(coordinate);
+            Position = position;
             Definition = definition;
-            EliteLevel = source.EliteLevel;
-            Buffs = source.Buffs;
+            EliteLevel = eliteLevel;
+            Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
+            ActivationTick = activationTick;
+            abilityStates = (abilities ?? Enumerable.Empty<RuntimeAbilityState>()).OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal).ToList();
+            AbilityStates = new ReadOnlyCollection<RuntimeAbilityState>(abilityStates);
             BlockedUnitIds = new ReadOnlyCollection<string>(blockedUnitIds);
         }
 
@@ -33,6 +112,7 @@ namespace ArknoNights.Battle.Core
         public string TypeId { get; }
         public int EliteLevel { get; }
         public IReadOnlyList<BuffPlaceholder> Buffs { get; }
+        public int ActivationTick { get; }
         public int CurrentHitPoints { get; internal set; }
         public FixedPosition Position { get; internal set; }
         public bool IsAlive { get; internal set; } = true;
@@ -45,6 +125,7 @@ namespace ArknoNights.Battle.Core
         internal int MoveXNumeratorRemainder { get; set; }
         internal int MoveYNumeratorRemainder { get; set; }
         internal UnitDefinition Definition { get; }
+        internal IReadOnlyList<RuntimeAbilityState> AbilityStates { get; }
         internal bool HasBlockingCapacity => blockedUnitIds.Count < Definition.BlockCapacity;
         internal bool IsBlocked => blockedUnitIds.Count != 0;
         internal bool HasBlockWith(string unitId) => blockedUnitIds.Contains(unitId);
@@ -92,6 +173,25 @@ namespace ArknoNights.Battle.Core
     public sealed class BattleRunResult
     {
         internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, string stableSummary)
+            : this(
+                battleId,
+                homePlayerId,
+                awayPlayerId,
+                inputCanonicalSummary,
+                knownUnitTypeIds,
+                completedTicks,
+                stopReason,
+                winner,
+                trace,
+                events,
+                finalUnits,
+                new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
+                    new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal)),
+                stableSummary)
+        {
+        }
+
+        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> unitSnapshots, string stableSummary)
         {
             BattleId = battleId;
             HomePlayerId = homePlayerId;
@@ -104,6 +204,7 @@ namespace ArknoNights.Battle.Core
             Trace = trace;
             Events = events;
             FinalUnits = finalUnits;
+            UnitSnapshots = unitSnapshots;
             StableSummary = stableSummary;
         }
 
@@ -119,27 +220,47 @@ namespace ArknoNights.Battle.Core
         public IReadOnlyList<BattleStepTrace> Trace { get; }
         public IReadOnlyList<BattleEvent> Events { get; }
         public IReadOnlyList<BattleUnitFinalState> FinalUnits { get; }
+        public IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> UnitSnapshots { get; }
         public string StableSummary { get; }
+
+        public bool TryGetUnitSnapshot(string unitId, out BattleUnitInstanceSnapshot snapshot)
+        {
+            return UnitSnapshots.TryGetValue(unitId, out snapshot);
+        }
     }
 
     /// <summary>Explicit, deterministic tick driver. TASK-003 will add combat stages inside RunAuthoritativeTick.</summary>
     public sealed class BattleRunner
     {
+        private const int AutomaticSkillPointGainIntervalTicks = BattleInput.TicksPerSecond / BattleInput.AutomaticSkillPointsPerSecond;
         private readonly List<RuntimeUnitState> runtimeUnits;
         private readonly List<BattleStepTrace> trace = new List<BattleStepTrace>();
         private readonly List<BattleEvent> events = new List<BattleEvent>();
         private readonly List<PendingAttack> pendingAttacks = new List<PendingAttack>();
+        private readonly Dictionary<string, UnitDefinition> unitDefinitions;
+        private readonly Dictionary<string, AbilityDefinition> abilityDefinitions;
+        private readonly Dictionary<string, BattleUnitInstanceSnapshot> unitSnapshots = new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal);
+        private readonly DynamicUnitIdAllocator dynamicUnitIdAllocator = new DynamicUnitIdAllocator();
         private int eventTick = int.MinValue;
         private int eventSequence;
 
         public BattleRunner(BattleInput input)
         {
             Input = input ?? throw new ArgumentNullException(nameof(input));
-            runtimeUnits = BuildInitialUnits(input);
+            if (BattleInput.TicksPerSecond % BattleInput.AutomaticSkillPointsPerSecond != 0)
+                throw new InvalidOperationException("Automatic skill-point cadence must divide the authoritative tick rate evenly.");
+            unitDefinitions = input.UnitDefinitions.ToDictionary(item => item.TypeId, StringComparer.Ordinal);
+            abilityDefinitions = input.AbilityDefinitions.ToDictionary(item => item.AbilityId, StringComparer.Ordinal);
+            runtimeUnits = BuildInitialUnits(input, unitDefinitions, abilityDefinitions);
             RuntimeUnits = new ReadOnlyCollection<RuntimeUnitState>(runtimeUnits);
             Events = new ReadOnlyCollection<BattleEvent>(events);
             Status = BattleRunnerStatus.Ready;
-            foreach (var unit in runtimeUnits) EmitSpawn(unit);
+            foreach (var unit in runtimeUnits)
+            {
+                var snapshot = CreateSpawnSnapshot(unit, false);
+                unitSnapshots.Add(unit.UnitId, snapshot);
+                EmitSpawn(unit, snapshot);
+            }
         }
 
         public BattleInput Input { get; }
@@ -176,8 +297,12 @@ namespace ArknoNights.Battle.Core
                 .Select(definition => definition.TypeId)
                 .OrderBy(typeId => typeId, StringComparer.Ordinal)
                 .ToArray());
+            var immutableUnitSnapshots = new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
+                unitSnapshots.OrderBy(item => item.Key, StringComparer.Ordinal)
+                    .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal));
             return new BattleRunResult(Input.BattleId, homePlayerId, awayPlayerId, Input.CanonicalSummary, knownUnitTypeIds,
-                CurrentTick, StopReason, Winner, immutableTrace, new ReadOnlyCollection<BattleEvent>(events.ToArray()), finalUnits, BuildStableSummary());
+                CurrentTick, StopReason, Winner, immutableTrace, new ReadOnlyCollection<BattleEvent>(events.ToArray()), finalUnits,
+                immutableUnitSnapshots, BuildStableSummary());
         }
 
         public BattleSide? Winner { get; private set; }
@@ -188,11 +313,12 @@ namespace ArknoNights.Battle.Core
             AcquireTargets();
             ApplyMovement();
             EvaluateBlocking();
-            if (Status == BattleRunnerStatus.Stopped) return;
             StartAttacks();
             ResolveDueDamage();
             ResolveDeathsAndCleanup();
             EvaluateBattleEnd();
+            if (Status == BattleRunnerStatus.Stopped) return;
+            RecoverAutomaticSkillPointsAndCast();
         }
 
         private void RemoveInvalidPendingAttacks()
@@ -203,10 +329,10 @@ namespace ArknoNights.Battle.Core
 
         private void AcquireTargets()
         {
-            foreach (var unit in runtimeUnits.Where(item => item.IsAlive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 if (HasLiveTarget(unit)) continue;
-                var selected = runtimeUnits.Where(candidate => candidate.IsAlive && candidate.Side != unit.Side)
+                var selected = runtimeUnits.Where(candidate => IsActive(candidate) && candidate.Side != unit.Side)
                     .OrderBy(candidate => DistanceSquared(unit.Position, candidate.Position))
                     .ThenBy(candidate => DistanceSquared(candidate.Position, GatePosition(unit.Side)))
                     .ThenBy(candidate => candidate.UnitId, StringComparer.Ordinal).FirstOrDefault();
@@ -217,7 +343,7 @@ namespace ArknoNights.Battle.Core
         private void ApplyMovement()
         {
             var intents = new List<MoveIntent>();
-            foreach (var unit in runtimeUnits.Where(item => item.IsAlive && !item.IsBlocked && !HasTargetDeathAnimationLock(item) && HasLiveTarget(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && !item.IsBlocked && !HasTargetDeathAnimationLock(item) && HasLiveTarget(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 var target = FindUnit(unit.TargetUnitId);
                 if (IsInAttackRange(unit.Position, target.Position)) continue;
@@ -242,9 +368,9 @@ namespace ArknoNights.Battle.Core
                 }
             }
 
-            var proposals = runtimeUnits.Where(item => item.IsAlive && item.HasBlockingCapacity && HasLiveTarget(item))
+            var proposals = runtimeUnits.Where(item => IsActive(item) && item.HasBlockingCapacity && HasLiveTarget(item))
                 .Select(item => new BlockProposal(item, FindUnit(item.TargetUnitId)))
-                .Where(item => item.Target != null && item.Target.IsAlive && item.Target.HasBlockingCapacity && DistanceSquared(item.Actor.Position, item.Target.Position) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre)
+                .Where(item => item.Target != null && IsActive(item.Target) && item.Target.HasBlockingCapacity && DistanceSquared(item.Actor.Position, item.Target.Position) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre)
                 .ToArray();
 
             foreach (var group in proposals.GroupBy(item => item.Target.UnitId, StringComparer.Ordinal).OrderBy(item => item.Key, StringComparer.Ordinal))
@@ -264,7 +390,7 @@ namespace ArknoNights.Battle.Core
 
         private void StartAttacks()
         {
-            foreach (var unit in runtimeUnits.Where(item => item.IsAlive && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 var target = GetAttackTarget(unit);
                 if (target == null) continue;
@@ -316,6 +442,104 @@ namespace ArknoNights.Battle.Core
             EndBattle(BattleStopReason.Victory, homeAlive ? BattleSide.Home : BattleSide.Away);
         }
 
+        private void RecoverAutomaticSkillPointsAndCast()
+        {
+            if (CurrentTick % AutomaticSkillPointGainIntervalTicks != 0) return;
+
+            foreach (var caster in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray())
+            foreach (var abilityState in caster.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal))
+            {
+                if (abilityState.Definition.SkillPointGeneration != SkillPointGeneration.Automatic) continue;
+                if (!abilityState.RecoverAndTryCast(out var castOrdinal)) continue;
+                CastSummonAbility(caster, abilityState.Definition, castOrdinal);
+            }
+        }
+
+        private void CastSummonAbility(RuntimeUnitState caster, AbilityDefinition ability, int castOrdinal)
+        {
+            var summonEffect = ability.SummonEffect;
+            var summonDefinition = unitDefinitions[summonEffect.SummonTypeId];
+            for (var spawnOrdinal = 1; spawnOrdinal <= summonEffect.Count; spawnOrdinal++)
+            {
+                var offsetX = StableSpawnOffset(
+                    Input.BattleId,
+                    caster.UnitId,
+                    ability.AbilityId,
+                    castOrdinal,
+                    spawnOrdinal,
+                    0,
+                    summonEffect.SideLengthCentimetres);
+                var offsetY = StableSpawnOffset(
+                    Input.BattleId,
+                    caster.UnitId,
+                    ability.AbilityId,
+                    castOrdinal,
+                    spawnOrdinal,
+                    1,
+                    summonEffect.SideLengthCentimetres);
+                var position = new FixedPosition(caster.Position.XUnits + offsetX, caster.Position.YUnits + offsetY);
+                var summoned = new RuntimeUnitState(
+                    dynamicUnitIdAllocator.Allocate(),
+                    caster.PlayerId,
+                    caster.Side,
+                    summonDefinition,
+                    position,
+                    0,
+                    Array.Empty<BuffPlaceholder>(),
+                    CurrentTick + 1,
+                    CreateAbilityStates(summonDefinition, abilityDefinitions));
+                runtimeUnits.Add(summoned);
+                var snapshot = CreateSpawnSnapshot(summoned, true);
+                unitSnapshots.Add(summoned.UnitId, snapshot);
+                EmitSpawn(summoned, snapshot);
+            }
+        }
+
+        private static int StableSpawnOffset(
+            string battleId,
+            string casterId,
+            string abilityId,
+            int castOrdinal,
+            int spawnOrdinal,
+            int axis,
+            int sideLengthCentimetres)
+        {
+            var hash = 14695981039346656037UL;
+            hash = AppendStableHash(hash, battleId);
+            hash = AppendStableHash(hash, casterId);
+            hash = AppendStableHash(hash, abilityId);
+            hash = AppendStableHash(hash, castOrdinal);
+            hash = AppendStableHash(hash, spawnOrdinal);
+            hash = AppendStableHash(hash, axis);
+            var minimum = -(sideLengthCentimetres / 2);
+            return minimum + (int)(hash % ((ulong)sideLengthCentimetres + 1UL));
+        }
+
+        private static ulong AppendStableHash(ulong hash, string value)
+        {
+            var bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
+            hash = AppendStableHash(hash, bytes.Length);
+            foreach (var item in bytes)
+            {
+                hash ^= item;
+                hash *= 1099511628211UL;
+            }
+            return hash;
+        }
+
+        private static ulong AppendStableHash(ulong hash, int value)
+        {
+            unchecked
+            {
+                for (var shift = 0; shift < 32; shift += 8)
+                {
+                    hash ^= (byte)((uint)value >> shift);
+                    hash *= 1099511628211UL;
+                }
+            }
+            return hash;
+        }
+
         private void EndBattle(BattleStopReason reason, BattleSide? winner)
         {
             if (Status == BattleRunnerStatus.Stopped) return;
@@ -355,6 +579,7 @@ namespace ArknoNights.Battle.Core
             Emit(BattleEventType.TargetChanged, unit.UnitId, null, targetUnitId, null, null, null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None);
         }
 
+        private bool IsActive(RuntimeUnitState unit) => unit.IsAlive && unit.ActivationTick <= CurrentTick;
         private bool HasLiveTarget(RuntimeUnitState unit) => unit.TargetUnitId != null && FindUnit(unit.TargetUnitId) != null && FindUnit(unit.TargetUnitId).IsAlive;
         private RuntimeUnitState GetAttackTarget(RuntimeUnitState unit)
         {
@@ -429,10 +654,10 @@ namespace ArknoNights.Battle.Core
             events.Add(new BattleEvent(type, CurrentTick, ++eventSequence, unitId, unitTypeId, null, relatedUnitId, from, to, damageType, amount, hpBefore, hpAfter, damageTick, originalTicks, effectiveTicks, winner, reason, null));
         }
 
-        private void EmitSpawn(RuntimeUnitState unit)
+        private void EmitSpawn(RuntimeUnitState unit, BattleUnitInstanceSnapshot snapshot)
         {
             if (eventTick != CurrentTick) { eventTick = CurrentTick; eventSequence = 0; }
-            events.Add(new BattleEvent(BattleEventType.Spawn, CurrentTick, ++eventSequence, unit.UnitId, unit.TypeId, unit.Side, null, null, unit.Position, null, 0, unit.CurrentHitPoints, unit.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None, CreateInitialSpawnSnapshot(unit)));
+            events.Add(new BattleEvent(BattleEventType.Spawn, CurrentTick, ++eventSequence, unit.UnitId, unit.TypeId, unit.Side, null, null, unit.Position, null, 0, unit.CurrentHitPoints, unit.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None, snapshot));
         }
 
         private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to) { Unit = unit; From = from; To = to; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } }
@@ -440,21 +665,41 @@ namespace ArknoNights.Battle.Core
         private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
 
-        private static List<RuntimeUnitState> BuildInitialUnits(BattleInput input)
+        private static List<RuntimeUnitState> BuildInitialUnits(
+            BattleInput input,
+            IReadOnlyDictionary<string, UnitDefinition> definitions,
+            IReadOnlyDictionary<string, AbilityDefinition> abilities)
         {
-            var definitions = input.UnitDefinitions.ToDictionary(item => item.TypeId, StringComparer.Ordinal);
             var result = new List<RuntimeUnitState>();
             foreach (var player in input.Players)
             foreach (var unit in player.Units)
             {
                 if (unit.Zone != UnitZone.Deployed) continue;
                 var coordinate = player.Side == BattleSide.Home ? BattlefieldRules.MapHome(unit.Formation.Value) : BattlefieldRules.MapAway(unit.Formation.Value);
-                result.Add(new RuntimeUnitState(unit.UnitId, player.PlayerId, player.Side, definitions[unit.TypeId], unit, coordinate));
+                var definition = definitions[unit.TypeId];
+                result.Add(new RuntimeUnitState(
+                    unit.UnitId,
+                    player.PlayerId,
+                    player.Side,
+                    definition,
+                    unit,
+                    coordinate,
+                    CreateAbilityStates(definition, abilities)));
             }
             return result.OrderBy(item => item.UnitId, StringComparer.Ordinal).ToList();
         }
 
-        private static BattleUnitInstanceSnapshot CreateInitialSpawnSnapshot(RuntimeUnitState unit)
+        private static IEnumerable<RuntimeAbilityState> CreateAbilityStates(
+            UnitDefinition definition,
+            IReadOnlyDictionary<string, AbilityDefinition> abilities)
+        {
+            return definition.InnateAbilityIds
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .Select(item => new RuntimeAbilityState(abilities[item]))
+                .ToArray();
+        }
+
+        private static BattleUnitInstanceSnapshot CreateSpawnSnapshot(RuntimeUnitState unit, bool isDynamicallyGenerated)
         {
             var definition = unit.Definition;
             return new BattleUnitInstanceSnapshot(
@@ -462,7 +707,7 @@ namespace ArknoNights.Battle.Core
                 unit.TypeId,
                 unit.PlayerId,
                 unit.Side,
-                false,
+                isDynamicallyGenerated,
                 unit.Position,
                 unit.EliteLevel,
                 definition.MaxHitPoints,
@@ -478,14 +723,19 @@ namespace ArknoNights.Battle.Core
                 definition.AttackMethod,
                 definition.BlockCapacity,
                 definition.TauntLevel,
-                unit.Buffs);
+                unit.Buffs,
+                unit.ActivationTick);
         }
 
         private string BuildStableSummary()
         {
             var builder = new StringBuilder(Input.CanonicalSummary);
             builder.Append("|runner:").Append(CurrentTick).Append(',').Append((int)Status).Append(',').Append((int)StopReason);
-            foreach (var unit in runtimeUnits.OrderBy(item => item.UnitId, StringComparer.Ordinal)) builder.Append("|R:").Append(unit.UnitId).Append(',').Append(unit.PlayerId).Append(',').Append((int)unit.Side).Append(',').Append(unit.TypeId).Append(',').Append(unit.CurrentHitPoints).Append(',').Append(unit.Position.XUnits).Append(',').Append(unit.Position.YUnits);
+            foreach (var unit in runtimeUnits.OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            {
+                builder.Append("|R:").Append(unit.UnitId).Append(',').Append(unit.PlayerId).Append(',').Append((int)unit.Side).Append(',').Append(unit.TypeId).Append(',').Append(unit.CurrentHitPoints).Append(',').Append(unit.Position.XUnits).Append(',').Append(unit.Position.YUnits).Append(',').Append(unit.ActivationTick);
+                foreach (var ability in unit.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal)) ability.AppendStableSummary(builder);
+            }
             foreach (var item in trace) builder.Append("|S:").Append(item.Tick).Append(',').Append((int)item.Status).Append(',').Append((int)item.StopReason);
             return builder.ToString();
         }
