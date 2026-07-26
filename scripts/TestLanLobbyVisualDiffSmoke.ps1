@@ -158,6 +158,13 @@ try
     Assert-True (($referenceFixtureHashes -join "`n") -eq ($referenceFixtureHashesAfterExport -join "`n")) 'explicit external references must remain read-only exporter inputs'
     $report = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.json') | ConvertFrom-Json
     $homeCapture = $report.captures | Where-Object name -eq 'home'
+    $actionBars = @($report.actionBars)
+    Assert-True ($actionBars.Count -eq 2) 'two Home action bars must be reported separately'
+    $createAction = $actionBars | Where-Object name -eq 'home-create-action'
+    $joinAction = $actionBars | Where-Object name -eq 'home-join-action'
+    Assert-True (($createAction.actualRect.x -eq 1154) -and ($createAction.actualRect.y -eq 453) -and ($createAction.actualRect.width -eq 717) -and ($createAction.actualRect.height -eq 99)) 'Create actual crop must use the approved Rect'
+    Assert-True (($joinAction.actualRect.x -eq 1154) -and ($joinAction.actualRect.y -eq 876) -and ($joinAction.actualRect.width -eq 717) -and ($joinAction.actualRect.height -eq 99)) 'Join actual crop must use the approved Rect'
+    foreach ($name in @('home-create-action','home-join-action')) { foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ($name + '-' + $kind + '.png'))) "missing $name $kind" } }
     Assert-True (($report.captures | Measure-Object).Count -eq 5) 'five captures must be reported'
     Assert-True (($report.referenceNormalization -eq 'independent-xy') -and ($homeCapture.actualWidth -eq 1920) -and ($homeCapture.actualHeight -eq 1080) -and ($homeCapture.referenceWidth -eq 2048) -and ($homeCapture.referenceHeight -eq 1118)) 'report must retain native dimensions and independent normalization'
     Assert-True ($homeCapture.maskedPixels -gt 0) 'home must record masked pixels'

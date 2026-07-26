@@ -47,6 +47,11 @@ $homeRegions = @(
   @{ name='join-room'; x=0.60; y=0.81; width=0.36; height=0.10; mask=$false },
   @{ name='main-background'; x=0.22; y=0.00; width=0.78; height=1.00; mask=$false }
 )
+$homeActionBars = @(
+  @{ name='home-create-action'; actual=@{x=1154;y=453;width=717;height=99}; reference=@{x=1257;y=482;width=763;height=105} },
+  @{ name='home-join-action'; actual=@{x=1154;y=876;width=717;height=99}; reference=@{x=1257;y=932;width=763;height=105} }
+)
+$figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
   @{ name='ignored-top-left'; x=0.00; y=0.00; width=0.22; height=0.15; mask=$true },
   @{ name='ignored-player-art'; x=0.11; y=0.20; width=0.80; height=0.50; mask=$true },
@@ -62,6 +67,63 @@ function Convert-NormalizedRectangle($Region, [int] $Width, [int] $Height)
     $right = [Math]::Max($x, [Math]::Min($Width, [int][Math]::Ceiling(($Region.x + $Region.width) * $Width)))
     $bottom = [Math]::Max($y, [Math]::Min($Height, [int][Math]::Ceiling(($Region.y + $Region.height) * $Height)))
     return New-Object Drawing.Rectangle $x, $y, ($right - $x), ($bottom - $y)
+}
+
+function Convert-ActionReferenceRectangle($Reference, [int] $NativeWidth, [int] $NativeHeight)
+{
+    $scaleX = [double]$NativeWidth / $figure9MeasurementSize.width
+    $scaleY = [double]$NativeHeight / $figure9MeasurementSize.height
+    $x = [int][Math]::Floor($Reference.x * $scaleX)
+    $y = [int][Math]::Floor($Reference.y * $scaleY)
+    $right = [int][Math]::Ceiling(($Reference.x + $Reference.width) * $scaleX)
+    $bottom = [int][Math]::Ceiling(($Reference.y + $Reference.height) * $scaleY)
+    return New-Object Drawing.Rectangle $x, $y, ($right - $x), ($bottom - $y)
+}
+
+function Get-ClampedRectangle([Drawing.Rectangle] $Rectangle, [Drawing.Bitmap] $Source)
+{
+    $x = [Math]::Max(0, [Math]::Min($Source.Width, $Rectangle.X))
+    $y = [Math]::Max(0, [Math]::Min($Source.Height, $Rectangle.Y))
+    $right = [Math]::Max($x, [Math]::Min($Source.Width, $Rectangle.Right))
+    $bottom = [Math]::Max($y, [Math]::Min($Source.Height, $Rectangle.Bottom))
+    if ($right -le $x -or $bottom -le $y) { throw "Action crop is outside source bitmap: $Rectangle for $($Source.Width)x$($Source.Height)" }
+    return New-Object Drawing.Rectangle $x, $y, ($right - $x), ($bottom - $y)
+}
+
+function New-LanLobbyBitmapCrop([Drawing.Bitmap] $Source, [Drawing.Rectangle] $Rectangle)
+{
+    $crop = Get-ClampedRectangle $Rectangle $Source
+    $result = New-Object Drawing.Bitmap $crop.Width, $crop.Height
+    $graphics = [Drawing.Graphics]::FromImage($result)
+    try { $graphics.DrawImage($Source, (New-Object Drawing.Rectangle 0,0,$crop.Width,$crop.Height), $crop.X, $crop.Y, $crop.Width, $crop.Height, [Drawing.GraphicsUnit]::Pixel) }
+    finally { $graphics.Dispose() }
+    return $result
+}
+
+function Resize-LanLobbyBitmap([Drawing.Bitmap] $Source, [int] $Width, [int] $Height)
+{
+    $result = New-Object Drawing.Bitmap $Width, $Height
+    $graphics = [Drawing.Graphics]::FromImage($result)
+    try { $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear; $graphics.DrawImage($Source, 0, 0, $Width, $Height) }
+    finally { $graphics.Dispose() }
+    return $result
+}
+
+function New-LanLobbyActionOverlay([Drawing.Bitmap] $Actual, [Drawing.Bitmap] $Reference)
+{
+    $overlay = New-Object Drawing.Bitmap $Actual.Width, $Actual.Height
+    $graphics = [Drawing.Graphics]::FromImage($overlay)
+    $attributes = New-Object Drawing.Imaging.ImageAttributes
+    try
+    {
+        $graphics.DrawImage($Reference, 0, 0, $Reference.Width, $Reference.Height)
+        $alphaMatrix = New-Object Drawing.Imaging.ColorMatrix
+        $alphaMatrix.Matrix33 = 0.5
+        $attributes.SetColorMatrix($alphaMatrix)
+        $graphics.DrawImage($Actual, (New-Object Drawing.Rectangle 0,0,$Actual.Width,$Actual.Height), 0,0,$Actual.Width,$Actual.Height, [Drawing.GraphicsUnit]::Pixel, $attributes)
+    }
+    finally { $attributes.Dispose(); $graphics.Dispose() }
+    return $overlay
 }
 
 function Get-RoomCardGeometry($Capture)
@@ -119,6 +181,7 @@ $assets = @($spriteUsage | Group-Object SpriteName | Sort-Object Name | ForEach-
     [pscustomobject][ordered]@{ spriteName=$first.SpriteName; captures=@($_.Group.CaptureName | Sort-Object -Unique); resourcesPath=$first.ResourcesPath; sourcePath=$first.SourcePath; importedSha256=$first.ImportedSha256; occurrenceCount=[int](($_.Group | Measure-Object OccurrenceCount -Sum).Sum) }
 })
 $reportCaptures = @()
+$actionBarReports = @()
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
@@ -175,7 +238,48 @@ try
         }
         finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($normalizedReference) { $normalizedReference.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     }
-    $report = [ordered]@{ generatedAtUtc=[DateTime]::UtcNow.ToString('o'); referenceNormalization='independent-xy'; captures=$reportCaptures; assets=$assets }
+    $homeCapture = @($manifest.captures | Where-Object { $_.name -eq 'home' })[0]
+    foreach ($spec in $homeActionBars)
+    {
+        $actual = $null
+        $nativeReference = $null
+        $actualCrop = $null
+        $nativeReferenceCrop = $null
+        $resizedReferenceCrop = $null
+        $overlay = $null
+        $heatmap = $null
+        try
+        {
+            $actual = [Drawing.Bitmap]::FromFile($homeCapture.path)
+            $nativeReference = [Drawing.Bitmap]::FromFile($referenceHome)
+            $actualRectangle = New-Object Drawing.Rectangle $spec.actual.x, $spec.actual.y, $spec.actual.width, $spec.actual.height
+            $scaledReference = Convert-ActionReferenceRectangle $spec.reference $nativeReference.Width $nativeReference.Height
+            $actualCrop = New-LanLobbyBitmapCrop $actual $actualRectangle
+            $nativeReferenceCrop = New-LanLobbyBitmapCrop $nativeReference $scaledReference
+            $resizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualCrop.Width $actualCrop.Height
+            $overlay = New-LanLobbyActionOverlay $actualCrop $resizedReferenceCrop
+            $heatmap = New-Object Drawing.Bitmap $actualCrop.Width, $actualCrop.Height
+            $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height
+            [long]$maskedPixels = 0
+            $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $resizedReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
+            $actionBarReports += [pscustomobject][ordered]@{
+                name = $spec.name
+                capture = 'home'
+                actualRect = [ordered]@{ x=$spec.actual.x; y=$spec.actual.y; width=$spec.actual.width; height=$spec.actual.height }
+                referenceRect = [ordered]@{ x=$scaledReference.X; y=$scaledReference.Y; width=$scaledReference.Width; height=$scaledReference.Height }
+                referenceMeasurementCanvas = [ordered]@{ width=$figure9MeasurementSize.width; height=$figure9MeasurementSize.height }
+                comparedPixels = $metric.ComparedPixels
+                pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
+                averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
+            }
+            $actualCrop.Save((Join-Path $stagingDirectory ($spec.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $resizedReferenceCrop.Save((Join-Path $stagingDirectory ($spec.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $overlay.Save((Join-Path $stagingDirectory ($spec.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $heatmap.Save((Join-Path $stagingDirectory ($spec.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($resizedReferenceCrop) { $resizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
+    }
+    $report = [ordered]@{ generatedAtUtc=[DateTime]::UtcNow.ToString('o'); referenceNormalization='independent-xy'; captures=$reportCaptures; actionBars=$actionBarReports; assets=$assets }
     $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $stagingDirectory 'visual-diff-report.json') -Encoding UTF8
     $referenceDimensionLines = @($reportCaptures | Group-Object referenceFigure | Sort-Object Name | ForEach-Object {
         $first = $_.Group[0]
@@ -183,7 +287,9 @@ try
     })
     $markdown = @('# LAN Lobby Visual Difference Report', '', "Reference figure native dimensions (decoded from this export): $($referenceDimensionLines -join '; '). Each reference is independently normalized on X and Y to 1920×1080. This is non-blocking layout/color reporting, not a pixel-equality claim.", '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
-    $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
+    $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect | Native reference Rect | Difference ratio | Avg RGB error |', '| --- | --- | --- | ---: | ---: |')
+    foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
+    $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Approved sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
     foreach ($asset in $assets) { $markdown += "| $($asset.spriteName) | $($asset.captures -join ', ') | $($asset.resourcesPath) | $($asset.sourcePath) | $($asset.importedSha256) | $($asset.occurrenceCount) |" }
