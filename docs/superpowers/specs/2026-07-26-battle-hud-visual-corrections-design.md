@@ -29,14 +29,14 @@ Correct the currently visible player-list, shop, and ready-button layout without
 
 ## Fonts and colors
 
-- Reuse the existing bundled `NotoSansSC-VF.ttf` for Chinese text and request `FontStyle.Bold`. No external font is downloaded or added. If the resulting weight is still visually too light in the Player screenshot, stop and request a static Source Han Sans Medium/Bold asset from the user.
+- Compare the existing `HanYiCuHeiJian-1.ttf` and `FangZhengHeiTiJianTi-1.ttf` in equivalent Player screenshots and select the more readable candidate for the compact shop and Ready labels. Only if both are visibly unsuitable may a static Source Han Sans Medium/Bold asset be downloaded; its source and license must be recorded before adding it.
 - Use `Novecento wide Normal Regular` for every numeric-only HUD value in this surface:
   - player life;
   - level;
   - shop price;
   - upgrade price;
   - refresh price.
-- Chinese unit names and button labels use the bold Source Han/Noto font.
+- Chinese unit names and button labels use the selected heavier Chinese font.
 - Initial color targets, subject to screenshot fitting:
   - player life and level numbers: white;
   - shop unit name: light neutral gray;
@@ -88,5 +88,5 @@ Correct the currently visible player-list, shop, and ready-button layout without
 ## Scope limits
 
 - Do not change battle calculation, track playback, formation rules, unit JSON, scene files, prefabs, packages, or project settings.
-- Do not introduce a new font asset without user approval.
+- Prefer the two existing Chinese font assets. A new Source Han Sans asset is allowed only after both existing candidates have been compared and rejected.
 - Do not rename files after task numbers; all newly introduced code, evidence directories, and documentation use semantic names.
