@@ -483,6 +483,14 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 
 ## 31. PREP-DEPLOY 已部署单位拖动时隐藏选择框（2026-07-24）
 
+## Home room-select capture refresh (2026-07-26)
+
+1. Run `LanLobbyCaptureSuitePlayModeTests`; the `home` manifest must include both a `[uc]autochessouter/room_select_*` source and a `Combined/[uc]autochesscommon/icon_*` avatar source.
+2. Build with `Task006StandaloneBuild.BuildWindowsX64`, then launch the resulting Player visibly with `-force-d3d11 -lanLobbyCaptureSuite -lanLobbyCaptureOutput Artifacts/LAN-LOBBY/HomeRoomSelect/CapturesFinal -screen-width 1920 -screen-height 1080`.
+3. Require five decodeable non-empty `1920x1080` captures and `manifest.json` in `Artifacts/LAN-LOBBY/HomeRoomSelect/CapturesFinal/`.
+4. With the output directory absent, export `Artifacts/LAN-LOBBY/HomeRoomSelect/VisualDiff/` through `scripts/ExportLanLobbyVisualDiff.ps1` and explicitly pass read-only `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud`.
+5. Inspect `home.png`, `home-overlay.png`, `home-heatmap.png`, and both visual-diff reports. The reports are non-blocking but must record the reference dimensions, normalized masks, and a source table with Resources path, approved source path, SHA-256, and occurrence count for each rendered Sprite.
+
 ## 32. UI-INFO-001 验证（2026-07-24）
 
 - Focused EditMode：42 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135249/EditModeResults.xml`。

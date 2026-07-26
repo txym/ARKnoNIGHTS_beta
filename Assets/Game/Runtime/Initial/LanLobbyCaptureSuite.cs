@@ -16,6 +16,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     private const string SuiteFlag = "-lanLobbyCaptureSuite";
     private const string OutputFlag = "-lanLobbyCaptureOutput";
     private const string AssetSourcePrefix = "[uc]autochessouter/";
+    private const string CombinedAvatarSourcePrefix = "Combined/[uc]autochesscommon/";
     private readonly List<CaptureRecord> captures = new List<CaptureRecord>();
     private string outputDirectory;
     private global::LanLobbyView view;
@@ -196,7 +197,17 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             case "create_icon": case "join_icon": case "img_player_bkg": case "img_player_confirmed":
             case "player_card_waiting": case "player_card_ready": case "player_card_self_frame": case "team_icon_frame":
             case "team_hp_back": case "btn_match_host_normal": case "btn_match_host_grey": case "btn_match_grey": case "btn_match_cancel":
+            case "room_select_right_bg": case "room_select_title_icon": case "room_select_dot": case "room_select_img_startroom":
+            case "room_select_create_btn_bg_down": case "room_select_create_left_line": case "room_select_create_logo":
+            case "room_select_create_middleicon": case "room_select_create_text_01": case "room_select_create_text_02":
+            case "room_select_join_ban": case "room_select_join_blank": case "room_select_join_btn_bg_down":
+            case "room_select_join_left_block": case "room_select_join_logo": case "room_select_join_middle_block":
+            case "room_select_join_middle_block_mask": case "room_select_join_right_block": case "room_select_join_text_01":
+            case "room_select_join_text_02": case "room_select_join_text_bg": case "room_select_join_triangle":
                 source = AssetSourcePrefix + spriteName + ".png";
+                return true;
+            case "icon_amiy": case "icon_clementi": case "icon_kirar": case "icon_zumam":
+                source = CombinedAvatarSourcePrefix + spriteName + ".png";
                 return true;
             default:
                 source = string.Empty;

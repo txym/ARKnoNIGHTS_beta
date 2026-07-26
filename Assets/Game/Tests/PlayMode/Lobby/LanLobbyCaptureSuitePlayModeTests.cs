@@ -78,6 +78,18 @@ namespace ArknoNights.Lobby.Tests
             var discovered = parsed.captures.Single(record => record.name == "discovered-prefill");
             Assert.That(discovered.roomCode, Is.EqualTo("654321"));
             Assert.That(discovered.members, Is.Empty);
+
+            var home = parsed.captures.Single(record => record.name == "home");
+            Assert.That(home.spriteSources.Any(sprite =>
+                    sprite.spriteName.StartsWith("room_select_", StringComparison.Ordinal) &&
+                    sprite.sourcePath.StartsWith("[uc]autochessouter/room_select_", StringComparison.Ordinal)),
+                Is.True,
+                "The Home capture manifest must prove it rendered an approved room_select_ source.");
+            Assert.That(home.spriteSources.Any(sprite =>
+                    sprite.spriteName.StartsWith("icon_", StringComparison.Ordinal) &&
+                    sprite.sourcePath.StartsWith("Combined/[uc]autochesscommon/icon_", StringComparison.Ordinal)),
+                Is.True,
+                "The Home capture manifest must prove it rendered an approved Combined avatar source.");
         }
 
         [Test]
