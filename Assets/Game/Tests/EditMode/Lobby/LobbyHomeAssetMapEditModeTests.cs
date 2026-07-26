@@ -16,7 +16,8 @@ namespace ArknoNights.Lobby.Tests
         {
             "room_select_right_bg", "room_select_title_icon", "room_select_dot", "room_select_img_startroom",
             "room_select_create_btn_bg_down", "room_select_create_left_line", "room_select_create_logo", "room_select_create_middleicon", "room_select_create_text_01", "room_select_create_text_02",
-            "room_select_join_ban", "room_select_join_blank", "room_select_join_btn_bg_down", "room_select_join_left_block", "room_select_join_logo", "room_select_join_middle_block", "room_select_join_middle_block_mask", "room_select_join_right_block", "room_select_join_text_01", "room_select_join_text_02", "room_select_join_text_bg", "room_select_join_triangle"
+            "room_select_join_ban", "room_select_join_blank", "room_select_join_btn_bg_down", "room_select_join_left_block", "room_select_join_logo", "room_select_join_middle_block", "room_select_join_middle_block_mask", "room_select_join_right_block", "room_select_join_text_01", "room_select_join_text_02", "room_select_join_text_bg", "room_select_join_triangle",
+            "img_pointer", "doc_frame_line"
         };
 
         private static readonly string[] AvatarAssetNames =

@@ -47,6 +47,8 @@ public sealed class LobbyAssetImportSetup : AssetPostprocessor
         LobbyAssetDirectory + "Home/room_select_join_text_02.png",
         LobbyAssetDirectory + "Home/room_select_join_text_bg.png",
         LobbyAssetDirectory + "Home/room_select_join_triangle.png",
+        LobbyAssetDirectory + "Home/img_pointer.png",
+        LobbyAssetDirectory + "Home/doc_frame_line.png",
         LobbyAssetDirectory + "Home/icon_amiy.png",
         LobbyAssetDirectory + "Home/icon_clementi.png",
         LobbyAssetDirectory + "Home/icon_kirar.png",
