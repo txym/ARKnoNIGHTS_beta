@@ -36,5 +36,25 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(layout.RoomSelectCreate.Bottom, Is.GreaterThanOrEqualTo(0f));
             Assert.That(layout.RoomSelectJoin.Bottom, Is.GreaterThanOrEqualTo(0f));
         }
+
+        [Test]
+        public void RoomSelect_ActionBarsUseMeasuredFigure9Rects()
+        {
+            var full = global::LanLobbyLayout.ForSize(1920, 1080, 4);
+            AssertRect(full.RoomSelectCreateAction, 1154f, 528f, 717f, 99f, 0.01f);
+            AssertRect(full.RoomSelectJoinAction, 1154f, 105f, 717f, 99f, 0.01f);
+
+            var small = global::LanLobbyLayout.ForSize(1280, 720, 4);
+            AssertRect(small.RoomSelectCreateAction, 1154f * 2f / 3f, 528f * 2f / 3f, 717f * 2f / 3f, 66f, 0.02f);
+            AssertRect(small.RoomSelectJoinAction, 1154f * 2f / 3f, 70f, 717f * 2f / 3f, 66f, 0.02f);
+        }
+
+        private static void AssertRect(global::LanLobbyRect actual, float left, float bottom, float width, float height, float tolerance)
+        {
+            Assert.That(actual.Left, Is.EqualTo(left).Within(tolerance));
+            Assert.That(actual.Bottom, Is.EqualTo(bottom).Within(tolerance));
+            Assert.That(actual.Width, Is.EqualTo(width).Within(tolerance));
+            Assert.That(actual.Height, Is.EqualTo(height).Within(tolerance));
+        }
     }
 }

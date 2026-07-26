@@ -7,18 +7,28 @@ public sealed class LanLobbyLayout
     private const float ReferenceWidth = 1920f;
     private const float ReferenceHeight = 1080f;
 
-    private LanLobbyLayout(IReadOnlyList<LanLobbyRect> cards, IReadOnlyList<LanLobbyRect> homePanels, LanLobbyRect roomSelectCreate, LanLobbyRect roomSelectJoin)
+    private LanLobbyLayout(
+        IReadOnlyList<LanLobbyRect> cards,
+        IReadOnlyList<LanLobbyRect> homePanels,
+        LanLobbyRect roomSelectCreate,
+        LanLobbyRect roomSelectJoin,
+        LanLobbyRect roomSelectCreateAction,
+        LanLobbyRect roomSelectJoinAction)
     {
         Cards = cards;
         HomePanels = homePanels;
         RoomSelectCreate = roomSelectCreate;
         RoomSelectJoin = roomSelectJoin;
+        RoomSelectCreateAction = roomSelectCreateAction;
+        RoomSelectJoinAction = roomSelectJoinAction;
     }
 
     public IReadOnlyList<LanLobbyRect> Cards { get; }
     public IReadOnlyList<LanLobbyRect> HomePanels { get; }
     public LanLobbyRect RoomSelectCreate { get; }
     public LanLobbyRect RoomSelectJoin { get; }
+    public LanLobbyRect RoomSelectCreateAction { get; }
+    public LanLobbyRect RoomSelectJoinAction { get; }
 
     public static LanLobbyLayout ForSize(int width, int height, int playerCount)
     {
@@ -45,6 +55,8 @@ public sealed class LanLobbyLayout
 
         var create = new LanLobbyRect(leftInset + 1032f * scale, bottomInset + 562f * scale, 820f * scale, 270f * scale);
         var join = new LanLobbyRect(leftInset + 1032f * scale, bottomInset + 225f * scale, 820f * scale, 270f * scale);
+        var createAction = new LanLobbyRect(leftInset + 1154f * scale, bottomInset + 528f * scale, 717f * scale, 99f * scale);
+        var joinAction = new LanLobbyRect(leftInset + 1154f * scale, bottomInset + 105f * scale, 717f * scale, 99f * scale);
         var panels = new[]
         {
             new LanLobbyRect(leftInset + 80f * scale, bottomInset + 180f * scale, 540f * scale, 720f * scale),
@@ -53,7 +65,13 @@ public sealed class LanLobbyLayout
             new LanLobbyRect(leftInset + 1032f * scale, bottomInset + 80f * scale, 820f * scale, 120f * scale)
         };
 
-        return new LanLobbyLayout(new ReadOnlyCollection<LanLobbyRect>(cards), new ReadOnlyCollection<LanLobbyRect>(panels), create, join);
+        return new LanLobbyLayout(
+            new ReadOnlyCollection<LanLobbyRect>(cards),
+            new ReadOnlyCollection<LanLobbyRect>(panels),
+            create,
+            join,
+            createAction,
+            joinAction);
     }
 
     private const int LobbyMemberCapacity = 4;

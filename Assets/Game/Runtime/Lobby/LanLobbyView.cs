@@ -279,17 +279,11 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionSprite(titleDot, new Vector2(.88f, .91f), 26f);
         var create = Rect("Create", roomSelect);
         PositionBottomLeft(create, layout.RoomSelectCreate);
-        var createHitTarget = create.gameObject.AddComponent<Image>();
-        createHitTarget.color = Color.clear;
-        createHitTarget.raycastTarget = true;
-        var createArea = create.gameObject.AddComponent<Button>();
-        createArea.targetGraphic = createHitTarget;
-        createArea.onClick.AddListener(() => CreateRequested?.Invoke());
-        BuildCreateSection(create);
+        BuildCreateSection(create, RelativeTo(layout.RoomSelectCreateAction, layout.RoomSelectCreate));
 
         var join = Rect("Join", roomSelect);
         PositionBottomLeft(join, layout.RoomSelectJoin);
-        BuildJoinSection(join);
+        BuildJoinSection(join, RelativeTo(layout.RoomSelectJoinAction, layout.RoomSelectJoin));
 
         discoveredRoomsPanel = Rect("DiscoveredRooms", roomSelect);
         Position(discoveredRoomsPanel, new Vector2(.751f, .125f), new Vector2(770f, 100f));
@@ -326,7 +320,7 @@ public sealed class LanLobbyView : MonoBehaviour
         FrameLine("Divider", frame, new Vector2(.5f, .46f), new Vector2(680f, 2f));
     }
 
-    private void BuildCreateSection(RectTransform parent)
+    private void BuildCreateSection(RectTransform parent, LanLobbyRect actionRect)
     {
         var firstLine = Image("Line_0", parent, "Home/room_select_create_left_line");
         PositionSprite(firstLine, new Vector2(.18f, .62f), 24f);
@@ -343,16 +337,20 @@ public sealed class LanLobbyView : MonoBehaviour
         var startRoom = Image("StartRoomDecoration", parent, "Home/room_select_img_startroom");
         PositionSprite(startRoom, new Vector2(.5f, .88f), 128f);
         var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
-        PositionSprite(create.GetComponent<Image>(), new Vector2(.5f, .07f), 537f);
+        PositionBottomLeft(create.GetComponent<RectTransform>(), actionRect);
+        create.GetComponent<Image>().preserveAspect = false;
         var createIcon = Image("ActionIcon", create.transform, "create_icon");
-        PositionSprite(createIcon, new Vector2(.12f, .5f), 48f);
+        PositionSprite(createIcon, new Vector2(.08f, .5f), 48f);
         var createLabel = create.GetComponentInChildren<Text>();
         createLabel.color = new Color(.02f, .12f, .12f);
+        createLabel.alignment = TextAnchor.MiddleLeft;
+        createLabel.rectTransform.offsetMin = new Vector2(112f, 0f);
+        createLabel.rectTransform.offsetMax = new Vector2(-220f, 0f);
         createLabel.fontSize = 38;
         create.onClick.AddListener(() => CreateRequested?.Invoke());
     }
 
-    private void BuildJoinSection(RectTransform parent)
+    private void BuildJoinSection(RectTransform parent, LanLobbyRect actionRect)
     {
         for (var index = 0; index < 2; index++)
         {
@@ -395,12 +393,16 @@ public sealed class LanLobbyView : MonoBehaviour
         var ban = Image("Ban", parent, "Home/room_select_join_ban");
         PositionSprite(ban, new Vector2(.5f, .67f), 24f);
         joinButton = Button("JoinAction", parent, "Home/room_select_join_btn_bg_down", "加入同盟", 32, true);
-        PositionSprite(joinButton.GetComponent<Image>(), new Vector2(.5f, .11f), 537f);
+        PositionBottomLeft(joinButton.GetComponent<RectTransform>(), actionRect);
+        joinButton.GetComponent<Image>().preserveAspect = false;
         var joinLabel = joinButton.GetComponentInChildren<Text>();
         joinLabel.color = new Color(.12f, .06f, .01f);
+        joinLabel.alignment = TextAnchor.MiddleLeft;
+        joinLabel.rectTransform.offsetMin = new Vector2(112f, 0f);
+        joinLabel.rectTransform.offsetMax = new Vector2(-220f, 0f);
         joinLabel.fontSize = 38;
         var joinIcon = Image("ActionIcon", joinButton.transform, "join_icon");
-        PositionSprite(joinIcon, new Vector2(.12f, .5f), 48f);
+        PositionSprite(joinIcon, new Vector2(.08f, .5f), 48f);
         joinButton.onClick.AddListener(RequestJoin);
     }
 
@@ -568,6 +570,7 @@ public sealed class LanLobbyView : MonoBehaviour
         button.targetGraphic = image;
         var text = Text("Label", value.transform, fontSize, TextAnchor.MiddleCenter, Color.white);
         Stretch(text.rectTransform);
+        text.text = label;
         return button;
     }
 
@@ -650,6 +653,11 @@ public sealed class LanLobbyView : MonoBehaviour
         value.pivot = Vector2.zero;
         value.anchoredPosition = new Vector2(rect.Left, rect.Bottom);
         value.sizeDelta = new Vector2(rect.Width, rect.Height);
+    }
+
+    private static LanLobbyRect RelativeTo(LanLobbyRect child, LanLobbyRect parent)
+    {
+        return new LanLobbyRect(child.Left - parent.Left, child.Bottom - parent.Bottom, child.Width, child.Height);
     }
 
     private static void PositionSprite(Image value, Vector2 anchor, float width)

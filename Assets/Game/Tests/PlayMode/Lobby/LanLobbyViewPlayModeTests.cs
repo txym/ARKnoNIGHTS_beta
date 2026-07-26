@@ -110,15 +110,19 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
-        public IEnumerator HomeRoomSelect_UsesPreservedAssetProportionsWithinRightSideBounds()
+        public IEnumerator HomeRoomSelect_ActionBarsUseMeasuredRectsStretchSpritesAndOwnCreateInput()
         {
             var home = view.transform.Find("LanLobbyRoot/Home");
             var layout = global::LanLobbyLayout.ForSize(1920, 1080, 4);
             var create = home.Find("RoomSelect/Create").GetComponent<RectTransform>();
             var join = home.Find("RoomSelect/Join").GetComponent<RectTransform>();
             var background = home.Find("RoomSelect/RightBackground").GetComponent<UnityEngine.UI.Image>();
-            var createAction = home.Find("RoomSelect/Create/CreateAction").GetComponent<UnityEngine.UI.Image>();
-            var joinAction = home.Find("RoomSelect/Join/JoinAction").GetComponent<UnityEngine.UI.Image>();
+            var createAction = create.Find("CreateAction");
+            var joinAction = join.Find("JoinAction");
+            var createActionRect = createAction.GetComponent<RectTransform>();
+            var joinActionRect = joinAction.GetComponent<RectTransform>();
+            var createActionImage = createAction.GetComponent<UnityEngine.UI.Image>();
+            var joinActionImage = joinAction.GetComponent<UnityEngine.UI.Image>();
 
             Assert.That(create.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
             Assert.That(join.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
@@ -127,13 +131,24 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(create.anchoredPosition.x, Is.EqualTo(layout.RoomSelectCreate.Left));
             Assert.That(join.anchoredPosition.x, Is.EqualTo(layout.RoomSelectJoin.Left));
             Assert.That(background.preserveAspect, Is.True);
-            Assert.That(createAction.preserveAspect, Is.True);
-            Assert.That(joinAction.preserveAspect, Is.True);
-            Assert.That(Aspect(createAction.rectTransform), Is.EqualTo(Aspect(createAction.sprite)).Within(.01f));
-            Assert.That(Aspect(joinAction.rectTransform), Is.EqualTo(Aspect(joinAction.sprite)).Within(.01f));
             Assert.That(Aspect(background.rectTransform), Is.EqualTo(Aspect(background.sprite)).Within(.01f));
-            Assert.That(create.Find("CreateAction").GetComponent<RectTransform>().anchoredPosition.y, Is.LessThan(create.sizeDelta.y * .3f));
-            Assert.That(join.Find("JoinAction").GetComponent<RectTransform>().anchoredPosition.y, Is.LessThan(join.sizeDelta.y * .3f));
+            AssertActionRect(createActionRect, create, layout.RoomSelectCreateAction, 2f);
+            AssertActionRect(joinActionRect, join, layout.RoomSelectJoinAction, 2f);
+            Assert.That(createActionImage.preserveAspect, Is.False);
+            Assert.That(joinActionImage.preserveAspect, Is.False);
+            Assert.That(createActionRect.sizeDelta, Is.EqualTo(joinActionRect.sizeDelta));
+            Assert.That(createAction.Find("ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name, Is.EqualTo("create_icon"));
+            Assert.That(joinAction.Find("ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name, Is.EqualTo("join_icon"));
+            Assert.That(createAction.Find("Label").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo("创建同盟"));
+            Assert.That(joinAction.Find("Label").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo("加入同盟"));
+            Assert.That(create.GetComponent<UnityEngine.UI.Button>(), Is.Null, "The whole decoration container must not replace the action-bar hit area.");
+            Assert.That(createActionRect.GetSiblingIndex(), Is.EqualTo(create.childCount - 1));
+            Assert.That(joinActionRect.GetSiblingIndex(), Is.EqualTo(join.childCount - 1));
+
+            var createRequests = 0;
+            view.CreateRequested += () => createRequests++;
+            createAction.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            Assert.That(createRequests, Is.EqualTo(1));
             yield return null;
         }
 
@@ -329,8 +344,19 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(image, Is.Not.Null, item.Key);
                 Assert.That(image.sprite, Is.Not.Null, item.Key);
                 Assert.That(image.sprite.name, Is.EqualTo(item.Value), item.Key);
-                Assert.That(image.preserveAspect, Is.True, item.Key);
+                if (item.Key != "RoomSelect/Create/CreateAction" && item.Key != "RoomSelect/Join/JoinAction")
+                {
+                    Assert.That(image.preserveAspect, Is.True, item.Key);
+                }
             }
+        }
+
+        private static void AssertActionRect(RectTransform action, RectTransform container, global::LanLobbyRect expected, float tolerance)
+        {
+            Assert.That(container.anchoredPosition.x + action.anchoredPosition.x, Is.EqualTo(expected.Left).Within(tolerance));
+            Assert.That(container.anchoredPosition.y + action.anchoredPosition.y, Is.EqualTo(expected.Bottom).Within(tolerance));
+            Assert.That(action.sizeDelta.x, Is.EqualTo(expected.Width).Within(tolerance));
+            Assert.That(action.sizeDelta.y, Is.EqualTo(expected.Height).Within(tolerance));
         }
 
         private static float Aspect(RectTransform rect)
