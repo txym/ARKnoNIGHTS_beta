@@ -54,6 +54,10 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(damage.HitPointsAfter, damaged.Sample(damage.Tick).CurrentHitPoints);
             Assert.AreNotEqual("Hit", damaged.Sample(damage.Tick).Action.ToString());
             Assert.AreEqual(UnitPresentationAction.Death, dead.Sample(death.Tick).Action);
+            Assert.IsTrue(dead.Sample(death.Tick - 0.01d).ShouldDisplay);
+            Assert.IsFalse(dead.Sample(death.Tick).IsAlive);
+            Assert.IsFalse(dead.Sample(death.Tick).ShouldDisplay);
+            Assert.IsFalse(dead.Sample(track.EndTick).ShouldDisplay);
             Assert.AreEqual(UnitPresentationAction.Move, mover.Sample(move.Tick).Action);
             Assert.AreEqual(UnitPresentationAction.Idle, attacker.Sample(attacker.SpawnTick).Action);
         }

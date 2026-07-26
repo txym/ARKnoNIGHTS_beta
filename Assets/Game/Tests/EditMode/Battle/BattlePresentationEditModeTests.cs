@@ -50,6 +50,71 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void TrackPlayback_BindAtDeathSkipsTheDeadUnit()
+        {
+            var result = RunFixture();
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var death = result.Events.First(item => item.Type == BattleEventType.Death);
+            var factory = new FakeFactory();
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, factory, BattleObserverView.Home, death.Tick, out var bindDiagnostics),
+                    Is.True, string.Join(";", bindDiagnostics));
+
+                Assert.That(factory.Contains(death.UnitId), Is.False);
+            }
+        }
+
+        [Test]
+        public void TrackPlayback_ContinuousDeathTriggersTheExistingViewOnce()
+        {
+            var result = RunFixture();
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var death = result.Events.First(item => item.Type == BattleEventType.Death);
+            var factory = new FakeFactory();
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, factory, BattleObserverView.Home, death.Tick - 0.01d, out var bindDiagnostics),
+                    Is.True, string.Join(";", bindDiagnostics));
+                Assert.That(factory.Contains(death.UnitId), Is.True);
+
+                Assert.That(playback.RenderAt(death.Tick, out var renderDiagnostics),
+                    Is.True, string.Join(";", renderDiagnostics));
+                Assert.That(playback.RenderAt(death.Tick + 0.25d, out renderDiagnostics),
+                    Is.True, string.Join(";", renderDiagnostics));
+
+                Assert.That(factory.Get(death.UnitId).Commands.Count(command => command == "death"), Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void TrackPlayback_RewindBeforeDeathRecreatesTheLivingUnit()
+        {
+            var result = RunFixture();
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var death = result.Events.First(item => item.Type == BattleEventType.Death);
+            var factory = new FakeFactory();
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, factory, BattleObserverView.Home, death.Tick, out var bindDiagnostics),
+                    Is.True, string.Join(";", bindDiagnostics));
+                Assert.That(factory.Contains(death.UnitId), Is.False);
+
+                Assert.That(playback.RenderAt(death.Tick - 0.01d, out var rewindDiagnostics),
+                    Is.True, string.Join(";", rewindDiagnostics));
+
+                Assert.That(factory.Contains(death.UnitId), Is.True);
+                Assert.That(factory.Get(death.UnitId).Commands, Does.Not.Contain("death"));
+            }
+        }
+
+        [Test]
         public void TrackPlayback_ViewStatesSampleTheCurrentPresentationTickInsteadOfTheFinalResult()
         {
             var result = RunFixture();
@@ -621,6 +686,7 @@ namespace ArknoNights.Battle.Tests
                 return true;
             }
             public FakeView Get(string unitId) => views[unitId];
+            public bool Contains(string unitId) => views.ContainsKey(unitId);
         }
 
         private sealed class FakeView : IBattlePresentationView

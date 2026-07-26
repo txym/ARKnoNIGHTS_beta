@@ -65,6 +65,7 @@ namespace ArknoNights.Battle.Presentation
                 if (!sample.HasSpawned) continue;
                 if (!views.TryGetValue(unit.UnitId, out var record))
                 {
+                    if (!sample.ShouldDisplay) continue;
                     if (!factory.TryCreate(unit.UnitId, unit.TypeId, out var view, out var diagnostic) || view == null)
                     {
                         AddDiagnostic(diagnostic ?? new BattlePresentationDiagnostic("view.create.failed", "A view could not be created.", Track.BattleId, unit.UnitId));
