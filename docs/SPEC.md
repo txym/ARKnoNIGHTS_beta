@@ -569,3 +569,12 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 两个真实源文件使用 `unit-source-v1`，按身份与文本、养成与费用、行为分类、战斗数值、阻挡/价值/能力、资源与动画的顺序定义 lower camel case 字段。`resourceKey` 仅用于技术资源查找；`displayNameZhHans` 与 `skillDescriptionZhHans` 是独立的玩家可见简体中文字段。
 - 当前两个单位已配置简体中文显示名；显示名为空时仍不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`initialEliteLevel` 必须为 `0..3`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。
 - 源 JSON 是唯一权威。Editor 将它确定性生成 Player-safe `unit-catalog-v1`；Player 再从目录读取资源键、中文文本、稀有度、目标价值以及既有战斗/表现字段。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
+
+## 15. `SUMMON_JELLY_MINIONS` 果冻召唤（2026-07-26）
+
+- 自动技能的 SP 回复速率是全局规则：20 TPS 下每秒回复 `2 SP`，即每 `10 Tick` 回复 `1 SP`。每个单位的每个技能仍保存彼此独立的私有 SP 与施放次数；该速率不写入单位或能力源 JSON。`SUMMON_JELLY_MINIONS` 初始为 `5 SP`、需要并消耗 `15 SP`，因此持续存活且战斗未结束时首次在 Tick `100` 施放，消耗后再次积累并在 Tick `250` 施放。
+- 每次施放以施法者当前位置为中心，在一个地图格大小的正方形内生成三个 `5504`。该正方形边长固定为 `1 m`（`100 cm`），位置由 Core 的整数定点算法确定，不使用 Unity 浮点随机或 `Random`。
+- 新生成单位不继承施法者的路径、目标或阻挡关系。它们在生成 Tick 只产生 Spawn 与不可变实例快照，从下一 Tick 起才按普通单位的索敌、嘲讽与稳定决胜规则各自重新选择目标和行动。
+- 同一 Tick 先完成已到达伤害、Death、阻挡解除与索敌清理，再判断战斗是否终局。若清理后已终局，该 Tick 不回复 SP、不施放定时技能，召唤不能延长已经结束的战斗；BattleEnded 仍是该终局 Tick 的最后事件。
+- `BattleRunResult` 为动态实例保留唯一负数实例 ID、生成位置、激活 Tick、完整单位状态及只读实例快照索引。Presentation 只能从该封存结果编译动态 Track：初始单位在 Tick `0` 建立视图，动态 `5504` 在各自 Spawn Tick 建立视图；Home/Away 投影、暂停、变速、观察切换和 Replay 均不得重算或回写 Core。Replay 清理旧动态视图，并在再次越过对应 Spawn Tick 时用相同 ID 与快照重建。
+- `Assets/GameData/Units/Json` 与 `Assets/GameData/Abilities/Json` 是人工维护的权威源；单位/能力目录生成器只读、校验、稳定排序并写各自生成目录，不回写源 JSON。任何已部署单位引用的 innate ability 都必须在封存的 ability definitions 中解析成功；未知能力 ID 或未知召唤类型返回结构化验证错误，不允许静默省略能力。

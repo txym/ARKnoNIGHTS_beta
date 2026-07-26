@@ -177,7 +177,7 @@ namespace ArknoNights.Battle.Infrastructure
             if (!valid) return null;
 
             return new UnitCatalogEntry(
-                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false),
+                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>()),
                 dto.legacyUnitTypeId, dto.resourceKey, dto.displayNameZhHans, dto.skillDescriptionZhHans, dto.sourceFile, dto.deploymentCost, dto.portraitResourcePath, dto.rarity, dto.initialEliteLevel, dto.lifeDeduct, dto.prefabResourcePath, dto.skeletonDataResourcePath, dto.unitSkelType, dto.moveAnimation, dto.attackAnimation, dto.hitAnimation ?? string.Empty, dto.deathAnimation);
         }
 
@@ -186,25 +186,37 @@ namespace ArknoNights.Battle.Infrastructure
         internal static ValidationError Error(string code, string schema, string battleOrCatalogId, string playerId, string typeId) => new ValidationError(code, "schema=" + (schema ?? "<missing>") + "; battleId=" + (battleOrCatalogId ?? "<missing>") + "; playerId=" + (playerId ?? "<none>") + "; typeId=" + (typeId ?? "<none>"));
 
         [Serializable] private sealed class UnitCatalogDto { public string schemaVersion; public string catalogId; public UnitCatalogEntryDto[] units; }
-        [Serializable] private sealed class UnitCatalogEntryDto { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; }
+        [Serializable] private sealed class UnitCatalogEntryDto { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string[] innateAbilityIds; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; }
     }
 
     /// <summary>Joins a local-battle-v1 player snapshot to a Player-safe unit catalog without exposing presentation data to Core.</summary>
     public static class LocalBattleLoader
     {
+        private const string DefaultAbilityCatalogResourcePath = "BattleData/ability-catalog-v1";
+
         public static LocalBattleLoadResult LoadFromResources(string catalogResourcePath, string battleResourcePath)
         {
             var catalogResult = UnitCatalogLoader.LoadFromResources(catalogResourcePath);
             if (!catalogResult.Success) return new LocalBattleLoadResult(null, null, catalogResult.Errors);
+            var abilityCatalogResult = AbilityCatalogLoader.LoadFromResources(DefaultAbilityCatalogResourcePath, catalogResult.Catalog);
+            if (!abilityCatalogResult.Success) return new LocalBattleLoadResult(null, catalogResult.Catalog, abilityCatalogResult.Errors);
             var asset = Resources.Load<TextAsset>(battleResourcePath);
             return asset == null
                 ? Failure("localBattle.resource.missing", "schema=local-battle-v1; battleResource=" + battleResourcePath)
-                : LoadFromJson(catalogResult.Catalog, asset.text);
+                : LoadFromJson(catalogResult.Catalog, abilityCatalogResult.Catalog, asset.text);
         }
 
         public static LocalBattleLoadResult LoadFromJson(UnitCatalog catalog, string json)
         {
-            if (catalog == null) return Failure("localBattle.catalog.missing", "schema=local-battle-v1");
+            var abilityCatalogResult = AbilityCatalogLoader.LoadFromResources(DefaultAbilityCatalogResourcePath, catalog);
+            return abilityCatalogResult.Success
+                ? LoadFromJson(catalog, abilityCatalogResult.Catalog, json)
+                : new LocalBattleLoadResult(null, catalog, abilityCatalogResult.Errors);
+        }
+
+        public static LocalBattleLoadResult LoadFromJson(UnitCatalog catalog, AbilityCatalog abilityCatalog, string json)
+        {
+            if (catalog == null || abilityCatalog == null) return Failure("localBattle.catalog.missing", "schema=local-battle-v1");
             if (string.IsNullOrWhiteSpace(json)) return Failure("localBattle.json.empty", "schema=local-battle-v1");
             LocalBattleDto dto;
             try { dto = JsonUtility.FromJson<LocalBattleDto>(json); }
@@ -216,7 +228,7 @@ namespace ArknoNights.Battle.Infrastructure
             var players = (dto.players ?? Array.Empty<PlayerDto>()).Select(player => ConvertPlayer(player, dto, catalog, errors)).ToArray();
             if (errors.Count > 0) return new LocalBattleLoadResult(null, catalog, new ReadOnlyCollection<ValidationError>(errors));
 
-            var specification = new BattleInputSpecification(BattleInput.LocalBattleSchemaVersion, dto.battleId, dto.maxTicks, catalog.Entries.Select(entry => entry.Definition), players);
+            var specification = new BattleInputSpecification(BattleInput.LocalBattleSchemaVersion, dto.battleId, dto.maxTicks, catalog.Entries.Select(entry => entry.Definition), abilityCatalog.Abilities, players);
             if (!BattleInputFactory.TryCreate(specification, out var input, out var inputErrors)) return new LocalBattleLoadResult(null, catalog, inputErrors);
             return new LocalBattleLoadResult(input, catalog, Array.Empty<ValidationError>());
         }

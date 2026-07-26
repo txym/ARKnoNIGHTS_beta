@@ -297,3 +297,11 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `FormalBattleHudController.SetSessionHudValues` 只显示 loop-owned 本地赤金、生命和下一对手名称。当前固定测试数据因此显示赤金 `7`、生命 `400`；生命扣除、淘汰及经济规则仍未实现。
 - `ShopReadyHudController` 使用全屏锚定的组合根，但等级、商店和准备按钮均按 `1920×1080` 参考矩形计算。当前商店面板和内部内容按早期布局的 `1.5×` 呈现：六张 `237×262.5` 商品卡以 `12px` 间距贴商店右边缘排列，升级卡紧邻第一张商品卡左侧并允许越过面板左边缘；面板整体左移 `10px`、上移 `40px`。升级与商品价格背景统一下移 `15px`，商品价格再左移 `1px`；冻结和刷新按钮分别额外右移 `10px` 与 `15px`，并统一相对商店面板局部基线下移 `30px`。刷新价格背景仍以刷新按钮为父物体，底边与按钮底边重合，数字相对背景上移 `3px`。`SetRefreshFreePresentation(bool)` 是保留的 UI-only 接口：启用时加载 `cost_free` 并隐藏费用数字，关闭时恢复 `cost_bg_1/2` 与数字；它不调用 `LocalMatchState`、不改变刷新按钮可用性或实际扣费。升级确认渐变占据升级卡底部 `166.5×81`。冻结/刷新图标和标签相对含阴影按钮的几何中心上移 `9px`。准备按钮固定在赤金和部署费用区上方并与两者共中垂线。刷新命令单击即执行；冻结命令通过 `LocalMatchState.TrySetOccupiedShopSlotsFrozen` 一次设置全部非空槽位并只发出一次状态通知。准备状态使用 `ready_icon`，已准备状态使用 `icon_ready`。商店商品名和冻结、刷新、准备中文标签由缓存的方正黑体简体 `FangZhengHeiTiJianTi-1` 呈现，纯数字由 `FormalNumericFont` 呈现。`FormalHudSpriteLoader` 同时支持 Sprite 与 Texture 导入的现有 Resources PNG，避免未改导入类型的贴图显示为默认白块。
 - `BattleHudSceneCoordinator` 订阅商店可见性和正式单位选择事件：打开单位信息面板会关闭商店，打开商店会清除单位选择并恢复玩家列表，避免两个左/上层信息区域同时占用界面。`BattleHudCaptureRunner` 仅在 Player 参数 `-battleHudCapture` 时运行，按真实商店、观察和阶段命令生成 `17` 张截图，并把阶段、本地/观察玩家、准备状态、商店六槽、选中比赛/观察侧、共享演示 Tick、Track 摘要、Canvas scale 和关键 RectTransform 写入 `battle-hud-manifest.json`；其中包含一张战斗阶段商店打开状态。若截图全黑或写入超时，入口明确失败并写入 `battle-hud-capture-failed.txt`。
+
+## 24. Mainline 果冻召唤数据流与生命周期（2026-07-26）
+
+- 权威数据流为 `Units/Json + Abilities/Json → UnitCatalogGenerator/AbilityCatalogGenerator → unit-catalog-v1 + ability-catalog-v1 → BattleInputFactory → BattleRunner`。两个生成器只读源数据并执行 schema、引用、数值及稳定顺序验证；不会从资源或目录反向改写源 JSON。
+- `LocalBattleLoader`、准备阶段封存器和 `PreparationBattleLoopController` 会把已验证的 ability definitions 与单位定义一起封存。`BattleInputFactory` 验证单位固有能力 ID 与 summon type 均可解析，遗漏目录或未知 ID 会结构化失败。
+- 全局自动恢复为 `2 SP/s`，在 20 TPS 下每 10 Tick 增加一点；每个 `RuntimeAbilityState` 私有保存 SP 和施放次数。`SUMMON_JELLY_MINIONS` 在 Tick 100/250 施放，每次在施法者中心 100cm × 100cm 方形中确定性生成三个 5504，并分配递减负数 ID。
+- Tick 在处理本 Tick 伤害、Death、阻挡解除和目标清理后判定终局；终局 Tick 不恢复 SP、不施放技能。非终局 Spawn 只创建无路径、无目标、无阻挡继承的新实例，`ActivationTick = SpawnTick + 1`，之后按普通单位规则重新索敌。
+- `BattleRunResult.UnitSnapshots` 是初始和动态实例的不可变索引。`BattlePresentationTrackCompiler` 从此索引建立动态 Track；Playback 在越过 Spawn Tick 时创建目录映射视图，Replay/Dispose 清理旧视图，并以相同实例 ID 重建，绝不重新运行 Core。

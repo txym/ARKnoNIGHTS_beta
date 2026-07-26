@@ -123,7 +123,7 @@ namespace ArknoNights.Battle.Presentation
             displayTicks += unscaledDeltaSeconds * PlaybackSpeed * BattleInput.TicksPerSecond;
             if (compiledTrack != null)
             {
-                foreach (var action in events.Where(item => (item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack) && item.Tick > previousTicks && item.Tick <= displayTicks))
+                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack) && item.Tick > previousTicks && item.Tick <= displayTicks))
                     if (!trackPlayback.RenderAt(action.Tick, out var actionDiagnostics)) diagnostics.AddRange(actionDiagnostics);
                 if (!trackPlayback.RenderAt(displayTicks, out var trackDiagnostics)) diagnostics.AddRange(trackDiagnostics);
             }

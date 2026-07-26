@@ -40,6 +40,8 @@ namespace ArknoNights.Battle.Tests
             var first = matches.Cast<object>().Single(item => (string)item.GetType().GetProperty("MatchId").GetValue(item) == "match-ab");
             var firstInput = (ArknoNights.Battle.Core.BattleInput)first.GetType().GetProperty("Input").GetValue(first);
             Assert.AreEqual("local-5503-alpha", firstInput.Players.Single(player => player.Side == ArknoNights.Battle.Core.BattleSide.Home).Units.Single(unit => unit.Zone == ArknoNights.Battle.Core.UnitZone.Deployed).UnitId);
+            Assert.That(firstInput.AbilityDefinitions.Select(item => item.AbilityId), Does.Contain("SUMMON_JELLY_MINIONS"),
+                "The SampleScene preparation loop must seal the validated ability required by deployed 5503.");
             loopType.GetMethod("AdvanceForTests").Invoke(loop, new object[] { 0.05f });
             var sharedTick = (double)multi.GetType().GetProperty("PresentationTick").GetValue(multi);
             Assert.That(sharedTick, Is.GreaterThan(0d));

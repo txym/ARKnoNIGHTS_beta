@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Infrastructure;
@@ -171,7 +172,7 @@ namespace ArknoNights.Battle.Tests
             {
                 Assert.IsTrue(playback.Load(result, factory, out var diagnostics), string.Join(";", diagnostics));
 
-                foreach (var spawn in result.Events.Where(item => item.Type == BattleEventType.Spawn))
+                foreach (var spawn in result.Events.Where(item => item.Type == BattleEventType.Spawn && item.Tick == 0))
                 {
                     var firstActiveMove = result.Events.FirstOrDefault(item =>
                         item.Type == BattleEventType.Move &&
@@ -292,6 +293,128 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void DynamicSpawnTrack_UsesResultSnapshotIndexAndProjectsThreeTick100Arcslmi()
+        {
+            var authoritative = RunSingleArcslmaSummonBattle();
+            var result = WithoutDynamicEventSnapshots(authoritative);
+            var compiler = new BattlePresentationTrackCompiler();
+
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var minions = track.Units.Where(unit => unit.TypeId == "5504").ToArray();
+            Assert.That(minions, Has.Length.EqualTo(3));
+            Assert.That(minions.All(unit => unit.SpawnTick == 100), Is.True);
+            Assert.That(minions.All(unit => unit.MaxHitPoints == 2500), Is.True);
+
+            var currentHitPoints = typeof(UnitPresentationTrack).GetProperty("CurrentHitPoints");
+            var currentShield = typeof(UnitPresentationTrack).GetProperty("CurrentShield");
+            var initialPosition = typeof(UnitPresentationTrack).GetProperty("InitialPosition");
+            Assert.That(currentHitPoints, Is.Not.Null, "The track contract must carry snapshot CurrentHitPoints.");
+            Assert.That(currentShield, Is.Not.Null, "The track contract must carry snapshot CurrentShield.");
+            Assert.That(initialPosition, Is.Not.Null, "The track contract must carry the actual snapshot Spawn position.");
+            foreach (var minion in minions)
+            {
+                Assert.That(currentHitPoints.GetValue(minion), Is.EqualTo(2500), minion.UnitId);
+                Assert.That(currentShield.GetValue(minion), Is.EqualTo(0), minion.UnitId);
+                var spawn = result.Events.Single(item => item.Type == BattleEventType.Spawn && item.UnitId == minion.UnitId);
+                Assert.That(initialPosition.GetValue(minion), Is.EqualTo(spawn.ToPosition.Value), minion.UnitId);
+                var sample = minion.Sample(100);
+                Assert.That(sample.Position.XUnits, Is.EqualTo(spawn.ToPosition.Value.XUnits / 100d), minion.UnitId);
+                Assert.That(sample.Position.YUnits, Is.EqualTo(spawn.ToPosition.Value.YUnits / 100d), minion.UnitId);
+            }
+        }
+
+        [Test]
+        public void DynamicSpawnPlayback_InheritsTheActivePlaybackSpeed()
+        {
+            var result = WithoutDynamicEventSnapshots(RunSingleArcslmaSummonBattle());
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var factory = new FakeFactory();
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, factory, BattleObserverView.Home, 0d, out var bindDiagnostics), Is.True, string.Join(";", bindDiagnostics));
+                playback.SetPlaybackSpeed(2f);
+                Assert.That(playback.RenderAt(100d, out var renderDiagnostics), Is.True, string.Join(";", renderDiagnostics));
+
+                foreach (var unitId in new[] { "-1", "-2", "-3" })
+                    Assert.That(factory.Get(unitId).PlaybackSpeeds.Last(), Is.EqualTo(2f), unitId);
+            }
+        }
+
+        [Test]
+        public void DynamicSpawnTrack_RejectsMissingAndDuplicateResultSnapshotsWithIdentityDiagnostics()
+        {
+            var authoritative = RunSingleArcslmaSummonBattle();
+            var dynamicSpawn = authoritative.Events.First(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504");
+            var missingSnapshots = authoritative.UnitSnapshots
+                .Where(item => item.Key != dynamicSpawn.UnitId)
+                .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            AssertCompileDiagnostic(
+                CloneResult(authoritative, authoritative.Events, missingSnapshots),
+                "track.spawn.snapshot.missing",
+                dynamicSpawn.UnitId,
+                dynamicSpawn.Tick,
+                dynamicSpawn.Sequence);
+
+            var duplicateSnapshots = authoritative.UnitSnapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            duplicateSnapshots.Add("duplicate-index-key", CloneSnapshot(authoritative.UnitSnapshots[dynamicSpawn.UnitId]));
+            AssertCompileDiagnostic(
+                CloneResult(authoritative, authoritative.Events, duplicateSnapshots),
+                "track.spawn.snapshot.duplicate",
+                dynamicSpawn.UnitId,
+                dynamicSpawn.Tick,
+                dynamicSpawn.Sequence);
+        }
+
+        [TestCase("type")]
+        [TestCase("side")]
+        [TestCase("position")]
+        public void DynamicSpawnTrack_RejectsSpawnAgainstMismatchedResultSnapshot(string mismatch)
+        {
+            var authoritative = RunSingleArcslmaSummonBattle();
+            var dynamicSpawn = authoritative.Events.First(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504");
+            var source = authoritative.UnitSnapshots[dynamicSpawn.UnitId];
+            var mismatched = mismatch == "type"
+                ? CloneSnapshot(source, typeId: "1000")
+                : mismatch == "side"
+                    ? CloneSnapshot(source, side: BattleSide.Away)
+                    : CloneSnapshot(source, position: new FixedPosition(source.Position.XUnits + 1, source.Position.YUnits));
+            var snapshots = authoritative.UnitSnapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            snapshots[dynamicSpawn.UnitId] = mismatched;
+
+            AssertCompileDiagnostic(
+                CloneResult(authoritative, authoritative.Events, snapshots),
+                "track.spawn.snapshot.mismatch",
+                dynamicSpawn.UnitId,
+                dynamicSpawn.Tick,
+                dynamicSpawn.Sequence);
+        }
+
+        [Test]
+        public void DynamicSpawnTrack_RejectsEventBeforeSpawnWithIdentityDiagnostic()
+        {
+            var authoritative = RunSingleArcslmaSummonBattle();
+            var dynamicSpawn = authoritative.Events.First(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504");
+            var events = authoritative.Events.Where(item => item.Tick < 99)
+                .Concat(new[]
+                {
+                    new BattleEvent(BattleEventType.TargetChanged, 99, 1, dynamicSpawn.UnitId, null, null, null, null, null,
+                        null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None, null)
+                })
+                .Concat(authoritative.Events.Where(item => item.Tick == 99).Select(item => CloneEvent(item, item.Sequence + 1, item.SpawnSnapshot)))
+                .Concat(authoritative.Events.Where(item => item.Tick > 99))
+                .ToArray();
+
+            AssertCompileDiagnostic(
+                CloneResult(authoritative, events, authoritative.UnitSnapshots),
+                "track.unit.beforeSpawn",
+                dynamicSpawn.UnitId,
+                99,
+                1);
+        }
+
+        [Test]
         public void Playback_MissingResourceMappingFailsWithStructuredDiagnostic()
         {
             using (var playback = new BattleEventPlaybackController())
@@ -314,6 +437,136 @@ namespace ArknoNights.Battle.Tests
             var loaded = LocalBattleLoader.LoadFromResources(RealCatalogPath, RealBattlePath);
             Assert.IsTrue(loaded.Success, string.Join(";", loaded.Errors.Select(item => item.ToString())));
             return new BattleRunner(loaded.Input).RunToCompletion();
+        }
+
+        private static BattleRunResult RunSingleArcslmaSummonBattle()
+        {
+            var catalog = UnitCatalogLoader.LoadFromResources(RealCatalogPath);
+            Assert.That(catalog.Success, Is.True, string.Join(";", catalog.Errors.Select(item => item.ToString())));
+            var abilities = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalog.Catalog);
+            Assert.That(abilities.Success, Is.True, string.Join(";", abilities.Errors.Select(item => item.ToString())));
+            var specification = new BattleInputSpecification(
+                BattleInput.SupportedSchemaVersion,
+                "presentation-single-caster",
+                101,
+                catalog.Catalog.Entries.Select(item => item.Definition),
+                abilities.Catalog.Abilities,
+                new[]
+                {
+                    new PlayerSnapshot("home", BattleSide.Home, new[]
+                    {
+                        new UnitSnapshot("caster", "5503", UnitZone.Deployed, new FormationCoordinate(5, 2), Array.Empty<BuffPlaceholder>())
+                    }),
+                    new PlayerSnapshot("away", BattleSide.Away, new[]
+                    {
+                        new UnitSnapshot("enemy", "1000", UnitZone.Deployed, new FormationCoordinate(5, 2), Array.Empty<BuffPlaceholder>())
+                    })
+                });
+            Assert.That(BattleInputFactory.TryCreate(specification, out var input, out var errors), Is.True, string.Join(";", errors.Select(item => item.ToString())));
+            return new BattleRunner(input).RunToCompletion();
+        }
+
+        private static BattleRunResult WithoutDynamicEventSnapshots(BattleRunResult source)
+        {
+            var events = source.Events.Select(item =>
+                item.Type == BattleEventType.Spawn && item.UnitId.StartsWith("-", StringComparison.Ordinal)
+                    ? CloneEvent(item, item.Sequence, null)
+                    : item);
+            return CloneResult(source, events, source.UnitSnapshots);
+        }
+
+        private static BattleRunResult CloneResult(
+            BattleRunResult source,
+            IEnumerable<BattleEvent> events,
+            IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> snapshots)
+        {
+            return new BattleRunResult(
+                source.BattleId,
+                source.HomePlayerId,
+                source.AwayPlayerId,
+                source.InputCanonicalSummary,
+                source.KnownUnitTypeIds,
+                source.CompletedTicks,
+                source.StopReason,
+                source.Winner,
+                source.Trace,
+                new ReadOnlyCollection<BattleEvent>(events.ToArray()),
+                source.FinalUnits,
+                new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
+                    snapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)),
+                source.StableSummary);
+        }
+
+        private static BattleEvent CloneEvent(BattleEvent source, int sequence, BattleUnitInstanceSnapshot spawnSnapshot)
+        {
+            return new BattleEvent(
+                source.Type,
+                source.Tick,
+                sequence,
+                source.UnitId,
+                source.UnitTypeId,
+                source.UnitSide,
+                source.RelatedUnitId,
+                source.FromPosition,
+                source.ToPosition,
+                source.DamageType,
+                source.DamageAmount,
+                source.HitPointsBefore,
+                source.HitPointsAfter,
+                source.PlannedDamageTick,
+                source.OriginalAnimationTicks,
+                source.EffectiveAnimationTicks,
+                source.Winner,
+                source.Reason,
+                spawnSnapshot);
+        }
+
+        private static BattleUnitInstanceSnapshot CloneSnapshot(
+            BattleUnitInstanceSnapshot source,
+            string typeId = null,
+            BattleSide? side = null,
+            FixedPosition? position = null)
+        {
+            return new BattleUnitInstanceSnapshot(
+                source.UnitId,
+                typeId ?? source.TypeId,
+                source.PlayerId,
+                side ?? source.Side,
+                source.IsDynamicallyGenerated,
+                position ?? source.Position,
+                source.EliteLevel,
+                source.MaxHitPoints,
+                source.CurrentHitPoints,
+                source.CurrentShield,
+                source.Attack,
+                source.Defense,
+                source.MagicResistance,
+                source.MoveSpeedCentimetresPerSecond,
+                source.AttackIntervalTicks,
+                source.AttackAnimationDurationTicks,
+                source.DamageType,
+                source.AttackMethod,
+                source.BlockCapacity,
+                source.TauntLevel,
+                source.Buffs,
+                source.ActivationTick);
+        }
+
+        private static void AssertCompileDiagnostic(
+            BattleRunResult result,
+            string code,
+            string unitId,
+            int tick,
+            int sequence)
+        {
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out _, out var diagnostics), Is.False);
+            Assert.That(diagnostics, Has.Some.Matches<BattlePresentationDiagnostic>(item =>
+                item.Code == code
+                && item.BattleId == result.BattleId
+                && item.UnitId == unitId
+                && item.Tick == tick
+                && item.Sequence == sequence));
         }
 
         private static FixedPosition PositionAt(BattleRunResult result, string unitId, int tick)

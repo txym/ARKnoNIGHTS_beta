@@ -43,6 +43,11 @@ namespace ArknoNights.Battle.Presentation
             var knownTypeIds = new HashSet<string>(result.KnownUnitTypeIds ?? Array.Empty<string>(), StringComparer.Ordinal);
             var builders = new Dictionary<string, UnitBuilder>(StringComparer.Ordinal);
             var events = (result.Events ?? Array.Empty<BattleEvent>()).ToArray();
+            if (!ValidateSnapshotIndex(result, events, errors))
+            {
+                diagnostics = ReadOnly(errors);
+                return false;
+            }
             BattleEvent battleEnded = null;
             var lastTick = -1;
             var lastSequence = 0;
@@ -58,7 +63,7 @@ namespace ArknoNights.Battle.Presentation
 
                 if (item.Type == BattleEventType.Spawn)
                 {
-                    if (!TryAddSpawn(item, result.BattleId, knownTypeIds, builders, errors)) break;
+                    if (!TryAddSpawn(item, result.BattleId, result.UnitSnapshots, knownTypeIds, builders, errors)) break;
                     continue;
                 }
 
@@ -140,7 +145,7 @@ namespace ArknoNights.Battle.Presentation
                 .ThenBy(item => item.Snapshot.UnitId, StringComparer.Ordinal)
                 .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, compressedPositions[item.Snapshot.UnitId], item.HitPoints, item.Attacks))
                 .ToArray();
-            track = new BattlePresentationTrack(result, units, CreateEventDigest(events), metrics);
+            track = new BattlePresentationTrack(result, units, CreateEventDigest(events, result.UnitSnapshots), metrics);
             diagnostics = ReadOnly(errors);
             return true;
         }
@@ -176,17 +181,42 @@ namespace ArknoNights.Battle.Presentation
             return true;
         }
 
-        private static bool TryAddSpawn(BattleEvent item, string battleId, ISet<string> knownTypeIds, IDictionary<string, UnitBuilder> builders, List<BattlePresentationDiagnostic> errors)
+        private static bool ValidateSnapshotIndex(BattleRunResult result, IReadOnlyList<BattleEvent> events, List<BattlePresentationDiagnostic> errors)
+        {
+            if (result.UnitSnapshots == null) return true;
+            var duplicate = result.UnitSnapshots.Values
+                .Where(snapshot => snapshot != null && !string.IsNullOrWhiteSpace(snapshot.UnitId))
+                .GroupBy(snapshot => snapshot.UnitId, StringComparer.Ordinal)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicate != null)
+            {
+                var spawn = events.FirstOrDefault(item => item != null && item.Type == BattleEventType.Spawn && item.UnitId == duplicate.Key);
+                AddError(errors, "track.spawn.snapshot.duplicate", "Snapshot Unit ID appears more than once in the result index.", result.BattleId, duplicate.Key, spawn == null ? -1 : spawn.Tick, spawn == null ? -1 : spawn.Sequence);
+                return false;
+            }
+
+            foreach (var item in result.UnitSnapshots)
+            {
+                if (item.Value != null && string.Equals(item.Key, item.Value.UnitId, StringComparison.Ordinal)) continue;
+                var unitId = item.Value == null ? item.Key : item.Value.UnitId;
+                var spawn = events.FirstOrDefault(candidate => candidate != null && candidate.Type == BattleEventType.Spawn && candidate.UnitId == unitId);
+                AddError(errors, "track.spawn.snapshot.index.invalid", "Snapshot index key does not match its Unit ID.", result.BattleId, unitId, spawn == null ? -1 : spawn.Tick, spawn == null ? -1 : spawn.Sequence);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryAddSpawn(BattleEvent item, string battleId, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> snapshots, ISet<string> knownTypeIds, IDictionary<string, UnitBuilder> builders, List<BattlePresentationDiagnostic> errors)
         {
             if (builders.ContainsKey(item.UnitId))
             {
                 AddError(errors, "track.spawn.duplicate", "Duplicate Spawn event.", battleId, item.UnitId, item.Tick, item.Sequence);
                 return false;
             }
-            var snapshot = item.SpawnSnapshot;
-            if (snapshot == null)
+            if (!TryResolveSpawnSnapshot(item, snapshots, out var snapshot))
             {
-                AddError(errors, "track.spawn.snapshot.missing", "Spawn snapshot is required.", battleId, item.UnitId, item.Tick, item.Sequence);
+                AddError(errors, "track.spawn.snapshot.missing", "BattleRunResult snapshot is required for Spawn.", battleId, item.UnitId, item.Tick, item.Sequence);
                 return false;
             }
             if (item.UnitId != snapshot.UnitId || item.UnitTypeId != snapshot.TypeId || item.UnitSide != snapshot.Side || !item.ToPosition.HasValue || !item.ToPosition.Value.Equals(snapshot.Position))
@@ -215,6 +245,23 @@ namespace ArknoNights.Battle.Presentation
             builder.HitPoints.Add(new UnitPresentationTrack.HpKey(item.Tick, item.Sequence, snapshot.CurrentHitPoints));
             builders.Add(snapshot.UnitId, builder);
             return true;
+        }
+
+        private static bool TryResolveSpawnSnapshot(
+            BattleEvent item,
+            IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> snapshots,
+            out BattleUnitInstanceSnapshot snapshot)
+        {
+            if (snapshots != null && snapshots.TryGetValue(item.UnitId ?? string.Empty, out snapshot) && snapshot != null)
+                return true;
+
+            snapshot = item.SpawnSnapshot;
+            return snapshots != null
+                && snapshots.Count == 0
+                && item.Tick == 0
+                && snapshot != null
+                && !snapshot.IsDynamicallyGenerated
+                && !IsNegative(item.UnitId);
         }
 
         private static bool TryResolveUnit(string unitId, string battleId, int tick, int sequence, IReadOnlyDictionary<string, UnitBuilder> builders, out UnitBuilder unit, List<BattlePresentationDiagnostic> errors)
@@ -464,13 +511,14 @@ namespace ArknoNights.Battle.Presentation
         private static IReadOnlyList<BattlePresentationDiagnostic> ReadOnly(IEnumerable<BattlePresentationDiagnostic> errors) => new ReadOnlyCollection<BattlePresentationDiagnostic>(errors.ToArray());
         private static void AddError(ICollection<BattlePresentationDiagnostic> errors, string code, string message, string battleId, string unitId, int tick, int sequence) => errors.Add(new BattlePresentationDiagnostic(code, message, battleId, unitId, tick, sequence));
 
-        private static string CreateEventDigest(IEnumerable<BattleEvent> events)
+        private static string CreateEventDigest(IEnumerable<BattleEvent> events, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> snapshots)
         {
             var builder = new StringBuilder();
             foreach (var item in events)
             {
                 builder.Append((int)item.Type).Append('|').Append(item.Tick).Append('|').Append(item.Sequence).Append('|').Append(item.UnitId).Append('|').Append(item.UnitTypeId).Append('|').Append(item.UnitSide).Append('|').Append(item.RelatedUnitId).Append('|').Append(item.FromPosition).Append('|').Append(item.ToPosition).Append('|').Append(item.DamageType).Append('|').Append(item.DamageAmount).Append('|').Append(item.HitPointsBefore).Append('|').Append(item.HitPointsAfter).Append('|').Append(item.PlannedDamageTick).Append('|').Append(item.OriginalAnimationTicks).Append('|').Append(item.EffectiveAnimationTicks).Append('|').Append(item.Winner).Append('|').Append(item.Reason);
-                AppendSnapshot(builder, item.SpawnSnapshot);
+                if (item.Type == BattleEventType.Spawn && TryResolveSpawnSnapshot(item, snapshots, out var snapshot))
+                    AppendSnapshot(builder, snapshot);
             }
             return BattlePresentationTrack.Digest(builder.ToString());
         }

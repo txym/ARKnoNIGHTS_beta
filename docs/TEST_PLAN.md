@@ -586,3 +586,9 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 严格 Windows x64：`Artifacts/BattleHudVisualAudit/final-regression/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出为 `WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告是既有 `TagRegistry.freezeAppend` 未使用。
 - 可见 Player 截图：`Artifacts/BattleHudVisualAudit/final-regression/captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest；日志记录 `[BattleHudCapture][completed] count=17`。已重点复核商店、冻结/刷新位置、Player3 掉线表现及 Player4 退出替换头像与掉线图标层级，未发现捕获失败或运行时异常。
 - 提交前范围检查：新退出头像贴图与 `.meta` 成对保留；`.superpowers/` 和 `docs/bonds/` 属于无关未跟踪内容，不纳入 HUD 最终提交。
+
+## 44. Mainline 果冻召唤最终集成验证（2026-07-26）
+
+- 数据、Core、演出与准备阶段的定向证据保存在能力分支的 `.superpowers/sdd/2026-07-26-mainline-jelly-summon/evidence/`。覆盖 5504 目录、能力目录、全局 2 SP/s 的私有技力、Tick 100/250、终局 Tick 不施放、1 格方形固定点 Spawn、下一 Tick 激活、独立索敌、动态轨道、真实 5504 工厂和 Replay。
+- 功能分支最终全量验证为 EditMode `159/159`、PlayMode `22/22`，均为非零 XML、零失败、零跳过；批处理编译退出码为 `0`，日志未见 C# 编译错误或未处理异常。合并后必须重新运行相关全量测试，合并结果才是最终验收依据。
+- 未验证：交互式 Unity Editor/Windows Player 中对三个 5504 一格分布、Tick 100/250 出现、重新索敌、死亡清理、Home/Away 投影、暂停/变速和 Replay 连续性的人工视觉检查；自动断言不能替代此检查。

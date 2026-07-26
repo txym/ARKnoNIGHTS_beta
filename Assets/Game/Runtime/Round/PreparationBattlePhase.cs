@@ -112,8 +112,14 @@ namespace ArknoNights.Round
     {
         public static bool TryCreate(PlayerStateSnapshot home, PlayerStateSnapshot away, UnitCatalog catalog, string battleId, int maxTicks, out BattleInput input, out IReadOnlyList<ValidationError> errors)
         {
+            if (!TryLoadDefaultAbilityCatalog(catalog, out var abilityCatalog, out errors)) { input = null; return false; }
+            return TryCreate(home, away, catalog, abilityCatalog, battleId, maxTicks, out input, out errors);
+        }
+
+        public static bool TryCreate(PlayerStateSnapshot home, PlayerStateSnapshot away, UnitCatalog catalog, AbilityCatalog abilityCatalog, string battleId, int maxTicks, out BattleInput input, out IReadOnlyList<ValidationError> errors)
+        {
             input = null;
-            if (home == null || away == null || catalog == null)
+            if (home == null || away == null || catalog == null || abilityCatalog == null)
             {
                 errors = new[] { new ValidationError("round.snapshot.missing", "Home snapshot, Away snapshot, and catalog are required.") };
                 return false;
@@ -124,14 +130,21 @@ namespace ArknoNights.Round
                 battleId,
                 maxTicks,
                 catalog.Entries.Select(entry => entry.Definition),
+                abilityCatalog.Abilities,
                 new[] { ToPlayerSnapshot(home, BattleSide.Home), ToPlayerSnapshot(away, BattleSide.Away) });
             return BattleInputFactory.TryCreate(specification, out input, out errors);
         }
 
         public static bool TryCreate(PlayerStateSnapshot player, UnitCatalog catalog, PlayerSnapshot fixedAway, string battleId, int maxTicks, out BattleInput input, out IReadOnlyList<ValidationError> errors)
         {
+            if (!TryLoadDefaultAbilityCatalog(catalog, out var abilityCatalog, out errors)) { input = null; return false; }
+            return TryCreate(player, catalog, abilityCatalog, fixedAway, battleId, maxTicks, out input, out errors);
+        }
+
+        public static bool TryCreate(PlayerStateSnapshot player, UnitCatalog catalog, AbilityCatalog abilityCatalog, PlayerSnapshot fixedAway, string battleId, int maxTicks, out BattleInput input, out IReadOnlyList<ValidationError> errors)
+        {
             input = null;
-            if (player == null || catalog == null || fixedAway == null)
+            if (player == null || catalog == null || abilityCatalog == null || fixedAway == null)
             {
                 errors = new[] { new ValidationError("round.snapshot.missing", "Player snapshot, catalog, and fixed Away snapshot are required.") };
                 return false;
@@ -149,6 +162,7 @@ namespace ArknoNights.Round
                 battleId,
                 maxTicks,
                 catalog.Entries.Select(entry => entry.Definition),
+                abilityCatalog.Abilities,
                 new[] { new PlayerSnapshot(player.PlayerId, BattleSide.Home, homeUnits), fixedAway });
             return BattleInputFactory.TryCreate(specification, out input, out errors);
         }
@@ -173,6 +187,14 @@ namespace ArknoNights.Round
                 case PlayerUnitZone.Shop: return UnitZone.Shop;
                 default: return UnitZone.Staging;
             }
+        }
+
+        private static bool TryLoadDefaultAbilityCatalog(UnitCatalog catalog, out AbilityCatalog abilityCatalog, out IReadOnlyList<ValidationError> errors)
+        {
+            var loaded = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalog);
+            abilityCatalog = loaded.Catalog;
+            errors = loaded.Errors;
+            return loaded.Success;
         }
     }
 
@@ -318,9 +340,21 @@ namespace ArknoNights.Round
     {
         public static bool TrySealRound(LocalMatchState match, UnitCatalog catalog, int maxTicks, string roundId, out FourPlayerBattleRoundSealResult result, out string error)
         {
+            var abilityCatalogLoad = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalog);
+            if (!abilityCatalogLoad.Success)
+            {
+                result = null;
+                error = "round.abilityCatalog.load.failed:" + string.Join(" | ", abilityCatalogLoad.Errors.Select(item => item.ToString()).ToArray());
+                return false;
+            }
+            return TrySealRound(match, catalog, abilityCatalogLoad.Catalog, maxTicks, roundId, out result, out error);
+        }
+
+        public static bool TrySealRound(LocalMatchState match, UnitCatalog catalog, AbilityCatalog abilityCatalog, int maxTicks, string roundId, out FourPlayerBattleRoundSealResult result, out string error)
+        {
             result = null;
             error = string.Empty;
-            if (match == null || catalog == null || maxTicks <= 0 || string.IsNullOrWhiteSpace(roundId))
+            if (match == null || catalog == null || abilityCatalog == null || maxTicks <= 0 || string.IsNullOrWhiteSpace(roundId))
             {
                 error = "round.fourPlayer.dependencies.invalid";
                 return false;
@@ -352,12 +386,12 @@ namespace ArknoNights.Round
                 playerSeals.Add(playerSeal);
             }
 
-            if (!PlayerStateBattleInputAdapter.TryCreate(playerSeals[0].After, playerSeals[1].After, catalog, roundId + "-ab", maxTicks, out var matchAb, out var abErrors))
+            if (!PlayerStateBattleInputAdapter.TryCreate(playerSeals[0].After, playerSeals[1].After, catalog, abilityCatalog, roundId + "-ab", maxTicks, out var matchAb, out var abErrors))
             {
                 error = "round.fourPlayer.match-ab.input.invalid:" + string.Join(" | ", abErrors.Select(item => item.ToString()).ToArray());
                 return false;
             }
-            if (!PlayerStateBattleInputAdapter.TryCreate(playerSeals[2].After, playerSeals[3].After, catalog, roundId + "-cd", maxTicks, out var matchCd, out var cdErrors))
+            if (!PlayerStateBattleInputAdapter.TryCreate(playerSeals[2].After, playerSeals[3].After, catalog, abilityCatalog, roundId + "-cd", maxTicks, out var matchCd, out var cdErrors))
             {
                 error = "round.fourPlayer.match-cd.input.invalid:" + string.Join(" | ", cdErrors.Select(item => item.ToString()).ToArray());
                 return false;

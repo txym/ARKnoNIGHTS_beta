@@ -98,6 +98,27 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void Compile_LegacyInitialSpawnEventSnapshotRemainsCompatible()
+        {
+            var track = Compile(CreateLegacyInitialSpawnResult(0));
+
+            Assert.That(track.Units.Single().UnitId, Is.EqualTo("home-unit"));
+            Assert.That(track.Units.Single().IsDynamicallyGenerated, Is.False);
+        }
+
+        [Test]
+        public void Compile_RejectsPartialSnapshotIndexAndNonzeroLegacyFallback()
+        {
+            var authoritative = RunFixture();
+            var spawn = authoritative.Events.First(item => item.Type == BattleEventType.Spawn);
+            var partialSnapshots = authoritative.UnitSnapshots
+                .Where(item => item.Key != spawn.UnitId)
+                .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            AssertDiagnostic(CloneWithSnapshots(authoritative, partialSnapshots), "track.spawn.snapshot.missing");
+            AssertDiagnostic(CreateLegacyInitialSpawnResult(5), "track.spawn.snapshot.missing");
+        }
+
+        [Test]
         public void Compile_HoldsTheLatestPositionAcrossAnIdleGap()
         {
             var valid = CreateDynamicSpawnResult();
@@ -140,7 +161,7 @@ namespace ArknoNights.Battle.Tests
             var valid = CreateDynamicSpawnResult();
             var events = valid.Events.ToList();
             var spawn = events[0];
-            events[0] = Event(BattleEventType.Spawn, spawn.Tick, spawn.Sequence, "not-the-snapshot", "unit", BattleSide.Home,
+            events[0] = Event(BattleEventType.Spawn, spawn.Tick, spawn.Sequence, "-1", "not-the-snapshot", BattleSide.Home,
                 null, null, spawn.ToPosition, snapshot: Snapshot("-1", "unit", 5));
             AssertDiagnostic(CreateResult(events, valid.FinalUnits, valid.Winner, valid.StopReason), "track.spawn.snapshot.mismatch");
 
@@ -237,13 +258,51 @@ namespace ArknoNights.Battle.Tests
             return CreateResult(events, new[] { new BattleUnitFinalState(state) }, BattleSide.Home, BattleStopReason.Victory);
         }
 
-        private static BattleRunResult CreateResult(IEnumerable<BattleEvent> events, IEnumerable<BattleUnitFinalState> finalUnits, BattleSide? winner, BattleStopReason reason)
-            => new BattleRunResult("track-test", "home", "away", "input-summary", new ReadOnlyCollection<string>(new[] { "unit" }), 7,
-                reason, winner, new ReadOnlyCollection<BattleStepTrace>(Array.Empty<BattleStepTrace>()),
-                new ReadOnlyCollection<BattleEvent>(events.ToArray()), new ReadOnlyCollection<BattleUnitFinalState>(finalUnits.ToArray()), "result-summary");
+        private static BattleRunResult CreateLegacyInitialSpawnResult(int spawnTick)
+        {
+            var snapshot = Snapshot("home-unit", "unit", spawnTick, false);
+            var events = new[]
+            {
+                Event(BattleEventType.Spawn, spawnTick, 1, "home-unit", "unit", BattleSide.Home, null, null, snapshot.Position, snapshot: snapshot),
+                Event(BattleEventType.BattleEnded, spawnTick + 1, 1, null, null, null, null, null, null, winner: BattleSide.Home, reason: BattleStopReason.Victory)
+            };
+            var state = new RuntimeUnitState("home-unit", "home", BattleSide.Home, Definition(),
+                new UnitSnapshot("home-unit", "unit", UnitZone.Deployed, new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>()),
+                new BattlefieldCoordinate(4, 2));
+            return new BattleRunResult("legacy-initial-track", "home", "away", "input-summary",
+                new ReadOnlyCollection<string>(new[] { "unit" }), spawnTick + 1, BattleStopReason.Victory, BattleSide.Home,
+                new ReadOnlyCollection<BattleStepTrace>(Array.Empty<BattleStepTrace>()),
+                new ReadOnlyCollection<BattleEvent>(events),
+                new ReadOnlyCollection<BattleUnitFinalState>(new[] { new BattleUnitFinalState(state) }),
+                "result-summary");
+        }
 
-        private static BattleUnitInstanceSnapshot Snapshot(string unitId, string typeId, int spawnTick)
-            => new BattleUnitInstanceSnapshot(unitId, typeId, "home", BattleSide.Home, true, new FixedPosition(400, 200), 1,
+        private static BattleRunResult CloneWithSnapshots(
+            BattleRunResult source,
+            IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> snapshots)
+        {
+            return new BattleRunResult(source.BattleId, source.HomePlayerId, source.AwayPlayerId, source.InputCanonicalSummary,
+                source.KnownUnitTypeIds, source.CompletedTicks, source.StopReason, source.Winner, source.Trace, source.Events,
+                source.FinalUnits, new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
+                    snapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)), source.StableSummary);
+        }
+
+        private static BattleRunResult CreateResult(IEnumerable<BattleEvent> events, IEnumerable<BattleUnitFinalState> finalUnits, BattleSide? winner, BattleStopReason reason)
+        {
+            var eventArray = events.ToArray();
+            var snapshots = eventArray
+                .Where(item => item.Type == BattleEventType.Spawn && item.SpawnSnapshot != null)
+                .Select(item => item.SpawnSnapshot)
+                .GroupBy(item => item.UnitId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            return new BattleRunResult("track-test", "home", "away", "input-summary", new ReadOnlyCollection<string>(new[] { "unit" }), 7,
+                reason, winner, new ReadOnlyCollection<BattleStepTrace>(Array.Empty<BattleStepTrace>()),
+                new ReadOnlyCollection<BattleEvent>(eventArray), new ReadOnlyCollection<BattleUnitFinalState>(finalUnits.ToArray()),
+                new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(snapshots), "result-summary");
+        }
+
+        private static BattleUnitInstanceSnapshot Snapshot(string unitId, string typeId, int spawnTick, bool isDynamicallyGenerated = true)
+            => new BattleUnitInstanceSnapshot(unitId, typeId, "home", BattleSide.Home, isDynamicallyGenerated, new FixedPosition(400, 200), 1,
                 10, 10, 0, 3, 0, 0, 100, 20, 4, DamageType.Physical, AttackMethod.Melee, 1, 0, Array.Empty<BuffPlaceholder>());
 
         private static BattleEvent Event(BattleEventType type, int tick, int sequence, string unitId, string typeId, BattleSide? side,

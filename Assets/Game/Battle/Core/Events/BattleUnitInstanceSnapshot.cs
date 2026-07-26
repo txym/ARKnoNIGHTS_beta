@@ -29,6 +29,55 @@ namespace ArknoNights.Battle.Core
             int blockCapacity,
             int tauntLevel,
             IEnumerable<BuffPlaceholder> buffs)
+            : this(
+                unitId,
+                typeId,
+                playerId,
+                side,
+                isDynamicallyGenerated,
+                position,
+                eliteLevel,
+                maxHitPoints,
+                currentHitPoints,
+                currentShield,
+                attack,
+                defense,
+                magicResistance,
+                moveSpeedCentimetresPerSecond,
+                attackIntervalTicks,
+                attackAnimationDurationTicks,
+                damageType,
+                attackMethod,
+                blockCapacity,
+                tauntLevel,
+                buffs,
+                0)
+        {
+        }
+
+        public BattleUnitInstanceSnapshot(
+            string unitId,
+            string typeId,
+            string playerId,
+            BattleSide side,
+            bool isDynamicallyGenerated,
+            FixedPosition position,
+            int eliteLevel,
+            int maxHitPoints,
+            int currentHitPoints,
+            int currentShield,
+            int attack,
+            int defense,
+            int magicResistance,
+            int moveSpeedCentimetresPerSecond,
+            int attackIntervalTicks,
+            int attackAnimationDurationTicks,
+            DamageType damageType,
+            AttackMethod attackMethod,
+            int blockCapacity,
+            int tauntLevel,
+            IEnumerable<BuffPlaceholder> buffs,
+            int activationTick)
         {
             UnitId = unitId;
             TypeId = typeId;
@@ -51,6 +100,7 @@ namespace ArknoNights.Battle.Core
             BlockCapacity = blockCapacity;
             TauntLevel = tauntLevel;
             Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
+            ActivationTick = activationTick;
         }
 
         public string UnitId { get; }
@@ -74,5 +124,6 @@ namespace ArknoNights.Battle.Core
         public int BlockCapacity { get; }
         public int TauntLevel { get; }
         public IReadOnlyList<BuffPlaceholder> Buffs { get; }
+        public int ActivationTick { get; }
     }
 }

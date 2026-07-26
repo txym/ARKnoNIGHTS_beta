@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Demo;
 using ArknoNights.Battle.Presentation;
 using NUnit.Framework;
@@ -42,6 +44,16 @@ namespace ArknoNights.Battle.Tests
                 Assert.AreEqual("Away", demo.WinnerOrReason);
                 Assert.AreEqual(eventDigest, demo.EventDigest);
                 Assert.AreEqual(resultDigest, demo.ResultDigest);
+                var authoredSpawns = demo.Result.Events
+                    .Where(item => item.Type == BattleEventType.Spawn && item.Tick == 0 && !item.SpawnSnapshot.IsDynamicallyGenerated)
+                    .ToArray();
+                var dynamicJellySpawns = demo.Result.Events
+                    .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504" && item.SpawnSnapshot.IsDynamicallyGenerated)
+                    .ToArray();
+                Assert.AreEqual(7, authoredSpawns.Length);
+                Assert.AreEqual(42, dynamicJellySpawns.Length);
+                Assert.That(dynamicJellySpawns, Has.All.Matches<BattleEvent>(item => item.Tick >= 100));
+                Assert.AreEqual(authoredSpawns.Length + dynamicJellySpawns.Length, factory.Created);
 
                 Assert.IsTrue(demo.Replay());
                 Assert.AreEqual(BattleDemoState.Playing, demo.State);
@@ -49,7 +61,7 @@ namespace ArknoNights.Battle.Tests
                 Assert.AreEqual(eventDigest, demo.EventDigest);
                 Assert.AreEqual(resultDigest, demo.ResultDigest);
                 Assert.AreEqual(BattleObserverView.Away, demo.Observer);
-                expectedViewCount = demo.Result.FinalUnits.Count * 2;
+                expectedViewCount = authoredSpawns.Length * 2 + dynamicJellySpawns.Length;
             }
             Assert.AreEqual(expectedViewCount, factory.Created);
             Assert.AreEqual(expectedViewCount, factory.Disposed);
