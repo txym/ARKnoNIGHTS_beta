@@ -2,7 +2,14 @@
 
 ## Status
 
-Approved in conversation on 2026-07-27.
+Superseded on 2026-07-27 by
+`2026-07-27-room-select-create-open-frame-correction-design.md`.
+
+The implementation and three real Player calibration cycles exposed a
+semantic error in this design: Figure 9 does not contain an independent cyan
+bottom edge around the Create action bar. The visible `创建同盟` bar supplies
+the lower boundary itself, so the four-edge rectangular frame and its bottom
+contrast gate are no longer authoritative.
 
 This design supersedes
 `2026-07-27-room-select-create-decoration-overlap-recovery-design.md` before
