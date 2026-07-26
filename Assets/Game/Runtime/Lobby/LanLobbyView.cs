@@ -312,23 +312,19 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         CreateSolidDecorationPanel(
             "InteriorBacking", parent,
-            128f, -12f, 705f, 217f,
+            147f, -12f, 666f, 224f,
             new Color(0f, 0f, 0f, .78f));
 
         var createFrame = Rect("CreateFrame", parent);
         Stretch(createFrame);
         var frameTint = new Color(.42f, .82f, .76f, .72f);
-        CreateOrientedDecorationSprite("Top_0", createFrame, "Home/doc_frame_line", 252f, -18f, 260f, 12f, 0f, false, frameTint);
-        CreateOrientedDecorationSprite("Top_1", createFrame, "Home/doc_frame_line", 491f, -18f, 260f, 12f, 0f, false, frameTint);
-        CreateOrientedDecorationSprite("Top_2", createFrame, "Home/doc_frame_line", 730f, -18f, 260f, 12f, 0f, false, frameTint);
-        CreateOrientedDecorationSprite("Bottom_0", createFrame, "Home/doc_frame_line", 252f, 344f, 260f, 12f, 180f, false, frameTint);
-        CreateOrientedDecorationSprite("Bottom_1", createFrame, "Home/doc_frame_line", 491f, 344f, 260f, 12f, 180f, false, frameTint);
-        CreateOrientedDecorationSprite("Bottom_2", createFrame, "Home/doc_frame_line", 730f, 344f, 260f, 12f, 180f, false, frameTint);
-        CreateOrientedDecorationSprite("LeftUpper", createFrame, "Home/doc_frame_line", 128f, 76f, 200f, 12f, 90f, false, frameTint);
-        CreateOrientedDecorationSprite("LeftLower", createFrame, "Home/doc_frame_line", 128f, 253f, 200f, 12f, 90f, false, frameTint);
-        CreateOrientedDecorationSprite("RightUpper", createFrame, "Home/doc_frame_line", 833f, 76f, 200f, 12f, 270f, false, frameTint);
-        CreateOrientedDecorationSprite("RightLower", createFrame, "Home/doc_frame_line", 833f, 253f, 200f, 12f, 270f, false, frameTint);
-        CreateOrientedDecorationSprite("TopRightChamfer", createFrame, "Home/doc_frame_line", 826f, -10f, 40f, 12f, 45f, false, frameTint);
+        CreateOrientedDecorationSprite("Top_0", createFrame, "Home/doc_frame_line", 263.667f, -23f, 237.171f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("Top_1", createFrame, "Home/doc_frame_line", 480f, -23f, 237.171f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("Top_2", createFrame, "Home/doc_frame_line", 696.333f, -23f, 237.171f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("LeftUpper", createFrame, "Home/doc_frame_line", 147f, 40f, 128.053f, 12f, 90f, false, frameTint);
+        CreateOrientedDecorationSprite("LeftLower", createFrame, "Home/doc_frame_line", 147f, 149f, 128.053f, 12f, 90f, false, frameTint);
+        CreateOrientedDecorationSprite("RightUpper", createFrame, "Home/doc_frame_line", 813f, 40f, 128.053f, 12f, 270f, false, frameTint);
+        CreateOrientedDecorationSprite("RightLower", createFrame, "Home/doc_frame_line", 813f, 149f, 128.053f, 12f, 270f, false, frameTint);
 
         var wings = Rect("Wings", parent);
         Stretch(wings);

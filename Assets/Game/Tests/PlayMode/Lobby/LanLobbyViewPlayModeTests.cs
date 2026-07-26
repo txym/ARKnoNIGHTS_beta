@@ -102,8 +102,8 @@ namespace ArknoNights.Lobby.Tests
 
             Assert.That(home.Find("RoomSelect/PanelFrame"), Is.Null);
             Assert.That(home.Find("RoomSelect/Create/CreateFrame/Top_0"), Is.Not.Null);
-            Assert.That(home.Find("RoomSelect/Create/CreateFrame/Bottom_2"), Is.Not.Null);
-            Assert.That(home.Find("RoomSelect/Create/CreateFrame/TopRightChamfer"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/Create/CreateFrame/Bottom_2"), Is.Null);
+            Assert.That(home.Find("RoomSelect/Create/CreateFrame/TopRightChamfer"), Is.Null);
             Assert.That(home.Find("RoomSelect/Join/SimulationInvite"), Is.Not.Null);
             Assert.That(home.Find("RoomSelect/Join/SimulationInvite/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
                 Is.EqualTo("join_icon"));
@@ -147,17 +147,13 @@ namespace ArknoNights.Lobby.Tests
             };
             var frameExpected = new[]
             {
-                new OrientedDecorationExpectation("CreateFrame/Top_0", "doc_frame_line", 252f, -18f, 260f, 12f, 0f, false),
-                new OrientedDecorationExpectation("CreateFrame/Top_1", "doc_frame_line", 491f, -18f, 260f, 12f, 0f, false),
-                new OrientedDecorationExpectation("CreateFrame/Top_2", "doc_frame_line", 730f, -18f, 260f, 12f, 0f, false),
-                new OrientedDecorationExpectation("CreateFrame/Bottom_0", "doc_frame_line", 252f, 344f, 260f, 12f, 180f, false),
-                new OrientedDecorationExpectation("CreateFrame/Bottom_1", "doc_frame_line", 491f, 344f, 260f, 12f, 180f, false),
-                new OrientedDecorationExpectation("CreateFrame/Bottom_2", "doc_frame_line", 730f, 344f, 260f, 12f, 180f, false),
-                new OrientedDecorationExpectation("CreateFrame/LeftUpper", "doc_frame_line", 128f, 76f, 200f, 12f, 90f, false),
-                new OrientedDecorationExpectation("CreateFrame/LeftLower", "doc_frame_line", 128f, 253f, 200f, 12f, 90f, false),
-                new OrientedDecorationExpectation("CreateFrame/RightUpper", "doc_frame_line", 833f, 76f, 200f, 12f, 270f, false),
-                new OrientedDecorationExpectation("CreateFrame/RightLower", "doc_frame_line", 833f, 253f, 200f, 12f, 270f, false),
-                new OrientedDecorationExpectation("CreateFrame/TopRightChamfer", "doc_frame_line", 826f, -10f, 40f, 12f, 45f, false)
+                new OrientedDecorationExpectation("CreateFrame/Top_0", "doc_frame_line", 263.667f, -23f, 237.171f, 12f, 0f, false),
+                new OrientedDecorationExpectation("CreateFrame/Top_1", "doc_frame_line", 480f, -23f, 237.171f, 12f, 0f, false),
+                new OrientedDecorationExpectation("CreateFrame/Top_2", "doc_frame_line", 696.333f, -23f, 237.171f, 12f, 0f, false),
+                new OrientedDecorationExpectation("CreateFrame/LeftUpper", "doc_frame_line", 147f, 40f, 128.053f, 12f, 90f, false),
+                new OrientedDecorationExpectation("CreateFrame/LeftLower", "doc_frame_line", 147f, 149f, 128.053f, 12f, 90f, false),
+                new OrientedDecorationExpectation("CreateFrame/RightUpper", "doc_frame_line", 813f, 40f, 128.053f, 12f, 270f, false),
+                new OrientedDecorationExpectation("CreateFrame/RightLower", "doc_frame_line", 813f, 149f, 128.053f, 12f, 270f, false)
             };
 
             Assert.That(home.Find("RoomSelect/PanelFrame"), Is.Null);
@@ -173,13 +169,17 @@ namespace ArknoNights.Lobby.Tests
             Assert.IsNull(materialField.GetValue(backing), "InteriorBacking must not use a custom serialized material.");
             Assert.That(backing.color, Is.EqualTo(new Color(0f, 0f, 0f, .78f)));
             Assert.That(backing.raycastTarget, Is.False);
-            AssertTopLeftRect(backingRect, 128f, -12f, 705f, 217f, .05f);
+            AssertTopLeftRect(backingRect, 147f, -12f, 666f, 224f, .05f);
             Assert.That(backingRect.GetSiblingIndex(), Is.LessThan(create.Find("CreateFrame").GetSiblingIndex()));
             var createFrame = create.Find("CreateFrame");
             Assert.That(createFrame.GetComponent<Graphic>(), Is.Null);
             Assert.That(create.Find("Wings").GetComponent<Graphic>(), Is.Null);
             var frameImages = createFrame.GetComponentsInChildren<UnityEngine.UI.Image>(false);
-            Assert.That(frameImages, Has.Length.EqualTo(11));
+            Assert.That(frameImages, Has.Length.EqualTo(7));
+            Assert.That(createFrame.Find("Bottom_0"), Is.Null);
+            Assert.That(createFrame.Find("Bottom_1"), Is.Null);
+            Assert.That(createFrame.Find("Bottom_2"), Is.Null);
+            Assert.That(createFrame.Find("TopRightChamfer"), Is.Null);
             Assert.That(frameImages.All(image => image.gameObject.activeInHierarchy), Is.True);
             Assert.That(frameImages.All(image => image.color == new Color(.42f, .82f, .76f, .72f)), Is.True);
             var expectedWingTint = new Color(.35f, .65f, .58f, .45f);
@@ -243,9 +243,7 @@ namespace ArknoNights.Lobby.Tests
             var horizontalPairs = new[]
             {
                 new[] { "Top_0", "Top_1" },
-                new[] { "Top_1", "Top_2" },
-                new[] { "Bottom_0", "Bottom_1" },
-                new[] { "Bottom_1", "Bottom_2" }
+                new[] { "Top_1", "Top_2" }
             };
             foreach (var pair in horizontalPairs)
             {
@@ -253,7 +251,7 @@ namespace ArknoNights.Lobby.Tests
                 var second = createFrame.Find(pair[1]).GetComponent<RectTransform>();
                 var overlap = first.sizeDelta.x * visibleLongAxisRatio
                     - Mathf.Abs(second.anchoredPosition.x - first.anchoredPosition.x);
-                Assert.That(overlap, Is.InRange(10f, 24f), string.Join("/", pair));
+                Assert.That(overlap, Is.EqualTo(17f).Within(.1f), string.Join("/", pair));
             }
             var verticalPairs = new[]
             {
@@ -266,8 +264,16 @@ namespace ArknoNights.Lobby.Tests
                 var second = createFrame.Find(pair[1]).GetComponent<RectTransform>();
                 var overlap = first.sizeDelta.x * visibleLongAxisRatio
                     - Mathf.Abs(second.anchoredPosition.y - first.anchoredPosition.y);
-                Assert.That(overlap, Is.InRange(10f, 24f), string.Join("/", pair));
+                Assert.That(overlap, Is.EqualTo(17f).Within(.1f), string.Join("/", pair));
             }
+            var topLeft = createFrame.Find("Top_0").GetComponent<RectTransform>();
+            var topRight = createFrame.Find("Top_2").GetComponent<RectTransform>();
+            Assert.That(topLeft.anchoredPosition.x - topLeft.sizeDelta.x * visibleLongAxisRatio / 2f, Is.EqualTo(147f).Within(.1f));
+            Assert.That(topRight.anchoredPosition.x + topRight.sizeDelta.x * visibleLongAxisRatio / 2f, Is.EqualTo(813f).Within(.1f));
+            var leftTop = createFrame.Find("LeftUpper").GetComponent<RectTransform>();
+            var leftBottom = createFrame.Find("LeftLower").GetComponent<RectTransform>();
+            Assert.That(-leftTop.anchoredPosition.y - leftTop.sizeDelta.x * visibleLongAxisRatio / 2f, Is.EqualTo(-23f).Within(.1f));
+            Assert.That(-leftBottom.anchoredPosition.y + leftBottom.sizeDelta.x * visibleLongAxisRatio / 2f, Is.EqualTo(212f).Within(.1f));
             foreach (var frameImage in frameImages)
             {
                 Assert.That(frameImage.rectTransform.sizeDelta.y, Is.InRange(8f, 14f), frameImage.name);
@@ -506,14 +512,10 @@ namespace ArknoNights.Lobby.Tests
                 { "RoomSelect/Create/CreateFrame/Top_0", "doc_frame_line" },
                 { "RoomSelect/Create/CreateFrame/Top_1", "doc_frame_line" },
                 { "RoomSelect/Create/CreateFrame/Top_2", "doc_frame_line" },
-                { "RoomSelect/Create/CreateFrame/Bottom_0", "doc_frame_line" },
-                { "RoomSelect/Create/CreateFrame/Bottom_1", "doc_frame_line" },
-                { "RoomSelect/Create/CreateFrame/Bottom_2", "doc_frame_line" },
                 { "RoomSelect/Create/CreateFrame/LeftUpper", "doc_frame_line" },
                 { "RoomSelect/Create/CreateFrame/LeftLower", "doc_frame_line" },
                 { "RoomSelect/Create/CreateFrame/RightUpper", "doc_frame_line" },
                 { "RoomSelect/Create/CreateFrame/RightLower", "doc_frame_line" },
-                { "RoomSelect/Create/CreateFrame/TopRightChamfer", "doc_frame_line" },
                 { "RoomSelect/Create/Wings/WingLeftUpper", "img_pointer" },
                 { "RoomSelect/Create/Wings/WingLeftLower", "img_pointer" },
                 { "RoomSelect/Create/Wings/WingRightUpper", "img_pointer" },

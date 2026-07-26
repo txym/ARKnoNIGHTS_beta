@@ -101,7 +101,7 @@ namespace ArknoNights.Lobby.Tests
             var homeStates = new[] { home, discovered };
             foreach (var homeState in homeStates)
             {
-                Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(11));
+                Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(7));
                 Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
                 Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
                 Assert.That(homeState.spriteSources.Any(sprite =>
@@ -120,7 +120,7 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(interiorBacking.height, Is.GreaterThan(0f));
             }
             Assert.That(homeStates.Sum(record =>
-                record.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line")), Is.EqualTo(22));
+                record.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line")), Is.EqualTo(14));
             Assert.That(homeStates.Sum(record =>
                 record.spriteSources.Count(sprite => sprite.spriteName == "img_pointer")), Is.EqualTo(8));
             Assert.That(homeStates.Sum(record =>
@@ -161,7 +161,7 @@ namespace ArknoNights.Lobby.Tests
                 "Home must count both rendered join_icon instances.");
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
-            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(11));
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(7));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_left_line"), Is.EqualTo(2));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_dot"), Is.EqualTo(5));
             Assert.That(home.spriteSources
