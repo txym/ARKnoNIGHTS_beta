@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Linq;
+using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Demo;
 using ArknoNights.Battle.Presentation;
 using NUnit.Framework;
@@ -59,15 +60,26 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.AreEquivalent(new[] { "1000", "5503" }, demo.Input.Players[0].Units.Select(unit => unit.TypeId).Distinct().ToArray());
             CollectionAssert.AreEquivalent(new[] { "1000", "5503" }, demo.Input.Players[1].Units.Select(unit => unit.TypeId).Distinct().ToArray());
             Assert.AreEqual("Away", demo.WinnerOrReason);
-            var views = demo.Result.FinalUnits.Select(unit => GameObject.Find("BattleView_" + unit.UnitId)).ToArray();
-            Assert.That(views, Has.All.Not.Null, "A real unit view was not created.");
-            foreach (var view in views) AssertHorizontalFacing(view);
+            var authoredSpawns = demo.Result.Events
+                .Where(item => item.Type == BattleEventType.Spawn && item.Tick == 0 && !item.SpawnSnapshot.IsDynamicallyGenerated)
+                .ToArray();
+            var dynamicJellySpawns = demo.Result.Events
+                .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504" && item.SpawnSnapshot.IsDynamicallyGenerated)
+                .ToArray();
+            Assert.AreEqual(7, authoredSpawns.Length);
+            Assert.AreEqual(42, dynamicJellySpawns.Length);
+            Assert.That(dynamicJellySpawns, Has.All.Matches<BattleEvent>(item => item.Tick >= 100));
+            var authoredViews = authoredSpawns.Select(item => GameObject.Find("BattleView_" + item.UnitId)).ToArray();
+            Assert.That(authoredViews, Has.All.Not.Null, "A Tick-0 authored unit view was not created.");
+            Assert.That(dynamicJellySpawns.Select(item => GameObject.Find("BattleView_" + item.UnitId)), Has.All.Null,
+                "Tick-100+ dynamic views must not exist at presentation Tick 0.");
+            foreach (var view in authoredViews) AssertHorizontalFacing(view);
             var sourceEventDigest = demo.EventDigest;
             controller.SendMessage("SetAwayView");
             Assert.AreEqual(BattleObserverView.Away, demo.Observer);
             Assert.AreEqual(sourceEventDigest, demo.EventDigest);
             Assert.AreEqual("Away", demo.WinnerOrReason);
-            foreach (var view in views) AssertHorizontalFacing(view);
+            foreach (var view in authoredViews) AssertHorizontalFacing(view);
 
             controller.SendMessage("Pause");
             Assert.AreEqual(BattleDemoState.Paused, demo.State);
@@ -79,9 +91,15 @@ namespace ArknoNights.Battle.Tests
             demo.Advance(1200f);
             Assert.AreEqual(BattleDemoState.Completed, demo.State, demo.LastError);
             Assert.AreEqual(demo.EventCount, demo.ConsumedEventCount);
+            var dynamicViews = dynamicJellySpawns.Select(item => GameObject.Find("BattleView_" + item.UnitId)).ToArray();
+            Assert.That(dynamicViews, Has.All.Not.Null, "Every Tick-100+ dynamic Spawn must create its catalog-backed view.");
+            foreach (var view in dynamicViews) AssertHorizontalFacing(view);
             Assert.IsTrue(demo.Replay());
             Assert.IsTrue(demo.Replay());
             Assert.AreEqual(BattleDemoState.Playing, demo.State);
+            yield return null;
+            Assert.That(dynamicJellySpawns.Select(item => GameObject.Find("BattleView_" + item.UnitId)), Has.All.Null,
+                "Replay must remove dynamic views until their Spawn ticks are crossed again.");
         }
 
         private static void AssertHorizontalFacing(GameObject view)

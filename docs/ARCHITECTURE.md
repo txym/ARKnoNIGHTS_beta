@@ -297,3 +297,12 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `FormalBattleHudController.SetSessionHudValues` 只显示 loop-owned 本地赤金、生命和下一对手名称。当前固定测试数据因此显示赤金 `7`、生命 `400`；生命扣除、淘汰及经济规则仍未实现。
 - `ShopReadyHudController` 使用全屏锚定的组合根，但等级、商店和准备按钮均按 `1920×1080` 参考矩形计算。商店由左侧升级卡、右侧五张 `158×175` 商品卡及下方冻结/刷新按钮组成；准备按钮固定在赤金和部署费用区上方。`FormalHudSpriteLoader` 同时支持 Sprite 与 Texture 导入的现有 Resources PNG，避免未改导入类型的贴图显示为默认白块。
 - `BattleHudCaptureRunner` 仅在 Player 参数 `-battleHudCapture` 时运行，按真实商店、观察和阶段命令生成 `17` 张截图，并把阶段、本地/观察玩家、准备状态、商店五槽、选中比赛/观察侧、共享演示 Tick、Track 摘要、Canvas scale 和关键 RectTransform 写入 `battle-hud-manifest.json`。若截图全黑或写入超时，入口明确失败并写入 `battle-hud-capture-failed.txt`。
+
+## 24. Mainline 果冻召唤数据流与生命周期（2026-07-26）
+
+- 权威数据流为 `Units/Json + Abilities/Json → UnitCatalogGenerator/AbilityCatalogGenerator → unit-catalog-v1 + ability-catalog-v1 → BattleInputFactory → BattleRunner`。两个生成器只读源文件，执行 schema、引用、数值和稳定顺序验证，只写生成目录；不会从 Skeleton、目录或另一单位反向推导并回写源数据。
+- `LocalBattleLoader`、`PlayerStateBattleInputAdapter`、`PreparationBattleSealer`、`FourPlayerBattleRoundSealer` 与 `PreparationBattleLoopController` 在建立含已部署 `5503` 的 `BattleInput` 时传入已经按 unit catalog 验证的 ability definitions。`BattleInputFactory` 在边界验证每个 `UnitDefinition.InnateAbilityIds` 都可解析，并验证 summon type 存在；遗漏目录、未知 ability ID 或未知 summon type 均以结构化错误中止封存。
+- Core 只保存整数/定点状态。全局自动回复常量为 `2 SP/s`，20 TPS 下换算为每 `10 Tick` 一点；每个 `RuntimeAbilityState` 独立保存当前 SP 与施放序号。首次/再次满足阈值的边界为 Tick `100`/`250`。一次施放使用确定性整数采样，在施法者中心的 `100 cm × 100 cm` 正方形中建立三个动态 `5504`，分配战斗内稳定的递减负数 ID。
+- Tick 管线在终局判断前完成本 Tick 已到达伤害、Death、阻挡解除和目标清理。若此时终局，直接追加最后的 BattleEnded，不运行该 Tick 的 SP 回复或 timed cast。非终局召唤只在当前 Tick 建立无路径、无目标、无阻挡继承的实例；`ActivationTick = SpawnTick + 1`，下一 Tick 才进入普通的移动、阻挡和目标优先级计算。
+- `BattleRunResult.UnitSnapshots` 是初始与动态实例的不可变索引；动态 Spawn 载荷与索引身份必须一致。`BattlePresentationTrackCompiler` 由该索引建立带 Spawn Tick、位置、HP、阵营与动态标志的 Track，不能要求实例存在于初始输入，也不能回退到技术 key 或运行时 Resources 推断。
+- Playback 只在演示 Tick 越过 Spawn 时创建目录映射的视图，并把当前速度、观察侧投影与只读状态应用到新视图。Replay/Dispose 清理旧视图，再从同一封存 Track 的 Tick `0` 开始；动态 `5504` 仅在再次越过其 Spawn Tick 时以相同实例 ID 重建，不重新运行 Core。

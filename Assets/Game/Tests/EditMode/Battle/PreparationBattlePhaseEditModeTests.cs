@@ -49,6 +49,8 @@ namespace ArknoNights.Battle.Tests
             var deployed = home.Units.Single(item => item.Zone == UnitZone.Deployed);
             Assert.AreEqual("local-5503-alpha", deployed.UnitId);
             Assert.AreEqual(new FormationCoordinate(5, 2), deployed.Formation.Value);
+            Assert.That(seal.Input.AbilityDefinitions.Select(item => item.AbilityId), Does.Contain("SUMMON_JELLY_MINIONS"),
+                "The preparation sealer must forward the validated ability required by deployed 5503.");
             Assert.IsFalse(seal.After.Units.Any(unit => unit.Zone == PlayerUnitZone.Overflow));
         }
 
