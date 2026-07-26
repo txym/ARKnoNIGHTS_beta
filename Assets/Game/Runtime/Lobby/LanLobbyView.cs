@@ -402,7 +402,7 @@ public sealed class LanLobbyView : MonoBehaviour
         joinLabel.rectTransform.offsetMax = new Vector2(-220f, 2f);
         joinLabel.fontSize = 38;
         var joinIcon = Image("ActionIcon", joinButton.transform, "join_icon");
-        PositionSpriteTopLeft(joinIcon, 45f, 19f, 47f);
+        PositionSpriteTopLeft(joinIcon, 47f, 19f, 47f);
         joinButton.onClick.AddListener(RequestJoin);
     }
 

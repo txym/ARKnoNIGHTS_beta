@@ -142,7 +142,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(createAction.Find("ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name, Is.EqualTo("create_icon"));
             Assert.That(joinAction.Find("ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name, Is.EqualTo("join_icon"));
             AssertTopLeftRect(createAction.Find("ActionIcon").GetComponent<RectTransform>(), 47f, 25f, 38f, 38f, .05f);
-            AssertTopLeftRect(joinAction.Find("ActionIcon").GetComponent<RectTransform>(), 45f, 19f, 47f, 47f * 41f / 36f, .05f);
+            AssertTopLeftRect(joinAction.Find("ActionIcon").GetComponent<RectTransform>(), 47f, 19f, 47f, 47f * 41f / 36f, .05f);
             var createLabel = createAction.Find("Label").GetComponent<UnityEngine.UI.Text>();
             var joinLabel = joinAction.Find("Label").GetComponent<UnityEngine.UI.Text>();
             Assert.That(createLabel.text, Is.EqualTo("创建同盟"));
