@@ -348,7 +348,7 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 - 相同的初始数据和战斗规则必须产生相同的战斗计算结果；
 - 战斗演示可以使用更多渲染帧在相邻逻辑帧之间插值，但插值结果不得影响战斗计算。
 
-第一阶段逻辑帧固定为 `20 TPS`，即每 Tick `0.05` 秒。权威计算使用显式 Tick 推进，不读取 Unity 时间、物理或渲染帧率。源秒数无法精确换算为整数 Tick 时向上取整，确保权威间隔与动画时长不短于源秒数。
+第一阶段逻辑帧固定为 `20 TPS`，即每 Tick `0.05` 秒。权威计算使用显式 Tick 推进，不读取 Unity 时间、物理或渲染帧率。需要进入 Core 的秒数无法精确换算为整数 Tick 时向上取整，确保权威间隔与动画时长不短于各自完成规则换算后的秒数。
 
 ### 7.2 移动、索敌与阻挡
 
@@ -397,6 +397,8 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 
 ### 7.4.1 攻击、死亡与 Tick 内结算
 
+- 正式单位的基础攻击间隔为源单位 JSON 中 `attackIntervalSeconds` 的一半，即 `baseAttackIntervalSeconds = attackIntervalSeconds × 0.5`；先得到基础攻击间隔秒数，再按 `20 TPS` 向上取整为 Core 使用的 `AttackIntervalTicks`；
+- Core 中的 `AttackIntervalTicks` 始终表示已经完成上述换算的实际攻击间隔，不得在 `BattleRunner`、表现层或 UI 中再次折半。直接以 Tick 定义攻击间隔的合成 fixture 同样填写实际间隔 Tick，不套用源 JSON 换算规则；
 - 单位维护下一次允许攻击开始的最早 Tick；首次满足范围且不在冷却时可立即攻击；
 - 攻击开始产生 Attack 事件和待结算攻击。其有效动画时长为 `min(原始动画 Tick, 攻击间隔 Tick)`，并在有效动画结束 Tick 结算伤害；
 - 攻击者在出伤前死亡时取消待结算攻击；目标在出伤前死亡时取消该次 Damage，但攻击者仍须保持已开始的攻击动画，并在该攻击有效动画结束 Tick（含）前不得移动。两种情况均保留已产生的 Attack 事件；
@@ -550,7 +552,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 `local-battle-v1` 通过 `typeId` 连接目录后才构造不可变 `BattleInput`；Core 仅接收 Core 值，不能接收 Resources、Spine 或表现对象。未知 schema、未知类型、重复或无效 ID、无效数值、空/不存在的表现资源路径均必须返回结构化诊断，其中包含 schema、battleId、playerId（如适用）和 typeId（如适用）。
 
-源单位的 `moveSpeedMetresPerSecond` 以米/秒严格换算为厘米/秒；`attackIntervalSeconds` 和 `attackAnimationDurationSeconds` 以 20 TPS 换算为 Tick。项目负责人已于 2026-07-18 确认：秒数不能整除为 Tick 时向上取整，确保权威间隔与动画时长不短于源秒数。已由 Unity/Spine API 核验：`gopro/Attack=1.0s=20 Tick`，`arcslma/Attack=2.666667s=54 Tick`。当前两单位均为 `Physical`、`Melee`、阻挡容量 1、嘲讽等级 0；旧映射可以继续保存 Hit 动画名称以兼容已有数据，但新 Track 播放路径不调用 Hit，Death 仍使用经核验的 `Die`。
+源单位的 `moveSpeedMetresPerSecond` 以米/秒严格换算为厘米/秒。`attackIntervalSeconds` 先乘以 `0.5` 得到正式单位的基础攻击间隔秒数，再以 20 TPS 换算为 `AttackIntervalTicks`；`attackAnimationDurationSeconds` 不折半，直接以 20 TPS 换算为原始攻击动画 Tick。项目负责人已于 2026-07-18 确认秒数不能整除为 Tick 时向上取整；该规则分别应用于已经折半的基础攻击间隔秒数和未经折半的攻击动画秒数。当前真实目录应得到 `gopro=14 Tick`、`arcslma=40 Tick`、`arcslmi=15 Tick` 的基础攻击间隔。已由 Unity/Spine API 核验：`gopro/Attack=1.0s=20 Tick`，`arcslma/Attack=2.666667s=54 Tick`。当前两单位均为 `Physical`、`Melee`、阻挡容量 1、嘲讽等级 0；旧映射可以继续保存 Hit 动画名称以兼容已有数据，但新 Track 播放路径不调用 Hit，Death 仍使用经核验的 `Die`。
 
 ## 12. UI-004 本地准备—战斗循环（2026-07-22）
 

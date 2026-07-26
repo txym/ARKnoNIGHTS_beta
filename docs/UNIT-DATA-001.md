@@ -157,9 +157,9 @@ deathAnimation
 - `rarity` 只允许 `1～6`；不得再把 `0` 当成有效默认等级，也不得 clamp。
 - `initialEliteLevel` 只允许 `0～3`，并继续作为创建玩家单位实例时的初始值。
 - `moveSpeedMetresPerSecond` 的单位是米/秒；`1 格 = 1 米 = 100 Unity 世界坐标单位`。
-- `attackIntervalSeconds` 是两次开始播放攻击动画的最短间隔，单位为秒。
+- `attackIntervalSeconds` 是源数据提供的攻击间隔配置，单位为秒。正式单位的基础攻击间隔为该值的一半；目录生成器先计算 `attackIntervalSeconds × 0.5`，再按 `20 Tick/秒` 向上取整为 Core 的实际攻击间隔 Tick。
 - `attackAnimationDurationSeconds` 是攻击动画从开始到出伤的时长，单位为秒。
-- 目录生成继续使用 `20 Tick/秒`，秒到 Tick 的非整数结果向上取整。
+- 目录生成继续使用 `20 Tick/秒`，完成字段各自规则换算后的秒数到 Tick 的非整数结果向上取整。攻击动画时长不参与折半。
 - 当前战斗中的共享攻击/阻挡半径仍以 SPEC 已确认的 `0.25 米` 规则为准。本任务只规范源字段，不得利用 `attackRadiusMetres` 或 `blockRadiusMetres` 改变现有战斗机制。
 - `lifeDeduct` 是目标价值；当前只用于数据与 UI 显示，不实现玩家生命扣除。
 - `innateAbilityIds` 可以是空数组；不得因为技能描述为空而删除已有固有能力 ID。
@@ -168,8 +168,8 @@ deathAnimation
 
 - 不填写、翻译或推测单位中文名称和技能说明；
 - 不设计完整本地化表、语言切换、字体回退或文本热更新系统；
-- 不调整 `gopro`、`arcslma` 的战斗数值、费用、稀有度、精英化、资源名或动画名；
-- 不改变 Tick 频率、秒到 Tick 的向上取整规则、伤害、移动、阻挡、攻击或胜负逻辑；
+- 不改写 `gopro`、`arcslma`、`arcslmi` 源 JSON 中的攻击间隔配置值；实际基础攻击间隔由目录生成规则统一派生；
+- 除本次确认的基础攻击间隔派生规则外，不改变 Tick 频率、秒到 Tick 的向上取整规则、伤害、移动、索敌、阻挡或胜负逻辑；
 - 不让源 JSON 直接进入 Player 构建；Player 仍通过生成的 Resources 目录读取数据；
 - 不把 `UnitTemplate` 的历史序列化字段全部重命名，也不批量重写现有 ScriptableObject、Prefab 或场景；
 - 不实现技能效果、Buff 解释、目标价值结算、玩家生命扣除、商店或网络同步；

@@ -145,8 +145,8 @@ Player-safe 载体优先使用项目已有 `Resources.Load<TextAsset>` 能力下
 
 - `id` 转为十进制字符串 Core `typeId`；不得使用本地化格式。
 - `moveSpeed` 的源单位是米/秒；乘以 100 转为整数厘米/秒。若不能无损转为当前定点精度，停止并报告，不得静默取整。
-- `attackInterval` 的源单位是秒；按 20 TPS 转为整数 Tick。若不是整数 Tick，停止并询问，不得自行选择四舍五入、向上或向下。
-- `attackAnimationDuration` 的源单位是秒；按 20 TPS 转为整数 Tick。实际值应通过对应 SkeletonDataAsset 中正式攻击动画核对后写回源 JSON。若动画不存在、命名冲突或时长不能无损转为整数 Tick，停止并询问。
+- `attackInterval` 的源单位是秒；先乘以 `0.5` 得到正式单位基础攻击间隔，再按 20 TPS 向上取整为实际攻击间隔 Tick。源 JSON 数值保持不变。
+- `attackAnimationDuration` 的源单位是秒；按 20 TPS 向上取整为原始攻击动画 Tick。实际值应通过对应 SkeletonDataAsset 中正式攻击动画核对；若动画不存在、命名冲突或换算结果与动画不一致，停止并报告。
 - 当前 `gopro`/`arcslma` 的 `damageType` 明确写为 `Physical`；不得从 `attackMethod` 推断伤害类型。
 - 当前阻挡容量明确写为 1；`attackMethod` 只转换为现有近战/远程枚举，不新增远程行为。
 - 不使用浮点数推进权威战斗；浮点只允许停留在源 JSON 解析/严格转换边界和 Unity 表现层。
@@ -157,12 +157,13 @@ Player-safe 载体优先使用项目已有 `Resources.Load<TextAsset>` 能力下
 - 战场使用一基 `9×8` 坐标；双方本地阵型使用一基 `9×4` 坐标；Away 阵型进入 Home 权威战场时做 180 度变换。
 - `1 格 = 1 米 = 100 Unity 世界坐标单位`。
 - 权威战斗为 20 TPS；不依赖 Unity Physics、`Time.deltaTime`、渲染帧率或 Spine 状态。
-- `moveSpeed` 单位为米/秒；`attackInterval` 与 `attackAnimationDuration` 的源单位为秒，并转换成整数 Tick 供 Core 使用。
+- `moveSpeed` 单位为米/秒；`attackInterval` 与 `attackAnimationDuration` 的源单位为秒。`attackInterval` 先乘以 `0.5`，`attackAnimationDuration` 不折半，再分别转换成整数 Tick 供 Core 使用。
 - 伤害在有效动画结束 Tick 到达；有效时长沿用已实现规则 `min(原始攻击动画 Tick, 攻击间隔 Tick)`。攻击者或目标在到达前死亡时删除该 pending attack。
 - 当前真实单位按物理伤害处理，但伤害类型必须是独立字段；阻挡容量为 1。
 - 演示层可根据 `attackAnimationDuration > attackInterval` 加速动画，但不得改变 Core 出伤 Tick、事件或结果。
 - Core type ID、玩家 ID 和单位实例 ID 是不同概念，不得混用。
 - 合成 fixture 可以继续用于算法边界测试，但不能作为真实 Spine Demo 的单位目录或资源映射依据。
+- 合成 fixture 中直接配置的 `attackIntervalTicks` 已经表示实际攻击间隔，不应用源 JSON 的折半规则。
 
 ## 不属于本任务的内容
 
