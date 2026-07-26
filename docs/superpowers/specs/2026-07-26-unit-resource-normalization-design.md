@@ -8,6 +8,8 @@ Normalize the three confirmed unit source files and their Resources assets witho
 
 The only retained units are `gopro`, `arcslma`, and `arcslmi`.
 
+The Resources normalization scope is limited to `Characters`, `ProfilePicture`, `BattleData`, and `PlayerData`. `BattleData` and `PlayerData` retain their existing runtime root paths and versioned kebab-case JSON filenames; they are audited and regenerated only where unit source filenames, portrait paths, or skeleton paths change. No UI, map, font, prefab, or Spine runtime asset is renamed in this migration.
+
 | Unit | Type ID | `resourceKey` | Source JSON | Characters directory | Avatar |
 |---|---:|---|---|---|---|
 | gopro | 1000 | `gopro` | `1000_gopro.json` | `1000_gopro` | `UIImage_1000_gopro.png` |
@@ -39,7 +41,8 @@ The JSON filename is validated against the same full key. The generated Player-s
 3. Move each retained avatar PNG and its `.meta` to the `UIImage_<full-key>.png` name.
 4. Delete `go`, `mdgint`, and their directory `.meta` files.
 5. Replace all editor/runtime path composition that assumes `Characters/<resourceKey>/` with one shared, explicit `<typeId>_<resourceKey>` composition rule. Update the catalog generator, UnitFactory, spine probe, hard-coded HUD portrait paths, generated catalog, and directly affected tests.
-6. Regenerate the Player-safe catalog through the existing Unity editor generator; do not hand-edit a catalog that claims to be generated.
+6. Audit `Resources/BattleData` and `Resources/PlayerData`: keep their existing normalized versioned JSON filenames, update only generated catalog values affected by the moved unit assets, and confirm player-state references remain valid.
+7. Regenerate the Player-safe catalog through the existing Unity editor generator; do not hand-edit a catalog that claims to be generated.
 
 ## Safety and Validation
 
