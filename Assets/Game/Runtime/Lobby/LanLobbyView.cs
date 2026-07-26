@@ -258,26 +258,23 @@ public sealed class LanLobbyView : MonoBehaviour
     private void BuildRoomSelect(Transform parent)
     {
         var roomSelect = Rect("RoomSelect", parent);
-        Position(roomSelect, new Vector2(.75f, .5f), new Vector2(900f, 900f));
+        Stretch(roomSelect);
+        var layout = LanLobbyLayout.ForSize(1920, 1080, LobbyRoomSnapshot.MaximumMembers);
         var rightBackground = Image("RightBackground", roomSelect, "Home/room_select_right_bg");
-        Stretch(rightBackground.rectTransform);
-        rightBackground.preserveAspect = false;
+        PositionSprite(rightBackground, new Vector2(.751f, .79f), 820f);
 
         var titleIcon = Image("TitleIcon", roomSelect, "Home/room_select_title_icon");
-        Position(titleIcon.rectTransform, new Vector2(.2f, .91f), new Vector2(68f, 68f));
-        titleIcon.preserveAspect = true;
+        PositionSprite(titleIcon, new Vector2(.56f, .91f), 76f);
         var title = Text("Title", roomSelect, 34, TextAnchor.MiddleLeft, Color.white);
-        Position(title.rectTransform, new Vector2(.53f, .91f), new Vector2(560f, 58f));
+        Position(title.rectTransform, new Vector2(.71f, .91f), new Vector2(420f, 58f));
         title.text = "选择同盟方式";
         var titleDot = Image("TitleDot", roomSelect, "Home/room_select_dot");
-        Position(titleDot.rectTransform, new Vector2(.84f, .91f), new Vector2(18f, 18f));
-        titleDot.preserveAspect = true;
+        PositionSprite(titleDot, new Vector2(.88f, .91f), 26f);
         var startRoom = Image("StartRoomDecoration", roomSelect, "Home/room_select_img_startroom");
-        Position(startRoom.rectTransform, new Vector2(.9f, .84f), new Vector2(140f, 55f));
-        startRoom.preserveAspect = true;
+        PositionSprite(startRoom, new Vector2(.9f, .84f), 128f);
 
         var create = Rect("Create", roomSelect);
-        Position(create, new Vector2(.5f, .66f), new Vector2(820f, 270f));
+        PositionBottomLeft(create, layout.RoomSelectCreate);
         var createHitTarget = create.gameObject.AddComponent<Image>();
         createHitTarget.color = Color.clear;
         createHitTarget.raycastTarget = true;
@@ -287,11 +284,11 @@ public sealed class LanLobbyView : MonoBehaviour
         BuildCreateSection(create);
 
         var join = Rect("Join", roomSelect);
-        Position(join, new Vector2(.5f, .32f), new Vector2(820f, 270f));
+        PositionBottomLeft(join, layout.RoomSelectJoin);
         BuildJoinSection(join);
 
         var discovered = Image("DiscoveredRooms", roomSelect, "Home/room_select_join_text_bg");
-        Position(discovered.rectTransform, new Vector2(.5f, .1f), new Vector2(790f, 120f));
+        PositionSprite(discovered, new Vector2(.751f, .125f), 770f);
         discoveryItemsRoot = Rect("Items", discovered.transform);
         Stretch(discoveryItemsRoot);
         discoveryItemsRoot.offsetMin = new Vector2(28f, 15f);
@@ -309,71 +306,63 @@ public sealed class LanLobbyView : MonoBehaviour
         discoveryOverflowText.rectTransform.sizeDelta = new Vector2(-130f, 30f);
 
         statusText = Text("Status", roomSelect, 20, TextAnchor.MiddleCenter, Color.white);
-        Position(statusText.rectTransform, new Vector2(.5f, .18f), new Vector2(700f, 36f));
+        Position(statusText.rectTransform, new Vector2(.751f, .19f), new Vector2(700f, 36f));
         statusText.text = "DISCOVERING LOCAL ROOMS";
     }
 
     private void BuildCreateSection(RectTransform parent)
     {
         var line = Image("LeftLine", parent, "Home/room_select_create_left_line");
-        Position(line.rectTransform, new Vector2(.08f, .5f), new Vector2(72f, 220f));
-        line.preserveAspect = true;
+        PositionSprite(line, new Vector2(.08f, .5f), 24f);
         var logo = Image("Logo", parent, "Home/room_select_create_logo");
-        Position(logo.rectTransform, new Vector2(.22f, .5f), new Vector2(130f, 130f));
-        logo.preserveAspect = true;
+        PositionSprite(logo, new Vector2(.25f, .76f), 172f);
         var middle = Image("MiddleIcon", parent, "Home/room_select_create_middleicon");
-        Position(middle.rectTransform, new Vector2(.43f, .5f), new Vector2(108f, 108f));
-        middle.preserveAspect = true;
+        PositionSprite(middle, new Vector2(.29f, .46f), 126f);
         var text01 = Image("Text01", parent, "Home/room_select_create_text_01");
-        Position(text01.rectTransform, new Vector2(.44f, .77f), new Vector2(240f, 36f));
-        text01.preserveAspect = true;
+        PositionSprite(text01, new Vector2(.47f, .67f), 126f);
         var text02 = Image("Text02", parent, "Home/room_select_create_text_02");
-        Position(text02.rectTransform, new Vector2(.44f, .24f), new Vector2(205f, 34f));
-        text02.preserveAspect = true;
-        var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32);
-        Position(create.GetComponent<RectTransform>(), new Vector2(.75f, .5f), new Vector2(310f, 124f));
+        PositionSprite(text02, new Vector2(.47f, .33f), 92f);
+        var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
+        PositionSprite(create.GetComponent<Image>(), new Vector2(.74f, .5f), 400f);
         create.onClick.AddListener(() => CreateRequested?.Invoke());
     }
 
     private void BuildJoinSection(RectTransform parent)
     {
         var leftBlock = Image("LeftBlock", parent, "Home/room_select_join_left_block");
-        Position(leftBlock.rectTransform, new Vector2(.09f, .5f), new Vector2(140f, 230f));
-        leftBlock.preserveAspect = true;
+        PositionSprite(leftBlock, new Vector2(.1f, .5f), 150f);
         var middleBlock = Image("MiddleBlock", parent, "Home/room_select_join_middle_block");
-        Position(middleBlock.rectTransform, new Vector2(.35f, .5f), new Vector2(280f, 230f));
-        middleBlock.preserveAspect = true;
+        PositionSprite(middleBlock, new Vector2(.29f, .5f), 129f);
         var middleMask = Image("MiddleBlockMask", parent, "Home/room_select_join_middle_block_mask");
-        Position(middleMask.rectTransform, new Vector2(.35f, .5f), new Vector2(280f, 230f));
-        middleMask.preserveAspect = true;
+        PositionSprite(middleMask, new Vector2(.365f, .5f), 96f);
         var rightBlock = Image("RightBlock", parent, "Home/room_select_join_right_block");
-        Position(rightBlock.rectTransform, new Vector2(.62f, .5f), new Vector2(180f, 230f));
-        rightBlock.preserveAspect = true;
+        PositionSprite(rightBlock, new Vector2(.52f, .5f), 146f);
         var logo = Image("Logo", parent, "Home/room_select_join_logo");
-        Position(logo.rectTransform, new Vector2(.13f, .5f), new Vector2(88f, 88f));
-        logo.preserveAspect = true;
+        PositionSprite(logo, new Vector2(.11f, .75f), 172f);
         var textBackground = Image("TextBackground", parent, "Home/room_select_join_text_bg");
-        Position(textBackground.rectTransform, new Vector2(.38f, .77f), new Vector2(235f, 36f));
-        textBackground.preserveAspect = true;
+        PositionSprite(textBackground, new Vector2(.39f, .74f), 278f);
         var text01 = Image("Text01", parent, "Home/room_select_join_text_01");
-        Position(text01.rectTransform, new Vector2(.38f, .77f), new Vector2(205f, 28f));
-        text01.preserveAspect = true;
+        PositionSprite(text01, new Vector2(.39f, .74f), 141f);
         var text02 = Image("Text02", parent, "Home/room_select_join_text_02");
-        Position(text02.rectTransform, new Vector2(.38f, .24f), new Vector2(220f, 35f));
-        text02.preserveAspect = true;
+        PositionSprite(text02, new Vector2(.39f, .26f), 132f);
         var triangle = Image("Triangle", parent, "Home/room_select_join_triangle");
-        Position(triangle.rectTransform, new Vector2(.54f, .5f), new Vector2(28f, 28f));
-        triangle.preserveAspect = true;
-        roomCodeInput = Input("RoomCodeInput", parent, "输入六位同盟密钥", 30, "Home/room_select_join_blank");
+        PositionSprite(triangle, new Vector2(.56f, .5f), 48f);
+        for (var index = 0; index < LobbyRoomCode.Length; index++)
+        {
+            var blank = Image("Blank_" + index, parent, "Home/room_select_join_blank");
+            PositionSprite(blank, new Vector2(.345f + index * .052f, .5f), 43f);
+        }
+        roomCodeInput = Input("RoomCodeInput", parent, "输入六位同盟密钥", 30, null);
         roomCodeInput.characterLimit = LobbyRoomCode.Length;
         roomCodeInput.contentType = InputField.ContentType.IntegerNumber;
-        Position(roomCodeInput.GetComponent<RectTransform>(), new Vector2(.43f, .5f), new Vector2(270f, 68f));
+        roomCodeInput.GetComponent<Image>().color = Color.clear;
+        roomCodeInput.textComponent.alignment = TextAnchor.MiddleCenter;
+        Position(roomCodeInput.GetComponent<RectTransform>(), new Vector2(.475f, .5f), new Vector2(258f, 50f));
         roomCodeInput.onValueChanged.AddListener(_ => EvaluateJoinAvailability());
         var ban = Image("Ban", parent, "Home/room_select_join_ban");
-        Position(ban.rectTransform, new Vector2(.57f, .5f), new Vector2(24f, 24f));
-        ban.preserveAspect = true;
-        joinButton = Button("JoinAction", parent, "Home/room_select_join_btn_bg_down", "加入同盟", 32);
-        Position(joinButton.GetComponent<RectTransform>(), new Vector2(.79f, .5f), new Vector2(260f, 124f));
+        PositionSprite(ban, new Vector2(.59f, .5f), 24f);
+        joinButton = Button("JoinAction", parent, "Home/room_select_join_btn_bg_down", "加入同盟", 32, true);
+        PositionSprite(joinButton.GetComponent<Image>(), new Vector2(.74f, .5f), 400f);
         joinButton.onClick.AddListener(RequestJoin);
     }
 
@@ -530,13 +519,13 @@ public sealed class LanLobbyView : MonoBehaviour
         }
     }
 
-    private static Button Button(string name, Transform parent, string spriteName, string label, int fontSize)
+    private static Button Button(string name, Transform parent, string spriteName, string label, int fontSize, bool preserveAspect = false)
     {
         var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
         value.transform.SetParent(parent, false);
         var image = value.GetComponent<Image>();
         image.sprite = Sprite(spriteName);
-        image.preserveAspect = false;
+        image.preserveAspect = preserveAspect;
         var button = value.GetComponent<Button>();
         button.targetGraphic = image;
         var text = Text("Label", value.transform, fontSize, TextAnchor.MiddleCenter, Color.white);
@@ -548,7 +537,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(InputField));
         value.transform.SetParent(parent, false);
-        value.GetComponent<Image>().sprite = Sprite(spriteName);
+        value.GetComponent<Image>().sprite = string.IsNullOrEmpty(spriteName) ? null : Sprite(spriteName);
         var text = Text("Text", value.transform, fontSize, TextAnchor.MiddleLeft, Color.white);
         Stretch(text.rectTransform);
         text.rectTransform.offsetMin = new Vector2(18f, 0f);
@@ -615,5 +604,22 @@ public sealed class LanLobbyView : MonoBehaviour
         value.pivot = new Vector2(.5f, .5f);
         value.anchoredPosition = Vector2.zero;
         value.sizeDelta = size;
+    }
+
+    private static void PositionBottomLeft(RectTransform value, LanLobbyRect rect)
+    {
+        value.anchorMin = value.anchorMax = Vector2.zero;
+        value.pivot = Vector2.zero;
+        value.anchoredPosition = new Vector2(rect.Left, rect.Bottom);
+        value.sizeDelta = new Vector2(rect.Width, rect.Height);
+    }
+
+    private static void PositionSprite(Image value, Vector2 anchor, float width)
+    {
+        var sprite = value == null ? null : value.sprite;
+        if (sprite == null) throw new InvalidOperationException("Room-select sprite must be assigned before positioning.");
+        var height = width * sprite.rect.height / sprite.rect.width;
+        Position(value.rectTransform, anchor, new Vector2(width, height));
+        value.preserveAspect = true;
     }
 }
