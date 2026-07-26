@@ -264,6 +264,87 @@ namespace ArknoNights.Battle.Tests
         }
 
         [UnityTest]
+        public IEnumerator RealUnitView_DeathCompletesThenBlackensForHalfASecondAndHides()
+        {
+            var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
+            Assert.IsNotNull(factoryType);
+            var factoryObject = new GameObject("DeathPresentationFactory");
+            var factory = factoryObject.AddComponent(factoryType) as IBattlePresentationViewFactory;
+            Assert.IsNotNull(factory);
+
+            Assert.That(factory.TryCreate("death-probe", "5504", out var view, out var diagnostic),
+                Is.True, diagnostic == null ? string.Empty : diagnostic.ToString());
+            var viewObject = FindChild(factoryObject.transform, "BattleView_death-probe");
+            Assert.IsNotNull(viewObject);
+            var skeleton = viewObject.GetComponent("SkeletonAnimation");
+            Assert.IsNotNull(skeleton);
+            var statusBarRoot = viewObject.transform.Find("WorldStatusBar");
+            Assert.IsNotNull(statusBarRoot);
+            view.SetStatusBarState("death-probe", false, 0, 0);
+            Assert.That(statusBarRoot.gameObject.activeInHierarchy, Is.True);
+            var initialColor = GetSkeletonColor(skeleton);
+
+            view.SetPlaybackSpeed(10f);
+            view.PlayDeath();
+            view.PlayDeath();
+
+            var fadeDeadline = Time.realtimeSinceStartup + 3f;
+            while (viewObject.activeSelf &&
+                   !HasAnyRgbDecreased(initialColor, GetSkeletonColor(skeleton)) &&
+                   Time.realtimeSinceStartup < fadeDeadline)
+                yield return null;
+
+            Assert.That(viewObject.activeSelf, Is.True, "The view must remain visible when blackening begins.");
+            var earlyFadeColor = GetSkeletonColor(skeleton);
+            Assert.That(HasAnyRgbDecreased(initialColor, earlyFadeColor), Is.True,
+                "The death animation must be followed by a visible RGB blackening phase.");
+            Assert.That(statusBarRoot.gameObject.activeInHierarchy, Is.True,
+                "The status bar remains visible while the owning unit remains visible.");
+
+            yield return new WaitForSecondsRealtime(0.15f);
+            var laterFadeColor = GetSkeletonColor(skeleton);
+            Assert.That(laterFadeColor.r, Is.LessThan(earlyFadeColor.r));
+            Assert.That(laterFadeColor.g, Is.LessThan(earlyFadeColor.g));
+            Assert.That(laterFadeColor.b, Is.LessThan(earlyFadeColor.b));
+            Assert.That(laterFadeColor.a, Is.EqualTo(initialColor.a).Within(0.0001f));
+            Assert.That(viewObject.activeSelf, Is.True);
+
+            yield return new WaitForSecondsRealtime(0.45f);
+            Assert.That(viewObject.activeSelf, Is.False);
+            Assert.That(statusBarRoot.gameObject.activeInHierarchy, Is.False);
+
+            view.Dispose();
+            UnityEngine.Object.Destroy(factoryObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RealUnitView_DisposeDuringDeathImmediatelyHidesBeforeFrameEnd()
+        {
+            var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
+            Assert.IsNotNull(factoryType);
+            var factoryObject = new GameObject("DeathDisposeFactory");
+            var factory = factoryObject.AddComponent(factoryType) as IBattlePresentationViewFactory;
+            Assert.IsNotNull(factory);
+
+            Assert.That(factory.TryCreate("dispose-probe", "5504", out var view, out var diagnostic),
+                Is.True, diagnostic == null ? string.Empty : diagnostic.ToString());
+            var viewObject = FindChild(factoryObject.transform, "BattleView_dispose-probe");
+            Assert.IsNotNull(viewObject);
+
+            view.PlayDeath();
+            view.Dispose();
+
+            Assert.That(viewObject.activeSelf, Is.False,
+                "Dispose must hide the old death view before Unity destroys it at frame end.");
+            yield return null;
+            Assert.That(FindChild(factoryObject.transform, "BattleView_dispose-probe"), Is.Null);
+
+            UnityEngine.Object.Destroy(factoryObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator RealUnitView_FacesRightByDefaultAndOnlyFlipsForHorizontalMovement()
         {
             var viewType = Type.GetType("UnitSkelPresentationView, Assembly-CSharp");
@@ -294,6 +375,23 @@ namespace ArknoNights.Battle.Tests
             Assert.IsNotNull(field, "SkeletonAnimation.timeScale is unavailable.");
             return (float)field.GetValue(skeleton);
         }
+
+        private static Color GetSkeletonColor(Component skeletonAnimation)
+        {
+            var skeleton = skeletonAnimation.GetType().GetProperty("Skeleton").GetValue(skeletonAnimation, null);
+            Assert.IsNotNull(skeleton);
+            var type = skeleton.GetType();
+            return new Color(
+                (float)type.GetProperty("R").GetValue(skeleton, null),
+                (float)type.GetProperty("G").GetValue(skeleton, null),
+                (float)type.GetProperty("B").GetValue(skeleton, null),
+                (float)type.GetProperty("A").GetValue(skeleton, null));
+        }
+
+        private static bool HasAnyRgbDecreased(Color before, Color after)
+            => after.r < before.r - 0.0001f ||
+               after.g < before.g - 0.0001f ||
+               after.b < before.b - 0.0001f;
 
         private static BattleRunResult RunSingleArcslmaSummonBattle()
         {

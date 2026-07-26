@@ -141,7 +141,13 @@ public abstract class UnitSkelBase : MonoBehaviour
     /// </summary>
     public bool PlayPresentationAnimation(string animName, bool loop, float animationSpeedMultiplier)
     {
-        var entry = PlayAnimation(animName, loop);
+        return TryPlayPresentationAnimation(animName, loop, animationSpeedMultiplier, out _);
+    }
+
+    /// <summary>Presentation-only animation command that also exposes the created Spine entry.</summary>
+    public bool TryPlayPresentationAnimation(string animName, bool loop, float animationSpeedMultiplier, out TrackEntry entry)
+    {
+        entry = PlayAnimation(animName, loop);
         if (entry == null) return false;
         entry.TimeScale = Mathf.Max(0f, animationSpeedMultiplier);
         return true;

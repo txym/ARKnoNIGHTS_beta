@@ -6,6 +6,16 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentationView
 {
+    private const float DeathBlackeningSeconds = 0.5f;
+
+    private enum DeathPresentationState
+    {
+        Alive,
+        Animation,
+        Blackening,
+        Hidden
+    }
+
     // The model's authored default is screen-right. Left is exactly a 180-degree local Y rotation.
     private static readonly Quaternion RightFacing = Quaternion.Euler(60f, 0f, 0f);
     private static readonly Quaternion LeftFacing = RightFacing * Quaternion.Euler(0f, 180f, 0f);
@@ -20,6 +30,10 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
 
     private float playbackSpeed = 1f;
     private bool deathFallbackApplied;
+    private DeathPresentationState deathState;
+    private Spine.TrackEntry deathTrackEntry;
+    private float deathBlackeningElapsed;
+    private Color deathBlackeningStartColor = Color.white;
 
     private void Awake()
     {
@@ -27,6 +41,23 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
         if (!skeletonAnimation) skeletonAnimation = GetComponent<SkeletonAnimation>();
         if (!statusBar) statusBar = GetComponent<UnitWorldStatusBar>();
         transform.rotation = RightFacing;
+    }
+
+    private void Update()
+    {
+        if (deathState != DeathPresentationState.Blackening) return;
+
+        deathBlackeningElapsed += Time.unscaledDeltaTime;
+        var progress = Mathf.Clamp01(deathBlackeningElapsed / DeathBlackeningSeconds);
+        var target = new Color(0f, 0f, 0f, deathBlackeningStartColor.a);
+        if (skeletonAnimation && skeletonAnimation.Skeleton != null)
+            skeletonAnimation.Skeleton.SetColor(Color.Lerp(deathBlackeningStartColor, target, progress));
+        if (progress >= 1f) HideDeathView();
+    }
+
+    private void OnDestroy()
+    {
+        DetachDeathTrackEntry();
     }
 
     /// <summary>Catalog-driven animation names for a real unit view. Empty hit animation keeps the existing warning-only fallback.</summary>
@@ -92,22 +123,43 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
 
     public void PlayDeath()
     {
-        if (PlayOrReport(deathAnimation, false, 1f, "death")) return;
+        if (deathState != DeathPresentationState.Alive) return;
+        if (PlayOrReport(deathAnimation, false, 1f, "death", out var entry))
+        {
+            deathState = DeathPresentationState.Animation;
+            deathTrackEntry = entry;
+            deathTrackEntry.Complete += HandleDeathAnimationComplete;
+            deathTrackEntry.Dispose += HandleDeathTrackDisposed;
+            return;
+        }
+
+        ApplyDeathFallback();
+    }
+
+    private void ApplyDeathFallback()
+    {
         deathFallbackApplied = true;
-        gameObject.SetActive(false);
         Debug.LogWarning("[BattlePresentation][death.fallback.hide] Missing death animation; hid the event-confirmed dead unit.", this);
+        HideDeathView();
     }
 
     public void Dispose()
     {
-        if (this && gameObject) Destroy(gameObject);
+        if (!this || !gameObject) return;
+        DetachDeathTrackEntry();
+        if (gameObject.activeSelf) gameObject.SetActive(false);
+        Destroy(gameObject);
     }
 
     private int configuredMaximumHitPoints;
 
 
     private bool PlayOrReport(string animationName, bool loop, float localSpeed, string action)
+        => PlayOrReport(animationName, loop, localSpeed, action, out _);
+
+    private bool PlayOrReport(string animationName, bool loop, float localSpeed, string action, out Spine.TrackEntry entry)
     {
+        entry = null;
         if (deathFallbackApplied || !unitSkel)
         {
             Debug.LogWarning("[BattlePresentation][animation.adapter.missing] Cannot play " + action + " because UnitSkelBase is unavailable.", this);
@@ -117,8 +169,52 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
         // SkeletonAnimation.timeScale already receives playbackSpeed in SetPlaybackSpeed.
         // Applying it again here made a 0.5x demo run each clip at 0.25x while events
         // advanced at 0.5x, allowing a Damage/Death event to overtake the Attack clip.
-        var success = unitSkel.PlayPresentationAnimation(animationName, loop, Mathf.Max(0f, localSpeed));
+        var success = unitSkel.TryPlayPresentationAnimation(animationName, loop, Mathf.Max(0f, localSpeed), out entry);
         if (!success) Debug.LogWarning("[BattlePresentation][animation.missing] action=" + action + "; animation=" + animationName, this);
         return success;
+    }
+
+    private void HandleDeathAnimationComplete(Spine.TrackEntry entry)
+    {
+        if (!ReferenceEquals(entry, deathTrackEntry) ||
+            deathState != DeathPresentationState.Animation)
+            return;
+
+        DetachDeathTrackEntry();
+        if (!skeletonAnimation || skeletonAnimation.Skeleton == null)
+        {
+            Debug.LogWarning("[BattlePresentation][death.fade.skeleton.missing] Cannot blacken a death view without an initialized Skeleton.", this);
+            HideDeathView();
+            return;
+        }
+
+        deathBlackeningStartColor = skeletonAnimation.Skeleton.GetColor();
+        deathBlackeningElapsed = 0f;
+        deathState = DeathPresentationState.Blackening;
+    }
+
+    private void HandleDeathTrackDisposed(Spine.TrackEntry entry)
+    {
+        if (!ReferenceEquals(entry, deathTrackEntry)) return;
+        DetachDeathTrackEntry();
+        if (deathState != DeathPresentationState.Animation) return;
+        Debug.LogWarning("[BattlePresentation][death.animation.interrupted] Death animation ended before completion; hid the dead unit.", this);
+        HideDeathView();
+    }
+
+    private void HideDeathView()
+    {
+        deathState = DeathPresentationState.Hidden;
+        DetachDeathTrackEntry();
+        if (gameObject.activeSelf) gameObject.SetActive(false);
+    }
+
+    private void DetachDeathTrackEntry()
+    {
+        var entry = deathTrackEntry;
+        deathTrackEntry = null;
+        if (entry == null) return;
+        entry.Complete -= HandleDeathAnimationComplete;
+        entry.Dispose -= HandleDeathTrackDisposed;
     }
 }
