@@ -128,10 +128,10 @@ namespace ArknoNights.Lobby.Tests
             var joinActionImage = joinAction.GetComponent<UnityEngine.UI.Image>();
             var expected = new[]
             {
-                new OrientedDecorationExpectation("Wings/WingLeftUpper", "img_pointer", 325f, 62.5f, 120f, 120f * 23f / 324f, 164f, true),
-                new OrientedDecorationExpectation("Wings/WingLeftLower", "img_pointer", 325f, 123.5f, 120f, 120f * 23f / 324f, 196f, true),
-                new OrientedDecorationExpectation("Wings/WingRightUpper", "img_pointer", 598f, 62.5f, 115f, 115f * 23f / 324f, 16f, true),
-                new OrientedDecorationExpectation("Wings/WingRightLower", "img_pointer", 598f, 123.5f, 115f, 115f * 23f / 324f, 344f, true),
+                new OrientedDecorationExpectation("Wings/WingLeftUpper", "img_pointer", 330f, 86f, 108f, 108f * 23f / 324f, 162f, true),
+                new OrientedDecorationExpectation("Wings/WingLeftLower", "img_pointer", 330f, 147f, 108f, 108f * 23f / 324f, 198f, true),
+                new OrientedDecorationExpectation("Wings/WingRightUpper", "img_pointer", 603f, 86f, 108f, 108f * 23f / 324f, 18f, true),
+                new OrientedDecorationExpectation("Wings/WingRightLower", "img_pointer", 603f, 147f, 108f, 108f * 23f / 324f, 342f, true),
                 new OrientedDecorationExpectation("DotTopLeft", "room_select_dot", 390.5f, 30.5f, 17f, 17f, 0f, true),
                 new OrientedDecorationExpectation("DotTopRight", "room_select_dot", 525.5f, 31.5f, 17f, 17f, 0f, true),
                 new OrientedDecorationExpectation("DotBottomLeft", "room_select_dot", 390f, 167f, 16f, 16f, 0f, true),
@@ -161,6 +161,11 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(create.Find("LogoRight"), Is.Null);
             Assert.That(create.Find("CreateFrame").GetComponent<Graphic>(), Is.Null);
             Assert.That(create.Find("Wings").GetComponent<Graphic>(), Is.Null);
+            var expectedWingTint = new Color(.35f, .65f, .58f, .65f);
+            foreach (var wing in create.Find("Wings").GetComponentsInChildren<UnityEngine.UI.Image>())
+            {
+                Assert.That(wing.color, Is.EqualTo(expectedWingTint), wing.name);
+            }
             Assert.That(create.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
             Assert.That(join.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
             Assert.That(create.anchoredPosition.x + create.sizeDelta.x, Is.LessThanOrEqualTo(1920f));

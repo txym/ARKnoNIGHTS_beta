@@ -325,11 +325,11 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var wings = Rect("Wings", parent);
         Stretch(wings);
-        var wingTint = new Color(.35f, .65f, .58f, .45f);
-        CreateOrientedDecorationSprite("WingLeftUpper", wings, "Home/img_pointer", 325f, 62.5f, 120f, 120f * 23f / 324f, 164f, true, wingTint);
-        CreateOrientedDecorationSprite("WingLeftLower", wings, "Home/img_pointer", 325f, 123.5f, 120f, 120f * 23f / 324f, 196f, true, wingTint);
-        CreateOrientedDecorationSprite("WingRightUpper", wings, "Home/img_pointer", 598f, 62.5f, 115f, 115f * 23f / 324f, 16f, true, wingTint);
-        CreateOrientedDecorationSprite("WingRightLower", wings, "Home/img_pointer", 598f, 123.5f, 115f, 115f * 23f / 324f, 344f, true, wingTint);
+        var wingTint = new Color(.35f, .65f, .58f, .65f);
+        CreateOrientedDecorationSprite("WingLeftUpper", wings, "Home/img_pointer", 330f, 86f, 108f, 108f * 23f / 324f, 162f, true, wingTint);
+        CreateOrientedDecorationSprite("WingLeftLower", wings, "Home/img_pointer", 330f, 147f, 108f, 108f * 23f / 324f, 198f, true, wingTint);
+        CreateOrientedDecorationSprite("WingRightUpper", wings, "Home/img_pointer", 603f, 86f, 108f, 108f * 23f / 324f, 18f, true, wingTint);
+        CreateOrientedDecorationSprite("WingRightLower", wings, "Home/img_pointer", 603f, 147f, 108f, 108f * 23f / 324f, 342f, true, wingTint);
 
         CreateOrientedDecorationSprite("DotTopLeft", parent, "Home/room_select_dot", 390.5f, 30.5f, 17f, 17f, 0f, true, Color.white);
         CreateOrientedDecorationSprite("DotTopRight", parent, "Home/room_select_dot", 525.5f, 31.5f, 17f, 17f, 0f, true, Color.white);
