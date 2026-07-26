@@ -51,7 +51,7 @@ function Get-LanLobbyCaptureManifest
     param([Parameter(Mandatory = $true)] [string] $ManifestPath)
 
     if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw "Capture manifest not found: $ManifestPath" }
-    try { $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json }
+    try { $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $ManifestPath | ConvertFrom-Json }
     catch { throw "Capture manifest is invalid JSON: $ManifestPath. $($_.Exception.Message)" }
 
     $rawCaptures = @($manifest.captures)

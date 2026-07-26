@@ -157,13 +157,24 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             localLatencyMilliseconds = latency,
             rects = KeyRects(),
             spriteSources = SpriteSources(),
+            unityText = UnityTexts(),
             codeNativeGeometry = CodeNativeGeometries()
         });
     }
 
     private CaptureRect[] KeyRects()
     {
-        var names = new[] { "LanLobbyRoot", "LanLobbyRoot/Home", "LanLobbyRoot/Room", "LanLobbyRoot/Room/RoomCard_0", "LanLobbyRoot/Home/CreateRoomCard", "LanLobbyRoot/Home/JoinRoomCard" };
+        var names = new[]
+        {
+            "LanLobbyRoot",
+            "LanLobbyRoot/Home",
+            "LanLobbyRoot/Room",
+            "LanLobbyRoot/Room/RoomCard_0",
+            "LanLobbyRoot/Home/CreateRoomCard",
+            "LanLobbyRoot/Home/JoinRoomCard",
+            "LanLobbyRoot/Home/RoomSelect/Create/CreateAction",
+            "LanLobbyRoot/Home/RoomSelect/Join/JoinAction"
+        };
         var values = new List<CaptureRect>();
         foreach (var name in names)
         {
@@ -171,24 +182,64 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             if (rect == null) continue;
             var corners = new Vector3[4];
             rect.GetWorldCorners(corners);
-            values.Add(new CaptureRect { name = name, x = corners[0].x, y = corners[0].y, width = corners[2].x - corners[0].x, height = corners[2].y - corners[0].y });
+            values.Add(new CaptureRect
+            {
+                name = name,
+                coordinateOrigin = "screen-bottom-left",
+                unit = "px",
+                x = corners[0].x,
+                y = corners[0].y,
+                width = corners[2].x - corners[0].x,
+                height = corners[2].y - corners[0].y
+            });
         }
         return values.ToArray();
     }
 
     private SpriteSource[] SpriteSources()
     {
-        var result = new Dictionary<string, SpriteSource>(StringComparer.Ordinal);
         // Provenance is evidence of actual rendering in this capture state, not of dormant page objects.
-        foreach (var image in view.GetComponentsInChildren<Image>(false))
-        {
-            if (image.sprite == null) continue;
-            var spriteName = image.sprite.name;
-            if (!TryGetApprovedSource(spriteName, out var source))
-                throw new InvalidOperationException("Lobby capture uses an unmapped sprite: " + spriteName);
-            result[spriteName] = new SpriteSource { spriteName = spriteName, sourcePath = source };
-        }
-        return result.Values.OrderBy(value => value.spriteName, StringComparer.Ordinal).ToArray();
+        return view.GetComponentsInChildren<Image>(false)
+            .Where(image => image.isActiveAndEnabled && image.sprite != null && image.color.a > 0f && image.canvasRenderer.GetAlpha() > 0f)
+            .Select(image =>
+            {
+                var spriteName = image.sprite.name;
+                if (!TryGetApprovedSource(spriteName, out var source))
+                    throw new InvalidOperationException("Lobby capture uses an unmapped sprite: " + spriteName);
+                return new SpriteSource
+                {
+                    node = HierarchyPath(image.transform, view.transform),
+                    spriteName = spriteName,
+                    sourcePath = source
+                };
+            })
+            .OrderBy(value => value.node, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private UnityText[] UnityTexts()
+    {
+        return view.GetComponentsInChildren<Text>(false)
+            .Where(text => text.isActiveAndEnabled &&
+                           text.font != null &&
+                           !string.IsNullOrEmpty(text.text) &&
+                           text.color.a > 0f &&
+                           text.canvasRenderer.GetAlpha() > 0f &&
+                           text.rectTransform.rect.width > 0f &&
+                           text.rectTransform.rect.height > 0f)
+            .Select(text => new UnityText
+            {
+                node = HierarchyPath(text.transform, view.transform),
+                text = text.text,
+                fontName = text.font.name,
+                // A runtime Font object does not expose its original Resources path. Record the
+                // observable name and explicitly avoid inventing a bitmap/material-library path.
+                fontResourcePath = string.Empty,
+                hasBitmapSource = false,
+                bitmapSourcePath = string.Empty
+            })
+            .OrderBy(value => value.node, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private CodeNativeGeometry[] CodeNativeGeometries()
@@ -403,10 +454,11 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     }
 
     [Serializable] private sealed class CaptureManifest { public CaptureRecord[] captures; }
-    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public float canvasScale; public string roomCode; public CaptureMember[] members; public long localLatencyMilliseconds; public CaptureRect[] rects; public SpriteSource[] spriteSources; public CodeNativeGeometry[] codeNativeGeometry; }
+    [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public float canvasScale; public string roomCode; public CaptureMember[] members; public long localLatencyMilliseconds; public CaptureRect[] rects; public SpriteSource[] spriteSources; public UnityText[] unityText; public CodeNativeGeometry[] codeNativeGeometry; }
     [Serializable] private sealed class CaptureMember { public string playerId; public string displayName; public int avatarIndex; public bool isReady; public long latencyMilliseconds; }
-    [Serializable] private sealed class CaptureRect { public string name; public float x; public float y; public float width; public float height; }
-    [Serializable] private sealed class SpriteSource { public string spriteName; public string sourcePath; }
+    [Serializable] private sealed class CaptureRect { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
+    [Serializable] private sealed class SpriteSource { public string node; public string spriteName; public string sourcePath; }
+    [Serializable] private sealed class UnityText { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
     [Serializable] private sealed class CodeNativeGeometry { public string name; public string kind; public bool isBitmap; public string color; public float x; public float y; public float width; public float height; }
 }
 

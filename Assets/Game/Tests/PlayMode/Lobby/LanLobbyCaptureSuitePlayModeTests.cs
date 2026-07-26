@@ -61,6 +61,7 @@ namespace ArknoNights.Lobby.Tests
             StringAssert.Contains("\"localLatencyMilliseconds\"", manifest);
             StringAssert.Contains("\"rects\"", manifest);
             StringAssert.Contains("\"spriteSources\"", manifest);
+            StringAssert.Contains("\"unityText\"", manifest);
             StringAssert.Contains("\"codeNativeGeometry\"", manifest);
             StringAssert.Contains("[uc]autochessouter/", manifest);
 
@@ -71,8 +72,22 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(captureRecord.spriteSources, Is.Not.Null.And.Not.Empty, captureRecord.name + " must include sprite provenance.");
                 foreach (var spriteSource in captureRecord.spriteSources)
                 {
+                    Assert.That(spriteSource.node, Is.Not.Null.And.Not.Empty);
                     Assert.That(spriteSource.spriteName, Is.Not.Null.And.Not.Empty);
                     Assert.That(spriteSource.sourcePath, Is.Not.Null.And.Not.Empty);
+                }
+                Assert.That(captureRecord.unityText, Is.Not.Null.And.Not.Empty,
+                    captureRecord.name + " must enumerate current active rendered Unity Text.");
+                foreach (var text in captureRecord.unityText)
+                {
+                    Assert.That(text.node, Does.StartWith("LanLobbyRoot/"));
+                    Assert.That(text.text, Is.Not.Null.And.Not.Empty);
+                    Assert.That(text.fontName, Is.Not.Null.And.Not.Empty);
+                    Assert.That(text.fontResourcePath, Is.Empty,
+                        "The runtime capture cannot prove a Resources path and must not invent one.");
+                    Assert.That(text.hasBitmapSource, Is.False);
+                    Assert.That(text.bitmapSourcePath, Is.Empty,
+                        "Unity Text must explicitly have no material-library bitmap source.");
                 }
                 Assert.That(captureRecord.codeNativeGeometry.Any(geometry => geometry.name == "LanLobbyRoot/OpaqueBlocker"), Is.True,
                     captureRecord.name + " must report the visible non-bitmap OpaqueBlocker.");
@@ -83,6 +98,25 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(discovered.members, Is.Empty);
 
             var home = parsed.captures.Single(record => record.name == "home");
+            AssertActionRect(home, "LanLobbyRoot/Home/RoomSelect/Create/CreateAction");
+            AssertActionRect(home, "LanLobbyRoot/Home/RoomSelect/Join/JoinAction");
+            Assert.That(home.unityText.Any(text => text.text == "LOCAL IDENTITY"), Is.True,
+                "Home identity title must be captured dynamically.");
+            Assert.That(home.unityText.Any(text => text.text == "Doctor"), Is.True,
+                "Current profile input text must be captured dynamically.");
+            Assert.That(home.unityText.Any(text => text.text == "创建同盟"), Is.True,
+                "Create action text must be captured dynamically.");
+            Assert.That(home.unityText.Any(text => text.text == "加入同盟"), Is.True,
+                "Join action text must be captured dynamically.");
+            Assert.That(home.unityText.Any(text => text.text == "DISCOVERING LOCAL ROOMS"), Is.True,
+                "Current Home status text must be captured dynamically.");
+            Assert.That(discovered.unityText.Any(text => text.text.Contains("654321") && text.text.Contains("Doctor")), Is.True,
+                "The rendered discovered-room row must be captured dynamically.");
+            var roomHost = parsed.captures.Single(record => record.name == "room-host");
+            Assert.That(roomHost.unityText.Any(text => text.text == "18 ms"), Is.True,
+                "Room latency must be captured dynamically.");
+            Assert.That(roomHost.unityText.Any(text => text.text == "654321"), Is.True,
+                "Room code must be captured dynamically.");
             Assert.That(home.spriteSources.Any(sprite =>
                     sprite.spriteName.StartsWith("room_select_", StringComparison.Ordinal) &&
                     sprite.sourcePath.StartsWith("[uc]autochessouter/room_select_", StringComparison.Ordinal)),
@@ -95,6 +129,14 @@ namespace ArknoNights.Lobby.Tests
                 "The Home capture manifest must prove it rendered an approved Combined avatar source.");
             Assert.That(home.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.False,
                 "The Home provenance table must exclude inactive legacy foreground sprites.");
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
+                "Home must count both rendered join_icon instances.");
+            Assert.That(discovered.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
+                "Discovered Home must count both rendered join_icon instances.");
+            Assert.That(parsed.captures.Sum(record => record.spriteSources.Count(sprite => sprite.spriteName == "join_icon")), Is.EqualTo(4),
+                "Rendered join_icon occurrences must sum to four across the two Home states.");
+            Assert.That(home.spriteSources.Select(sprite => sprite.node), Is.Unique,
+                "Each Sprite usage row must identify one stable rendered node.");
             Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(6),
                 "The Home manifest must report every active non-bitmap Image: OpaqueBlocker plus five frame lines.");
             foreach (var geometry in home.codeNativeGeometry)
@@ -116,7 +158,6 @@ namespace ArknoNights.Lobby.Tests
                     "LanLobbyRoot/Home/RoomSelect/PanelFrame/Divider"
                 },
                 home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
-            var roomHost = parsed.captures.Single(record => record.name == "room-host");
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");
             Assert.That(roomHost.codeNativeGeometry.Select(geometry => geometry.name), Is.EquivalentTo(new[] { "LanLobbyRoot/OpaqueBlocker" }),
@@ -124,6 +165,17 @@ namespace ArknoNights.Lobby.Tests
             foreach (var room in parsed.captures.Where(record => record.name.StartsWith("room-", StringComparison.Ordinal)))
                 Assert.That(room.codeNativeGeometry.Any(geometry => geometry.name.Contains("PanelFrame")), Is.False,
                     room.name + " must not report inactive Home-only frame geometry.");
+        }
+
+        private static void AssertActionRect(CaptureRecordProbe capture, string name)
+        {
+            var rect = capture.rects.Single(value => value.name == name);
+            Assert.That(rect.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+            Assert.That(rect.unit, Is.EqualTo("px"));
+            Assert.That(rect.x, Is.GreaterThanOrEqualTo(0f));
+            Assert.That(rect.y, Is.GreaterThanOrEqualTo(0f));
+            Assert.That(rect.width, Is.GreaterThan(0f));
+            Assert.That(rect.height, Is.GreaterThan(0f));
         }
 
         [Test]
@@ -171,9 +223,11 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Serializable] private sealed class CaptureManifestProbe { public CaptureRecordProbe[] captures; }
-        [Serializable] private sealed class CaptureRecordProbe { public string name; public string roomCode; public CaptureMemberProbe[] members; public SpriteSourceProbe[] spriteSources; public CodeNativeGeometryProbe[] codeNativeGeometry; }
+        [Serializable] private sealed class CaptureRecordProbe { public string name; public string roomCode; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; }
         [Serializable] private sealed class CaptureMemberProbe { public string playerId; }
-        [Serializable] private sealed class SpriteSourceProbe { public string spriteName; public string sourcePath; }
+        [Serializable] private sealed class CaptureRectProbe { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
+        [Serializable] private sealed class SpriteSourceProbe { public string node; public string spriteName; public string sourcePath; }
+        [Serializable] private sealed class UnityTextProbe { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
         [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public float x; public float y; public float width; public float height; }
     }
 }

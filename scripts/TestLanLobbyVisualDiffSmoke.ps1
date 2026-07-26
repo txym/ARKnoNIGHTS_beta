@@ -97,28 +97,70 @@ try
             }
         }
         New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 40, 50, 60)) $draw
+        $actionRects = if ($name -eq 'home') {
+            @(
+                # Deliberately offset and resize Create so the report must derive non-zero deltas.
+                [ordered]@{ name = 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction'; coordinateOrigin = 'screen-bottom-left'; unit = 'px'; x = 1161; y = 536; width = 711; height = 95 },
+                [ordered]@{ name = 'LanLobbyRoot/Home/RoomSelect/Join/JoinAction'; coordinateOrigin = 'screen-bottom-left'; unit = 'px'; x = 1154; y = 105; width = 717; height = 99 }
+            )
+        } else { @() }
         $records += [ordered]@{
             name = $name
             path = $actualPath
-            spriteSources = @([ordered]@{ spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' })
+            width = 1920
+            height = 1080
+            spriteSources = @(
+                [ordered]@{ node = 'LanLobbyRoot/Terrain'; spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' }
+            ) + $(if ($name -eq 'home') {
+                @(
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/SimulationInvite/Icon'; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Join/JoinAction/ActionIcon'; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' }
+                )
+            } else { @() })
             rects = @(
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_0'; x = 100; y = 100; width = 200; height = 300 },
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_1'; x = 320; y = 100; width = 200; height = 300 },
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_2'; x = 540; y = 100; width = 200; height = 300 },
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_3'; x = 760; y = 100; width = 200; height = 300 }
-            )
+            ) + $actionRects
+            unityText = $(if ($name -eq 'home') {
+                @(
+                    [ordered]@{ node = 'LanLobbyRoot/Home/IdentityPanel/Title'; text = 'LOCAL IDENTITY'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction/Label'; text = '创建同盟'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Join/JoinAction/Label'; text = '加入同盟'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' }
+                )
+            } else {
+                @([ordered]@{ node = 'LanLobbyRoot/Room/Latency'; text = '18 ms'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' })
+            })
             codeNativeGeometry = @(
                 [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; x = 0; y = 0; width = 1920; height = 1080 }
             )
         }
     }
-    [ordered]@{ captures = $records } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $captureDirectory 'manifest.json') -Encoding UTF8
+    $manifestJson = [ordered]@{ captures = $records } | ConvertTo-Json -Depth 12
+    [IO.File]::WriteAllText(
+        (Join-Path $captureDirectory 'manifest.json'),
+        $manifestJson,
+        (New-Object Text.UTF8Encoding($false)))
+
+    $missingActionCaptureDirectory = Join-Path $scratch 'missing-action-captures'
+    New-Item -ItemType Directory -Force -Path $missingActionCaptureDirectory | Out-Null
+    foreach ($name in $names) { Copy-Item -LiteralPath (Join-Path $captureDirectory ($name + '.png')) -Destination (Join-Path $missingActionCaptureDirectory ($name + '.png')) }
+    $missingActionManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $captureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $missingActionManifest.captures) { $record.path = Join-Path $missingActionCaptureDirectory ($record.name + '.png') }
+    $missingActionHome = $missingActionManifest.captures | Where-Object name -eq 'home'
+    $missingActionHome.rects = @($missingActionHome.rects | Where-Object name -ne 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction')
+    $missingActionManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $missingActionCaptureDirectory 'manifest.json') -Encoding UTF8
+    $missingActionOutput = Join-Path $scratch 'missing-action-output'
+    Assert-FailsWithoutOutput {
+        & $exportScript -CaptureDirectory $missingActionCaptureDirectory -OutputDirectory $missingActionOutput -ReferenceDirectory $referenceDirectory
+    } $missingActionOutput 'Create action Rect'
 
     $invalidCaptureDirectory = Join-Path $scratch 'invalid-captures'
     New-Item -ItemType Directory -Force -Path $invalidCaptureDirectory | Out-Null
     Copy-Item -LiteralPath (Join-Path $captureDirectory 'manifest.json') -Destination (Join-Path $invalidCaptureDirectory 'manifest.json')
     foreach ($name in $names) { New-SolidPng (Join-Path $invalidCaptureDirectory ($name + '.png')) 1280 720 ([Drawing.Color]::Black) $null }
-    $invalidManifest = Get-Content -Raw -LiteralPath (Join-Path $invalidCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    $invalidManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $invalidCaptureDirectory 'manifest.json') | ConvertFrom-Json
     foreach ($record in $invalidManifest.captures) { $record.path = Join-Path $invalidCaptureDirectory ($record.name + '.png') }
     $invalidManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $invalidCaptureDirectory 'manifest.json') -Encoding UTF8
     $invalidOutput = Join-Path $scratch 'invalid-output'
@@ -165,19 +207,23 @@ try
     Assert-True ($actionBars.Count -eq 2) 'two Home action bars must be reported separately'
     $createAction = $actionBars | Where-Object name -eq 'home-create-action'
     $joinAction = $actionBars | Where-Object name -eq 'home-join-action'
-    Assert-True (($createAction.actualRect.x -eq 1154) -and ($createAction.actualRect.y -eq 453) -and ($createAction.actualRect.width -eq 717) -and ($createAction.actualRect.height -eq 99)) 'Create actual crop must use the approved Rect'
+    Assert-True (($createAction.actualRect.x -eq 1161) -and ($createAction.actualRect.y -eq 449) -and ($createAction.actualRect.width -eq 711) -and ($createAction.actualRect.height -eq 95)) 'Create actual crop must be converted from the captured manifest Rect'
     Assert-True (($joinAction.actualRect.x -eq 1154) -and ($joinAction.actualRect.y -eq 876) -and ($joinAction.actualRect.width -eq 717) -and ($joinAction.actualRect.height -eq 99)) 'Join actual crop must use the approved Rect'
-    foreach ($action in @($createAction, $joinAction))
-    {
-        Assert-True ($action.approvedTargetRectPx1920x1080.coordinateOrigin -eq 'screen-top-left') 'approved target Rect must name its screen coordinate origin'
-        Assert-True ($action.positionDeviationPx1920x1080.unit -eq 'px') 'position deviation must name px units'
-        Assert-True (($action.positionDeviationPx1920x1080.deltaX -eq 0) -and ($action.positionDeviationPx1920x1080.deltaY -eq 0)) 'configured actual crop must match the approved target position'
-        Assert-True ($action.sizeDeviationPxAfterLocalReferenceResize.unit -eq 'px') 'size deviation must name px units'
-        Assert-True (($action.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0) -and ($action.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0)) 'local resized reference must match the approved action size'
-    }
+    Assert-True (($createAction.actualRect.coordinateOrigin -eq 'screen-top-left') -and ($createAction.actualRect.unit -eq 'px')) 'actual action Rect must name its normalized origin and unit'
+    Assert-True (($createAction.approvedTargetRectPx1920x1080.coordinateOrigin -eq 'screen-top-left') -and ($createAction.approvedTargetRectPx1920x1080.unit -eq 'px')) 'approved target Rect must name its screen coordinate origin and unit'
+    Assert-True (($createAction.positionDeviationPx1920x1080.deltaX -eq 7) -and ($createAction.positionDeviationPx1920x1080.deltaY -eq -4)) 'Create position delta must be actual top-left minus approved target'
+    Assert-True (($createAction.locallyResizedReferenceSizePx.width -eq 717) -and ($createAction.locallyResizedReferenceSizePx.height -eq 99)) 'local reference target must remain the approved 717x99 size'
+    Assert-True (($createAction.comparisonReferenceSizePx.width -eq 711) -and ($createAction.comparisonReferenceSizePx.height -eq 95)) 'metric comparison reference must explicitly report its actual-crop size'
+    Assert-True (($createAction.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq -6) -and ($createAction.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq -4)) 'Create size delta must be actual minus locally resized target reference'
+    Assert-True (($joinAction.positionDeviationPx1920x1080.deltaX -eq 0) -and ($joinAction.positionDeviationPx1920x1080.deltaY -eq 0)) 'Join position delta must remain zero'
+    Assert-True (($joinAction.locallyResizedReferenceSizePx.width -eq 717) -and ($joinAction.locallyResizedReferenceSizePx.height -eq 99)) 'Join local reference target must be 717x99'
+    Assert-True (($joinAction.comparisonReferenceSizePx.width -eq 717) -and ($joinAction.comparisonReferenceSizePx.height -eq 99)) 'Join metric comparison size must be explicit'
+    Assert-True (($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0) -and ($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0)) 'Join size delta must remain zero'
     Assert-True (@($report.materialUsage.bitmapSprites).Count -gt 0) 'material usage must separately list bitmap Sprites'
-    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'Home/RoomSelect/Create/CreateAction/Label' -and $_.text -eq '创建同盟' }).Count -eq 1) 'Create action Unity Text must be audited outside Sprite usage'
-    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'Home/RoomSelect/Join/JoinAction/Label' -and $_.text -eq '加入同盟' }).Count -eq 1) 'Join action Unity Text must be audited outside Sprite usage'
+    Assert-True (($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'join_icon').occurrenceCount -eq 2) 'Sprite occurrence count must sum rendered instances, not capture presence'
+    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction/Label' -and $_.text -eq '创建同盟' }).Count -eq 1) 'Create action Unity Text must come from captured manifest data'
+    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Home/IdentityPanel/Title' -and $_.text -eq 'LOCAL IDENTITY' }).Count -eq 1) 'Home identity text must come from captured manifest data'
+    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Room/Latency' -and $_.text -eq '18 ms' }).Count -eq 1) 'Room text must come from captured manifest data'
     Assert-True (@($report.materialUsage.codeGeneratedGeometry).Count -gt 0) 'material usage must separately list code-generated geometry'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.PSObject.Properties.Name -contains 'sourcePath' }).Count -eq 0) 'Unity Text must not be represented as a Sprite source'
     foreach ($name in @('home-create-action','home-join-action')) { foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ($name + '-' + $kind + '.png'))) "missing $name $kind" } }
@@ -192,6 +238,11 @@ try
     Assert-True ($markdown.Contains("${figure9}: 2048×1118")) 'Markdown must derive figure 9 native dimensions from decoded reference pixels'
     Assert-True ($markdown.Contains("${figure10}: 2048×1118")) 'Markdown must derive figure 10 native dimensions from decoded reference pixels'
     Assert-True ($markdown.Contains('Position deviation (px)')) 'Markdown action table must expose position deviation in px'
+    Assert-True ($markdown.Contains('1161,449,711,95')) 'Markdown must contain the manifest-derived Create actual Rect'
+    Assert-True ($markdown.Contains('dx=7, dy=-4')) 'Markdown must contain the exact manifest-derived Create position delta'
+    Assert-True ($markdown.Contains('717x99')) 'Markdown must explicitly list the locally resized reference size'
+    Assert-True ($markdown.Contains('711x95')) 'Markdown must explicitly list the comparison reference size'
+    Assert-True ($markdown.Contains('dw=-6, dh=-4')) 'Markdown must contain the exact Create size delta'
     Assert-True ($markdown.Contains('## Unity Text usage')) 'Markdown must separate Unity Text usage from bitmap Sprites'
     Assert-True ($markdown.Contains('## Code-generated geometry usage')) 'Markdown must separate code-generated geometry from bitmap Sprites'
     Assert-True ((@($report.captures | Where-Object { $_.name -like 'room-*' } | ForEach-Object { @($_.roomCards).Count } | Measure-Object -Sum).Sum -eq 12)) 'room reports must retain four actual RoomCard rectangles each'

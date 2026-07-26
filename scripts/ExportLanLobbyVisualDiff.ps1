@@ -48,8 +48,8 @@ $homeRegions = @(
   @{ name='main-background'; x=0.22; y=0.00; width=0.78; height=1.00; mask=$false }
 )
 $homeActionBars = @(
-  @{ name='home-create-action'; actual=@{x=1154;y=453;width=717;height=99}; approvedTarget=@{x=1154;y=453;width=717;height=99}; reference=@{x=1257;y=482;width=763;height=105} },
-  @{ name='home-join-action'; actual=@{x=1154;y=876;width=717;height=99}; approvedTarget=@{x=1154;y=876;width=717;height=99}; reference=@{x=1257;y=932;width=763;height=105} }
+  @{ name='home-create-action'; label='Create'; manifestRectName='LanLobbyRoot/Home/RoomSelect/Create/CreateAction'; approvedTarget=@{x=1154;y=453;width=717;height=99}; reference=@{x=1257;y=482;width=763;height=105} },
+  @{ name='home-join-action'; label='Join'; manifestRectName='LanLobbyRoot/Home/RoomSelect/Join/JoinAction'; approvedTarget=@{x=1154;y=876;width=717;height=99}; reference=@{x=1257;y=932;width=763;height=105} }
 )
 $figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
@@ -134,6 +134,54 @@ function Get-RoomCardGeometry($Capture)
     return @($cards | ForEach-Object { [pscustomobject][ordered]@{ name=[string]$_.name; x=[double]$_.x; y=[double]$_.y; width=[double]$_.width; height=[double]$_.height } })
 }
 
+function Convert-CapturedActionRectangle($Capture, $Spec)
+{
+    $captureWidth = [double]$Capture.width
+    $captureHeight = [double]$Capture.height
+    if ($captureWidth -le 0 -or $captureHeight -le 0) { throw "$($Spec.label) action Rect capture dimensions are invalid." }
+
+    $matches = @($Capture.rects | Where-Object { $_ -and [string]$_.name -ceq [string]$Spec.manifestRectName })
+    if ($matches.Count -ne 1) { throw "$($Spec.label) action Rect must occur exactly once in the home capture manifest; found $($matches.Count)." }
+    $raw = $matches[0]
+    if ([string]$raw.coordinateOrigin -cne 'screen-bottom-left' -or [string]$raw.unit -cne 'px')
+    {
+        throw "$($Spec.label) action Rect must declare coordinateOrigin=screen-bottom-left and unit=px."
+    }
+
+    $numbers = @([double]$raw.x, [double]$raw.y, [double]$raw.width, [double]$raw.height)
+    $invalidNumbers = @($numbers | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) })
+    if ($invalidNumbers.Count -gt 0 -or
+        $numbers[0] -lt 0 -or $numbers[1] -lt 0 -or $numbers[2] -le 0 -or $numbers[3] -le 0 -or
+        ($numbers[0] + $numbers[2]) -gt $captureWidth -or ($numbers[1] + $numbers[3]) -gt $captureHeight)
+    {
+        throw "$($Spec.label) action Rect is invalid or outside the captured $([int]$captureWidth)x$([int]$captureHeight) screen."
+    }
+
+    $scaleX = 1920.0 / $captureWidth
+    $scaleY = 1080.0 / $captureHeight
+    $converted = [pscustomobject][ordered]@{
+        coordinateOrigin = 'screen-top-left'
+        unit = 'px'
+        x = [int][Math]::Round($numbers[0] * $scaleX, [MidpointRounding]::AwayFromZero)
+        y = [int][Math]::Round(($captureHeight - ($numbers[1] + $numbers[3])) * $scaleY, [MidpointRounding]::AwayFromZero)
+        width = [int][Math]::Round($numbers[2] * $scaleX, [MidpointRounding]::AwayFromZero)
+        height = [int][Math]::Round($numbers[3] * $scaleY, [MidpointRounding]::AwayFromZero)
+    }
+    if ($converted.width -le 0 -or $converted.height -le 0 -or
+        $converted.x -lt 0 -or $converted.y -lt 0 -or
+        ($converted.x + $converted.width) -gt 1920 -or ($converted.y + $converted.height) -gt 1080)
+    {
+        throw "$($Spec.label) action Rect is outside the normalized 1920x1080 screen."
+    }
+    return $converted
+}
+
+function ConvertTo-LanLobbyMarkdownCell([string] $Value)
+{
+    if ($null -eq $Value) { return '' }
+    return $Value.Replace('|', '\|').Replace("`r`n", '<br>').Replace("`n", '<br>').Replace("`r", '<br>')
+}
+
 function Test-LanLobbyReferenceImage([string] $ReferencePath)
 {
     try
@@ -165,9 +213,50 @@ $referenceRoomProbe = Test-LanLobbyReferenceImage -ReferencePath $referenceRoom
 foreach ($capture in @($manifest.captures))
 {
     $probe = [Drawing.Bitmap]::FromFile($capture.path)
-    try { if ($probe.Width -ne 1920 -or $probe.Height -ne 1080) { throw "Visual-diff actual capture must be exactly 1920x1080: $($capture.path) is $($probe.Width)x$($probe.Height)" } }
+    try
+    {
+        if ($probe.Width -ne 1920 -or $probe.Height -ne 1080) { throw "Visual-diff actual capture must be exactly 1920x1080: $($capture.path) is $($probe.Width)x$($probe.Height)" }
+        if ([int]$capture.width -ne $probe.Width -or [int]$capture.height -ne $probe.Height) { throw "Capture manifest dimensions do not match decoded pixels: $($capture.name)" }
+    }
     finally { $probe.Dispose() }
 }
+
+$homeCapture = @($manifest.captures | Where-Object { $_.name -eq 'home' })[0]
+$actionActualRects = @{}
+foreach ($spec in $homeActionBars)
+{
+    $actionActualRects[$spec.name] = Convert-CapturedActionRectangle -Capture $homeCapture -Spec $spec
+}
+
+$textOccurrences = @(
+    foreach ($capture in @($manifest.captures))
+    {
+        $textProperty = $capture.PSObject.Properties['unityText']
+        $records = @()
+        if ($null -ne $textProperty) { $records = @($textProperty.Value | Where-Object { $null -ne $_ }) }
+        if ($records.Count -eq 0) { throw "Capture $($capture.name) has no active Unity Text evidence." }
+        foreach ($record in $records)
+        {
+            if ([string]::IsNullOrWhiteSpace([string]$record.node) -or
+                [string]::IsNullOrEmpty([string]$record.text) -or
+                [string]::IsNullOrWhiteSpace([string]$record.fontName) -or
+                [bool]$record.hasBitmapSource -or
+                -not [string]::IsNullOrEmpty([string]$record.bitmapSourcePath))
+            {
+                throw "Capture $($capture.name) has invalid Unity Text evidence at node '$($record.node)'."
+            }
+            [pscustomobject]@{
+                Capture = [string]$capture.name
+                Node = [string]$record.node
+                Text = [string]$record.text
+                FontName = [string]$record.fontName
+                FontResourcePath = [string]$record.fontResourcePath
+                HasBitmapSource = [bool]$record.hasBitmapSource
+                BitmapSourcePath = [string]$record.bitmapSourcePath
+            }
+        }
+    }
+)
 
 # The exporter never overwrites or removes caller output. A report destination must be absent;
 # all generated files are staged beside it and moved in only after successful report generation.
@@ -180,12 +269,20 @@ $assets = @($spriteUsage | Group-Object SpriteName | Sort-Object Name | ForEach-
     $first = $_.Group[0]
     [pscustomobject][ordered]@{ spriteName=$first.SpriteName; captures=@($_.Group.CaptureName | Sort-Object -Unique); resourcesPath=$first.ResourcesPath; sourcePath=$first.SourcePath; importedSha256=$first.ImportedSha256; occurrenceCount=[int](($_.Group | Measure-Object OccurrenceCount -Sum).Sum) }
 })
-$unityTextUsage = @(
-    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Create/CreateAction/Label'; text='创建同盟'; captures=@('home','discovered-prefill'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=2 },
-    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Join/JoinAction/Label'; text='加入同盟'; captures=@('home','discovered-prefill'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=2 },
-    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Status'; text='DISCOVERING LOCAL ROOMS'; captures=@('home'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=1 },
-    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Status'; text='Room ready to join.'; captures=@('discovered-prefill'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=1 }
-)
+$unityTextUsage = @($textOccurrences | Group-Object Node, Text, FontName, FontResourcePath, HasBitmapSource, BitmapSourcePath | Sort-Object Name | ForEach-Object {
+    $first = $_.Group[0]
+    [pscustomobject][ordered]@{
+        kind='unity-text'
+        node=$first.Node
+        text=$first.Text
+        captures=@($_.Group.Capture | Sort-Object -Unique)
+        fontName=$first.FontName
+        fontResourcePath=$first.FontResourcePath
+        hasBitmapSource=$first.HasBitmapSource
+        bitmapSourcePath=$first.BitmapSourcePath
+        occurrenceCount=$_.Count
+    }
+})
 $geometryOccurrences = @(
     foreach ($capture in @($manifest.captures))
     {
@@ -272,50 +369,53 @@ try
         }
         finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($normalizedReference) { $normalizedReference.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     }
-    $homeCapture = @($manifest.captures | Where-Object { $_.name -eq 'home' })[0]
     foreach ($spec in $homeActionBars)
     {
+        $actualSpec = $actionActualRects[$spec.name]
         $actual = $null
         $nativeReference = $null
         $actualCrop = $null
         $nativeReferenceCrop = $null
-        $resizedReferenceCrop = $null
+        $locallyResizedReferenceCrop = $null
+        $comparisonReferenceCrop = $null
         $overlay = $null
         $heatmap = $null
         try
         {
             $actual = [Drawing.Bitmap]::FromFile($homeCapture.path)
             $nativeReference = [Drawing.Bitmap]::FromFile($referenceHome)
-            $actualRectangle = New-Object Drawing.Rectangle $spec.actual.x, $spec.actual.y, $spec.actual.width, $spec.actual.height
+            $actualRectangle = New-Object Drawing.Rectangle $actualSpec.x, $actualSpec.y, $actualSpec.width, $actualSpec.height
             $scaledReference = Convert-ActionReferenceRectangle $spec.reference $nativeReference.Width $nativeReference.Height
             $actualCrop = New-LanLobbyBitmapCrop $actual $actualRectangle
             $nativeReferenceCrop = New-LanLobbyBitmapCrop $nativeReference $scaledReference
-            $resizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualCrop.Width $actualCrop.Height
-            $overlay = New-LanLobbyActionOverlay $actualCrop $resizedReferenceCrop
+            $locallyResizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $spec.approvedTarget.width $spec.approvedTarget.height
+            $comparisonReferenceCrop = Resize-LanLobbyBitmap $locallyResizedReferenceCrop $actualCrop.Width $actualCrop.Height
+            $overlay = New-LanLobbyActionOverlay $actualCrop $comparisonReferenceCrop
             $heatmap = New-Object Drawing.Bitmap $actualCrop.Width, $actualCrop.Height
             $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height
             [long]$maskedPixels = 0
-            $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $resizedReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
+            $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $comparisonReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
             $actionBarReports += [pscustomobject][ordered]@{
                 name = $spec.name
                 capture = 'home'
-                actualRect = [ordered]@{ x=$spec.actual.x; y=$spec.actual.y; width=$spec.actual.width; height=$spec.actual.height }
+                actualRect = [ordered]@{ coordinateOrigin=$actualSpec.coordinateOrigin; unit=$actualSpec.unit; x=$actualSpec.x; y=$actualSpec.y; width=$actualSpec.width; height=$actualSpec.height }
                 referenceRect = [ordered]@{ x=$scaledReference.X; y=$scaledReference.Y; width=$scaledReference.Width; height=$scaledReference.Height }
                 referenceMeasurementCanvas = [ordered]@{ width=$figure9MeasurementSize.width; height=$figure9MeasurementSize.height }
                 approvedTargetRectPx1920x1080 = [ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$spec.approvedTarget.x; y=$spec.approvedTarget.y; width=$spec.approvedTarget.width; height=$spec.approvedTarget.height }
-                locallyResizedReferenceSizePx = [ordered]@{ unit='px'; width=$resizedReferenceCrop.Width; height=$resizedReferenceCrop.Height }
-                positionDeviationPx1920x1080 = [ordered]@{ unit='px'; deltaX=($spec.actual.x - $spec.approvedTarget.x); deltaY=($spec.actual.y - $spec.approvedTarget.y) }
-                sizeDeviationPxAfterLocalReferenceResize = [ordered]@{ unit='px'; deltaWidth=($actualCrop.Width - $resizedReferenceCrop.Width); deltaHeight=($actualCrop.Height - $resizedReferenceCrop.Height) }
+                locallyResizedReferenceSizePx = [ordered]@{ unit='px'; width=$locallyResizedReferenceCrop.Width; height=$locallyResizedReferenceCrop.Height }
+                comparisonReferenceSizePx = [ordered]@{ unit='px'; width=$comparisonReferenceCrop.Width; height=$comparisonReferenceCrop.Height }
+                positionDeviationPx1920x1080 = [ordered]@{ unit='px'; deltaX=($actualSpec.x - $spec.approvedTarget.x); deltaY=($actualSpec.y - $spec.approvedTarget.y) }
+                sizeDeviationPxAfterLocalReferenceResize = [ordered]@{ unit='px'; deltaWidth=($actualCrop.Width - $locallyResizedReferenceCrop.Width); deltaHeight=($actualCrop.Height - $locallyResizedReferenceCrop.Height) }
                 comparedPixels = $metric.ComparedPixels
                 pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
                 averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
             }
             $actualCrop.Save((Join-Path $stagingDirectory ($spec.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
-            $resizedReferenceCrop.Save((Join-Path $stagingDirectory ($spec.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
+            $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($spec.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
             $overlay.Save((Join-Path $stagingDirectory ($spec.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
             $heatmap.Save((Join-Path $stagingDirectory ($spec.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
         }
-        finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($resizedReferenceCrop) { $resizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
+        finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($comparisonReferenceCrop) { $comparisonReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     }
     $report = [ordered]@{
         generatedAtUtc=[DateTime]::UtcNow.ToString('o')
@@ -336,14 +436,14 @@ try
     })
     $markdown = @('# LAN Lobby Visual Difference Report', '', "Reference figure native dimensions (decoded from this export): $($referenceDimensionLines -join '; '). Each reference is independently normalized on X and Y to 1920×1080. This is non-blocking layout/color reporting, not a pixel-equality claim.", '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
-    $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The approved target and actual crop use 1920×1080 screen coordinates with a top-left origin; the reference crop is locally resized to the approved action size. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect (px) | Approved target Rect (px) | Native reference Rect (px) | Position deviation (px) | Size deviation after local resize (px) | Difference ratio | Avg RGB error |', '| --- | --- | --- | --- | --- | --- | ---: | ---: |')
-    foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.approvedTargetRectPx1920x1080.x),$($item.approvedTargetRectPx1920x1080.y),$($item.approvedTargetRectPx1920x1080.width),$($item.approvedTargetRectPx1920x1080.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | dx=$($item.positionDeviationPx1920x1080.deltaX), dy=$($item.positionDeviationPx1920x1080.deltaY) | dw=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
+    $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The manifest-derived actual crop and approved target use 1920×1080 screen coordinates with a top-left origin. The native reference crop is locally resized to the approved target size; a separately reported comparison copy is resized to the actual crop only for pixel metrics and overlays. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect (px) | Approved target Rect (px) | Native reference Rect (px) | Locally resized reference | Comparison reference | Position deviation (px) | Size deviation after local resize (px) | Difference ratio | Avg RGB error |', '| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: |')
+    foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.approvedTargetRectPx1920x1080.x),$($item.approvedTargetRectPx1920x1080.y),$($item.approvedTargetRectPx1920x1080.width),$($item.approvedTargetRectPx1920x1080.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | $($item.locallyResizedReferenceSizePx.width)x$($item.locallyResizedReferenceSizePx.height) px | $($item.comparisonReferenceSizePx.width)x$($item.comparisonReferenceSizePx.height) px | dx=$($item.positionDeviationPx1920x1080.deltaX), dy=$($item.positionDeviationPx1920x1080.deltaY) | dw=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Bitmap Sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
     foreach ($asset in $assets) { $markdown += "| $($asset.spriteName) | $($asset.captures -join ', ') | $($asset.resourcesPath) | $($asset.sourcePath) | $($asset.importedSha256) | $($asset.occurrenceCount) |" }
-    $markdown += @('', '## Unity Text usage', '', 'These records are native Unity Text, not bitmap Sprites and therefore have no material-library source path.', '', '| Node | Text | Captures | Font Resources path | Total occurrences |', '| --- | --- | --- | --- | ---: |')
-    foreach ($textUsage in $unityTextUsage) { $markdown += "| $($textUsage.node) | $($textUsage.text) | $($textUsage.captures -join ', ') | $($textUsage.fontResourcesPath) | $($textUsage.occurrenceCount) |" }
+    $markdown += @('', '## Unity Text usage', '', 'These rows are aggregated from active, rendered UnityEngine.UI.Text instances in each captured page state. Dormant or non-rendered Text is intentionally absent. Runtime Font objects expose a font name but no provable original Resources path, so fontResourcePath and bitmapSourcePath are empty and hasBitmapSource is false.', '', '| Node | Text | Captures | Font name | Font Resources path | Has bitmap source | Bitmap source path | Total occurrences |', '| --- | --- | --- | --- | --- | --- | --- | ---: |')
+    foreach ($textUsage in $unityTextUsage) { $markdown += "| $(ConvertTo-LanLobbyMarkdownCell $textUsage.node) | $(ConvertTo-LanLobbyMarkdownCell $textUsage.text) | $($textUsage.captures -join ', ') | $(ConvertTo-LanLobbyMarkdownCell $textUsage.fontName) | $(ConvertTo-LanLobbyMarkdownCell $textUsage.fontResourcePath) | $($textUsage.hasBitmapSource) | $(ConvertTo-LanLobbyMarkdownCell $textUsage.bitmapSourcePath) | $($textUsage.occurrenceCount) |" }
     $markdown += @('', '## Code-generated geometry usage', '', '| Node | Kind | Bitmap | Color | Captures | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
     foreach ($geometry in $codeGeneratedGeometry) { $markdown += "| $($geometry.name) | $($geometry.kind) | $($geometry.isBitmap) | $($geometry.color) | $($geometry.captures -join ', ') | $($geometry.occurrenceCount) |" }
     Set-Content -LiteralPath (Join-Path $stagingDirectory 'visual-diff-report.md') -Value $markdown -Encoding UTF8
