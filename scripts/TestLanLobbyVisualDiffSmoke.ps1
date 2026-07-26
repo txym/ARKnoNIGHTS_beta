@@ -481,7 +481,7 @@ try
     Assert-True (($null -eq $missingDiagnostic.actualBounds) -and ($null -eq $missingDiagnostic.centerDeviationPx) -and ($null -eq $missingDiagnostic.sizeDeviationPx)) 'missing central diagnostic must publish null measurements'
     Assert-True ($missingDiagnostic.passed -eq $false) 'missing central diagnostic must fail informationally'
     $unexpectedDecorationFailures = @($decoration.components | Where-Object { $_.name -ne 'text-02' -and -not $_.passed })
-    Assert-True ($unexpectedDecorationFailures.Count -eq 0) "all measured Create decoration diagnostics must pass; failed: $(@($unexpectedDecorationFailures.name) -join ', ')"
+    Assert-True ($unexpectedDecorationFailures.Count -eq 0) "all measured Create decoration diagnostics must pass; failed: $(@($unexpectedDecorationFailures | ForEach-Object { $_.name }) -join ', ')"
     $frame = $report.createFrame
     Assert-True ($frame.name -eq 'home-create-frame') 'Create frame report name'
     Assert-True (($frame.actualRect.x -eq 1154) -and ($frame.actualRect.y -eq 224) -and ($frame.actualRect.width -eq 717) -and ($frame.actualRect.height -eq 374)) 'Create frame crop'
@@ -512,7 +512,7 @@ try
     Assert-True ($bottomEdge.continuityPassed -and ($bottomEdge.contrastPassed -eq $false) -and ($bottomEdge.passed -eq $false)) 'Create frame bottom fixture must fail only brightness contrast'
     Assert-True ($bottomEdge.frameMedianLuma -lt $bottomEdge.backgroundMedianLuma) 'Create frame bottom fixture must use a dim qualifying cyan'
     $unexpectedFrameFailures = @($frame.edges | Where-Object { $_.name -notin @('top','bottom') -and -not $_.passed })
-    Assert-True ($unexpectedFrameFailures.Count -eq 0) "left, right, and chamfer Create frame rows must pass; failed: $(@($unexpectedFrameFailures.name) -join ', ')"
+    Assert-True ($unexpectedFrameFailures.Count -eq 0) "left, right, and chamfer Create frame rows must pass; failed: $(@($unexpectedFrameFailures | ForEach-Object { $_.name }) -join ', ')"
     Assert-True (-not $frame.passed) 'Create frame overall state must reflect the deliberate top-continuity and bottom-contrast failures'
     $expectedContent = @(
         @{ bar='home-create-action'; name='icon';  x=47;  y=25; width=36;  height=37; actualX=49; passed=$false },
