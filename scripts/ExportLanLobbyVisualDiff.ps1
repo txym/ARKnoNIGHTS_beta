@@ -203,11 +203,15 @@ function New-LanLobbyBitmapCrop([Drawing.Bitmap] $Source, [Drawing.Rectangle] $R
     return $result
 }
 
-function Resize-LanLobbyBitmap([Drawing.Bitmap] $Source, [int] $Width, [int] $Height)
+function Resize-LanLobbyBitmap(
+    [Drawing.Bitmap] $Source,
+    [int] $Width,
+    [int] $Height,
+    [Drawing.Drawing2D.InterpolationMode] $InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear)
 {
     $result = New-Object Drawing.Bitmap $Width, $Height
     $graphics = [Drawing.Graphics]::FromImage($result)
-    try { $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear; $graphics.DrawImage($Source, 0, 0, $Width, $Height) }
+    try { $graphics.InterpolationMode = $InterpolationMode; $graphics.DrawImage($Source, 0, 0, $Width, $Height) }
     finally { $graphics.Dispose() }
     return $result
 }
@@ -585,7 +589,7 @@ try
         $scaledReference = Convert-ActionReferenceRectangle $homeCreateDecoration.reference $nativeReference.Width $nativeReference.Height
         $actualCrop = New-LanLobbyBitmapCrop $actual $actualRectangle
         $nativeReferenceCrop = New-LanLobbyBitmapCrop $nativeReference $scaledReference
-        $locallyResizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualSpec.width $actualSpec.height
+        $locallyResizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualSpec.width $actualSpec.height ([Drawing.Drawing2D.InterpolationMode]::NearestNeighbor)
         $overlay = New-LanLobbyActionOverlay $actualCrop $locallyResizedReferenceCrop
         $heatmap = New-Object Drawing.Bitmap $actualCrop.Width, $actualCrop.Height
         $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height

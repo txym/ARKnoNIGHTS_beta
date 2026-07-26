@@ -381,6 +381,7 @@ try
         Assert-True ($component.Count -eq 1) "Create decoration/$($expectedDecoration.name) visible bounds must occur once"
         $component = $component[0]
         Assert-True (($component.expectedBounds.x -eq $expectedDecoration.x) -and ($component.expectedBounds.y -eq $expectedDecoration.y) -and ($component.expectedBounds.width -eq $expectedDecoration.width) -and ($component.expectedBounds.height -eq $expectedDecoration.height)) "Create decoration/$($expectedDecoration.name) expected bounds"
+        Assert-True (($component.referenceBounds.x -eq $expectedDecoration.x) -and ($component.referenceBounds.y -eq $expectedDecoration.y) -and ($component.referenceBounds.width -eq $expectedDecoration.width) -and ($component.referenceBounds.height -eq $expectedDecoration.height)) "Create decoration/$($expectedDecoration.name) reference bounds; actual=$($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height)"
         Assert-True (($component.thresholdMinimumGreen -eq $expectedDecoration.threshold) -and ($component.minimumGreenOverRed -eq 8) -and ($component.minimumBlueOverRed -eq 5)) "Create decoration/$($expectedDecoration.name) cyan thresholds"
     }
     $logoLeft = @($decoration.components | Where-Object name -eq 'logo-left')[0]
