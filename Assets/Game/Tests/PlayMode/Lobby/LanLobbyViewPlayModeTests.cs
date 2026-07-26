@@ -127,18 +127,18 @@ namespace ArknoNights.Lobby.Tests
             var joinActionImage = joinAction.GetComponent<UnityEngine.UI.Image>();
             var expected = new[]
             {
-                new DecorationExpectation("LogoLeft", "room_select_create_logo", 272f, 30f, 107f, 135f, 180f, false),
-                new DecorationExpectation("LogoRight", "room_select_create_logo", 539f, 30f, 109f, 133f, 0f, false),
-                new DecorationExpectation("DotTopLeft", "room_select_dot", 381f, 21f, 19f, 19f, 0f, true),
-                new DecorationExpectation("DotTopRight", "room_select_dot", 516f, 21f, 19f, 19f, 0f, true),
-                new DecorationExpectation("DotBottomLeft", "room_select_dot", 381f, 157f, 19f, 19f, 0f, true),
-                new DecorationExpectation("DotBottomRight", "room_select_dot", 516f, 157f, 19f, 19f, 0f, true),
-                new DecorationExpectation("LineLeft", "room_select_create_left_line", 393f, 54f, 20f, 20f * 40f / 12f, 0f, true),
-                new DecorationExpectation("LineRight", "room_select_create_left_line", 506f, 54f, 20f, 20f * 40f / 12f, 180f, true),
-                new DecorationExpectation("MiddleIcon", "room_select_create_middleicon", 415f, 44f, 89f, 89f * 62f / 63f, 0f, true),
-                new DecorationExpectation("Text01", "room_select_create_text_01", 415f, 137f, 89f, 89f * 9f / 63f, 0f, true),
+                new DecorationExpectation("LogoLeft", "room_select_create_logo", 382f, 159f, 98f, 122.5f, 180f, false),
+                new DecorationExpectation("LogoRight", "room_select_create_logo", 543f, 24f, 104f, 118f, 0f, false),
+                new DecorationExpectation("DotTopLeft", "room_select_dot", 379f, 18f, 13f, 13f, 0f, true),
+                new DecorationExpectation("DotTopRight", "room_select_dot", 516f, 21f, 16f, 16f, 0f, true),
+                new DecorationExpectation("DotBottomLeft", "room_select_dot", 379f, 155f, 12f, 12f, 0f, true),
+                new DecorationExpectation("DotBottomRight", "room_select_dot", 516f, 155f, 12f, 12f, 0f, true),
+                new DecorationExpectation("LineLeft", "room_select_create_left_line", 394f, 52f, 13f, 13f * 40f / 12f, 0f, true),
+                new DecorationExpectation("LineRight", "room_select_create_left_line", 526f, 122.5f, 16.5f, 16.5f * 40f / 12f, 180f, true),
+                new DecorationExpectation("MiddleIcon", "room_select_create_middleicon", 415f, 44f, 76.5f, 76.5f * 62f / 63f, 0f, true),
+                new DecorationExpectation("Text01", "room_select_create_text_01", 417f, 140f, 61f, 61f * 9f / 63f, 0f, true),
                 new DecorationExpectation("Text02", "room_select_create_text_02", 428f, 151f, 66f, 66f * 5f / 46f, 0f, true),
-                new DecorationExpectation("StartRoomDecoration", "room_select_img_startroom", 416f, 16f, 87f, 87f * 8f / 64f, 0f, true)
+                new DecorationExpectation("StartRoomDecoration", "room_select_img_startroom", 413f, 13f, 46f, 46f * 8f / 64f, 0f, true)
             };
 
             Assert.That(create.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));

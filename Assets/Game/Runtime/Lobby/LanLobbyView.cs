@@ -323,26 +323,26 @@ public sealed class LanLobbyView : MonoBehaviour
     private void BuildCreateSection(RectTransform parent, LanLobbyRect actionRect)
     {
         var logoLeft = Image("LogoLeft", parent, "Home/room_select_create_logo");
-        PositionTopLeft(logoLeft.rectTransform, 272f, 30f, 107f, 135f);
+        PositionTopLeft(logoLeft.rectTransform, 382f, 159f, 98f, 122.5f);
         logoLeft.preserveAspect = false;
         logoLeft.raycastTarget = false;
         logoLeft.rectTransform.localEulerAngles = new Vector3(0f, 0f, 180f);
 
         var logoRight = Image("LogoRight", parent, "Home/room_select_create_logo");
-        PositionTopLeft(logoRight.rectTransform, 539f, 30f, 109f, 133f);
+        PositionTopLeft(logoRight.rectTransform, 543f, 24f, 104f, 118f);
         logoRight.preserveAspect = false;
         logoRight.raycastTarget = false;
 
-        CreateDecorationSprite("DotTopLeft", parent, "Home/room_select_dot", 381f, 21f, 19f, 0f);
-        CreateDecorationSprite("DotTopRight", parent, "Home/room_select_dot", 516f, 21f, 19f, 0f);
-        CreateDecorationSprite("DotBottomLeft", parent, "Home/room_select_dot", 381f, 157f, 19f, 0f);
-        CreateDecorationSprite("DotBottomRight", parent, "Home/room_select_dot", 516f, 157f, 19f, 0f);
-        CreateDecorationSprite("LineLeft", parent, "Home/room_select_create_left_line", 393f, 54f, 20f, 0f);
-        CreateDecorationSprite("LineRight", parent, "Home/room_select_create_left_line", 506f, 54f, 20f, 180f);
-        CreateDecorationSprite("MiddleIcon", parent, "Home/room_select_create_middleicon", 415f, 44f, 89f, 0f);
-        CreateDecorationSprite("Text01", parent, "Home/room_select_create_text_01", 415f, 137f, 89f, 0f);
+        CreateDecorationSprite("DotTopLeft", parent, "Home/room_select_dot", 379f, 18f, 13f, 0f);
+        CreateDecorationSprite("DotTopRight", parent, "Home/room_select_dot", 516f, 21f, 16f, 0f);
+        CreateDecorationSprite("DotBottomLeft", parent, "Home/room_select_dot", 379f, 155f, 12f, 0f);
+        CreateDecorationSprite("DotBottomRight", parent, "Home/room_select_dot", 516f, 155f, 12f, 0f);
+        CreateDecorationSprite("LineLeft", parent, "Home/room_select_create_left_line", 394f, 52f, 13f, 0f);
+        CreateDecorationSprite("LineRight", parent, "Home/room_select_create_left_line", 526f, 122.5f, 16.5f, 180f);
+        CreateDecorationSprite("MiddleIcon", parent, "Home/room_select_create_middleicon", 415f, 44f, 76.5f, 0f);
+        CreateDecorationSprite("Text01", parent, "Home/room_select_create_text_01", 417f, 140f, 61f, 0f);
         CreateDecorationSprite("Text02", parent, "Home/room_select_create_text_02", 428f, 151f, 66f, 0f);
-        CreateDecorationSprite("StartRoomDecoration", parent, "Home/room_select_img_startroom", 416f, 16f, 87f, 0f);
+        CreateDecorationSprite("StartRoomDecoration", parent, "Home/room_select_img_startroom", 413f, 13f, 46f, 0f);
         var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
         PositionBottomLeft(create.GetComponent<RectTransform>(), actionRect);
         create.GetComponent<Image>().preserveAspect = false;
