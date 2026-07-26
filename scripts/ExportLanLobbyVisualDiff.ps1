@@ -361,32 +361,32 @@ $homeCreateFrame = @{
 $createFrameEdges = @(
   [ordered]@{
     name='top'; axis='x'
-    search=@{x=0;y=0;width=690;height=18}
-    background=@{x=0;y=26;width=690;height=10}
-    minimumCoverage=.90; maximumGap=6; minimumContrast=18
-  },
-  [ordered]@{
-    name='bottom'; axis='x'
-    search=@{x=0;y=356;width=717;height=18}
-    background=@{x=0;y=338;width=717;height=10}
+    search=@{x=25;y=0;width=666;height=18}
+    background=@{x=25;y=26;width=666;height=10}
     minimumCoverage=.90; maximumGap=6; minimumContrast=18
   },
   [ordered]@{
     name='left'; axis='y'
-    search=@{x=0;y=0;width=18;height=374}
-    background=@{x=26;y=0;width=10;height=374}
+    search=@{x=16;y=0;width=18;height=236}
+    background=@{x=42;y=0;width=10;height=236}
     minimumCoverage=.90; maximumGap=6; minimumContrast=18
   },
   [ordered]@{
     name='right'; axis='y'
-    search=@{x=699;y=18;width=18;height=356}
-    background=@{x=681;y=18;width=10;height=356}
+    search=@{x=682;y=0;width=18;height=236}
+    background=@{x=664;y=0;width=10;height=236}
     minimumCoverage=.90; maximumGap=6; minimumContrast=18
   },
   [ordered]@{
-    name='top-right-chamfer'; axis='diagonal'
-    search=@{x=680;y=0;width=37;height=37}
-    background=@{x=656;y=20;width=16;height=16}
+    name='top-left-joint'; axis='joint'
+    search=@{x=16;y=0;width=28;height=28}
+    background=@{x=42;y=30;width=16;height=16}
+    minimumPixelCount=80; minimumContrast=18
+  },
+  [ordered]@{
+    name='top-right-joint'; axis='joint'
+    search=@{x=673;y=0;width=28;height=28}
+    background=@{x=659;y=30;width=16;height=16}
     minimumPixelCount=80; minimumContrast=18
   }
 )
@@ -926,6 +926,33 @@ try
         $heatmap.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
     }
     finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
+    $createActionReport = @(
+        $actionBarReports | Where-Object name -eq 'home-create-action'
+    )
+    if ($createActionReport.Count -ne 1) {
+        throw 'Expected exactly one home-create-action report for the Create lower boundary.'
+    }
+    $createActionReport = $createActionReport[0]
+    $createActionContentPassed = @(
+        $createActionReport.contentVisuals | Where-Object { -not $_.passed }
+    ).Count -eq 0
+    $createActionRectPassed =
+        $createActionReport.positionDeviationPx1920x1080.deltaX -eq 0 -and
+        $createActionReport.positionDeviationPx1920x1080.deltaY -eq 0 -and
+        $createActionReport.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0 -and
+        $createActionReport.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0
+    $bottomBoundary = [pscustomobject][ordered]@{
+        kind = 'action-bar'
+        action = 'home-create-action'
+        visibleTopScreenY = 460
+        frameLocalY = 212
+        positionDeviationPx1920x1080 =
+            $createActionReport.positionDeviationPx1920x1080
+        sizeDeviationPxAfterLocalReferenceResize =
+            $createActionReport.sizeDeviationPxAfterLocalReferenceResize
+        contentPassed = $createActionContentPassed
+        passed = $createActionRectPassed -and $createActionContentPassed
+    }
     $actual = $null
     $nativeReference = $null
     $actualCrop = $null
@@ -958,7 +985,8 @@ try
             $referenceContinuity = [LanLobbyVisualDiff]::MeasureCyanContinuity($locallyResizedReferenceCrop, $search, $horizontal, 12, 3, 2)
             $contrast = [LanLobbyVisualDiff]::MeasureFrameLumaContrast($actualCrop, $search, $background, 12, 3, 2)
             $contrastPassed = $contrast.Available -and $contrast.ContrastDelta -ge $edgeSpec.minimumContrast
-            $continuityPassed = if ($edgeSpec.axis -eq 'diagonal') {
+            $usesPixelCount = $edgeSpec.Contains('minimumPixelCount')
+            $continuityPassed = if ($usesPixelCount) {
                 $actualContinuity.QualifyingPixelCount -ge $edgeSpec.minimumPixelCount
             } else {
                 $actualContinuity.CoverageRatio -ge $edgeSpec.minimumCoverage -and
@@ -973,9 +1001,9 @@ try
                 thresholdMinimumGreen = 12
                 minimumGreenOverRed = 3
                 minimumBlueOverRed = 2
-                minimumCoverage = $(if ($edgeSpec.axis -eq 'diagonal') { $null } else { $edgeSpec.minimumCoverage })
-                maximumGap = $(if ($edgeSpec.axis -eq 'diagonal') { $null } else { $edgeSpec.maximumGap })
-                minimumPixelCount = $(if ($edgeSpec.axis -eq 'diagonal') { $edgeSpec.minimumPixelCount } else { $null })
+                minimumCoverage = $(if ($usesPixelCount) { $null } else { $edgeSpec.minimumCoverage })
+                maximumGap = $(if ($usesPixelCount) { $null } else { $edgeSpec.maximumGap })
+                minimumPixelCount = $(if ($usesPixelCount) { $edgeSpec.minimumPixelCount } else { $null })
                 qualifyingPixelCount = $actualContinuity.QualifyingPixelCount
                 coveredAxisPixels = $actualContinuity.CoveredAxisPixels
                 axisLength = $actualContinuity.AxisLength
@@ -1012,7 +1040,10 @@ try
             pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
             averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
             edges = $edges
-            passed = @($edges | Where-Object { -not $_.passed }).Count -eq 0
+            bottomBoundary = $bottomBoundary
+            passed =
+                @($edges | Where-Object { -not $_.passed }).Count -eq 0 -and
+                $bottomBoundary.passed
         }
         $actualCrop.Save((Join-Path $stagingDirectory ($homeCreateFrame.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
         $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($homeCreateFrame.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
@@ -1061,12 +1092,13 @@ try
         $measurementStatus = if ($component.measurementAvailable) { 'available' } else { ConvertTo-LanLobbyMarkdownCell ("unavailable: " + [string]$component.measurementError) }
         $markdown += "| $($component.name) | $($component.measurementMode) | $($component.thresholdMinimumGreen)/$($component.minimumGreenOverRed)/$($component.minimumBlueOverRed) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
     }
-    $markdown += @('', '## Home Create frame continuity', '', "Actual crop (1920×1080 top-left px): $($createFrameReport.actualRect.x),$($createFrameReport.actualRect.y),$($createFrameReport.actualRect.width),$($createFrameReport.actualRect.height). Native Figure 9 crop: $($createFrameReport.referenceRect.x),$($createFrameReport.referenceRect.y),$($createFrameReport.referenceRect.width),$($createFrameReport.referenceRect.height). Overall passed: $($createFrameReport.passed).", '', '| Edge | Search/background | Reference pixels/coverage/gap | Actual pixels/coverage/gap | Frame/background median luma | Contrast delta/minimum | Continuity passed | Contrast passed | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+    $markdown += @('', '## Home Create open-frame continuity', '', "Actual crop (1920×1080 top-left px): $($createFrameReport.actualRect.x),$($createFrameReport.actualRect.y),$($createFrameReport.actualRect.width),$($createFrameReport.actualRect.height). Native Figure 9 crop: $($createFrameReport.referenceRect.x),$($createFrameReport.referenceRect.y),$($createFrameReport.referenceRect.width),$($createFrameReport.referenceRect.height). Overall passed: $($createFrameReport.passed).", '', '| Edge | Search/background | Reference pixels/coverage/gap | Actual pixels/coverage/gap | Frame/background median luma | Contrast delta/minimum | Continuity passed | Contrast passed | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($edge in @($createFrameReport.edges))
     {
         $searchAndBackground = "$($edge.search.x),$($edge.search.y),$($edge.search.width),$($edge.search.height) / $($edge.backgroundSearch.x),$($edge.backgroundSearch.y),$($edge.backgroundSearch.width),$($edge.backgroundSearch.height)"
         $markdown += "| $($edge.name) | $searchAndBackground | $($edge.referenceMeasurement.qualifyingPixelCount)/$([Math]::Round($edge.referenceMeasurement.coverageRatio, 4))/$($edge.referenceMeasurement.largestGapPixels) | $($edge.qualifyingPixelCount)/$([Math]::Round($edge.coverageRatio, 4))/$($edge.largestGapPixels) | $([Math]::Round($edge.frameMedianLuma, 2))/$([Math]::Round($edge.backgroundMedianLuma, 2)) | $([Math]::Round($edge.contrastDelta, 2))/$($edge.minimumContrast) | $($edge.continuityPassed) | $($edge.contrastPassed) | $($edge.passed) |"
     }
+    $markdown += @('', '| Lower boundary kind | Action | Visible top (screen Y) | Frame local Y | Position deviation (px) | Size deviation (px) | Content passed | Passed |', '| --- | --- | ---: | ---: | --- | --- | --- | --- |', "| $($createFrameReport.bottomBoundary.kind) | $($createFrameReport.bottomBoundary.action) | $($createFrameReport.bottomBoundary.visibleTopScreenY) | $($createFrameReport.bottomBoundary.frameLocalY) | dx=$($createFrameReport.bottomBoundary.positionDeviationPx1920x1080.deltaX), dy=$($createFrameReport.bottomBoundary.positionDeviationPx1920x1080.deltaY) | dw=$($createFrameReport.bottomBoundary.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($createFrameReport.bottomBoundary.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $($createFrameReport.bottomBoundary.contentPassed) | $($createFrameReport.bottomBoundary.passed) |")
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Bitmap Sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
