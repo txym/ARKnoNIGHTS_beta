@@ -83,6 +83,33 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
+        public IEnumerator RoomView_RestoresLegacyForegroundAndHomeAddsCompleteRoomSelectAffordances()
+        {
+            var home = view.transform.Find("LanLobbyRoot/Home");
+            var room = view.transform.Find("LanLobbyRoot/Room");
+            var grid = view.transform.Find("LanLobbyRoot/GridForeground");
+
+            Assert.That(grid.gameObject.activeSelf, Is.False);
+            view.ShowRoom();
+            Assert.That(room.gameObject.activeSelf, Is.True);
+            Assert.That(grid.gameObject.activeSelf, Is.True);
+            view.ShowHome();
+            Assert.That(grid.gameObject.activeSelf, Is.False);
+
+            Assert.That(home.Find("RoomSelect/PanelFrame/Top"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/PanelFrame/Bottom"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/PanelFrame/Divider"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/Join/SimulationInvite"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/Join/SimulationInvite/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
+                Is.EqualTo("join_icon"));
+            Assert.That(home.Find("RoomSelect/Create/CreateAction/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
+                Is.EqualTo("create_icon"));
+            Assert.That(home.Find("RoomSelect/Join/JoinAction/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
+                Is.EqualTo("join_icon"));
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator HomeRoomSelect_UsesPreservedAssetProportionsWithinRightSideBounds()
         {
             var home = view.transform.Find("LanLobbyRoot/Home");

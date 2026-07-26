@@ -90,6 +90,11 @@ namespace ArknoNights.Lobby.Tests
                     sprite.sourcePath.StartsWith("Combined/[uc]autochesscommon/icon_", StringComparison.Ordinal)),
                 Is.True,
                 "The Home capture manifest must prove it rendered an approved Combined avatar source.");
+            Assert.That(home.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.False,
+                "The Home provenance table must exclude inactive legacy foreground sprites.");
+            var roomHost = parsed.captures.Single(record => record.name == "room-host");
+            Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
+                "The Room provenance table must include the foreground once that page restores it.");
         }
 
         [Test]

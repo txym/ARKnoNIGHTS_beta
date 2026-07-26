@@ -178,7 +178,8 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     private SpriteSource[] SpriteSources()
     {
         var result = new Dictionary<string, SpriteSource>(StringComparer.Ordinal);
-        foreach (var image in view.GetComponentsInChildren<Image>(true))
+        // Provenance is evidence of actual rendering in this capture state, not of dormant page objects.
+        foreach (var image in view.GetComponentsInChildren<Image>(false))
         {
             if (image.sprite == null) continue;
             var spriteName = image.sprite.name;

@@ -88,7 +88,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         if (homeRoot != null) homeRoot.gameObject.SetActive(false);
         if (roomRoot != null) roomRoot.gameObject.SetActive(true);
-        if (legacyGridForeground != null) legacyGridForeground.gameObject.SetActive(false);
+        if (legacyGridForeground != null) legacyGridForeground.gameObject.SetActive(true);
     }
 
     public void ShowRoom(LobbyRoomSnapshot room, string localId)
@@ -266,6 +266,7 @@ public sealed class LanLobbyView : MonoBehaviour
         var roomSelect = Rect("RoomSelect", parent);
         Stretch(roomSelect);
         var layout = LanLobbyLayout.ForSize(1920, 1080, LobbyRoomSnapshot.MaximumMembers);
+        BuildRoomSelectFrame(roomSelect);
         var rightBackground = Image("RightBackground", roomSelect, "Home/room_select_right_bg");
         PositionSprite(rightBackground, new Vector2(.751f, .79f), 820f);
 
@@ -314,6 +315,17 @@ public sealed class LanLobbyView : MonoBehaviour
         statusText.text = "DISCOVERING LOCAL ROOMS";
     }
 
+    private static void BuildRoomSelectFrame(Transform parent)
+    {
+        var frame = Rect("PanelFrame", parent);
+        Position(frame, new Vector2(.751f, .47f), new Vector2(720f, 700f));
+        FrameLine("Top", frame, new Vector2(.5f, 1f), new Vector2(720f, 2f));
+        FrameLine("Bottom", frame, new Vector2(.5f, 0f), new Vector2(720f, 2f));
+        FrameLine("Left", frame, new Vector2(0f, .5f), new Vector2(2f, 700f));
+        FrameLine("Right", frame, new Vector2(1f, .5f), new Vector2(2f, 700f));
+        FrameLine("Divider", frame, new Vector2(.5f, .46f), new Vector2(680f, 2f));
+    }
+
     private void BuildCreateSection(RectTransform parent)
     {
         var firstLine = Image("Line_0", parent, "Home/room_select_create_left_line");
@@ -332,6 +344,8 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionSprite(startRoom, new Vector2(.5f, .88f), 128f);
         var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
         PositionSprite(create.GetComponent<Image>(), new Vector2(.5f, .07f), 537f);
+        var createIcon = Image("ActionIcon", create.transform, "create_icon");
+        PositionSprite(createIcon, new Vector2(.12f, .5f), 48f);
         var createLabel = create.GetComponentInChildren<Text>();
         createLabel.color = new Color(.02f, .12f, .12f);
         createLabel.fontSize = 38;
@@ -358,6 +372,12 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionSprite(text01, new Vector2(.38f, .9f), 141f);
         var text02 = Image("Text02", parent, "Home/room_select_join_text_02");
         PositionSprite(text02, new Vector2(.75f, .9f), 132f);
+        var simulationInvite = Button("SimulationInvite", parent, "Home/room_select_join_text_bg", "模拟邀约", 24, true);
+        PositionSprite(simulationInvite.GetComponent<Image>(), new Vector2(.78f, .94f), 290f);
+        simulationInvite.GetComponent<Image>().color = new Color(1f, .53f, .18f, .85f);
+        var inviteIcon = Image("ActionIcon", simulationInvite.transform, "join_icon");
+        PositionSprite(inviteIcon, new Vector2(.12f, .5f), 28f);
+        simulationInvite.GetComponentInChildren<Text>().color = Color.white;
         var triangle = Image("Triangle", parent, "Home/room_select_join_triangle");
         PositionSprite(triangle, new Vector2(.5f, .5f), 48f);
         for (var index = 0; index < LobbyRoomCode.Length; index++)
@@ -379,6 +399,8 @@ public sealed class LanLobbyView : MonoBehaviour
         var joinLabel = joinButton.GetComponentInChildren<Text>();
         joinLabel.color = new Color(.12f, .06f, .01f);
         joinLabel.fontSize = 38;
+        var joinIcon = Image("ActionIcon", joinButton.transform, "join_icon");
+        PositionSprite(joinIcon, new Vector2(.12f, .5f), 48f);
         joinButton.onClick.AddListener(RequestJoin);
     }
 
@@ -637,5 +659,17 @@ public sealed class LanLobbyView : MonoBehaviour
         var height = width * sprite.rect.height / sprite.rect.width;
         Position(value.rectTransform, anchor, new Vector2(width, height));
         value.preserveAspect = true;
+    }
+
+    private static Image FrameLine(string name, Transform parent, Vector2 anchor, Vector2 size)
+    {
+        var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        value.transform.SetParent(parent, false);
+        var image = value.GetComponent<Image>();
+        image.sprite = null;
+        image.color = new Color(.22f, .48f, .48f, .7f);
+        image.raycastTarget = false;
+        Position(image.rectTransform, anchor, size);
+        return image;
     }
 }
