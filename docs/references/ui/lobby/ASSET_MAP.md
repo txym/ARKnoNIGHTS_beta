@@ -1,6 +1,11 @@
 # LAN Lobby UI asset map
 
-All listed source paths are relative to the approved `G:\素材\11.14\Unpacked_1763129662\Android\ui\autochess` root. The import script refuses every other root and copies only these PNGs.
+## Approved source roots
+
+- **Unpacked room-select source:** `G:\素材\11.14\Unpacked_1763129662\Android\ui\autochess\[uc]autochessouter`. Home `room_select_` entries use only the normal filename; every Unpacked `$0` variant is forbidden.
+- **Combined avatar source:** `G:\素材\11.14\Combined_1763139377\Android\ui\autochess\[uc]autochesscommon`. Home imports exactly the normal `icon_amiy`, `icon_clementi`, `icon_kirar`, and `icon_zumam` PNGs.
+
+All other existing lobby rows remain relative to the approved Unpacked root. The importer copies only its explicit whitelist; EditMode provenance tests byte-compare every Home PNG to the source type declared above.
 
 | Imported file | Source-relative path | Resources destination | Visible role | Stretch mode |
 | --- | --- | --- | --- | --- |
