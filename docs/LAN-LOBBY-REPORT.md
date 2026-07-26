@@ -31,9 +31,9 @@ The prior root-level evidence paths above are retained as historical context onl
 - The non-blocking report records Home difference ratios `0.5852` (`home`) and `0.5850` (`discovered-prefill`), plus room ratios `0.4654`–`0.4658`. It retains decoded reference dimensions `图9.png` `2102x1149` and `图10.png` `2107x1153`, normalized independently to `1920x1080`.
 - Inspect `CapturesFinal/home.png`, `VisualDiff/home-overlay.png`, and `VisualDiff/home-heatmap.png` for the primary visual review. `VisualDiff/visual-diff-report.md` and `.json` contain a 33-row audited source table; every row has its Resources path, source-relative path, SHA-256, capture names, and occurrence count.
 
-## Home room-select action-bar evidence (2026-07-26)
+## Initial Home room-select action-bar evidence (2026-07-26)
 
-This is a fresh retained Player run for the Create and Join action bars. It does not replace the historical `HomeRoomSelect` evidence above. All generated material is ignored under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/`.
+This run established the Create and Join anchors. It is superseded by the final-review-fix evidence below. Its focused XML was parsed from `Temp/` when run but is not retained evidence; its Player/build/visual artifacts remain ignored under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/`.
 
 - Focused Unity results: `Temp/ROOM-SELECT-ACTION-BARS/FinalLayout/EditModeResults.xml` is `6/6` passed; `FinalView/PlayModeResults.xml` is `13/13` passed; `FinalCapture/PlayModeResults.xml` is `3/3` passed; and `FinalController/PlayModeResults.xml` is `3/3` passed. Every XML has `failed=0`, `skipped=0`, and `result=Passed` (25 tests total).
 - Exact focused-test commands:
@@ -51,6 +51,31 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.
 - Join action: actual Rect `(1154,876,717,99)`; reference Rect `(1257,932,763,105)` measured against Figure 9's `2102x1149` canvas; local `pixelDifferenceRatio=0.47197216234873141`, `averageAbsoluteRgbError=29.866451591695665`, `comparedPixels=70983`.
 - Manual inspection covered both action-only overlays and heatmaps. They visibly retain the captured/reference bar layers and show concentrated contour differences; the metrics are non-blocking evidence, not visual acceptance. `home` manifest records `create_icon` from `[uc]autochessouter/create_icon.png` and `join_icon` from `[uc]autochessouter/join_icon.png`; no `$0` Unpacked source occurs. The audited source table records `UI/Lobby/create_icon`, SHA-256 `AE047958EE4E7D43F368D3205110307200D30F79BCF393B36CBBDE37A8A00BA7`, 2 occurrences (`home`, `discovered-prefill`) and `UI/Lobby/join_icon`, SHA-256 `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09`, 2 occurrences (the same captures).
 - Other decoration placement is intentionally **not accepted** in this iteration. The next visual step is to use these two calibrated bars as anchors, rotate a repeated `room_select_create_left_line` by `180°` for the Create right side, and compose Join decorations with overlap.
+
+## Home room-select action-bar final review fix (2026-07-26)
+
+This is the current retained evidence. The fix moves the status line below the Join bar and the discovered-room list above it, without changing discovery, six-digit prefill, Join gating, or LAN behavior. `LanLobbyViewPlayModeTests` now proves both the Home and discovered/prefilled states: the approved Join Rect remains `(1154,876,717,99)` in top-left screen coordinates, later active Home graphics do not intersect it, the discovered room Button does not intersect it, and a real `EventSystem.RaycastAll` at the bar center resolves the Join Button first and produces one `JoinRequested`.
+
+- Persistent focused results are under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-FinalFix-20260726-163314/`:
+  - `Layout/EditModeResults.xml`: `result=Passed`, total/passed/failed/skipped `6/6/0/0`; shutdown `forced-stop-after-results` after valid non-zero XML, grace `20s`.
+  - `View/PlayModeResults.xml`: `result=Passed`, `14/14/0/0`; shutdown `normal-exit-after-results`.
+  - `Capture/PlayModeResults.xml`: `result=Passed`, `3/3/0/0`; shutdown `forced-stop-after-results` after valid non-zero XML, grace `20s`.
+  - `Controller/PlayModeResults.xml`: `result=Passed`, `3/3/0/0`; shutdown `normal-exit-after-results`.
+  - Total: `26/26` passed, failed `0`, skipped `0`. Later Unity runs did not delete these files. `Temp/` XML is not cited as retained proof.
+- Each suite used `scripts/Invoke-UnityTests.ps1`, Unity `D:\2022.3.62f1c1\Editor\Unity.exe`, project `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`, and its exact filter (`LanLobbyLayoutEditModeTests`, `LanLobbyViewPlayModeTests`, `LanLobbyCaptureSuitePlayModeTests`, or `LanLobbyControllerPlayModeTests`), with output set to the corresponding subdirectory above.
+- The fresh Windows x86_64 build is `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsFinalFix/WindowsStandalone/ARKnoNIGHTS.exe`; `WindowsStandaloneBuild.log` records `result=Succeeded`, `errors=0`, `warnings=0`, size `184751258`. Startup logged a transient licensing handshake/access-token diagnostic before entitlement resolution; it did not block compilation or the successful BuildReport, and no `error CS`, `Compilation failed`, or unhandled-exception marker occurs.
+- A visible D3D11 Player ran with `-force-d3d11 -screen-width 1920 -screen-height 1080 -lanLobbyCaptureSuite -lanLobbyCaptureOutput ...\HomeRoomSelectActionBarsFinalFix\CapturesFinal -logFile ...\PlayerCapture.log`, exited `0`, and retained five decodeable non-empty `1920x1080` PNGs plus `manifest.json`. The log ends with `[LanLobby][capture.completed] count=5`; no related unhandled exception was found.
+- The current report is `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsFinalFix/VisualDiff/visual-diff-report.{json,md}`. The JSON and Markdown both state the 1920×1080 top-left target, position deviation in pixels, and size deviation after the native Figure 9 crop is locally resized:
+  - Create: actual/target `(1154,453,717,99)`, native reference `(1257,482,763,105)`, position `dx=0px,dy=0px`, resized-size `dw=0px,dh=0px`, ratio `0.536508741529662`, mean RGB error `27.902361598316968`.
+  - Join: actual/target `(1154,876,717,99)`, native reference `(1257,932,763,105)`, position `dx=0px,dy=0px`, resized-size `dw=0px,dh=0px`, ratio `0.45764478818872123`, mean RGB error `28.189759050289037`.
+- Material usage is separated into `bitmapSprites` (34 audited rows with Resources path, approved source, SHA-256, captures, and occurrences), `unityText` (four non-Sprite rows, including “创建同盟” and “加入同盟”), and `codeGeneratedGeometry` (six grouped non-bitmap rows sourced from capture manifest geometry). Unity Text has no material-library `sourcePath` and is not presented as Sprite art.
+- Action bitmap audit for both `home` and `discovered-prefill` (two occurrences each):
+  - `room_select_create_btn_bg_down`: `[uc]autochessouter/room_select_create_btn_bg_down.png`, SHA-256 `8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149`.
+  - `room_select_join_btn_bg_down`: `[uc]autochessouter/room_select_join_btn_bg_down.png`, SHA-256 `71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468`.
+  - `create_icon`: `[uc]autochessouter/create_icon.png`, SHA-256 `AE047958EE4E7D43F368D3205110307200D30F79BCF393B36CBBDE37A8A00BA7`.
+  - `join_icon`: `[uc]autochessouter/join_icon.png`, SHA-256 `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09`.
+- The manifest contains no forbidden `$0`/`#0` Unpacked source. Manual inspection opened `home.png`, `discovered-prefill.png`, `home-create-action-overlay.png`, and `home-join-action-overlay.png`: neither Status nor the discovered room item covers the Join bar. The local difference metrics remain non-blocking and the remaining decorative composition is still not accepted.
+- Smoke verification: `scripts/TestLanLobbyVisualDiffSmoke.ps1` and `scripts/TestExportLanLobbyEvidenceSmoke.ps1` both print `PASS` and exit `0`.
 
 ## Automated result
 

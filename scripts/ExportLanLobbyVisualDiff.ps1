@@ -48,8 +48,8 @@ $homeRegions = @(
   @{ name='main-background'; x=0.22; y=0.00; width=0.78; height=1.00; mask=$false }
 )
 $homeActionBars = @(
-  @{ name='home-create-action'; actual=@{x=1154;y=453;width=717;height=99}; reference=@{x=1257;y=482;width=763;height=105} },
-  @{ name='home-join-action'; actual=@{x=1154;y=876;width=717;height=99}; reference=@{x=1257;y=932;width=763;height=105} }
+  @{ name='home-create-action'; actual=@{x=1154;y=453;width=717;height=99}; approvedTarget=@{x=1154;y=453;width=717;height=99}; reference=@{x=1257;y=482;width=763;height=105} },
+  @{ name='home-join-action'; actual=@{x=1154;y=876;width=717;height=99}; approvedTarget=@{x=1154;y=876;width=717;height=99}; reference=@{x=1257;y=932;width=763;height=105} }
 )
 $figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
@@ -180,6 +180,40 @@ $assets = @($spriteUsage | Group-Object SpriteName | Sort-Object Name | ForEach-
     $first = $_.Group[0]
     [pscustomobject][ordered]@{ spriteName=$first.SpriteName; captures=@($_.Group.CaptureName | Sort-Object -Unique); resourcesPath=$first.ResourcesPath; sourcePath=$first.SourcePath; importedSha256=$first.ImportedSha256; occurrenceCount=[int](($_.Group | Measure-Object OccurrenceCount -Sum).Sum) }
 })
+$unityTextUsage = @(
+    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Create/CreateAction/Label'; text='创建同盟'; captures=@('home','discovered-prefill'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=2 },
+    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Join/JoinAction/Label'; text='加入同盟'; captures=@('home','discovered-prefill'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=2 },
+    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Status'; text='DISCOVERING LOCAL ROOMS'; captures=@('home'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=1 },
+    [pscustomobject][ordered]@{ kind='unity-text'; node='Home/RoomSelect/Status'; text='Room ready to join.'; captures=@('discovered-prefill'); fontResourcesPath='Fonts/Novecento wide Normal Regular.woff2'; occurrenceCount=1 }
+)
+$geometryOccurrences = @(
+    foreach ($capture in @($manifest.captures))
+    {
+        $geometryProperty = $capture.PSObject.Properties['codeNativeGeometry']
+        if ($null -eq $geometryProperty) { continue }
+        foreach ($geometry in @($geometryProperty.Value | Where-Object { $null -ne $_ }))
+        {
+            [pscustomobject]@{
+                Capture = [string]$capture.name
+                Name = [string]$geometry.name
+                Kind = [string]$geometry.kind
+                IsBitmap = [bool]$geometry.isBitmap
+                Color = [string]$geometry.color
+            }
+        }
+    }
+)
+$codeGeneratedGeometry = @($geometryOccurrences | Group-Object Name, Kind, IsBitmap, Color | Sort-Object Name | ForEach-Object {
+    $first = $_.Group[0]
+    [pscustomobject][ordered]@{
+        name=$first.Name
+        kind=$first.Kind
+        isBitmap=$first.IsBitmap
+        color=$first.Color
+        captures=@($_.Group.Capture | Sort-Object -Unique)
+        occurrenceCount=$_.Count
+    }
+})
 $reportCaptures = @()
 $actionBarReports = @()
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
@@ -268,6 +302,10 @@ try
                 actualRect = [ordered]@{ x=$spec.actual.x; y=$spec.actual.y; width=$spec.actual.width; height=$spec.actual.height }
                 referenceRect = [ordered]@{ x=$scaledReference.X; y=$scaledReference.Y; width=$scaledReference.Width; height=$scaledReference.Height }
                 referenceMeasurementCanvas = [ordered]@{ width=$figure9MeasurementSize.width; height=$figure9MeasurementSize.height }
+                approvedTargetRectPx1920x1080 = [ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$spec.approvedTarget.x; y=$spec.approvedTarget.y; width=$spec.approvedTarget.width; height=$spec.approvedTarget.height }
+                locallyResizedReferenceSizePx = [ordered]@{ unit='px'; width=$resizedReferenceCrop.Width; height=$resizedReferenceCrop.Height }
+                positionDeviationPx1920x1080 = [ordered]@{ unit='px'; deltaX=($spec.actual.x - $spec.approvedTarget.x); deltaY=($spec.actual.y - $spec.approvedTarget.y) }
+                sizeDeviationPxAfterLocalReferenceResize = [ordered]@{ unit='px'; deltaWidth=($actualCrop.Width - $resizedReferenceCrop.Width); deltaHeight=($actualCrop.Height - $resizedReferenceCrop.Height) }
                 comparedPixels = $metric.ComparedPixels
                 pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
                 averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
@@ -279,7 +317,18 @@ try
         }
         finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($resizedReferenceCrop) { $resizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     }
-    $report = [ordered]@{ generatedAtUtc=[DateTime]::UtcNow.ToString('o'); referenceNormalization='independent-xy'; captures=$reportCaptures; actionBars=$actionBarReports; assets=$assets }
+    $report = [ordered]@{
+        generatedAtUtc=[DateTime]::UtcNow.ToString('o')
+        referenceNormalization='independent-xy'
+        captures=$reportCaptures
+        actionBars=$actionBarReports
+        assets=$assets
+        materialUsage=[ordered]@{
+            bitmapSprites=$assets
+            unityText=$unityTextUsage
+            codeGeneratedGeometry=$codeGeneratedGeometry
+        }
+    }
     $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $stagingDirectory 'visual-diff-report.json') -Encoding UTF8
     $referenceDimensionLines = @($reportCaptures | Group-Object referenceFigure | Sort-Object Name | ForEach-Object {
         $first = $_.Group[0]
@@ -287,12 +336,16 @@ try
     })
     $markdown = @('# LAN Lobby Visual Difference Report', '', "Reference figure native dimensions (decoded from this export): $($referenceDimensionLines -join '; '). Each reference is independently normalized on X and Y to 1920×1080. This is non-blocking layout/color reporting, not a pixel-equality claim.", '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
-    $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect | Native reference Rect | Difference ratio | Avg RGB error |', '| --- | --- | --- | ---: | ---: |')
-    foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
+    $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The approved target and actual crop use 1920×1080 screen coordinates with a top-left origin; the reference crop is locally resized to the approved action size. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect (px) | Approved target Rect (px) | Native reference Rect (px) | Position deviation (px) | Size deviation after local resize (px) | Difference ratio | Avg RGB error |', '| --- | --- | --- | --- | --- | --- | ---: | ---: |')
+    foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.approvedTargetRectPx1920x1080.x),$($item.approvedTargetRectPx1920x1080.y),$($item.approvedTargetRectPx1920x1080.width),$($item.approvedTargetRectPx1920x1080.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | dx=$($item.positionDeviationPx1920x1080.deltaX), dy=$($item.positionDeviationPx1920x1080.deltaY) | dw=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
-    $markdown += @('', '## Approved sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
+    $markdown += @('', '## Bitmap Sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
     foreach ($asset in $assets) { $markdown += "| $($asset.spriteName) | $($asset.captures -join ', ') | $($asset.resourcesPath) | $($asset.sourcePath) | $($asset.importedSha256) | $($asset.occurrenceCount) |" }
+    $markdown += @('', '## Unity Text usage', '', 'These records are native Unity Text, not bitmap Sprites and therefore have no material-library source path.', '', '| Node | Text | Captures | Font Resources path | Total occurrences |', '| --- | --- | --- | --- | ---: |')
+    foreach ($textUsage in $unityTextUsage) { $markdown += "| $($textUsage.node) | $($textUsage.text) | $($textUsage.captures -join ', ') | $($textUsage.fontResourcesPath) | $($textUsage.occurrenceCount) |" }
+    $markdown += @('', '## Code-generated geometry usage', '', '| Node | Kind | Bitmap | Color | Captures | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
+    foreach ($geometry in $codeGeneratedGeometry) { $markdown += "| $($geometry.name) | $($geometry.kind) | $($geometry.isBitmap) | $($geometry.color) | $($geometry.captures -join ', ') | $($geometry.occurrenceCount) |" }
     Set-Content -LiteralPath (Join-Path $stagingDirectory 'visual-diff-report.md') -Value $markdown -Encoding UTF8
     Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $stagingDirectory 'manifest.json') -Force
     Move-Item -LiteralPath $stagingDirectory -Destination $outputDirectory

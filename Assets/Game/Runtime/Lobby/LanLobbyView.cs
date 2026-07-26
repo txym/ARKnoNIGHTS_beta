@@ -286,7 +286,7 @@ public sealed class LanLobbyView : MonoBehaviour
         BuildJoinSection(join, RelativeTo(layout.RoomSelectJoinAction, layout.RoomSelectJoin));
 
         discoveredRoomsPanel = Rect("DiscoveredRooms", roomSelect);
-        Position(discoveredRoomsPanel, new Vector2(.751f, .125f), new Vector2(770f, 100f));
+        Position(discoveredRoomsPanel, new Vector2(.751f, .325f), new Vector2(770f, 240f));
         discoveredRoomsPanel.gameObject.SetActive(false);
         discoveryItemsRoot = Rect("Items", discoveredRoomsPanel);
         Stretch(discoveryItemsRoot);
@@ -305,7 +305,7 @@ public sealed class LanLobbyView : MonoBehaviour
         discoveryOverflowText.rectTransform.sizeDelta = new Vector2(-130f, 30f);
 
         statusText = Text("Status", roomSelect, 20, TextAnchor.MiddleCenter, Color.white);
-        Position(statusText.rectTransform, new Vector2(.751f, .19f), new Vector2(700f, 36f));
+        Position(statusText.rectTransform, new Vector2(.751f, .06f), new Vector2(700f, 36f));
         statusText.text = "DISCOVERING LOCAL ROOMS";
     }
 

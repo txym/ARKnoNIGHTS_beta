@@ -107,6 +107,9 @@ try
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_2'; x = 540; y = 100; width = 200; height = 300 },
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_3'; x = 760; y = 100; width = 200; height = 300 }
             )
+            codeNativeGeometry = @(
+                [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; x = 0; y = 0; width = 1920; height = 1080 }
+            )
         }
     }
     [ordered]@{ captures = $records } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $captureDirectory 'manifest.json') -Encoding UTF8
@@ -164,6 +167,19 @@ try
     $joinAction = $actionBars | Where-Object name -eq 'home-join-action'
     Assert-True (($createAction.actualRect.x -eq 1154) -and ($createAction.actualRect.y -eq 453) -and ($createAction.actualRect.width -eq 717) -and ($createAction.actualRect.height -eq 99)) 'Create actual crop must use the approved Rect'
     Assert-True (($joinAction.actualRect.x -eq 1154) -and ($joinAction.actualRect.y -eq 876) -and ($joinAction.actualRect.width -eq 717) -and ($joinAction.actualRect.height -eq 99)) 'Join actual crop must use the approved Rect'
+    foreach ($action in @($createAction, $joinAction))
+    {
+        Assert-True ($action.approvedTargetRectPx1920x1080.coordinateOrigin -eq 'screen-top-left') 'approved target Rect must name its screen coordinate origin'
+        Assert-True ($action.positionDeviationPx1920x1080.unit -eq 'px') 'position deviation must name px units'
+        Assert-True (($action.positionDeviationPx1920x1080.deltaX -eq 0) -and ($action.positionDeviationPx1920x1080.deltaY -eq 0)) 'configured actual crop must match the approved target position'
+        Assert-True ($action.sizeDeviationPxAfterLocalReferenceResize.unit -eq 'px') 'size deviation must name px units'
+        Assert-True (($action.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0) -and ($action.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0)) 'local resized reference must match the approved action size'
+    }
+    Assert-True (@($report.materialUsage.bitmapSprites).Count -gt 0) 'material usage must separately list bitmap Sprites'
+    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'Home/RoomSelect/Create/CreateAction/Label' -and $_.text -eq '创建同盟' }).Count -eq 1) 'Create action Unity Text must be audited outside Sprite usage'
+    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'Home/RoomSelect/Join/JoinAction/Label' -and $_.text -eq '加入同盟' }).Count -eq 1) 'Join action Unity Text must be audited outside Sprite usage'
+    Assert-True (@($report.materialUsage.codeGeneratedGeometry).Count -gt 0) 'material usage must separately list code-generated geometry'
+    Assert-True (@($report.materialUsage.unityText | Where-Object { $_.PSObject.Properties.Name -contains 'sourcePath' }).Count -eq 0) 'Unity Text must not be represented as a Sprite source'
     foreach ($name in @('home-create-action','home-join-action')) { foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ($name + '-' + $kind + '.png'))) "missing $name $kind" } }
     Assert-True (($report.captures | Measure-Object).Count -eq 5) 'five captures must be reported'
     Assert-True (($report.referenceNormalization -eq 'independent-xy') -and ($homeCapture.actualWidth -eq 1920) -and ($homeCapture.actualHeight -eq 1080) -and ($homeCapture.referenceWidth -eq 2048) -and ($homeCapture.referenceHeight -eq 1118)) 'report must retain native dimensions and independent normalization'
@@ -175,6 +191,9 @@ try
     $markdown = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.md')
     Assert-True ($markdown.Contains("${figure9}: 2048×1118")) 'Markdown must derive figure 9 native dimensions from decoded reference pixels'
     Assert-True ($markdown.Contains("${figure10}: 2048×1118")) 'Markdown must derive figure 10 native dimensions from decoded reference pixels'
+    Assert-True ($markdown.Contains('Position deviation (px)')) 'Markdown action table must expose position deviation in px'
+    Assert-True ($markdown.Contains('## Unity Text usage')) 'Markdown must separate Unity Text usage from bitmap Sprites'
+    Assert-True ($markdown.Contains('## Code-generated geometry usage')) 'Markdown must separate code-generated geometry from bitmap Sprites'
     Assert-True ((@($report.captures | Where-Object { $_.name -like 'room-*' } | ForEach-Object { @($_.roomCards).Count } | Measure-Object -Sum).Sum -eq 12)) 'room reports must retain four actual RoomCard rectangles each'
     foreach ($captureName in $names)
     {

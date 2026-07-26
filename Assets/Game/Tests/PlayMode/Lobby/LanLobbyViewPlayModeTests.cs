@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using ArknoNights.Lobby;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace ArknoNights.Lobby.Tests
 {
@@ -150,6 +152,49 @@ namespace ArknoNights.Lobby.Tests
             createAction.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             Assert.That(createRequests, Is.EqualTo(1));
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator HomeRoomSelect_JoinActionIsUnobstructedBeforeAndAfterDiscoveryPrefill()
+        {
+            var roomSelect = view.transform.Find("LanLobbyRoot/Home/RoomSelect").GetComponent<RectTransform>();
+            var joinAction = roomSelect.Find("Join/JoinAction").GetComponent<RectTransform>();
+            var status = roomSelect.Find("Status").GetComponent<RectTransform>();
+            var layout = global::LanLobbyLayout.ForSize(1920, 1080, 4);
+            var expectedJoinRect = new Rect(
+                layout.RoomSelectJoinAction.Left,
+                layout.RoomSelectJoinAction.Bottom,
+                layout.RoomSelectJoinAction.Width,
+                layout.RoomSelectJoinAction.Height);
+
+            Canvas.ForceUpdateCanvases();
+            Assert.That(DesignRect(joinAction, roomSelect), Is.EqualTo(expectedJoinRect).Using(RectComparer.Within(2f)));
+            Assert.That(DesignRect(status, roomSelect).Overlaps(expectedJoinRect), Is.False,
+                "Status must not visually cover the Join action bar.");
+
+            view.BindDiscoveredRooms(new[] { Discovery("654321") });
+            view.ClickDiscoveredRoomForTests("654321");
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+
+            var discoveredRoom = roomSelect.Find("DiscoveredRooms/Items/Room_654321").GetComponent<RectTransform>();
+            Assert.That(DesignRect(discoveredRoom, roomSelect).Overlaps(expectedJoinRect), Is.False,
+                "A discovered-room Button must not cover or intercept the Join action bar.");
+            AssertLaterRoomSelectGraphicsDoNotOverlapJoin(roomSelect, expectedJoinRect);
+
+            var pointer = new PointerEventData(EventSystem.current)
+            {
+                button = PointerEventData.InputButton.Left,
+                position = RectTransformUtility.WorldToScreenPoint(null, joinAction.TransformPoint(joinAction.rect.center))
+            };
+            var hits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(pointer, hits);
+            var firstButton = FirstInteractableButton(hits);
+            Assert.That(firstButton, Is.EqualTo(joinAction.GetComponent<Button>()),
+                "The Join action must be the first interactable Button at its screen-space center.");
+
+            ExecuteEvents.Execute(firstButton.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+            Assert.That(joinRequests, Is.EqualTo(1), "The unobstructed Join action must retain its request behavior.");
         }
 
         [UnityTest]
@@ -357,6 +402,72 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(container.anchoredPosition.y + action.anchoredPosition.y, Is.EqualTo(expected.Bottom).Within(tolerance));
             Assert.That(action.sizeDelta.x, Is.EqualTo(expected.Width).Within(tolerance));
             Assert.That(action.sizeDelta.y, Is.EqualTo(expected.Height).Within(tolerance));
+        }
+
+        private static Rect DesignRect(RectTransform target, RectTransform designRoot)
+        {
+            var corners = new Vector3[4];
+            target.GetWorldCorners(corners);
+            var bottomLeft = designRoot.InverseTransformPoint(corners[0]);
+            var topRight = designRoot.InverseTransformPoint(corners[2]);
+            return Rect.MinMaxRect(
+                bottomLeft.x - designRoot.rect.xMin,
+                bottomLeft.y - designRoot.rect.yMin,
+                topRight.x - designRoot.rect.xMin,
+                topRight.y - designRoot.rect.yMin);
+        }
+
+        private static void AssertLaterRoomSelectGraphicsDoNotOverlapJoin(RectTransform roomSelect, Rect joinRect)
+        {
+            var join = roomSelect.Find("Join");
+            var joinSiblingIndex = join.GetSiblingIndex();
+            foreach (var graphic in roomSelect.GetComponentsInChildren<Graphic>(true))
+            {
+                if (!graphic.isActiveAndEnabled || graphic.transform.IsChildOf(join)) continue;
+                var directChild = graphic.transform;
+                while (directChild.parent != roomSelect) directChild = directChild.parent;
+                if (directChild.GetSiblingIndex() <= joinSiblingIndex) continue;
+                Assert.That(DesignRect(graphic.rectTransform, roomSelect).Overlaps(joinRect), Is.False,
+                    graphic.transform.name + " is later in render/raycast order and must not overlap the Join action.");
+            }
+        }
+
+        private static Button FirstInteractableButton(IEnumerable<RaycastResult> hits)
+        {
+            foreach (var hit in hits)
+            {
+                var button = hit.gameObject.GetComponentInParent<Button>();
+                if (button != null && button.isActiveAndEnabled && button.interactable) return button;
+            }
+            return null;
+        }
+
+        private sealed class RectComparer : IEqualityComparer<Rect>
+        {
+            private readonly float tolerance;
+
+            private RectComparer(float tolerance)
+            {
+                this.tolerance = tolerance;
+            }
+
+            public static RectComparer Within(float tolerance)
+            {
+                return new RectComparer(tolerance);
+            }
+
+            public bool Equals(Rect left, Rect right)
+            {
+                return Mathf.Abs(left.x - right.x) <= tolerance
+                    && Mathf.Abs(left.y - right.y) <= tolerance
+                    && Mathf.Abs(left.width - right.width) <= tolerance
+                    && Mathf.Abs(left.height - right.height) <= tolerance;
+            }
+
+            public int GetHashCode(Rect value)
+            {
+                return value.GetHashCode();
+            }
         }
 
         private static float Aspect(RectTransform rect)
