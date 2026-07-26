@@ -439,6 +439,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.That(first.Catalog.Entries.Select(entry => entry.Definition.TypeId), Is.EqualTo(new[] { "1000", "5503", "5504" }));
             Assert.That(first.Catalog.TryGet("5504", out var arcslmi), Is.True);
+            Assert.That(arcslmi.DisplayNameZhHans, Is.EqualTo("果冻丁"));
             Assert.That(arcslmi.Definition.MaxHitPoints, Is.EqualTo(2500));
             Assert.That(arcslmi.Definition.Attack, Is.EqualTo(290));
             Assert.That(arcslmi.Definition.DamageType, Is.EqualTo(DamageType.Physical));
