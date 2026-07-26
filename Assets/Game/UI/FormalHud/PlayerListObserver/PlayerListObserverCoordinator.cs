@@ -165,28 +165,50 @@ namespace ArknoNights.UI.PlayerListObserver
             var rowHeight = ReferenceRowHeight * scale;
             var rowSpacing = ReferenceRowSpacing * scale;
             var rows = new List<PlayerListRowLayout>(Math.Max(0, rowCount));
+            var top = ReferenceTopPadding * scale;
             for (var index = 0; index < rowCount; index++)
             {
-                var yMin = ReferenceTopPadding * scale + index * (rowHeight + rowSpacing);
+                var yMin = top + index * (rowHeight + rowSpacing);
                 rows.Add(new PlayerListRowLayout(index, leftPadding, yMin, rowWidth, rowHeight));
             }
 
-            return new PlayerListLayoutSnapshot(isVisible, leftPadding, new ReadOnlyCollection<PlayerListRowLayout>(rows));
+            var backgroundHeight = rowCount <= 0 ? 0f : rowHeight * rowCount + rowSpacing * (rowCount - 1);
+            var background = new PlayerListRectLayout(leftPadding, top, rowWidth, backgroundHeight);
+            return new PlayerListLayoutSnapshot(isVisible, leftPadding, background, new ReadOnlyCollection<PlayerListRowLayout>(rows));
         }
     }
 
     public sealed class PlayerListLayoutSnapshot
     {
-        internal PlayerListLayoutSnapshot(bool isVisible, float leftPadding, IReadOnlyList<PlayerListRowLayout> rows)
+        internal PlayerListLayoutSnapshot(bool isVisible, float leftPadding, PlayerListRectLayout background, IReadOnlyList<PlayerListRowLayout> rows)
         {
             IsVisible = isVisible;
             LeftPadding = leftPadding;
+            Background = background;
             Rows = rows;
         }
 
         public bool IsVisible { get; }
         public float LeftPadding { get; }
+        public PlayerListRectLayout Background { get; }
         public IReadOnlyList<PlayerListRowLayout> Rows { get; }
+    }
+
+    public struct PlayerListRectLayout
+    {
+        internal PlayerListRectLayout(float x, float yMin, float width, float height)
+        {
+            X = x;
+            YMin = yMin;
+            Width = width;
+            Height = height;
+        }
+
+        public float X { get; }
+        public float YMin { get; }
+        public float Width { get; }
+        public float Height { get; }
+        public float YMax => YMin + Height;
     }
 
     public struct PlayerListRowLayout

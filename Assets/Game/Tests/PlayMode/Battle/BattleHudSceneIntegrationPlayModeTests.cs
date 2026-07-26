@@ -36,10 +36,30 @@ namespace ArknoNights.Battle.Tests
             Assert.That(shopRoot.offsetMax, Is.EqualTo(Vector2.zero));
             Assert.That(playerListRoot.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(playerListRoot.anchorMax, Is.EqualTo(Vector2.one));
+            var listBackground = playerListRoot.Find("Background");
+            Assert.NotNull(listBackground, "The player list needs its shared black background.");
+            Assert.AreEqual("bg_player_list", listBackground.GetComponent<Image>().sprite.name);
             var localPlayerRow = playerListRoot.Find("Player_local-ui-player");
             Assert.NotNull(localPlayerRow);
             Assert.That(localPlayerRow.GetComponent<RectTransform>().anchoredPosition.x, Is.LessThan(150f));
             Assert.NotNull(localPlayerRow.Find("AvatarBorder").GetComponent<Image>().sprite);
+            Assert.Less(listBackground.GetSiblingIndex(), localPlayerRow.GetSiblingIndex());
+            var avatar = localPlayerRow.Find("Avatar").GetComponent<RectTransform>();
+            var health = localPlayerRow.Find("HealthBackground").GetComponent<RectTransform>();
+            var self = localPlayerRow.Find("Self").GetComponent<RectTransform>();
+            Assert.That(health.anchoredPosition.x - health.sizeDelta.x * health.pivot.x,
+                Is.GreaterThanOrEqualTo(avatar.anchoredPosition.x - avatar.sizeDelta.x * avatar.pivot.x - .01f));
+            Assert.That(health.anchoredPosition.x + health.sizeDelta.x * (1f - health.pivot.x),
+                Is.LessThanOrEqualTo(avatar.anchoredPosition.x + avatar.sizeDelta.x * (1f - avatar.pivot.x) + .01f));
+            Assert.That(health.anchoredPosition.y - health.sizeDelta.y * health.pivot.y,
+                Is.GreaterThanOrEqualTo(avatar.anchoredPosition.y - avatar.sizeDelta.y * avatar.pivot.y - .01f));
+            Assert.That(health.anchoredPosition.y + health.sizeDelta.y * (1f - health.pivot.y),
+                Is.LessThanOrEqualTo(avatar.anchoredPosition.y + avatar.sizeDelta.y * (1f - avatar.pivot.y) + .01f));
+            Assert.That(self.anchoredPosition.x - self.sizeDelta.x * self.pivot.x,
+                Is.EqualTo(avatar.anchoredPosition.x - avatar.sizeDelta.x * avatar.pivot.x).Within(.01f));
+            Assert.AreSame(
+                ArknoNights.UI.StagingHudController.FormalNumericFont,
+                localPlayerRow.Find("HealthBackground/Life").GetComponent<Text>().font);
             var disconnectedRow = playerListRoot.Find("Player_local-ui-player-4");
             Assert.NotNull(disconnectedRow.Find("LostConnection"));
             Assert.That(
@@ -60,6 +80,44 @@ namespace ArknoNights.Battle.Tests
             Assert.That(slotRects.Select(slot => slot.anchoredPosition.y).Distinct().Count(), Is.EqualTo(1));
             Assert.That(slotRects.Select(slot => slot.sizeDelta), Is.All.EqualTo(new Vector2(158f, 175f)));
             Assert.That(slotRects.Select(slot => slot.Find("Background").GetComponent<Image>().sprite), Is.All.Not.Null);
+            var firstSlot = slotRects[0];
+            var lastSlot = slotRects[4];
+            var shopPanelRect = shopPanel.GetComponent<RectTransform>();
+            Assert.That(
+                lastSlot.anchoredPosition.x + lastSlot.sizeDelta.x,
+                Is.EqualTo(shopPanelRect.rect.width).Within(.01f),
+                "The five-card group must be right aligned.");
+            var upgrade = shopPanel.Find("UpgradeButton").GetComponent<RectTransform>();
+            Assert.That(
+                upgrade.anchoredPosition.x + upgrade.sizeDelta.x,
+                Is.EqualTo(firstSlot.anchoredPosition.x - 8f).Within(.01f),
+                "Upgrade belongs immediately left of the card group.");
+            var upgradeCostBackground = upgrade.Find("UpgradeCostBackground");
+            Assert.NotNull(upgradeCostBackground, "Upgrade price needs the same cost background language as product prices.");
+            var slotCostBackground = firstSlot.Find("CostBackground").GetComponent<RectTransform>();
+            Assert.That(
+                slotCostBackground.anchoredPosition.x + slotCostBackground.sizeDelta.x * .5f,
+                Is.EqualTo(firstSlot.rect.width * .5f).Within(.01f));
+            Assert.That(
+                slotCostBackground.anchoredPosition.y + slotCostBackground.sizeDelta.y * .5f,
+                Is.EqualTo(firstSlot.rect.height).Within(.01f));
+
+            var numericFont = ArknoNights.UI.StagingHudController.FormalNumericFont;
+            Assert.AreSame(numericFont, shopRoot.Find("ShopLevelButton/Level").GetComponent<Text>().font);
+            Assert.AreSame(numericFont, firstSlot.Find("Price").GetComponent<Text>().font);
+            Assert.AreSame(numericFont, upgrade.Find("Cost").GetComponent<Text>().font);
+            Assert.AreSame(numericFont, shopPanel.Find("RefreshButton/Cost").GetComponent<Text>().font);
+            var boldFontProperty = typeof(ArknoNights.UI.StagingHudController).GetProperty("FormalBoldUiFont");
+            Assert.NotNull(boldFontProperty, "Compact Chinese labels need an explicit heavier font boundary.");
+            var boldFont = (Font)boldFontProperty.GetValue(null);
+            Assert.AreSame(boldFont, firstSlot.Find("UnitName").GetComponent<Text>().font);
+            Assert.AreSame(boldFont, shopPanel.Find("FreezeButton/Label").GetComponent<Text>().font);
+            Assert.AreSame(boldFont, shopPanel.Find("RefreshButton/Label").GetComponent<Text>().font);
+            Assert.AreSame(boldFont, shopRoot.Find("ReadyButton/Label").GetComponent<Text>().font);
+            Assert.AreNotEqual(Color.white, shopPanel.Find("FreezeButton/Label").GetComponent<Text>().color);
+            Assert.AreNotEqual(Color.white, shopPanel.Find("RefreshButton/Label").GetComponent<Text>().color);
+            Assert.AreNotEqual(Color.white, shopRoot.Find("ReadyButton/Label").GetComponent<Text>().color);
+            Assert.AreEqual("ready_icon", shopRoot.Find("ReadyButton/Icon").GetComponent<Image>().sprite.name);
 
             Assert.That((bool)type.GetMethod("TryObservePlayer").Invoke(integration, new object[] { "local-ui-player-2" }), Is.True);
             yield return null;
@@ -81,6 +139,7 @@ namespace ArknoNights.Battle.Tests
             yield return null;
             shop.GetType().GetMethod("ToggleReady").Invoke(shop, null);
             yield return null;
+            Assert.AreEqual("icon_ready", shopRoot.Find("ReadyButton/Icon").GetComponent<Image>().sprite.name);
             Assert.That(deployment.GetType().GetProperty("InteractionEnabled").GetValue(deployment), Is.False, "Ready must lock only formation operations.");
             Assert.That((bool)shop.GetType().GetProperty("State").GetValue(shop).GetType().GetProperty("ShopCommandsEnabled").GetValue(shop.GetType().GetProperty("State").GetValue(shop)), Is.True);
 

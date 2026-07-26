@@ -288,6 +288,9 @@ public sealed class PlayerListHudController : MonoBehaviour
         var width = root.rect.width > 0f ? root.rect.width : Screen.width;
         var height = root.rect.height > 0f ? root.rect.height : Screen.height;
         var layout = PlayerListLayout.Calculate(width, height, entries.Count, coordinator.IsPlayerListVisible);
+        var background = Image("Background", root, FormalHudSpriteLoader.Load("UI/Texture/player_list/bg_player_list"));
+        PositionFromTopLeft(background.rectTransform, layout.Background);
+        background.preserveAspect = false;
         for (var index = 0; index < entries.Count; index++)
         {
             BuildRow(entries[index], layout.Rows[index]);
@@ -319,7 +322,7 @@ public sealed class PlayerListHudController : MonoBehaviour
         if (entry.IsLocalPlayer)
         {
             var self = Image("Self", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_self"));
-            Position(self.rectTransform, 8f, 118f, 36f, 36f);
+            Position(self.rectTransform, 28f, 110f, 32f, 32f);
             self.preserveAspect = true;
         }
         if (!entry.IsConnected)
@@ -338,14 +341,15 @@ public sealed class PlayerListHudController : MonoBehaviour
         // Disconnect is represented exclusively by LostConnection. bg_lose_hp is reserved for
         // a future, explicit post-battle life-loss presentation and must not imply that state here.
         var hp = Image("HealthBackground", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/bg_hp"));
-        Position(hp.rectTransform, 58f, 17f, 92f, 36f);
+        Position(hp.rectTransform, 58f, 36f, 92f, 24f);
         hp.preserveAspect = false;
         var hpIcon = Image("HealthIcon", hp.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_hp"));
-        Position(hpIcon.rectTransform, 20f, 18f, 14f, 22f);
+        Position(hpIcon.rectTransform, 14f, 12f, 12f, 18f);
         hpIcon.preserveAspect = true;
         var value = Text("Life", hp.transform, 18, TextAnchor.MiddleCenter, Color.white);
+        value.font = StagingHudController.FormalNumericFont;
         value.text = entry.Life.ToString();
-        Position(value.rectTransform, 59f, 18f, 54f, 30f);
+        Position(value.rectTransform, 55f, 12f, 60f, 20f);
         if (entry.IsLocalPlayer && coordinator.IsObservingAnotherPlayer)
         {
             var returnButton = Image("ReturnLocal", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/btn_return_self"));
@@ -402,6 +406,14 @@ public sealed class PlayerListHudController : MonoBehaviour
         target.pivot = new Vector2(.5f, .5f);
         target.anchoredPosition = new Vector2(x, y);
         target.sizeDelta = new Vector2(width, height);
+    }
+
+    private static void PositionFromTopLeft(RectTransform target, PlayerListRectLayout layout)
+    {
+        target.anchorMin = target.anchorMax = new Vector2(0f, 1f);
+        target.pivot = new Vector2(0f, 1f);
+        target.anchoredPosition = new Vector2(layout.X, -layout.YMin);
+        target.sizeDelta = new Vector2(layout.Width, layout.Height);
     }
 
     private void OnDestroy()

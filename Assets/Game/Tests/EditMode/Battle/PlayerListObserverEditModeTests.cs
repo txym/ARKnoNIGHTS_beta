@@ -110,6 +110,10 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(4, layout.Rows.Count);
             Assert.That(layout.Rows.Select(row => row.X), Is.All.EqualTo(layout.LeftPadding).Within(0.001f));
             Assert.That(layout.Rows.Zip(layout.Rows.Skip(1), (current, next) => current.YMax <= next.YMin), Is.All.True);
+            Assert.That(layout.Background.X, Is.EqualTo(layout.LeftPadding).Within(0.001f));
+            Assert.That(layout.Background.YMin, Is.EqualTo(layout.Rows[0].YMin).Within(0.001f));
+            Assert.That(layout.Background.Width, Is.EqualTo(layout.Rows[0].Width).Within(0.001f));
+            Assert.That(layout.Background.YMax, Is.EqualTo(layout.Rows[3].YMax).Within(0.001f));
         }
 
         private static LocalMatchState Load()

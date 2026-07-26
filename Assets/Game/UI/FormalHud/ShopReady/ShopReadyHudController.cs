@@ -16,6 +16,11 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     {
         private const int MaximumLevel = 9;
         private const int RefreshCost = 1;
+        private static readonly Color ShopNameColor = new Color(.82f, .84f, .82f, 1f);
+        private static readonly Color PriceColor = new Color(1f, .94f, .72f, 1f);
+        private static readonly Color FreezeLabelColor = new Color(.03f, .16f, .19f, 1f);
+        private static readonly Color RefreshLabelColor = new Color(.22f, .13f, .01f, 1f);
+        private static readonly Color ReadyLabelColor = new Color(.02f, .18f, .17f, 1f);
         private static readonly int[] UpgradeCosts = { 4, 6, 8, 10, 12, 14, 16, 18 };
 
         private sealed class SlotWidgets
@@ -54,6 +59,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private Image refreshBackground;
         private Image refreshIcon;
         private Image upgradeBackground;
+        private Image upgradeCostBackground;
         private Image upgradeFrame;
         private Image upgradeGradient;
         private Image freezeBackground;
@@ -199,7 +205,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             levelText.text = state.Level.ToString();
             readyText.text = state.IsReady ? "取消准备" : "准备就绪";
             readyIcon.sprite = FormalHudSpriteLoader.Load(
-                state.IsReady ? "UI/Texture/ready/ready_icon" : "UI/Texture/ready/icon_ready");
+                state.IsReady ? "UI/Texture/ready/icon_ready" : "UI/Texture/ready/ready_icon");
 
             shopPanel.gameObject.SetActive(state.ShopVisible);
             var upgradeCost = UpgradeCost(state.Level);
@@ -209,6 +215,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 canUpgrade ? "UI/Texture/shop/upgrade_max" : "UI/Texture/shop/upgrade_disable");
             upgradeLevelText.text = state.Level.ToString();
             upgradeCostText.text = state.Level >= MaximumLevel ? "MAX" : upgradeCost.ToString();
+            upgradeCostBackground.sprite = FormalHudSpriteLoader.Load(
+                canUpgrade ? "UI/Texture/shop/cost_bg_1" : "UI/Texture/shop/cost_bg_2");
+            upgradeCostBackground.gameObject.SetActive(state.Level < MaximumLevel);
             var upgradePending = pendingCommand.Kind == ShopReadyConfirmation.Upgrade;
             upgradeFrame.gameObject.SetActive(upgradePending);
             upgradeGradient.gameObject.SetActive(upgradePending);
@@ -251,7 +260,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             var levelBackground = Image("Background", levelButtonRoot, "UI/Texture/shop/level");
             Stretch(levelBackground.rectTransform);
             levelBackground.preserveAspect = true;
-            levelText = Label("Level", levelButtonRoot, 44, TextAnchor.MiddleCenter, Color.white);
+            levelText = NumberLabel("Level", levelButtonRoot, 44, TextAnchor.MiddleCenter, Color.white);
 
             shopPanel = Rect("ShopPanel", root);
             var upgradeRoot = ButtonRoot("UpgradeButton", shopPanel, RequestUpgrade, out upgradeButton);
@@ -260,30 +269,31 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             upgradeFrame = Image("ConfirmationFrame", upgradeRoot, "UI/Texture/shop/check_frame");
             Stretch(upgradeFrame.rectTransform);
             upgradeGradient = Image("ConfirmationGradient", upgradeRoot, "UI/Texture/shop/check_grad");
-            upgradeLevelText = Label("Level", upgradeRoot, 42, TextAnchor.MiddleCenter, Color.white);
-            upgradeCostText = Label("Cost", upgradeRoot, 18, TextAnchor.MiddleCenter, new Color(1f, .82f, .08f));
+            upgradeCostBackground = Image("UpgradeCostBackground", upgradeRoot, "UI/Texture/shop/cost_bg_1");
+            upgradeLevelText = NumberLabel("Level", upgradeRoot, 42, TextAnchor.MiddleCenter, Color.white);
+            upgradeCostText = NumberLabel("Cost", upgradeRoot, 18, TextAnchor.MiddleCenter, PriceColor);
 
             var freezeRoot = ButtonRoot("FreezeButton", shopPanel, ToggleAllFrozen, out freezeButton);
             freezeBackground = Image("Background", freezeRoot, "UI/Texture/shop/frozen_bg_normal");
             Stretch(freezeBackground.rectTransform);
             freezeIcon = Image("Icon", freezeRoot, "UI/Texture/shop/frozen_icon");
-            freezeText = Label("Label", freezeRoot, 21, TextAnchor.MiddleCenter, Color.white);
+            freezeText = Label("Label", freezeRoot, 21, TextAnchor.MiddleCenter, FreezeLabelColor);
 
             var refreshRoot = ButtonRoot("RefreshButton", shopPanel, RequestRefresh, out refreshButton);
             refreshBackground = Image("Background", refreshRoot, "UI/Texture/shop/refresh_bg_normal");
             Stretch(refreshBackground.rectTransform);
             refreshIcon = Image("Icon", refreshRoot, "UI/Texture/shop/refresh_icon");
-            refreshText = Label("Label", refreshRoot, 21, TextAnchor.MiddleCenter, Color.white);
+            refreshText = Label("Label", refreshRoot, 21, TextAnchor.MiddleCenter, RefreshLabelColor);
             refreshText.text = "刷新";
-            refreshCostText = Label("Cost", refreshRoot, 18, TextAnchor.MiddleCenter, new Color(1f, .82f, .08f));
+            refreshCostText = NumberLabel("Cost", refreshRoot, 18, TextAnchor.MiddleCenter, PriceColor);
 
             readyButtonRoot = ButtonRoot("ReadyButton", root, ToggleReady, out readyButton);
             readyBackground = Image("Background", readyButtonRoot, "UI/Texture/ready/ready_bg");
             Stretch(readyBackground.rectTransform);
             readyFrame = Image("Frame", readyButtonRoot, "UI/Texture/ready/ready_frame");
             Stretch(readyFrame.rectTransform);
-            readyIcon = Image("Icon", readyButtonRoot, "UI/Texture/ready/icon_ready");
-            readyText = Label("Label", readyButtonRoot, 24, TextAnchor.MiddleCenter, Color.white);
+            readyIcon = Image("Icon", readyButtonRoot, "UI/Texture/ready/ready_icon");
+            readyText = Label("Label", readyButtonRoot, 24, TextAnchor.MiddleCenter, ReadyLabelColor);
         }
 
         private void EnsureSlots()
@@ -307,9 +317,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 var outline = Image("HoverOutline", rootRect, "UI/Texture/shop/frame_outline");
                 var frame = Image("RarityFrame", rootRect, "UI/Texture/shop/frame_lv1");
                 var confirmation = Image("PurchaseConfirmation", rootRect, "UI/Texture/shop/bg_doublecheck1");
-                var name = Label("UnitName", rootRect, 16, TextAnchor.MiddleLeft, Color.white);
+                var name = Label("UnitName", rootRect, 16, TextAnchor.MiddleLeft, ShopNameColor);
                 var costBackground = Image("CostBackground", rootRect, "UI/Texture/shop/cost_bg_1");
-                var price = Label("Price", rootRect, 20, TextAnchor.MiddleCenter, Color.white);
+                var price = NumberLabel("Price", rootRect, 20, TextAnchor.MiddleCenter, PriceColor);
                 var frozen = Image("FrozenOverlay", rootRect, "UI/Texture/shop/ice_matte");
                 var pointer = rootRect.gameObject.AddComponent<ShopSlotPointerView>();
                 pointer.Initialize(outline);
@@ -369,20 +379,27 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             Stretch(levelText.rectTransform);
             levelText.rectTransform.anchoredPosition = new Vector2(0f, -8f * scale);
 
-            PositionBottomLeft(upgradeButton.GetComponent<RectTransform>(), 0f, 78f, 111f, 175f, scale);
+            const float cardWidth = 158f;
+            const float cardGap = 8f;
+            const float upgradeWidth = 111f;
+            var firstCardX = 1070f - (5f * cardWidth + 4f * cardGap);
+            var upgradeX = firstCardX - cardGap - upgradeWidth;
+
+            PositionBottomLeft(upgradeButton.GetComponent<RectTransform>(), upgradeX, 78f, upgradeWidth, 175f, scale);
             Stretch(upgradeBackground.rectTransform);
             Stretch(upgradeFrame.rectTransform);
             PositionBottomLeft(upgradeGradient.rectTransform, 0f, 18f, 111f, 136f, scale);
             PositionBottomLeft(upgradeLevelText.rectTransform, 8f, 44f, 95f, 92f, scale);
-            PositionBottomLeft(upgradeCostText.rectTransform, 8f, 143f, 95f, 27f, scale);
+            PositionBottomLeft(upgradeCostBackground.rectTransform, 33.5f, 157.5f, 44f, 35f, scale);
+            PositionBottomLeft(upgradeCostText.rectTransform, 33.5f, 157.5f, 44f, 35f, scale);
 
             PositionBottomLeft(freezeButton.GetComponent<RectTransform>(), 744f, 0f, 149f, 77f, scale);
             PositionBottomLeft(freezeIcon.rectTransform, 15f, 23f, 31f, 31f, scale);
-            PositionBottomLeft(freezeText.rectTransform, 45f, 18f, 96f, 40f, scale);
+            PositionBottomLeft(freezeText.rectTransform, 46f, 18f, 99f, 40f, scale);
 
             PositionBottomLeft(refreshButton.GetComponent<RectTransform>(), 902f, 0f, 147f, 77f, scale);
             PositionBottomLeft(refreshIcon.rectTransform, 15f, 23f, 31f, 31f, scale);
-            PositionBottomLeft(refreshText.rectTransform, 45f, 18f, 92f, 40f, scale);
+            PositionBottomLeft(refreshText.rectTransform, 46f, 18f, 94f, 40f, scale);
             PositionBottomLeft(refreshCostText.rectTransform, 112f, 55f, 31f, 22f, scale);
 
             PositionBottomLeft(readyIcon.rectTransform, 18f, 15f, 30f, 30f, scale);
@@ -391,7 +408,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             for (var index = 0; index < slotWidgets.Count; index++)
             {
                 var widget = slotWidgets[index];
-                PositionBottomLeft(widget.Root, 132f + index * 166f, 78f, 158f, 175f, scale);
+                PositionBottomLeft(widget.Root, firstCardX + index * (cardWidth + cardGap), 78f, cardWidth, 175f, scale);
                 Stretch(widget.Background.rectTransform);
                 PositionBottomLeft(widget.Portrait.transform.parent as RectTransform, 5f, 22f, 148f, 146f, scale);
                 PositionBottomLeft(widget.Portrait.rectTransform, -4f, -3f, 156f, 156f, scale);
@@ -400,8 +417,8 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 Stretch(widget.Frame.rectTransform);
                 PositionBottomLeft(widget.Confirmation.rectTransform, 0f, 0f, 158f, 125f, scale);
                 PositionBottomLeft(widget.Name.rectTransform, 9f, 3f, 140f, 27f, scale);
-                PositionBottomLeft(widget.CostBackground.rectTransform, 57f, 162f, 44f, 35f, scale);
-                PositionBottomLeft(widget.Price.rectTransform, 57f, 162f, 44f, 35f, scale);
+                PositionBottomLeft(widget.CostBackground.rectTransform, 57f, 157.5f, 44f, 35f, scale);
+                PositionBottomLeft(widget.Price.rectTransform, 57f, 157.5f, 44f, 35f, scale);
                 PositionBottomLeft(widget.Frozen.rectTransform, 0f, 0f, 157f, 66f, scale);
             }
         }
@@ -454,7 +471,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
             value.transform.SetParent(parent, false);
             var text = value.GetComponent<Text>();
-            text.font = StagingHudController.FormalUiFont;
+            text.font = StagingHudController.FormalBoldUiFont;
             text.fontSize = fontSize;
             text.alignment = alignment;
             text.color = color;
@@ -462,6 +479,13 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             text.resizeTextForBestFit = true;
             text.resizeTextMinSize = 11;
             text.resizeTextMaxSize = fontSize;
+            return text;
+        }
+
+        private static Text NumberLabel(string name, Transform parent, int fontSize, TextAnchor alignment, Color color)
+        {
+            var text = Label(name, parent, fontSize, alignment, color);
+            text.font = StagingHudController.FormalNumericFont;
             return text;
         }
 

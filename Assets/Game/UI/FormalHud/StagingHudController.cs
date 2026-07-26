@@ -19,8 +19,10 @@ namespace ArknoNights.UI
         private const string PlayerStatePath = "PlayerData/local-player-state-v1";
         private const string AtlasPath = "UI/Texture/SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged";
         private const string FormalUiFontPath = "UI/Fonts/NotoSansSC-VF";
+        private const string FormalBoldUiFontPath = "Fonts/HanYiCuHeiJian-1";
         private const string FormalNumericFontPath = "Fonts/Novecento wide Normal Regular.woff2";
         private static Font formalUiFont;
+        private static Font formalBoldUiFont;
         private static Font formalNumericFont;
 
         [Header("UI-001 Player-safe input")]
@@ -73,6 +75,15 @@ namespace ArknoNights.UI
             {
                 if (formalNumericFont == null) formalNumericFont = Resources.Load<Font>(FormalNumericFontPath);
                 return formalNumericFont != null ? formalNumericFont : FormalUiFont;
+            }
+        }
+
+        public static Font FormalBoldUiFont
+        {
+            get
+            {
+                if (formalBoldUiFont == null) formalBoldUiFont = Resources.Load<Font>(FormalBoldUiFontPath);
+                return formalBoldUiFont != null ? formalBoldUiFont : FormalUiFont;
             }
         }
         /// <summary>Read-only notification for HUD extensions. The stable stack ID remains authoritative.</summary>
