@@ -396,6 +396,8 @@ public sealed class PlayerListHudController : MonoBehaviour
         text.fontSize = fontSize;
         text.alignment = anchor;
         text.color = color;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
         text.raycastTarget = false;
         return text;
     }

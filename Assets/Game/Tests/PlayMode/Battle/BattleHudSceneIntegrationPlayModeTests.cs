@@ -57,9 +57,12 @@ namespace ArknoNights.Battle.Tests
                 Is.LessThanOrEqualTo(avatar.anchoredPosition.y + avatar.sizeDelta.y * (1f - avatar.pivot.y) + .01f));
             Assert.That(self.anchoredPosition.x - self.sizeDelta.x * self.pivot.x,
                 Is.EqualTo(avatar.anchoredPosition.x - avatar.sizeDelta.x * avatar.pivot.x).Within(.01f));
+            var life = localPlayerRow.Find("HealthBackground/Life").GetComponent<Text>();
             Assert.AreSame(
                 ArknoNights.UI.StagingHudController.FormalNumericFont,
-                localPlayerRow.Find("HealthBackground/Life").GetComponent<Text>().font);
+                life.font);
+            Assert.AreEqual(HorizontalWrapMode.Overflow, life.horizontalOverflow);
+            Assert.AreEqual(VerticalWrapMode.Overflow, life.verticalOverflow);
             var disconnectedRow = playerListRoot.Find("Player_local-ui-player-4");
             Assert.NotNull(disconnectedRow.Find("LostConnection"));
             Assert.That(
@@ -94,6 +97,13 @@ namespace ArknoNights.Battle.Tests
                 "Upgrade belongs immediately left of the card group.");
             var upgradeCostBackground = upgrade.Find("UpgradeCostBackground");
             Assert.NotNull(upgradeCostBackground, "Upgrade price needs the same cost background language as product prices.");
+            var upgradeCostRect = upgradeCostBackground.GetComponent<RectTransform>();
+            Assert.That(
+                upgradeCostRect.anchoredPosition.x + upgradeCostRect.sizeDelta.x * .5f,
+                Is.EqualTo(upgrade.rect.width * .5f).Within(.01f));
+            Assert.That(
+                upgradeCostRect.anchoredPosition.y + upgradeCostRect.sizeDelta.y * .5f,
+                Is.EqualTo(upgrade.rect.height).Within(.01f));
             var slotCostBackground = firstSlot.Find("CostBackground").GetComponent<RectTransform>();
             Assert.That(
                 slotCostBackground.anchoredPosition.x + slotCostBackground.sizeDelta.x * .5f,
