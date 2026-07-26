@@ -59,7 +59,7 @@ TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译�
 当前单位初始化不是自动场景流程，而是由初始化调试按钮触发：
 
 1. `ButtonDebug.Debugbutton` 调用 `UnitFactory.SpawnAll`；
-2. `UnitFactory` 扫描 `Application.dataPath/GameData/Units/Json` 下的 `*.json`，当前仓库内有 `arcslma.json` 和 `gopro.json`；
+2. `UnitFactory` 扫描 `Application.dataPath/GameData/Units/Json` 下的 `*.json`，当前仓库内有 `1000_gopro.json`、`5503_arcslma.json` 和 `5504_arcslmi.json`；
 3. JSON 经 `JsonUtility` 反序列化为 `UnitJson`；
 4. 工厂为每种类型创建内存中的 `UnitTemplate`，并按 `typeID` 写入静态字典；
 5. 工厂加载 `Resources/Prefabs/DefaultUnit` 并为每种类型实例化一个对象；

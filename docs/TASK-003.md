@@ -22,8 +22,9 @@
 - TASK-002 完成报告、测试结果、实际程序集/类型清单、fixture schema 和 runner 阶段说明
 - TASK-002 实际新增的 Battle Core、Infrastructure、fixture 和 EditMode 测试文件
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/arcslma.json`
-- `Assets/GameData/Units/Json/gopro.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Game/Runtime/Data/Unit/UnitTemplate.cs`
 - `Assets/Game/Runtime/Data/Unit/UnitSkelBase.cs`（只用于了解后续表现需求，不得让 Core 依赖它）
 

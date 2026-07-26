@@ -24,8 +24,9 @@
 - `ProjectSettings/ProjectVersion.txt`
 - `Packages/manifest.json`
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/gopro.json`
-- `Assets/GameData/Units/Json/arcslma.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Game/Runtime/Initial/UnitFactory.cs`
 - `Assets/Game/Runtime/Data/Unit/UnitTemplate.cs`，或实际定义 `UnitTemplate` 的文件
 - `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs`
@@ -46,7 +47,7 @@
 当前真实状态：
 
 - `Assets/GameData/Units/UnitJson.cs` 同时存在 `id`、`uintName`、`ProfilePicture`、`Rarity`、`HP`、`atk`、`BlockRadius`、`FixedAbility`、`LifeDeduct`、`narrowTitle` 等不同风格字段；
-- `gopro.json` 和 `arcslma.json` 是当前仅有的真实单位源 JSON，也是目录生成器的权威输入；
+- `1000_gopro.json`、`5503_arcslma.json` 和 `5504_arcslmi.json` 是当前真实单位源 JSON，也是目录生成器的权威输入；
 - `UnitCatalogGenerator` 会把米/秒转换为厘米/秒，把秒按 `20 Tick/秒` 向上取整为 Tick，并验证 Spine 动画；
 - 当前生成目录把 `uintName` 写入 `unitName`，所以资源键和玩家可见名称被混为同一个字段；
 - 当前目录没有中文单位名、中文技能描述或目标价值 `LifeDeduct` 的完整 Player-safe 契约；
@@ -62,7 +63,7 @@
 
 1. 为单位源 JSON 定义并实现 `unit-source-v1`（或语义等价且明确版本化的）规范格式。
 2. 将 `UnitJson` 字段统一为 lower camel case，并按“身份与文本 → 养成与费用 → 行为分类 → 战斗数值 → 阻挡/价值/能力 → 资源与动画”的固定顺序排列。
-3. 把 `gopro.json` 和 `arcslma.json` 一次性迁移为新字段，删除旧键，不长期保留双格式源文件。
+3. 把 `1000_gopro.json`、`5503_arcslma.json` 和 `5504_arcslmi.json` 一次性迁移为新字段，删除旧键，不长期保留双格式源文件。
 4. 新增 `displayNameZhHans` 和 `skillDescriptionZhHans`；两个字段暂时保留空字符串等待用户填写，不得生成虚构中文内容。
 5. 让 `skillDescriptionZhHans` 为空成为合法状态；`displayNameZhHans` 为空时允许数据迁移和目录生成，但必须保持“未配置”语义，不能回退为 `resourceKey` 并伪装成玩家可见中文名。
 6. 让单位目录明确区分资源键、中文显示名和中文技能描述，并携带 `lifeDeduct`、稀有度及现有 UI/战斗所需字段。
@@ -181,8 +182,9 @@ deathAnimation
 候选范围：
 
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/gopro.json`
-- `Assets/GameData/Units/Json/arcslma.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Game/Runtime/Initial/UnitFactory.cs`
 - `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs`
 - `Assets/Game/Editor/UnitJsonAbilityBakeTool.cs`

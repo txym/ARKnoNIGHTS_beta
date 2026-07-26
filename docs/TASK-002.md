@@ -24,8 +24,9 @@
 - `Packages/manifest.json`
 - `Packages/packages-lock.json`（若存在）
 - `Assets/GameData/Units/UnitJson.cs`
-- `Assets/GameData/Units/Json/arcslma.json`
-- `Assets/GameData/Units/Json/gopro.json`
+- `Assets/GameData/Units/Json/1000_gopro.json`
+- `Assets/GameData/Units/Json/5503_arcslma.json`
+- `Assets/GameData/Units/Json/5504_arcslmi.json`
 - `Assets/Game/Runtime/Data/Unit/UnitTemplate.cs`
 - `Assets/Game/Runtime/Data/Unit/UnitIdentity.cs`
 - `Assets/Game/Runtime/Data/Player/PlayerUnitCollection.cs`
