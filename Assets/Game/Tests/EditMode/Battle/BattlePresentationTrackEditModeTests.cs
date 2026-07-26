@@ -159,6 +159,46 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(1, summaries.Length);
         }
 
+        [Test]
+        public void Compression_DoesNotChangeSourceEventsOrFinalResult()
+        {
+            var result = RunFixture();
+            var sourceEvents = string.Join(";", result.Events.Select(item => item.Type + ":" + item.Tick + ":" + item.Sequence + ":" + item.UnitId + ":" + item.ToPosition));
+
+            var track = Compile(result);
+
+            Assert.AreEqual(sourceEvents, string.Join(";", result.Events.Select(item => item.Type + ":" + item.Tick + ":" + item.Sequence + ":" + item.UnitId + ":" + item.ToPosition)));
+            Assert.AreEqual(result.Winner, track.Winner);
+            Assert.AreEqual(result.StopReason, track.StopReason);
+            foreach (var final in result.FinalUnits)
+            {
+                var unit = track.Units.Single(item => item.UnitId == final.UnitId);
+                var sample = unit.Sample(track.EndTick);
+                Assert.AreEqual(final.IsAlive, sample.IsAlive);
+                Assert.AreEqual(final.HitPoints, sample.CurrentHitPoints);
+                Assert.AreEqual(final.Position.XUnits / 100d, sample.Position.XUnits, 0.00001d);
+                Assert.AreEqual(final.Position.YUnits / 100d, sample.Position.YUnits, 0.00001d);
+            }
+        }
+
+        [Test]
+        public void Compression_ReportsBoundedMetricsAndPreservesEveryMoveSample()
+        {
+            var result = RunFixture();
+            var track = Compile(result);
+
+            Assert.That(track.CompressionMetrics.OriginalMoveCount, Is.EqualTo(result.Events.Count(item => item.Type == BattleEventType.Move)));
+            Assert.That(track.CompressionMetrics.PositionKeyCount, Is.GreaterThan(0));
+            Assert.That(track.CompressionMetrics.MaximumErrorUnits, Is.LessThanOrEqualTo(1d));
+            foreach (var move in result.Events.Where(item => item.Type == BattleEventType.Move))
+            {
+                var sample = track.Units.Single(item => item.UnitId == move.UnitId).Sample(move.Tick);
+                var dx = sample.Position.XUnits * 100d - move.ToPosition.Value.XUnits;
+                var dy = sample.Position.YUnits * 100d - move.ToPosition.Value.YUnits;
+                Assert.That(dx * dx + dy * dy, Is.LessThanOrEqualTo(1d), move.UnitId + " tick " + move.Tick);
+            }
+        }
+
         private static BattlePresentationTrack Compile(BattleRunResult result)
         {
             var compiler = new BattlePresentationTrackCompiler();
