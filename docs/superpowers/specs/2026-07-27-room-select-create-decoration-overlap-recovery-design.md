@@ -2,7 +2,12 @@
 
 ## Status
 
-Approved in conversation on 2026-07-27.
+Superseded before implementation on 2026-07-27 by
+`2026-07-27-room-select-create-frame-completion-design.md`.
+
+The user explicitly removed the four wings from the acceptance scope and chose
+to complete the Create UI by making the stitched `doc_frame_line` outline
+continuous and visually obvious.
 
 This design replaces the failed assumptions in
 `2026-07-26-room-select-create-decoration-correction-design.md`. It applies
