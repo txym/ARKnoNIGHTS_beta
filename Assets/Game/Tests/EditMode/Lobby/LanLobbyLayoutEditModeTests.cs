@@ -22,5 +22,19 @@ namespace ArknoNights.Lobby.Tests
 
             Assert.That(layout.HomePanels.All(panel => panel.Left >= 0f && panel.Right <= width && panel.Bottom >= 0f && panel.Top <= height), Is.True);
         }
+
+        [TestCase(1920, 1080)]
+        [TestCase(1280, 720)]
+        public void RoomSelect_CreateAndJoinStayInRightHalfAtSupported16By9Sizes(int width, int height)
+        {
+            var layout = global::LanLobbyLayout.ForSize(width, height, 4);
+
+            Assert.That(layout.RoomSelectCreate.Left, Is.GreaterThanOrEqualTo(width * .5f));
+            Assert.That(layout.RoomSelectJoin.Left, Is.GreaterThanOrEqualTo(width * .5f));
+            Assert.That(layout.RoomSelectCreate.Right, Is.LessThanOrEqualTo(width));
+            Assert.That(layout.RoomSelectJoin.Right, Is.LessThanOrEqualTo(width));
+            Assert.That(layout.RoomSelectCreate.Bottom, Is.GreaterThanOrEqualTo(0f));
+            Assert.That(layout.RoomSelectJoin.Bottom, Is.GreaterThanOrEqualTo(0f));
+        }
     }
 }

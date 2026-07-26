@@ -45,6 +45,31 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
+        public IEnumerator HomeRoomSelect_ComposesMappedSpritesAndCombinedAvatar()
+        {
+            var home = view.transform.Find("LanLobbyRoot/Home");
+            var create = home.Find("RoomSelect/Create");
+            var join = home.Find("RoomSelect/Join");
+
+            Assert.That(create, Is.Not.Null);
+            Assert.That(join, Is.Not.Null);
+            Assert.That(create.position.x, Is.GreaterThan(Screen.width * .5f));
+            Assert.That(join.position.x, Is.GreaterThan(Screen.width * .5f));
+            Assert.That(home.Find("IdentityPanel/AvatarSelector/AvatarImage").GetComponent<UnityEngine.UI.Image>().sprite.name,
+                Is.EqualTo("icon_amiy"));
+            Assert.That(create.Find("CreateAction").GetComponent<UnityEngine.UI.Image>().sprite.name,
+                Is.EqualTo("room_select_create_btn_bg_down"));
+            Assert.That(join.Find("JoinAction").GetComponent<UnityEngine.UI.Image>().sprite.name,
+                Is.EqualTo("room_select_join_btn_bg_down"));
+
+            view.BindDiscoveredRooms(new[] { Discovery("654321") });
+            view.ClickDiscoveredRoomForTests("654321");
+            Assert.That(view.RoomCodeTextForTests, Is.EqualTo("654321"));
+            Assert.That(joinRequests, Is.Zero);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator UnknownFullAndStartedRooms_DisableJoinAndExplainWhy()
         {
             view.BindDiscoveredRooms(new[]
