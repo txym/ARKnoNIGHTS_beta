@@ -542,12 +542,18 @@ Record the ten central rows as informational only.
 
 If Cycle 1 passes every frame gate and manual inspection, skip to Step 7.
 
-If geometry/semantic gates pass but contrast or manual visibility fails,
-change the View test tint first to:
+If the exact View geometry/visible-overlap assertions and semantic
+bottom-boundary gate pass, but contrast/manual visibility fails, change the
+View test tint first to:
 
 ```csharp
 new Color(.55f, .95f, .88f, 1f)
 ```
+
+The same brightness-only cycle is authorized when a continuity row fails
+solely through threshold-dark runs while the View test proves its segment
+endpoints and `17 px` overlaps are exact. Record the qualifying-pixel and gap
+change as evidence; do not misclassify it as a missing geometric segment.
 
 Run the View fixture to obtain a complete XML with exactly the intended color
 assertion failure. Then change only the runtime `frameTint` to the same value
