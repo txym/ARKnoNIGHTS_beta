@@ -86,7 +86,7 @@ namespace ArknoNights.Battle.Tests
             var catalog = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
             Assert.That(catalog.Success, Is.True, string.Join(";", catalog.Errors.Select(item => item.ToString())));
             Assert.That(catalog.Catalog.TryGet("5504", out var arcslmi), Is.True);
-            Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/arcslmi/enemy_5504_arcslmi_SkeletonData"));
+            Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/5504_arcslmi/enemy_5504_arcslmi_SkeletonData"));
             var expectedSkeletonData = Resources.Load(arcslmi.SkeletonDataResourcePath);
             Assert.IsNotNull(expectedSkeletonData);
             var factoryObject = new GameObject("TASK4_DynamicArcslmiFactory");
@@ -144,8 +144,8 @@ namespace ArknoNights.Battle.Tests
         [UnityTest]
         public IEnumerator RealCatalog_FactoryUsesTheConfiguredCatalogMapping()
         {
-            const string arcslmiPath = "Characters/arcslmi/enemy_5504_arcslmi_SkeletonData";
-            const string alternatePath = "Characters/arcslma/enemy_5503_arcslma_SkeletonData";
+            const string arcslmiPath = "Characters/5504_arcslmi/enemy_5504_arcslmi_SkeletonData";
+            const string alternatePath = "Characters/5503_arcslma/enemy_5503_arcslma_SkeletonData";
             var sourceCatalog = Resources.Load<TextAsset>("BattleData/unit-catalog-v1");
             Assert.IsNotNull(sourceCatalog);
             Assert.That(sourceCatalog.text, Does.Contain(arcslmiPath));

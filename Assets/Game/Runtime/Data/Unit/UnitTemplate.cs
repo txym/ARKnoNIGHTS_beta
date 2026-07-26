@@ -8,7 +8,7 @@ public partial class UnitTemplate : ScriptableObject
     [Header("必须字段")]
     public int typeID = 1000;                 // 主键
     public string uintName = "gopro";
-    public string ProfilePicture = "UIImage_gopro";
+    public string ProfilePicture = "UIImage_1000_gopro";
     public int attackMethod = 0b01;    // 攻击方式
     public int actionMethod = 0b01;    // 行动方式
     public int unitskeltype = 1;       //动画机种类
