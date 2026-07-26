@@ -30,7 +30,7 @@ namespace ArknoNights.Battle.Tests
             var ability = loaded.Catalog.Abilities.Single();
             Assert.That(ability.AbilityId, Is.EqualTo("SUMMON_JELLY_MINIONS"));
             Assert.That(ability.DisplayNameZhHans, Is.Empty);
-            Assert.That(ability.DescriptionZhHans, Is.EqualTo("每隔一段时间，分裂出三个果冻。"));
+            Assert.That(ability.DescriptionZhHans, Is.EqualTo("每隔一段时间，分裂出三个<果冻丁>。"));
             Assert.That(ability.InitialSkillPoints, Is.EqualTo(5));
             Assert.That(ability.RequiredSkillPoints, Is.EqualTo(15));
             Assert.That(ability.SkillPointGeneration, Is.EqualTo(SkillPointGeneration.Automatic));
@@ -1063,7 +1063,7 @@ namespace ArknoNights.Battle.Tests
             => new AbilityDefinition(
                 "SUMMON_JELLY_MINIONS",
                 string.Empty,
-                "每隔一段时间，分裂出三个果冻。",
+                "每隔一段时间，分裂出三个<果冻丁>。",
                 AbilityActivationKind.Timed,
                 SilencePolicy.Unaffected,
                 5,

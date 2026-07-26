@@ -5,7 +5,7 @@
         {
             "abilityId": "SUMMON_JELLY_MINIONS",
             "displayNameZhHans": "",
-            "descriptionZhHans": "每隔一段时间，分裂出三个果冻。",
+            "descriptionZhHans": "每隔一段时间，分裂出三个<果冻丁>。",
             "activationKind": "Timed",
             "silencePolicy": "Unaffected",
             "initialSkillPoints": 5,
