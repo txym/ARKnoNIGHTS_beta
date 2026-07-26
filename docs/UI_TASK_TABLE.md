@@ -152,7 +152,7 @@
 | 待执行 | UI-006 | 本地对局、商店与准备状态闭环 | 建立确定性的四玩家本地对局状态，使本地玩家拥有等级、赤金、生命、准备状态和五槽商店，并通过原子命令购买、升级、刷新、冻结及切换观察目标 | 现有 UI-001～005、UNIT-DATA-001 | `Runtime/Data/Player` 或相邻本地对局状态目录、PlayerData 测试数据、EditMode 测试 | 固定 JSON 加载；命令成功/失败无副作用；价格等于稀有度；唯一实例 ID；冻结刷新确定性；同一输入重复摘要一致；0 项测试不得记为通过 | 已确认 | 不与任何修改 PlayerState 或 PlayerData 的任务并行 | 日志可打印四名玩家、本地玩家5个商品、等级/赤金/生命/准备状态和稳定 canonical summary；所有商店命令产生结构化结果 |
 | 待执行 | UI-007 | 右侧等级、商店与准备 HUD | 按 UI_SPEC 使用现有贴图实现右上等级按钮、五槽商店、升级、冻结、刷新和固定位置的准备按钮，并绑定 UI-006 命令 | UI-006 | 新的 FormalHud 商店/准备组件、贴图导入设置、必要 Prefab 或运行时构建器、现有 HUD 轻量接线、PlayMode 测试、截图入口 | 商店开关、5 槽状态矩阵、购买二次确认、空槽、买不起、冻结、升级确认、准备切换；1920×1080 截图；Editor 编译 | 临时经济规则已经确认；位置细节可截图迭代 | UI-008 可在独立文件中并行开发，但两者不得同时改 `SampleScene`、`FormalBattleHudUi005.cs` 或同一截图入口 | 等级按钮能开关商店；商店正确显示五槽及状态；准备按钮显示正确图标/文字；已准备时阵型操作被锁但商店仍可用 |
 | 待执行 | UI-008 | 左侧玩家列表与只读观察视图 | 显示四名本地测试玩家，并安全地把准备阶段场地和待部署区切换到被观察玩家，同时保持商店、资源和命令权限属于本地玩家 | UI-006 | 玩家列表组件、HUD 选择事件、StagingHud 显示绑定、PreparationUnitView 投影、观察坐标变换、PlayMode/EditMode 测试 | 玩家头像状态矩阵；观察/返回；对手部署命令被拒绝；本地商店未切换；单位选择时列表隐藏；阵型快照不因观察改变 | 已确认；战斗阶段观察交由 UI-009 | 可与 UI-007 仅在隔离 worktree、互不修改共享文件时并行；最终由 UI-010 串行集成 | 点击其他玩家后显示其准备阵型与待部署区；被观察头像出现眼睛，本地头像出现返回按钮；不能操作对手；选中单位时玩家列表隐藏 |
-| 待执行 | UI-009 | 四玩家双战斗 Track 与观察切换 | 将两场独立战斗结果编译为可定位的单位表现 Track，压缩逐 Tick 直线移动，并按共享时钟和玩家 Home/Away 身份切换观察 | UI-006、UI-008；战斗 TASK-006 与 UI-004 接口仍可用 | 回合封存/配对编排、Presentation Track 编译与采样、双战斗协调、BattleDemo 兼容入口、EditMode/PlayMode 测试 | 两份结果和 Track 摘要稳定；位置误差不超过 1 cm；强制关键帧精确；Damage 无 Hit；四玩家映射；切换不重新运行 Core；全部 Track 结束后返回准备 | 已确认 | 不与任何修改 BattleDemo、PreparationBattleLoopController、BattleEventPlaybackController 或战斗演示根的任务并行 | 点击任意玩家都能看到其真实配对战斗在共同 Tick 的位置、血量、死亡和动作类型；玩家2/4使用 Away；直线移动关键帧显著减少 |
+| 已完成（战斗场景接线） | UI-009 | 四玩家双战斗 Track 与观察切换 | 将两场独立战斗结果编译为可定位的单位表现 Track，压缩逐 Tick 直线移动，并按共享时钟和玩家 Home/Away 身份切换观察 | UI-006、UI-008；战斗 TASK-006 与 UI-004 接口仍可用 | 回合封存/配对编排、Presentation Track 编译与采样、双战斗协调、BattleDemo 兼容入口、EditMode/PlayMode 测试 | 两份结果和 Track 摘要稳定；位置误差不超过 1 cm；强制关键帧精确；Damage 无 Hit；四玩家映射；切换不重新运行 Core；全部 Track 结束后返回准备 | 已确认；完整玩家列表按钮挂接留给 UI-010 | 不与任何修改 BattleDemo、PreparationBattleLoopController、BattleEventPlaybackController 或战斗演示根的任务并行 | `TryObserveBattlePlayer` 可切换真实配对战斗的共同 Tick 投影；玩家2/4使用 Away；UI-010 将把左侧玩家列表按钮接到该入口 |
 | 待执行 | UI-010 | 阶段集成、截图拟合与最终验收 | 将 UI-007～009 接入现有准备—战斗循环，完成生命周期清理、最终视觉拟合、截图 manifest、Windows Player 构建和人工清单 | UI-007、UI-008、UI-009；现有 UI-INFO-002 完成状态 | `PreparationBattleLoopController` 的薄接线、Formal HUD 组合根、CaptureSuite、相关测试、ARCHITECTURE/TEST_PLAN/报告 | 全量 EditMode/PlayMode；Windows Standalone；覆盖商店关/开、买不起、二次确认、冻结、未准备/已准备、观察/返回、两场战斗、掉线、单位信息面板互斥的截图与 manifest；人工 GUI 清单 | 不新增经济或联网规则；发现缺口必须回到对应任务 | 最终串行任务 | 一键运行本地 UI Demo，准备状态、商店、四玩家观察、双战斗、部署锁定和阶段循环不互相污染；输出可审查截图、结构化状态和验收报告 |
 
 ## 6. 依赖关系
@@ -493,6 +493,13 @@ CanUseShop =
 - 为支持实例级动态 Spawn 必须改变现有事件契约，但无法提出兼容迁移和回归方案；
 - 位置压缩只能通过删除或改写权威 Move 事件实现；
 - 需要让演示层修改权威结果才能实现切换。
+
+#### 2026-07-26 实施结果
+
+- 已完成固定 `P1/P2 -> MatchAB` 与 `P3/P4 -> MatchCD` 的四玩家封存、两次独立 Core 计算、Track 编译和共享 Tick 播放。每份输入只计算一次；观察、暂停、调速和重播只重新采样已封存 Track。
+- 已把场景循环接到现有 `FormalBattleHudRoot`、`PreparationBattleLoopController` 和 `BattleDemoRoot`，没有创建第二个 Demo 根、相机或 PlayerState。两场结束后阶段只返回准备一次，战斗输出不回写四名玩家的持久单位状态。
+- 已提供战斗阶段的 `TryObserveBattlePlayer(playerId)` 路由。当前 UI-008 的左侧玩家列表图形点击和完整场景可视化挂接尚未实施；它必须由 UI-010 调用该入口，且不得复制或重跑 Battle Core。
+- 自动验证和构建结果记录在 `docs/TEST_PLAN.md` 的 UI-009 节。视觉截图、Player 手工切换和 manifest 扩展仍为未验证的 UI-010 工作，不能把它们列为 UI-009 已通过项。
 
 ### UI-010：阶段集成、截图拟合与最终验收
 

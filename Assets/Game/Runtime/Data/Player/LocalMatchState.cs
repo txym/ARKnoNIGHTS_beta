@@ -146,6 +146,7 @@ namespace ArknoNights.Player
 
         private readonly UnitCatalog catalog;
         private readonly Dictionary<string, LocalMatchPlayerData> playersById;
+        private readonly ReadOnlyCollection<string> orderedPlayerIds;
         private readonly HashSet<string> knownUnitIds;
         private readonly string[][] shopPages;
         private readonly ShopSlotData[] shopSlots;
@@ -162,7 +163,9 @@ namespace ArknoNights.Player
         {
             this.catalog = catalog;
             this.localPlayerId = localPlayerId;
-            playersById = players.ToDictionary(player => player.PlayerId, StringComparer.Ordinal);
+            var orderedPlayers = (players ?? Enumerable.Empty<LocalMatchPlayerData>()).ToArray();
+            playersById = orderedPlayers.ToDictionary(player => player.PlayerId, StringComparer.Ordinal);
+            orderedPlayerIds = new ReadOnlyCollection<string>(orderedPlayers.Select(player => player.PlayerId).ToArray());
             knownUnitIds = new HashSet<string>(playersById.Values.SelectMany(player => player.PlayerState.Snapshot.Units).Select(unit => unit.UnitId), StringComparer.Ordinal);
             this.shopPages = shopPages.Select(page => page.ToArray()).ToArray();
             shopSlots = this.shopPages[0].Select((typeId, index) => new ShopSlotData(index, typeId, false)).ToArray();
@@ -174,7 +177,21 @@ namespace ArknoNights.Player
         public event Action<LocalMatchSnapshot> Changed;
         public string LocalPlayerId => localPlayerId;
         public string ObservedPlayerId => observedPlayerId;
+        /// <summary>Stable fixture order used for the confirmed Player1-vs-2 / Player3-vs-4 battle pairing.</summary>
+        public IReadOnlyList<string> OrderedPlayerIds => orderedPlayerIds;
         public LocalMatchSnapshot Snapshot => CreateSnapshot();
+
+        /// <summary>Returns the persistent state belonging to one fixture player without changing command ownership.</summary>
+        public bool TryGetPlayerState(string playerId, out PlayerState state)
+        {
+            if (playersById.TryGetValue(playerId ?? string.Empty, out var player))
+            {
+                state = player.PlayerState;
+                return true;
+            }
+            state = null;
+            return false;
+        }
 
         public LocalMatchOperationResult TryPurchase(int shopSlotId)
         {
@@ -276,7 +293,7 @@ namespace ArknoNights.Player
 
         private LocalMatchSnapshot CreateSnapshot()
         {
-            var players = playersById.Values.Select(player =>
+            var players = orderedPlayerIds.Select(playerId => playersById[playerId]).Select(player =>
             {
                 var local = string.Equals(player.PlayerId, localPlayerId, StringComparison.Ordinal);
                 var slots = local ? shopSlots.Select(slot => new LocalMatchShopSlotSnapshot(slot.ShopSlotId, slot.UnitTypeId, slot.IsFrozen, catalog)) : Enumerable.Empty<LocalMatchShopSlotSnapshot>();
@@ -290,15 +307,21 @@ namespace ArknoNights.Player
     {
         public const string SchemaVersion = "local-match-state-v1";
 
-        public static LocalMatchLoadResult LoadFromResources(string catalogResourcePath, string matchStateResourcePath)
+        public static LocalMatchLoadResult LoadFromResources(string catalogResourcePath, string matchStateResourcePath, PlayerState localPlayerOverride = null)
         {
             var catalogResult = UnitCatalogLoader.LoadFromResources(catalogResourcePath);
             if (!catalogResult.Success) return Failure("localMatch.catalog.invalid", string.Join(";", catalogResult.Errors.Select(error => error.ToString())));
-            var asset = Resources.Load<TextAsset>(matchStateResourcePath);
-            return asset == null ? Failure("localMatch.resource.missing", matchStateResourcePath) : LoadFromJson(catalogResult.Catalog, asset.text);
+            return LoadFromResources(catalogResult.Catalog, matchStateResourcePath, localPlayerOverride);
         }
 
-        public static LocalMatchLoadResult LoadFromJson(UnitCatalog catalog, string json)
+        public static LocalMatchLoadResult LoadFromResources(UnitCatalog catalog, string matchStateResourcePath, PlayerState localPlayerOverride = null)
+        {
+            if (catalog == null) return Failure("localMatch.catalog.missing", "catalog is required");
+            var asset = Resources.Load<TextAsset>(matchStateResourcePath);
+            return asset == null ? Failure("localMatch.resource.missing", matchStateResourcePath) : LoadFromJson(catalog, asset.text, localPlayerOverride);
+        }
+
+        public static LocalMatchLoadResult LoadFromJson(UnitCatalog catalog, string json, PlayerState localPlayerOverride = null)
         {
             if (catalog == null) return Failure("localMatch.catalog.missing", "catalog is required");
             if (string.IsNullOrWhiteSpace(json)) return Failure("localMatch.json.empty", "JSON is empty");
@@ -318,11 +341,20 @@ namespace ArknoNights.Player
             {
                 if (source == null || string.IsNullOrWhiteSpace(source.playerId) || !playerIds.Add(source.playerId)) { errors.Add(Error("localMatch.playerId.invalid", source == null ? string.Empty : source.playerId)); continue; }
                 if (source.life != 400) errors.Add(Error("localMatch.player.life.invalid", source.playerId));
-                var playerLoad = LocalPlayerStateLoader.LoadFromResources(catalog, source.playerStateResourcePath);
-                if (!playerLoad.Success) { errors.Add(Error("localMatch.playerState.invalid", source.playerId)); continue; }
-                if (!string.Equals(playerLoad.State.PlayerId, source.playerId, StringComparison.Ordinal)) { errors.Add(Error("localMatch.playerState.playerId.mismatch", source.playerId)); continue; }
-                if (playerLoad.State.Snapshot.Units.Any(unit => !unitIds.Add(unit.UnitId))) { errors.Add(Error("localMatch.unitId.duplicate", source.playerId)); continue; }
-                players.Add(new LocalMatchPlayerData(source.playerId, source.displayName, source.avatarResourcePath, source.life, source.isConnected, playerLoad.State));
+                PlayerState playerState;
+                if (localPlayerOverride != null && string.Equals(source.playerId, dto.localPlayerId, StringComparison.Ordinal))
+                {
+                    playerState = localPlayerOverride;
+                }
+                else
+                {
+                    var playerLoad = LocalPlayerStateLoader.LoadFromResources(catalog, source.playerStateResourcePath);
+                    if (!playerLoad.Success) { errors.Add(Error("localMatch.playerState.invalid", source.playerId)); continue; }
+                    playerState = playerLoad.State;
+                }
+                if (!string.Equals(playerState.PlayerId, source.playerId, StringComparison.Ordinal)) { errors.Add(Error("localMatch.playerState.playerId.mismatch", source.playerId)); continue; }
+                if (playerState.Snapshot.Units.Any(unit => !unitIds.Add(unit.UnitId))) { errors.Add(Error("localMatch.unitId.duplicate", source.playerId)); continue; }
+                players.Add(new LocalMatchPlayerData(source.playerId, source.displayName, source.avatarResourcePath, source.life, source.isConnected, playerState));
             }
 
             if (string.IsNullOrWhiteSpace(dto.localPlayerId) || !playerIds.Contains(dto.localPlayerId)) errors.Add(Error("localMatch.localPlayer.invalid", dto.localPlayerId));

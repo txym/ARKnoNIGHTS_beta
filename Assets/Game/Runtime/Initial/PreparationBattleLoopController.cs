@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Demo;
 using ArknoNights.Battle.Infrastructure;
+using ArknoNights.Battle.Presentation;
 using ArknoNights.Deployment;
 using ArknoNights.Player;
 using ArknoNights.Round;
@@ -12,31 +14,35 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Thin SampleScene bridge for UI-004. It owns phase side effects only; the preparation clock, sealing,
+/// Thin SampleScene bridge for UI-009. It owns phase side effects only; the preparation clock, sealing,
 /// and PlayerState-to-Core conversion remain ordinary testable C# in ARKnoNIGHTS.Round.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class PreparationBattleLoopController : MonoBehaviour
 {
     private const string CatalogPath = "BattleData/unit-catalog-v1";
-    private const string FixedBattlePath = "BattleData/task004a-real-1v1";
-    private const string TemporaryOpponentPath = "PlayerData/temporary-opponent-player-state-v1";
+    private const string LocalMatchPath = "PlayerData/local-match-state-v1";
+    private const int BattleMaxTicks = 12000;
 
     private readonly PreparationBattlePhaseMachine machine = new PreparationBattlePhaseMachine();
     private StagingHudController hud;
     private StateDrivenDeploymentController deployment;
     private BattleDemoController demo;
     private UnitCatalog catalog;
-    private PlayerState temporaryOpponent;
-    private int maxTicks;
+    private LocalMatchState matchState;
+    private MultiBattlePresentationCoordinator multiBattle;
     private int roundNumber;
-    private PreparationSealResult activeSeal;
+    private FourPlayerBattleRoundSealResult activeSeal;
     private bool initialized;
 
     public LocalBattlePhase Phase => machine.Phase;
     public float RemainingPreparationSeconds => machine.RemainingPreparationSeconds;
     public string LastError => machine.LastError;
-    public PreparationSealResult ActiveSeal => activeSeal;
+    public FourPlayerBattleRoundSealResult ActiveSeal => activeSeal;
+    /// <summary>Shared-clock presentation session for UI-009. It is null before the first battle or after teardown.</summary>
+    public MultiBattlePresentationCoordinator MultiBattle => multiBattle;
+    /// <summary>Fixture player/economy source; UI-010 owns attaching its shop and player-list surfaces.</summary>
+    public LocalMatchState MatchState => matchState;
     public string LastBattleSummary { get; private set; } = string.Empty;
 
     private IEnumerator Start()
@@ -73,47 +79,52 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
             return;
         }
 
-        var fixedLoad = LocalBattleLoader.LoadFromResources(CatalogPath, FixedBattlePath);
-        if (!fixedLoad.Success)
+        var catalogLoad = UnitCatalogLoader.LoadFromResources(CatalogPath);
+        if (!catalogLoad.Success)
         {
-            Fail("round.fixedAway.load.failed:" + string.Join(" | ", fixedLoad.Errors.Select(error => error.ToString()).ToArray()));
+            Fail("round.catalog.load.failed:" + string.Join(" | ", catalogLoad.Errors.Select(error => error.ToString()).ToArray()));
             return;
         }
-        var opponentLoad = LocalPlayerStateLoader.LoadFromResources(CatalogPath, TemporaryOpponentPath);
-        if (!opponentLoad.Success)
+        var matchLoad = LocalMatchStateLoader.LoadFromResources(catalogLoad.Catalog, LocalMatchPath, hud.PlayerState);
+        if (!matchLoad.Success)
         {
-            Fail("round.temporaryOpponent.load.failed:" + string.Join(" | ", opponentLoad.Errors.Select(error => error.ToString()).ToArray()));
-            return;
-        }
-
-        temporaryOpponent = opponentLoad.State;
-        if (!temporaryOpponent.GetUnits(PlayerUnitZone.Deployed).Any())
-        {
-            Fail("round.temporaryOpponent.empty");
+            Fail("round.localMatch.load.failed:" + string.Join(" | ", matchLoad.Errors.Select(error => error.ToString()).ToArray()));
             return;
         }
 
-        catalog = fixedLoad.Catalog;
-        maxTicks = fixedLoad.Input.MaxTicks;
+        catalog = catalogLoad.Catalog;
+        matchState = matchLoad.State;
+        matchState.Changed += HandleMatchChanged;
+        multiBattle = new MultiBattlePresentationCoordinator();
         demo.SetFormalRoundMode(true);
         demo.ResetRuntimeBattle();
         deployment.SetPreparationViewsVisible(true);
         deployment.SetInteractionEnabled(true);
         machine.EnterPreparation();
         initialized = true;
-        Debug.Log("[UI-004][phase.enter] phase=Preparation; remaining=" + RemainingPreparationSeconds + "; player=" + hud.PlayerState.PlayerId, this);
+        Debug.Log("[UI-009][phase.enter] phase=Preparation; remaining=" + RemainingPreparationSeconds + "; player=" + hud.PlayerState.PlayerId + "; fixturePlayers=" + string.Join(",", matchState.OrderedPlayerIds.ToArray()), this);
     }
 
     private void Advance(float unscaledSeconds)
     {
-        if (machine.Phase == LocalBattlePhase.Preparation && machine.Advance(unscaledSeconds)) BeginBattle();
-        if (machine.Phase != LocalBattlePhase.Battle || demo == null) return;
-        if (demo.State == BattleDemoState.Error)
+        if (machine.Phase == LocalBattlePhase.Preparation && machine.Advance(unscaledSeconds))
         {
-            Fail("round.presentation.error:" + demo.Coordinator.LastError);
+            BeginBattle();
             return;
         }
-        if (demo.State == BattleDemoState.Completed) ReturnToPreparation();
+        if (machine.Phase != LocalBattlePhase.Battle || multiBattle == null) return;
+        if (multiBattle.State == MultiBattlePresentationState.Error)
+        {
+            Fail("round.presentation.error:" + multiBattle.LastError);
+            return;
+        }
+        multiBattle.Advance(unscaledSeconds);
+        if (multiBattle.State == MultiBattlePresentationState.Error)
+        {
+            Fail("round.presentation.error:" + multiBattle.LastError);
+            return;
+        }
+        if (multiBattle.State == MultiBattlePresentationState.Completed) ReturnToPreparation();
     }
 
     private void BeginBattle()
@@ -121,35 +132,67 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
         // This is deliberately first: no UI drag/selection can commit while irreversible PlayerState changes begin.
         deployment.SetInteractionEnabled(false);
         deployment.SetPreparationViewsVisible(false);
-        var battleId = "ui004-round-" + (++roundNumber);
-        if (!PreparationBattleSealer.TrySeal(hud.PlayerState, temporaryOpponent, catalog, battleId, maxTicks, out activeSeal, out var error))
+        var battleId = "ui009-round-" + (++roundNumber);
+        if (!FourPlayerBattleRoundSealer.TrySealRound(matchState, catalog, BattleMaxTicks, battleId, out activeSeal, out var error))
         {
             Fail(error);
             return;
         }
 
-        Debug.Log("[UI-004][phase.sealed] battle=" + battleId + "; overflowRemoved=" + string.Join(",", activeSeal.OverflowRemovedUnitIds.ToArray()) + "; autoDeployed=" + (string.IsNullOrEmpty(activeSeal.AutoDeployedUnitId) ? "<none>" : activeSeal.AutoDeployedUnitId) + "; cost=" + activeSeal.Before.DeploymentCost + "->" + activeSeal.After.DeploymentCost + "; before=" + activeSeal.Before.CanonicalSummary + "; after=" + activeSeal.After.CanonicalSummary, this);
-        if (!demo.StartRuntimeBattle(activeSeal.Input, catalog))
+        if (!demo.TryGetPresentationFactory(out var factory))
         {
-            Fail("round.demo.start.failed:" + demo.Coordinator.LastError);
+            Fail("round.presentationFactory.missing");
             return;
         }
-        Debug.Log("[UI-004][battle.started] battle=" + battleId + "; input=" + demo.Coordinator.InputDigest + "; winner=" + demo.Coordinator.WinnerOrReason, this);
+        var requests = activeSeal.Matches.Select(match => new BattleMatchRequest(match.MatchId, match.Input)).ToArray();
+        var observations = BuildObservations(activeSeal).ToArray();
+        if (!multiBattle.Prepare(requests, observations, factory, matchState.ObservedPlayerId) || !multiBattle.Play())
+        {
+            Fail("round.multiBattle.start.failed:" + multiBattle.LastError);
+            return;
+        }
+        Debug.Log("[UI-009][phase.sealed] round=" + battleId + "; playerSeals=" + string.Join(";", activeSeal.PlayerSeals.Select(seal => seal.After.PlayerId + "/overflow=" + string.Join(",", seal.OverflowRemovedUnitIds.ToArray()) + "/auto=" + (string.IsNullOrEmpty(seal.AutoDeployedUnitId) ? "<none>" : seal.AutoDeployedUnitId)).ToArray()) + "; summary=" + multiBattle.StableSummary, this);
     }
 
     private void ReturnToPreparation()
     {
-        var current = hud.PlayerState.Snapshot;
-        var stateUnchangedDuringBattle = activeSeal != null && string.Equals(activeSeal.After.CanonicalSummary, current.CanonicalSummary, StringComparison.Ordinal);
-        LastBattleSummary = "battle=" + demo.Coordinator.Input.BattleId + "; input=" + demo.Coordinator.InputDigest + "; events=" + demo.Coordinator.EventDigest + "; result=" + demo.Coordinator.ResultDigest + "; winner=" + demo.Coordinator.WinnerOrReason + "; playerUnchangedDuringBattle=" + stateUnchangedDuringBattle;
-        Debug.Log("[UI-004][battle.completed] " + LastBattleSummary, this);
+        var current = matchState.Snapshot;
+        var statesUnchangedDuringBattle = activeSeal != null && activeSeal.PlayerSeals.All(seal => current.Players.Any(player => player.PlayerId == seal.After.PlayerId && string.Equals(player.PlayerState.CanonicalSummary, seal.After.CanonicalSummary, StringComparison.Ordinal)));
+        LastBattleSummary = "summary=" + multiBattle.StableSummary + "; playersUnchangedDuringBattle=" + statesUnchangedDuringBattle;
+        Debug.Log("[UI-009][battle.completed] " + LastBattleSummary, this);
 
+        multiBattle.Reset();
         demo.ResetRuntimeBattle();
         deployment.SetPreparationViewsVisible(true);
         deployment.SetInteractionEnabled(true);
         activeSeal = null;
         machine.CompleteBattle();
-        Debug.Log("[UI-004][phase.enter] phase=Preparation; remaining=" + RemainingPreparationSeconds + "; playerCost=" + current.DeploymentCost, this);
+        Debug.Log("[UI-009][phase.enter] phase=Preparation; remaining=" + RemainingPreparationSeconds + "; playerCost=" + current.LocalPlayer.PlayerState.DeploymentCost, this);
+    }
+
+    /// <summary>Battle-phase-only observer entry for UI-008/010 player-list bindings.</summary>
+    public bool TryObserveBattlePlayer(string playerId)
+    {
+        if (!initialized || machine.Phase != LocalBattlePhase.Battle || matchState == null || multiBattle == null) return false;
+        var operation = matchState.TryObserve(playerId);
+        return operation.Success && multiBattle.State != MultiBattlePresentationState.Error;
+    }
+
+    private static IEnumerable<PlayerBattleObservation> BuildObservations(FourPlayerBattleRoundSealResult seal)
+    {
+        foreach (var match in seal.Matches)
+        {
+            var home = match.Input.Players.Single(player => player.Side == ArknoNights.Battle.Core.BattleSide.Home);
+            var away = match.Input.Players.Single(player => player.Side == ArknoNights.Battle.Core.BattleSide.Away);
+            yield return new PlayerBattleObservation(home.PlayerId, match.MatchId, BattleObserverView.Home);
+            yield return new PlayerBattleObservation(away.PlayerId, match.MatchId, BattleObserverView.Away);
+        }
+    }
+
+    private void HandleMatchChanged(LocalMatchSnapshot snapshot)
+    {
+        if (machine.Phase != LocalBattlePhase.Battle || multiBattle == null || multiBattle.State == MultiBattlePresentationState.Error) return;
+        if (!multiBattle.SelectObservedPlayer(snapshot.ObservedPlayerId)) Fail("round.observer.switch.failed:" + multiBattle.LastError);
     }
 
     private void Fail(string error)
@@ -160,16 +203,18 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
             deployment.SetInteractionEnabled(false);
             deployment.SetPreparationViewsVisible(false);
         }
-        Debug.LogError("[UI-004][phase.error] " + error, this);
+        Debug.LogError("[UI-009][phase.error] " + error, this);
     }
 
     private void OnDestroy()
     {
+        if (matchState != null) matchState.Changed -= HandleMatchChanged;
+        multiBattle?.Dispose();
         if (demo != null) demo.SetFormalRoundMode(false);
     }
 }
 
-/// <summary>Idempotently attaches exactly one UI-004 bridge after the existing UI bootstrap has run.</summary>
+/// <summary>Idempotently attaches exactly one UI-009 bridge after the existing UI bootstrap has run.</summary>
 internal static class PreparationBattleLoopBootstrap
 {
     private static bool subscribed;

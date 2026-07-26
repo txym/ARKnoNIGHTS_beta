@@ -146,13 +146,13 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     public void SelectBattleUnitForHud(string unitId)
     {
         if (loop == null || loop.Phase != LocalBattlePhase.Battle || string.IsNullOrEmpty(unitId)) return;
-        var state = demo.Coordinator?.PresentationViewStates.FirstOrDefault(item => item.UnitId == unitId);
+        var state = CurrentBattleStates().FirstOrDefault(item => item.UnitId == unitId);
         if (state == null) return;
         // Staging and battlefield inspection share one selection. Clearing the former must not grant
         // the selected enemy any command authority; it only moves the read-only information projection.
         hud?.ClearStagingSelection();
         selectedUnitId = unitId;
-        selectedBattleEnemy = state.Side != BattleSide.Home;
+        selectedBattleEnemy = state.Side != CurrentObserverSide();
         Refresh();
     }
 
@@ -272,14 +272,15 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         statusEnemyIcon.gameObject.SetActive(battle);
         if (battle)
         {
-            var states = demo.Coordinator?.PresentationViewStates ?? Array.Empty<BattlePresentationViewState>();
-            var initialEnemies = demo.Coordinator?.Input?.Players.Where(player => player.Side == BattleSide.Away).SelectMany(player => player.Units).Where(unit => unit.Zone == UnitZone.Deployed).Select(unit => unit.UnitId).ToArray() ?? Array.Empty<string>();
+            var states = CurrentBattleStates();
+            var observerSide = CurrentObserverSide();
+            var initialEnemies = CurrentBattleInput()?.Players.Where(player => player.Side != observerSide).SelectMany(player => player.Units).Where(unit => unit.Zone == UnitZone.Deployed).Select(unit => unit.UnitId).ToArray() ?? Array.Empty<string>();
             var defeated = states.Count(state => initialEnemies.Contains(state.UnitId) && !state.IsAlive);
             statusLeft.font = StagingHudController.FormalNumericFont;
             statusLeft.text = defeated + "/" + initialEnemies.Length;
             statusClockIcon.gameObject.SetActive(false);
             statusMiddle.font = StagingHudController.FormalUiFont;
-            statusMiddle.text = demo.State.ToString();
+            statusMiddle.text = loop.MultiBattle == null ? demo.State.ToString() : loop.MultiBattle.State.ToString();
         }
         else
         {
@@ -403,10 +404,33 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         var localUnit = hud?.Snapshot?.Units.FirstOrDefault(item => item.UnitId == selectedUnitId);
         if (loop.Phase == LocalBattlePhase.Battle && (selectedBattleEnemy || localUnit == null || localUnit.Zone != PlayerUnitZone.Staging))
         {
-            var input = demo.Coordinator?.Input;
-            return input != null && UnitDetailResolver.TryResolveBattle(input, demo.Coordinator.PresentationViewStates, catalog, selectedUnitId, out detail);
+            var input = CurrentBattleInput();
+            return input != null && UnitDetailResolver.TryResolveBattle(input, CurrentBattleStates(), catalog, selectedUnitId, out detail);
         }
         return hud?.Snapshot != null && UnitDetailResolver.TryResolvePreparation(hud.Snapshot, catalog, selectedUnitId, out detail);
+    }
+
+    private IReadOnlyList<BattlePresentationViewState> CurrentBattleStates()
+    {
+        return loop != null && loop.MultiBattle != null
+            ? loop.MultiBattle.PresentationViewStates
+            : demo?.Coordinator?.PresentationViewStates ?? Array.Empty<BattlePresentationViewState>();
+    }
+
+    private BattleInput CurrentBattleInput()
+    {
+        var multi = loop?.MultiBattle;
+        if (multi != null)
+        {
+            var match = multi.Matches.FirstOrDefault(item => item.MatchId == multi.SelectedMatchId);
+            if (match != null) return match.Input;
+        }
+        return demo?.Coordinator?.Input;
+    }
+
+    private BattleSide CurrentObserverSide()
+    {
+        return loop?.MultiBattle?.Observer == BattleObserverView.Away ? BattleSide.Away : BattleSide.Home;
     }
 
     private void AddStat(string key, string label, UnitInformationPanelLayout.Placement placement, UnitInformationPanelLayout layout)

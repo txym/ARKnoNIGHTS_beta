@@ -49,6 +49,26 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void TrackPlayback_ViewStatesSampleTheCurrentPresentationTickInsteadOfTheFinalResult()
+        {
+            var result = RunFixture();
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
+            var sampleTick = 0d;
+
+            using (var playback = new BattleTrackPlaybackController())
+            {
+                Assert.That(playback.Bind(track, new FakeFactory(), BattleObserverView.Home, sampleTick, out var bindDiagnostics), Is.True, string.Join(";", bindDiagnostics));
+                foreach (var state in playback.ViewStates)
+                {
+                    var expected = track.Units.Single(unit => unit.UnitId == state.UnitId).Sample(sampleTick);
+                    Assert.That(state.HitPoints, Is.EqualTo(expected.CurrentHitPoints), state.UnitId);
+                    Assert.That(state.IsAlive, Is.EqualTo(expected.IsAlive), state.UnitId);
+                }
+            }
+        }
+
+        [Test]
         public void Playback_ConsumesSpawnTypeIdsAndReachesResultDerivedFinalState()
         {
             var result = RunFixture();

@@ -23,7 +23,7 @@ namespace ArknoNights.Battle.Presentation
         public BattleObserverView Observer { get; private set; } = BattleObserverView.Home;
         public double PresentationTick { get; private set; }
         public IReadOnlyList<BattlePresentationDiagnostic> Diagnostics => new ReadOnlyCollection<BattlePresentationDiagnostic>(diagnostics);
-        public IReadOnlyList<BattlePresentationViewState> ViewStates => new ReadOnlyCollection<BattlePresentationViewState>(views.Values.OrderBy(item => item.Unit.UnitId, StringComparer.Ordinal).Select(item => item.ToState()).ToArray());
+        public IReadOnlyList<BattlePresentationViewState> ViewStates => new ReadOnlyCollection<BattlePresentationViewState>(views.Values.OrderBy(item => item.Unit.UnitId, StringComparer.Ordinal).Select(item => item.ToState(PresentationTick)).ToArray());
 
         public bool Bind(BattlePresentationTrack track, IBattlePresentationViewFactory viewFactory, BattleObserverView observer, double presentationTick, out IReadOnlyList<BattlePresentationDiagnostic> bindDiagnostics)
         {
@@ -138,9 +138,9 @@ namespace ArknoNights.Battle.Presentation
             internal UnitPresentationAction Action { get; set; } = (UnitPresentationAction)(-1);
             internal int ActionStartTick { get; set; } = int.MinValue;
             internal int ActionSequence { get; set; } = int.MinValue;
-            internal BattlePresentationViewState ToState()
+            internal BattlePresentationViewState ToState(double presentationTick)
             {
-                var sample = Unit.Sample(double.MaxValue);
+                var sample = Unit.Sample(presentationTick);
                 var position = new FixedPosition((int)Math.Round(sample.Position.XUnits * FixedPosition.UnitsPerMetre), (int)Math.Round(sample.Position.YUnits * FixedPosition.UnitsPerMetre));
                 return new BattlePresentationViewState(Unit.UnitId, Unit.TypeId, Unit.Side, position, sample.Position, sample.MaxHitPoints, sample.CurrentHitPoints, sample.CurrentShield, sample.HasSpawned, sample.IsAlive, sample.Action, Unit.EliteLevel);
             }
