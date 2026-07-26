@@ -33,6 +33,8 @@ namespace ArknoNights.UI
         private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
         private PlayerState playerState;
         private PlayerStateSnapshot snapshot;
+        private PlayerStateSnapshot displayedSnapshot;
+        private bool displayedReadOnly;
         private Canvas canvas;
         private RectTransform hudRoot;
         private RectTransform stagingArea;
@@ -47,7 +49,11 @@ namespace ArknoNights.UI
         private bool initialized;
 
         public PlayerState PlayerState => playerState;
+        /// <summary>Always the local command owner's snapshot. Existing deployment commands must keep using this value.</summary>
         public PlayerStateSnapshot Snapshot => snapshot;
+        /// <summary>Read-only projection used by UI-010 while observing another local fixture player.</summary>
+        public PlayerStateSnapshot DisplayedSnapshot => displayedSnapshot ?? snapshot;
+        public bool IsDisplayingReadOnlySnapshot => displayedReadOnly;
         public string SelectedSlotId => selectedSlotId;
         public int SlotCount => slotViews.Count;
         public bool InitializationSucceeded => initialized && playerState != null;
@@ -157,7 +163,8 @@ namespace ArknoNights.UI
         private void HandlePlayerStateChanged(PlayerStateSnapshot next)
         {
             snapshot = next;
-            var availableIds = new HashSet<string>(next.StagingSlots.Select(BuildSlotId), StringComparer.Ordinal);
+            if (!displayedReadOnly) displayedSnapshot = next;
+            var availableIds = new HashSet<string>(DisplayedSnapshot.StagingSlots.Select(BuildSlotId), StringComparer.Ordinal);
             if (!string.IsNullOrEmpty(selectedSlotId) && !availableIds.Contains(selectedSlotId))
             {
                 selectedSlotId = null;
@@ -169,13 +176,43 @@ namespace ArknoNights.UI
             if (statusText) statusText.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// Displays another player's immutable snapshot without transferring command ownership. The local
+        /// PlayerState and deployment-cost panel remain authoritative and visible to existing command code.
+        /// </summary>
+        public void SetDisplayedSnapshot(PlayerStateSnapshot source, bool readOnly)
+        {
+            if (source == null || !readOnly || (snapshot != null && string.Equals(source.PlayerId, snapshot.PlayerId, StringComparison.Ordinal)))
+            {
+                RestoreLocalDisplay();
+                return;
+            }
+
+            displayedSnapshot = source;
+            displayedReadOnly = true;
+            ClearStagingSelection();
+            RebuildSlots();
+        }
+
+        /// <summary>Restores the local command owner's staging projection after observation ends.</summary>
+        public void RestoreLocalDisplay()
+        {
+            var changed = displayedReadOnly || !ReferenceEquals(displayedSnapshot, snapshot);
+            displayedReadOnly = false;
+            displayedSnapshot = snapshot;
+            if (!changed) return;
+            ClearStagingSelection();
+            RebuildSlots();
+        }
+
         private void RebuildSlots()
         {
             foreach (var existing in slotViews) if (existing != null) Destroy(existing.gameObject);
             slotViews.Clear();
-            if (snapshot == null) return;
+            var display = DisplayedSnapshot;
+            if (display == null) return;
 
-            foreach (var stack in snapshot.StagingSlots)
+            foreach (var stack in display.StagingSlots)
             {
                 var view = StagingSlotView.Create(stagingArea, font, sprites, HandleSlotClicked, HandleSlotDragStarted);
                 view.Bind(stack, BuildSlotId(stack), LoadPortrait(stack));
@@ -203,7 +240,7 @@ namespace ArknoNights.UI
 
         private void HandleSlotDragStarted(string slotId)
         {
-            stagingDragStarted?.Invoke(slotId);
+            if (!displayedReadOnly) stagingDragStarted?.Invoke(slotId);
         }
 
         /// <summary>UI-003 bridge. Slots report a stable stack ID while drag state remains outside the HUD.</summary>

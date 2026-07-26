@@ -66,6 +66,10 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     private Image statusClockIcon;
     private Text statusMiddle;
     private Text statusRight;
+    private Text goldValue;
+    private int sessionGold;
+    private int sessionLife;
+    private string preparationOpponent = "固定测试";
     private string selectedUnitId;
     private string visualFixtureId;
     private bool selectedBattleEnemy;
@@ -73,6 +77,20 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
 
     public string SelectedUnitId => selectedUnitId;
     public bool SelectedBattleEnemy => selectedBattleEnemy;
+    /// <summary>Raised when the single HUD selection becomes visible or is cleared; UI-010 uses it to hide/show the player list.</summary>
+    public event Action<bool> SelectionChanged;
+
+    /// <summary>
+    /// UI-010 supplies the locally owned session values.  This presentation component stores only
+    /// their last read-only projection; it never writes economy, life, readiness, or observation.
+    /// </summary>
+    public void SetSessionHudValues(int gold, int life, string nextOpponent)
+    {
+        sessionGold = Math.Max(0, gold);
+        sessionLife = Math.Max(0, life);
+        preparationOpponent = string.IsNullOrWhiteSpace(nextOpponent) ? "固定测试" : nextOpponent;
+        Refresh();
+    }
 
     /// <summary>Capture/test-only layout data. It never writes PlayerState, the unit catalog, or battle input.</summary>
     public void ShowVisualFixtureForCapture(string fixtureId)
@@ -153,16 +171,34 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         hud?.ClearStagingSelection();
         selectedUnitId = unitId;
         selectedBattleEnemy = state.Side != CurrentObserverSide();
+        SelectionChanged?.Invoke(true);
         Refresh();
     }
 
+    /// <summary>Read-only preparation inspection for the player currently displayed by UI-010 observation.</summary>
+    public void SelectObservedPreparationUnitForHud(string unitId)
+    {
+        if (loop == null || loop.Phase != LocalBattlePhase.Preparation || string.IsNullOrWhiteSpace(unitId)) return;
+        var displayed = hud?.DisplayedSnapshot;
+        if (displayed == null || !displayed.Units.Any(unit => string.Equals(unit.UnitId, unitId, StringComparison.Ordinal))) return;
+        hud?.ClearStagingSelection();
+        selectedUnitId = unitId;
+        selectedBattleEnemy = false;
+        SelectionChanged?.Invoke(true);
+        Refresh();
+    }
+
+    /// <summary>Explicit UI-010 lifecycle boundary for phase and observation changes.</summary>
+    public void ClearSelectionForUi010() => ClearSelection();
+
     private void SelectStagingSlot(string slotId)
     {
-        if (string.IsNullOrEmpty(slotId) || hud?.Snapshot == null) { if (!selectedBattleEnemy) ClearSelection(); return; }
-        var slot = hud.Snapshot.StagingSlots.FirstOrDefault(item => StagingHudController.BuildSlotId(item) == slotId);
+        if (string.IsNullOrEmpty(slotId) || hud?.DisplayedSnapshot == null) { if (!selectedBattleEnemy) ClearSelection(); return; }
+        var slot = hud.DisplayedSnapshot.StagingSlots.FirstOrDefault(item => StagingHudController.BuildSlotId(item) == slotId);
         if (slot == null || slot.UnitIds.Count == 0) return;
         selectedUnitId = slot.UnitIds[0];
         selectedBattleEnemy = false;
+        SelectionChanged?.Invoke(true);
         Refresh();
     }
 
@@ -171,14 +207,17 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         if (string.IsNullOrEmpty(unitId)) { if (!selectedBattleEnemy) ClearSelection(); return; }
         selectedUnitId = unitId;
         selectedBattleEnemy = false;
+        SelectionChanged?.Invoke(true);
         Refresh();
     }
 
     private void ClearSelection()
     {
+        var hadSelection = !string.IsNullOrEmpty(selectedUnitId);
         selectedUnitId = null;
         selectedBattleEnemy = false;
         if (infoPanel) infoPanel.gameObject.SetActive(false);
+        if (hadSelection) SelectionChanged?.Invoke(false);
     }
 
     private void Build()
@@ -203,9 +242,9 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         panel.anchoredPosition = new Vector2(0f, 300f); panel.sizeDelta = new Vector2(180f, 80f);
         var background = Image("Background", panel, Sprite("ResourcePanelBackground")); Stretch(background.rectTransform); background.preserveAspect = false;
         // Gold deliberately uses the same left-icon/right-value anchors as DeploymentCostPanel.
-        // Its data is not defined yet, so only the value itself remains the explicit "--" placeholder.
+        // UI-010 supplies its read-only value from the loop-owned LocalMatchState.
         var icon = Image("Icon", panel, Resources.Load<Sprite>(GoldIconPath)); icon.rectTransform.anchorMin = icon.rectTransform.anchorMax = Vector2.zero; icon.rectTransform.pivot = new Vector2(.5f, .5f); icon.rectTransform.anchoredPosition = new Vector2(40f, 40f); icon.rectTransform.sizeDelta = new Vector2(48f, 37f); icon.preserveAspect = true;
-        var value = NumberText("Value", panel, 54, TextAnchor.MiddleCenter, new Color(1f, .82f, .15f)); value.text = "--"; value.rectTransform.anchorMin = value.rectTransform.anchorMax = Vector2.zero; value.rectTransform.pivot = new Vector2(.5f, .5f); value.rectTransform.anchoredPosition = new Vector2(116f, 35f); value.rectTransform.sizeDelta = new Vector2(90f, 54f);
+        goldValue = NumberText("Value", panel, 54, TextAnchor.MiddleCenter, new Color(1f, .82f, .15f)); goldValue.text = sessionGold.ToString(); goldValue.rectTransform.anchorMin = goldValue.rectTransform.anchorMax = Vector2.zero; goldValue.rectTransform.pivot = new Vector2(.5f, .5f); goldValue.rectTransform.anchoredPosition = new Vector2(116f, 35f); goldValue.rectTransform.sizeDelta = new Vector2(90f, 54f);
     }
 
     private void BuildSettingsButton()
@@ -285,12 +324,13 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         else
         {
             statusLeft.font = StagingHudController.FormalUiFont;
-            statusLeft.text = hud.PlayerState.PlayerId == "" ? "对手" : "对手: 固定测试";
+            statusLeft.text = hud.PlayerState.PlayerId == "" ? "对手" : "对手: " + preparationOpponent;
             statusClockIcon.gameObject.SetActive(true);
             statusMiddle.font = StagingHudController.FormalNumericFont;
             statusMiddle.text = Mathf.CeilToInt(loop.RemainingPreparationSeconds).ToString();
         }
-        statusRight.text = "--";
+        statusRight.text = sessionLife.ToString();
+        if (goldValue != null) goldValue.text = sessionGold.ToString();
         if (!string.IsNullOrEmpty(visualFixtureId)) { RefreshVisualFixture(); return; }
         RefreshInformation();
     }
@@ -401,13 +441,13 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     {
         detail = null;
         if (string.IsNullOrEmpty(selectedUnitId)) return false;
-        var localUnit = hud?.Snapshot?.Units.FirstOrDefault(item => item.UnitId == selectedUnitId);
-        if (loop.Phase == LocalBattlePhase.Battle && (selectedBattleEnemy || localUnit == null || localUnit.Zone != PlayerUnitZone.Staging))
+        var displayedUnit = hud?.DisplayedSnapshot?.Units.FirstOrDefault(item => item.UnitId == selectedUnitId);
+        if (loop.Phase == LocalBattlePhase.Battle && (selectedBattleEnemy || displayedUnit == null || displayedUnit.Zone != PlayerUnitZone.Staging))
         {
             var input = CurrentBattleInput();
             return input != null && UnitDetailResolver.TryResolveBattle(input, CurrentBattleStates(), catalog, selectedUnitId, out detail);
         }
-        return hud?.Snapshot != null && UnitDetailResolver.TryResolvePreparation(hud.Snapshot, catalog, selectedUnitId, out detail);
+        return hud?.DisplayedSnapshot != null && UnitDetailResolver.TryResolvePreparation(hud.DisplayedSnapshot, catalog, selectedUnitId, out detail);
     }
 
     private IReadOnlyList<BattlePresentationViewState> CurrentBattleStates()

@@ -287,3 +287,12 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `FormalBattleHudUi005` 与 `UI005CaptureSuite` 优先读取当前多战斗 Track 的观察侧和状态，保留旧单场 `BattleDemoCoordinator` 作为兼容回退。因此状态栏敌人数、战斗单位选择和详情面板不会把旧 Demo 的 Idle 状态误当作当前战斗。
 - `BattleTrackPlaybackController.ViewStates` 按当前 `PresentationTick` 采样 Track，而非采样最终 Tick；这保证了血量、死亡、动作和位置在共享时间轴上的场景投影与已封存结果一致。演示层仍没有修改战斗结果的路径。
 - 本任务没有修改 `SampleScene`、Prefab、Package 或项目设置；既有 `FormalBattleHudRoot`、`PreparationBattleLoopController` 和 `BattleDemoRoot` 的接线已足以自动进入此流程。商店/准备按钮、完整左侧玩家列表的可点击组件、截图 manifest 扩展和人工视觉拟合仍由 UI-010 负责，不能据此声称已完成最终 UI 验收。
+
+## 23. UI-010 场景生命周期与证据入口（2026-07-26）
+
+- `UI010SceneIntegrationController` 由 `SceneManager.sceneLoaded` 幂等附加到既有 `FormalBattleHudRoot`。它是组合层，不保存第二份 `PlayerState`、`LocalMatchState`、`BattleRunner` 或 Track；`LocalMatchState`、`PreparationBattleLoopController`、`ShopReadyHudController`、`PlayerListObserverCoordinator` 和 `FormalBattleHudUi005` 仍分别拥有既有数据与职责。
+- 唯一阵型命令门控为 `Preparation && !观察他人 && !本地已准备`。观察远端时，`StagingHudController.DisplayedSnapshot` 只替换只读显示快照，命令仍只使用 `Snapshot`（本地玩家）；本地 `PreparationUnitViews` 隐藏，远端已部署单位通过 `BattlefieldWorldProjection` 的 Away/180° 投影生成只读观察视图。切回本地会恢复本地快照和本地准备视图。
+- 阶段进入战斗会清除部署/待部署选择与商店二次确认并隐藏商店；战斗完成回到准备时，`LocalMatchState.ResetPreparationUiState()` 仅重置本地 `ready=false` 和观察目标为本地玩家，绝不改写单位、阵型、赤金、商店、生命或已封存战斗结果。商店命令在准备阶段仍可使用，即使本地玩家已准备；阵型命令仍被锁定。
+- `UI010PlayerListHud` 把 UI-008 的纯列表模型投影为左侧四行可点击行，显示本地、被观察、断线、生命与返回本地状态。当前测试 fixture 将 Player4 标记为断线，仅验证图标显示；断线不改变当前本地 Demo 的固定配对或战斗输入。JSON 中当前未提供的 `avatar_1..4` 会稳定回退到已有 `ProfilePicture` 资源；该回退只影响外观，不修改玩家档案或命令归属。选择任意单位时由 `FormalBattleHudUi005.SelectionChanged` 隐藏列表。
+- `FormalBattleHudUi005.SetSessionHudValues` 只显示 loop-owned 本地赤金、生命和下一对手名称。当前固定测试数据因此显示赤金 `7`、生命 `400`，而非旧的 `--` 占位；生命扣除、淘汰及经济规则仍未实现。
+- `UI010CaptureSuite` 仅在 Player 参数 `-ui010CaptureSuite` 时运行，按真实商店/观察/阶段命令请求截图，并把阶段、本地/观察玩家、准备状态、商店五槽、选中比赛/观察侧、共享演示 Tick、各 Track 摘要及位置压缩统计、Canvas scale 和关键 RectTransform 写入 `ui010-manifest.json`。若截图全黑或写入超时，入口明确失败并写入 `ui010-capture-failed.txt`，不生成“通过”的 manifest。

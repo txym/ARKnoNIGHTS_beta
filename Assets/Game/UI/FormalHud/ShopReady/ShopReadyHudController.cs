@@ -32,7 +32,8 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private Text levelText;
         private Text goldText;
         private Text confirmationText;
-        private bool shopVisible = true;
+        private bool shopVisible;
+        private bool preparationPhase = true;
         private readonly ShopReadyPendingCommand pendingCommand = new ShopReadyPendingCommand();
 
         public event Action<bool> FormationInteractionChanged;
@@ -40,6 +41,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         public bool IsInitialized => match != null;
         public ShopReadyHudState State => state;
+        public bool IsPreparationPhase => preparationPhase;
 
         public void Initialize(LocalMatchState source)
         {
@@ -53,28 +55,43 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         public void SetShopVisible(bool visible)
         {
-            shopVisible = visible;
+            shopVisible = preparationPhase && visible;
             if (!visible) pendingCommand.Clear();
             if (match != null) Refresh(match.Snapshot);
         }
 
         public void ToggleShopVisible() => SetShopVisible(!shopVisible);
 
+        /// <summary>UI-010 phase boundary. Battle hides and disables only this presentation surface; it never mutates shop state.</summary>
+        public void SetPreparationPhase(bool isPreparation)
+        {
+            preparationPhase = isPreparation;
+            if (!preparationPhase)
+            {
+                shopVisible = false;
+                pendingCommand.Clear();
+            }
+            if (match != null) Refresh(match.Snapshot);
+            if (root != null) root.gameObject.SetActive(preparationPhase);
+        }
+
         public void RequestRefresh()
         {
+            if (!preparationPhase) return;
             if (!EnsureConfirmation(ShopReadyConfirmation.Refresh)) return;
             Complete(match.TryRefresh());
         }
 
         public void RequestUpgrade()
         {
+            if (!preparationPhase) return;
             if (!EnsureConfirmation(ShopReadyConfirmation.Upgrade)) return;
             Complete(match.TryUpgrade());
         }
 
         public void Purchase(int shopSlotId)
         {
-            if (match == null || state == null || !state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanPurchase)) return;
+            if (!preparationPhase || match == null || state == null || !state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanPurchase)) return;
             if (!pendingCommand.RequestPurchase(shopSlotId))
             {
                 Refresh(match.Snapshot);
@@ -87,13 +104,13 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         public void ToggleFrozen(int shopSlotId)
         {
-            if (state == null || !state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanToggleFrozen)) return;
+            if (!preparationPhase || state == null || !state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanToggleFrozen)) return;
             Complete(match.TryToggleFrozen(shopSlotId));
         }
 
         public void ToggleReady()
         {
-            if (match != null) Complete(match.TryToggleReady());
+            if (preparationPhase && match != null) Complete(match.TryToggleReady());
         }
 
         private void OnDestroy()
@@ -140,7 +157,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                     : "\u518d\u6b21\u70b9\u51fb\u5347\u7ea7\u4ee5\u786e\u8ba4";
             RebuildSlots();
             ApplyLayout();
-            FormationInteractionChanged?.Invoke(state.FormationInteractionEnabled);
+            FormationInteractionChanged?.Invoke(preparationPhase && state.FormationInteractionEnabled);
         }
 
         private void EnsureView()

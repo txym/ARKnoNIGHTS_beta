@@ -276,6 +276,19 @@ namespace ArknoNights.Player
 
         public LocalMatchOperationResult TryObserveLocalPlayer() => TryObserve(localPlayerId);
 
+        /// <summary>
+        /// Resets only transient preparation UI state when a completed local battle returns to preparation.
+        /// Player units, formation, economy, shop contents, lives, and every computed battle result remain untouched.
+        /// </summary>
+        public LocalMatchOperationResult ResetPreparationUiState()
+        {
+            var changed = isReady || !string.Equals(observedPlayerId, localPlayerId, StringComparison.Ordinal);
+            isReady = false;
+            observedPlayerId = localPlayerId;
+            if (changed) NotifyChanged();
+            return Result(LocalMatchOperationCode.Success);
+        }
+
         private bool TryGetShopSlot(int shopSlotId, out ShopSlotData slot)
         {
             if (shopSlotId >= 0 && shopSlotId < shopSlots.Length) { slot = shopSlots[shopSlotId]; return true; }

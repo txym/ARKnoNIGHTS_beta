@@ -508,3 +508,12 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - PlayMode：同一脚本的全量 PlayMode 结果为 `19 passed / 0 failed / 0 skipped`，文件为 `Temp/UI-009/full-play-final-replay/PlayModeResults.xml`。`PreparationBattleLoopPlayModeTests` 实际加载 `SampleScene`，覆盖 Preparation 到双 Battle、`MatchAB`/`MatchCD`、共同 Tick、P4 Away 观察、结果对象不重算、两场结束后只返回一次 Preparation，及四名玩家的持久局内状态不被战斗结果覆盖。`StagingHudScenePlayModeTests` 回归了战斗单位选择和正式 HUD 的信息互斥。
 - Windows Standalone：执行 `Task006StandaloneBuild.BuildWindowsX64`，日志 `Temp/UI-009/WindowsStandaloneBuild-final-replay.log` 记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=2`，输出目录为忽略的 `Temp/TASK-006/WindowsStandalone/`。本次没有改动场景、Prefab、Package 或项目设置。
 - 未验证：没有在交互式 Editor 或 Windows Player 中人工观察 `MatchAB`/`MatchCD` Home/Away 的相机、朝向、动画速度、世界状态条和最终视觉布局；尚未由左侧玩家列表的真实按钮触发 `TryObserveBattlePlayer`，因为该图形挂接和截图 manifest 扩展属于 UI-010。自动断言与构建成功不替代上述视觉和鼠标流程检查。
+
+## 35. UI-010 场景集成验证（2026-07-26）
+
+- 合并审查基线：`txym` 已合并 UI-009 的 four-player Track 变化后，先运行全量 EditMode，`Artifacts/UI-010/EditMode/EditModeResults.xml` 为 `130 passed / 0 failed / 0 skipped`。该入口在 XML 完整写入后等待 Unity 正常退出；本次记录为 `forced-stop-after-results; graceSeconds=20`，结果 XML 已成功解析，不能误写为 Unity 自然退出。
+- 新增 `UI010SceneIntegrationPlayModeTests`。它实际重载 `SampleScene`，覆盖自动挂载、远端观察只读快照、观察时阵型命令锁定、本地 ready 只锁阵型不锁商店、战斗阶段 Player4 切换到 `MatchCD`，以及战斗完成后观察目标和 ready 重置。定向复测 `1 passed / 0 failed / 0 skipped`，见 `Temp/UI-010/green-scene-integration-rerun3/PlayModeResults.xml`。
+- 全量 PlayMode：`Artifacts/UI-010/PlayMode-rerun/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。一次初跑发现旧 UI-005 测试仍断言赤金/生命为 `--`；这与本地测试数据和 UI-010 的显示规则冲突，故将该断言更新为 `7`/`400` 并复跑通过。
+- Windows Standalone：`Task006StandaloneBuild.BuildWindowsX64` 最终输出到忽略目录 `Artifacts/UI-010/WindowsStandalone-final/`。最终审查构建日志 `Artifacts/UI-010/windows-build-final-review.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`；此前一次构建记录为 2 个 warning，但最终复构已降为 1。没有修改场景、Prefab、Package 或项目设置。
+- 截图入口：已构建 Player 并以 `-ui010CaptureSuite -uiCaptureOutput <dir>` 实际启动。为符合自动后台运行约束，Player 窗口隐藏后 `ScreenCapture` 只得到全黑 PNG；`UI010CaptureSuite` 在首张图以 `screenshot.invalid:01_preparation_closed` 明确失败，日志在 `Artifacts/UI-010/PlayerCaptures/player.log`。因此没有生成 manifest，也没有声称任何 UI 截图、断线图标、商店状态或 Home/Away 视觉拟合已通过。
+- 仍需人工/交互式 Player 检查：以可见窗口运行 `-ui010CaptureSuite` 并逐张审查 `ui010-manifest.json` 与 17 张截图；Player4 为专门的断线图标 fixture，但当前断线不改变本地 Demo 的固定配对。点击四个玩家行确认本地返回、远端只读和列表随单位选择隐藏；检查准备/战斗交界清理拖拽与二次确认；检查 MatchAB/MatchCD 的 Home/Away 方向、动画、状态条和 UI 层级。上述工作未验证，截图不能替代状态断言。

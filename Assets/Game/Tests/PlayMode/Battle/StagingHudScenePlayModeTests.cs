@@ -14,7 +14,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class StagingHudScenePlayModeTests
     {
         [UnityTest]
-        public IEnumerator SampleScene_UI005UsesExistingHudAndShowsOnlyDeclaredResourcePlaceholders()
+        public IEnumerator SampleScene_UI005UsesExistingHudAndShowsLoopOwnedSessionValues()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
             for (var frame = 0; frame < 16; frame++) yield return null;
@@ -28,8 +28,8 @@ namespace ArknoNights.Battle.Tests
             var canvas = hud.transform.Find("FormalBattleHudCanvas");
             Assert.NotNull(canvas);
             Assert.AreEqual(1, hud.GetComponentsInChildren<Canvas>().Length);
-            Assert.AreEqual("--", canvas.Find("FormalHudUi005/GoldCurrencyPanel/Value").GetComponent<Text>().text);
-            Assert.AreEqual("--", canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().text);
+            Assert.AreEqual("7", canvas.Find("FormalHudUi005/GoldCurrencyPanel/Value").GetComponent<Text>().text);
+            Assert.AreEqual("400", canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().text);
             Assert.That(canvas.Find("DeploymentCostPanel/Cost").GetComponent<RectTransform>().anchoredPosition.y, Is.EqualTo(40f).Within(0.01f));
             Assert.AreSame(numericFont, canvas.Find("DeploymentCostPanel/Cost").GetComponent<Text>().font);
             Assert.AreSame(numericFont, canvas.Find("StagingArea/StagingSlot/Header/Cost").GetComponent<Text>().font);
