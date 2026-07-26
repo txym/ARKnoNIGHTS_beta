@@ -20,6 +20,7 @@ public sealed class LanLobbyView : MonoBehaviour
     private Canvas canvas;
     private RectTransform homeRoot;
     private RectTransform roomRoot;
+    private Image legacyGridForeground;
     private InputField profileNameInput;
     private Text avatarIndexText;
     private Image avatarImage;
@@ -27,6 +28,7 @@ public sealed class LanLobbyView : MonoBehaviour
     private Button joinButton;
     private Text statusText;
     private RectTransform discoveryItemsRoot;
+    private RectTransform discoveredRoomsPanel;
     private Text discoveryOverflowText;
     private Text latencyText;
     private Text roomCodeText;
@@ -70,6 +72,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         if (homeRoot != null) homeRoot.gameObject.SetActive(true);
         if (roomRoot != null) roomRoot.gameObject.SetActive(false);
+        if (legacyGridForeground != null) legacyGridForeground.gameObject.SetActive(false);
     }
 
     public void ShowHome(LobbyProfile profile)
@@ -85,6 +88,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         if (homeRoot != null) homeRoot.gameObject.SetActive(false);
         if (roomRoot != null) roomRoot.gameObject.SetActive(true);
+        if (legacyGridForeground != null) legacyGridForeground.gameObject.SetActive(false);
     }
 
     public void ShowRoom(LobbyRoomSnapshot room, string localId)
@@ -106,6 +110,7 @@ public sealed class LanLobbyView : MonoBehaviour
         }
 
         RebuildDiscoveryItems();
+        if (discoveredRoomsPanel != null) discoveredRoomsPanel.gameObject.SetActive(discoveries.Count > 0);
         EvaluateJoinAvailability();
     }
 
@@ -209,10 +214,11 @@ public sealed class LanLobbyView : MonoBehaviour
         var background = Image("Terrain", root, "bg_terrain");
         Stretch(background.rectTransform);
         background.preserveAspect = false;
-        var foreground = Image("GridForeground", root, "shallow_main");
-        Stretch(foreground.rectTransform);
-        foreground.preserveAspect = false;
-        foreground.raycastTarget = false;
+        legacyGridForeground = Image("GridForeground", root, "shallow_main");
+        Stretch(legacyGridForeground.rectTransform);
+        legacyGridForeground.preserveAspect = false;
+        legacyGridForeground.raycastTarget = false;
+        legacyGridForeground.gameObject.SetActive(false);
 
         homeRoot = Rect("Home", root);
         Stretch(homeRoot);
@@ -270,9 +276,6 @@ public sealed class LanLobbyView : MonoBehaviour
         title.text = "选择同盟方式";
         var titleDot = Image("TitleDot", roomSelect, "Home/room_select_dot");
         PositionSprite(titleDot, new Vector2(.88f, .91f), 26f);
-        var startRoom = Image("StartRoomDecoration", roomSelect, "Home/room_select_img_startroom");
-        PositionSprite(startRoom, new Vector2(.9f, .84f), 128f);
-
         var create = Rect("Create", roomSelect);
         PositionBottomLeft(create, layout.RoomSelectCreate);
         var createHitTarget = create.gameObject.AddComponent<Image>();
@@ -287,9 +290,10 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionBottomLeft(join, layout.RoomSelectJoin);
         BuildJoinSection(join);
 
-        var discovered = Image("DiscoveredRooms", roomSelect, "Home/room_select_join_text_bg");
-        PositionSprite(discovered, new Vector2(.751f, .125f), 770f);
-        discoveryItemsRoot = Rect("Items", discovered.transform);
+        discoveredRoomsPanel = Rect("DiscoveredRooms", roomSelect);
+        Position(discoveredRoomsPanel, new Vector2(.751f, .125f), new Vector2(770f, 100f));
+        discoveredRoomsPanel.gameObject.SetActive(false);
+        discoveryItemsRoot = Rect("Items", discoveredRoomsPanel);
         Stretch(discoveryItemsRoot);
         discoveryItemsRoot.offsetMin = new Vector2(28f, 15f);
         discoveryItemsRoot.offsetMax = new Vector2(-28f, -15f);
@@ -298,7 +302,7 @@ public sealed class LanLobbyView : MonoBehaviour
         itemLayout.childAlignment = TextAnchor.UpperCenter;
         itemLayout.childControlWidth = true;
         itemLayout.childForceExpandHeight = false;
-        discoveryOverflowText = Text("Overflow", roomSelect, 18, TextAnchor.LowerRight, new Color(.3f, .95f, .95f));
+        discoveryOverflowText = Text("Overflow", discoveredRoomsPanel, 18, TextAnchor.LowerRight, new Color(.3f, .95f, .95f));
         discoveryOverflowText.rectTransform.anchorMin = new Vector2(0f, 0f);
         discoveryOverflowText.rectTransform.anchorMax = new Vector2(1f, 0f);
         discoveryOverflowText.rectTransform.pivot = new Vector2(.5f, 0f);
@@ -312,57 +316,69 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void BuildCreateSection(RectTransform parent)
     {
-        var line = Image("LeftLine", parent, "Home/room_select_create_left_line");
-        PositionSprite(line, new Vector2(.08f, .5f), 24f);
+        var firstLine = Image("Line_0", parent, "Home/room_select_create_left_line");
+        PositionSprite(firstLine, new Vector2(.18f, .62f), 24f);
+        var secondLine = Image("Line_1", parent, "Home/room_select_create_left_line");
+        PositionSprite(secondLine, new Vector2(.62f, .62f), 24f);
         var logo = Image("Logo", parent, "Home/room_select_create_logo");
-        PositionSprite(logo, new Vector2(.25f, .76f), 172f);
+        PositionSprite(logo, new Vector2(.5f, .33f), 172f);
         var middle = Image("MiddleIcon", parent, "Home/room_select_create_middleicon");
-        PositionSprite(middle, new Vector2(.29f, .46f), 126f);
+        PositionSprite(middle, new Vector2(.5f, .63f), 126f);
         var text01 = Image("Text01", parent, "Home/room_select_create_text_01");
-        PositionSprite(text01, new Vector2(.47f, .67f), 126f);
+        PositionSprite(text01, new Vector2(.5f, .25f), 126f);
         var text02 = Image("Text02", parent, "Home/room_select_create_text_02");
-        PositionSprite(text02, new Vector2(.47f, .33f), 92f);
+        PositionSprite(text02, new Vector2(.5f, .19f), 92f);
+        var startRoom = Image("StartRoomDecoration", parent, "Home/room_select_img_startroom");
+        PositionSprite(startRoom, new Vector2(.5f, .88f), 128f);
         var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
-        PositionSprite(create.GetComponent<Image>(), new Vector2(.74f, .5f), 400f);
+        PositionSprite(create.GetComponent<Image>(), new Vector2(.5f, .07f), 537f);
+        var createLabel = create.GetComponentInChildren<Text>();
+        createLabel.color = new Color(.02f, .12f, .12f);
+        createLabel.fontSize = 38;
         create.onClick.AddListener(() => CreateRequested?.Invoke());
     }
 
     private void BuildJoinSection(RectTransform parent)
     {
-        var leftBlock = Image("LeftBlock", parent, "Home/room_select_join_left_block");
-        PositionSprite(leftBlock, new Vector2(.1f, .5f), 150f);
-        var middleBlock = Image("MiddleBlock", parent, "Home/room_select_join_middle_block");
-        PositionSprite(middleBlock, new Vector2(.29f, .5f), 129f);
-        var middleMask = Image("MiddleBlockMask", parent, "Home/room_select_join_middle_block_mask");
-        PositionSprite(middleMask, new Vector2(.365f, .5f), 96f);
-        var rightBlock = Image("RightBlock", parent, "Home/room_select_join_right_block");
-        PositionSprite(rightBlock, new Vector2(.52f, .5f), 146f);
+        for (var index = 0; index < 2; index++)
+        {
+            var leftBlock = Image("LeftBlock_" + index, parent, "Home/room_select_join_left_block");
+            PositionSprite(leftBlock, new Vector2(.1f + index * .08f, .7f - index * .04f), 100f);
+            var rightBlock = Image("RightBlock_" + index, parent, "Home/room_select_join_right_block");
+            PositionSprite(rightBlock, new Vector2(.82f - index * .08f, .7f - index * .04f), 97f);
+        }
+        for (var index = 0; index < 4; index++)
+        {
+            var middleBlock = Image("MiddleBlock_" + index, parent, "Home/room_select_join_middle_block");
+            PositionSprite(middleBlock, new Vector2(.31f + index * .13f, .67f), 86f);
+        }
         var logo = Image("Logo", parent, "Home/room_select_join_logo");
-        PositionSprite(logo, new Vector2(.11f, .75f), 172f);
-        var textBackground = Image("TextBackground", parent, "Home/room_select_join_text_bg");
-        PositionSprite(textBackground, new Vector2(.39f, .74f), 278f);
+        PositionSprite(logo, new Vector2(.18f, .9f), 172f);
         var text01 = Image("Text01", parent, "Home/room_select_join_text_01");
-        PositionSprite(text01, new Vector2(.39f, .74f), 141f);
+        PositionSprite(text01, new Vector2(.38f, .9f), 141f);
         var text02 = Image("Text02", parent, "Home/room_select_join_text_02");
-        PositionSprite(text02, new Vector2(.39f, .26f), 132f);
+        PositionSprite(text02, new Vector2(.75f, .9f), 132f);
         var triangle = Image("Triangle", parent, "Home/room_select_join_triangle");
-        PositionSprite(triangle, new Vector2(.56f, .5f), 48f);
+        PositionSprite(triangle, new Vector2(.5f, .5f), 48f);
         for (var index = 0; index < LobbyRoomCode.Length; index++)
         {
             var blank = Image("Blank_" + index, parent, "Home/room_select_join_blank");
-            PositionSprite(blank, new Vector2(.345f + index * .052f, .5f), 43f);
+            PositionSprite(blank, new Vector2(.365f + index * .055f, .67f), 43f);
         }
-        roomCodeInput = Input("RoomCodeInput", parent, "输入六位同盟密钥", 30, null);
+        roomCodeInput = Input("RoomCodeInput", parent, "输入同盟密钥", 30, "Home/room_select_join_text_bg");
         roomCodeInput.characterLimit = LobbyRoomCode.Length;
         roomCodeInput.contentType = InputField.ContentType.IntegerNumber;
-        roomCodeInput.GetComponent<Image>().color = Color.clear;
+        roomCodeInput.GetComponent<Image>().preserveAspect = true;
         roomCodeInput.textComponent.alignment = TextAnchor.MiddleCenter;
-        Position(roomCodeInput.GetComponent<RectTransform>(), new Vector2(.475f, .5f), new Vector2(258f, 50f));
+        PositionSprite(roomCodeInput.GetComponent<Image>(), new Vector2(.5f, .32f), 470f);
         roomCodeInput.onValueChanged.AddListener(_ => EvaluateJoinAvailability());
         var ban = Image("Ban", parent, "Home/room_select_join_ban");
-        PositionSprite(ban, new Vector2(.59f, .5f), 24f);
+        PositionSprite(ban, new Vector2(.5f, .67f), 24f);
         joinButton = Button("JoinAction", parent, "Home/room_select_join_btn_bg_down", "加入同盟", 32, true);
-        PositionSprite(joinButton.GetComponent<Image>(), new Vector2(.74f, .5f), 400f);
+        PositionSprite(joinButton.GetComponent<Image>(), new Vector2(.5f, .11f), 537f);
+        var joinLabel = joinButton.GetComponentInChildren<Text>();
+        joinLabel.color = new Color(.12f, .06f, .01f);
+        joinLabel.fontSize = 38;
         joinButton.onClick.AddListener(RequestJoin);
     }
 

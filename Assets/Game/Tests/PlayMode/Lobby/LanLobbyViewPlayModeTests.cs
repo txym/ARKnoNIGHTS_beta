@@ -65,7 +65,15 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(join.GetComponent<RectTransform>().sizeDelta, Is.EqualTo(new Vector2(layout.RoomSelectJoin.Width, layout.RoomSelectJoin.Height)));
             Assert.That(home.Find("IdentityPanel/AvatarSelector/AvatarImage").GetComponent<UnityEngine.UI.Image>().sprite.name,
                 Is.EqualTo("icon_amiy"));
+            Assert.That(view.transform.Find("LanLobbyRoot/GridForeground").gameObject.activeSelf, Is.False,
+                "The legacy shallow_main HUD overlay must not be stretched over the room-select Home.");
             AssertMappedRoomSelectSprites(home);
+            Assert.That(join.Find("MiddleBlockMask"), Is.Null, "The source mask is a compositor mask, not a visible Home Image.");
+            Assert.That(ChildrenWithPrefix(create, "Line_").Count, Is.EqualTo(2));
+            Assert.That(ChildrenWithPrefix(join, "LeftBlock_").Count, Is.EqualTo(2));
+            Assert.That(ChildrenWithPrefix(join, "MiddleBlock_").Count, Is.EqualTo(4));
+            Assert.That(ChildrenWithPrefix(join, "RightBlock_").Count, Is.EqualTo(2));
+            Assert.That(ChildrenWithPrefix(join, "Blank_").Count, Is.EqualTo(LobbyRoomCode.Length));
 
             view.BindDiscoveredRooms(new[] { Discovery("654321") });
             view.ClickDiscoveredRoomForTests("654321");
@@ -97,6 +105,8 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(Aspect(createAction.rectTransform), Is.EqualTo(Aspect(createAction.sprite)).Within(.01f));
             Assert.That(Aspect(joinAction.rectTransform), Is.EqualTo(Aspect(joinAction.sprite)).Within(.01f));
             Assert.That(Aspect(background.rectTransform), Is.EqualTo(Aspect(background.sprite)).Within(.01f));
+            Assert.That(create.Find("CreateAction").GetComponent<RectTransform>().anchoredPosition.y, Is.LessThan(create.sizeDelta.y * .3f));
+            Assert.That(join.Find("JoinAction").GetComponent<RectTransform>().anchoredPosition.y, Is.LessThan(join.sizeDelta.y * .3f));
             yield return null;
         }
 
@@ -253,20 +263,23 @@ namespace ArknoNights.Lobby.Tests
                 { "RoomSelect/RightBackground", "room_select_right_bg" },
                 { "RoomSelect/TitleIcon", "room_select_title_icon" },
                 { "RoomSelect/TitleDot", "room_select_dot" },
-                { "RoomSelect/StartRoomDecoration", "room_select_img_startroom" },
-                { "RoomSelect/DiscoveredRooms", "room_select_join_text_bg" },
-                { "RoomSelect/Create/LeftLine", "room_select_create_left_line" },
+                { "RoomSelect/Create/Line_0", "room_select_create_left_line" },
+                { "RoomSelect/Create/Line_1", "room_select_create_left_line" },
                 { "RoomSelect/Create/Logo", "room_select_create_logo" },
                 { "RoomSelect/Create/MiddleIcon", "room_select_create_middleicon" },
                 { "RoomSelect/Create/Text01", "room_select_create_text_01" },
                 { "RoomSelect/Create/Text02", "room_select_create_text_02" },
+                { "RoomSelect/Create/StartRoomDecoration", "room_select_img_startroom" },
                 { "RoomSelect/Create/CreateAction", "room_select_create_btn_bg_down" },
-                { "RoomSelect/Join/LeftBlock", "room_select_join_left_block" },
-                { "RoomSelect/Join/MiddleBlock", "room_select_join_middle_block" },
-                { "RoomSelect/Join/MiddleBlockMask", "room_select_join_middle_block_mask" },
-                { "RoomSelect/Join/RightBlock", "room_select_join_right_block" },
+                { "RoomSelect/Join/LeftBlock_0", "room_select_join_left_block" },
+                { "RoomSelect/Join/LeftBlock_1", "room_select_join_left_block" },
+                { "RoomSelect/Join/MiddleBlock_0", "room_select_join_middle_block" },
+                { "RoomSelect/Join/MiddleBlock_1", "room_select_join_middle_block" },
+                { "RoomSelect/Join/MiddleBlock_2", "room_select_join_middle_block" },
+                { "RoomSelect/Join/MiddleBlock_3", "room_select_join_middle_block" },
+                { "RoomSelect/Join/RightBlock_0", "room_select_join_right_block" },
+                { "RoomSelect/Join/RightBlock_1", "room_select_join_right_block" },
                 { "RoomSelect/Join/Logo", "room_select_join_logo" },
-                { "RoomSelect/Join/TextBackground", "room_select_join_text_bg" },
                 { "RoomSelect/Join/Text01", "room_select_join_text_01" },
                 { "RoomSelect/Join/Text02", "room_select_join_text_02" },
                 { "RoomSelect/Join/Triangle", "room_select_join_triangle" },
@@ -276,6 +289,7 @@ namespace ArknoNights.Lobby.Tests
                 { "RoomSelect/Join/Blank_3", "room_select_join_blank" },
                 { "RoomSelect/Join/Blank_4", "room_select_join_blank" },
                 { "RoomSelect/Join/Blank_5", "room_select_join_blank" },
+                { "RoomSelect/Join/RoomCodeInput", "room_select_join_text_bg" },
                 { "RoomSelect/Join/Ban", "room_select_join_ban" },
                 { "RoomSelect/Join/JoinAction", "room_select_join_btn_bg_down" }
             };
@@ -300,6 +314,17 @@ namespace ArknoNights.Lobby.Tests
         private static float Aspect(Sprite sprite)
         {
             return sprite.rect.width / sprite.rect.height;
+        }
+
+        private static List<Transform> ChildrenWithPrefix(Transform parent, string prefix)
+        {
+            var result = new List<Transform>();
+            for (var index = 0; index < parent.childCount; index++)
+            {
+                var child = parent.GetChild(index);
+                if (child.name.StartsWith(prefix, System.StringComparison.Ordinal)) result.Add(child);
+            }
+            return result;
         }
 
         private static LobbyDiscoveryEntry Discovery(string roomCode, int memberCount = 1, int capacity = 4, bool joinable = true)
