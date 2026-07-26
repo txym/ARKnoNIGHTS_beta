@@ -514,3 +514,9 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 - 两个真实源文件使用 `unit-source-v1`，按身份与文本、养成与费用、行为分类、战斗数值、阻挡/价值/能力、资源与动画的顺序定义 lower camel case 字段。`resourceKey` 仅用于技术资源查找；`displayNameZhHans` 与 `skillDescriptionZhHans` 是独立的玩家可见简体中文字段。
 - 当前两个中文文本字段均为空，表示等待配置；显示名为空时不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`initialEliteLevel` 必须为 `0..3`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。
 - 源 JSON 是唯一权威。Editor 将它确定性生成 Player-safe `unit-catalog-v1`；Player 再从目录读取资源键、中文文本、稀有度、目标价值以及既有战斗/表现字段。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
+
+## LAN Home Create Open-Frame Rule (2026-07-27)
+
+In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.
+
+This visual rule does not change Create/Join actions or LAN-room creation, discovery, prefill, joining, readiness, start, or disconnect-recovery behavior.
