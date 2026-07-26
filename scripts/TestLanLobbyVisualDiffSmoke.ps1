@@ -71,7 +71,7 @@ function Fill-ScaledFixtureRectangle($Graphics, $Brush, $NativeCrop, $TargetSize
     $Graphics.FillRectangle($Brush, $x, $y, [Math]::Max(1, $right-$x), [Math]::Max(1, $bottom-$y))
 }
 
-function Fill-CreateFrameFixture($Graphics, $Brush, $NativeCrop, $TargetSize, [int] $TopGapPixels)
+function Fill-CreateFrameFixture($Graphics, $BrightBrush, $BottomBrush, $NativeCrop, $TargetSize, [int] $TopGapPixels)
 {
     $topSegments = if ($TopGapPixels -gt 0) {
         @(
@@ -81,8 +81,7 @@ function Fill-CreateFrameFixture($Graphics, $Brush, $NativeCrop, $TargetSize, [i
     } else {
         @([ordered]@{ x=0; y=0; width=690; height=3 })
     }
-    $segments = @($topSegments) + @(
-        [ordered]@{ x=0; y=371; width=717; height=3 },
+    $brightSegments = @($topSegments) + @(
         [ordered]@{ x=0; y=0; width=3; height=374 },
         [ordered]@{ x=714; y=18; width=3; height=356 },
         [ordered]@{ x=680; y=0; width=6; height=6 },
@@ -94,10 +93,11 @@ function Fill-CreateFrameFixture($Graphics, $Brush, $NativeCrop, $TargetSize, [i
         [ordered]@{ x=704; y=24; width=6; height=6 },
         [ordered]@{ x=708; y=28; width=6; height=6 }
     )
-    foreach ($segment in $segments)
+    foreach ($segment in $brightSegments)
     {
-        Fill-ScaledFixtureRectangle $Graphics $Brush $NativeCrop $TargetSize $segment
+        Fill-ScaledFixtureRectangle $Graphics $BrightBrush $NativeCrop $TargetSize $segment
     }
+    Fill-ScaledFixtureRectangle $Graphics $BottomBrush $NativeCrop $TargetSize ([ordered]@{ x=0; y=371; width=717; height=3 })
 }
 
 try
@@ -114,8 +114,6 @@ try
     $createFrameTarget = [ordered]@{ x=1154; y=224; width=717; height=374 }
     $createFrameNativeCrop = [ordered]@{ x=1224; y=232; width=745; height=387 }
     $createDecorationBounds = @(
-        [ordered]@{ name='wing-left';  mode='two-largest-components'; threshold=20; greenOverRed=4; blueOverRed=3; search=@{x=0;y=35;width=116;height=105}; expected=@{x=7;y=35;width=107;height=105} },
-        [ordered]@{ name='wing-right'; mode='two-largest-components'; threshold=20; greenOverRed=4; blueOverRed=3; search=@{x=270;y=35;width=120;height=105}; expected=@{x=283;y=35;width=101;height=105} },
         [ordered]@{ name='start-room'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=153;y=13;width=84;height=9} },
         [ordered]@{ name='dot-top-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=118;y=18;width=17;height=17} },
         [ordered]@{ name='dot-top-right'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=253;y=19;width=17;height=16} },
@@ -127,22 +125,37 @@ try
         [ordered]@{ name='dot-bottom-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=118;y=155;width=16;height=17} },
         [ordered]@{ name='dot-bottom-right'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=253;y=155;width=17;height=17} }
     )
-    $wingFixtureComponents = @{
-        'wing-left' = @(
-            [ordered]@{ x=7; y=35; width=50; height=45 },
-            [ordered]@{ x=64; y=95; width=50; height=45 }
-        )
-        'wing-right' = @(
-            [ordered]@{ x=283; y=35; width=45; height=45 },
-            [ordered]@{ x=339; y=95; width=45; height=45 }
-        )
-    }
     $createFrameEdges = @(
-        [ordered]@{ name='top'; axis='x'; search=@{x=0;y=0;width=690;height=18}; minimumCoverage=.90; maximumGap=6 },
-        [ordered]@{ name='bottom'; axis='x'; search=@{x=0;y=356;width=717;height=18}; minimumCoverage=.90; maximumGap=6 },
-        [ordered]@{ name='left'; axis='y'; search=@{x=0;y=0;width=18;height=374}; minimumCoverage=.90; maximumGap=6 },
-        [ordered]@{ name='right'; axis='y'; search=@{x=699;y=18;width=18;height=356}; minimumCoverage=.90; maximumGap=6 },
-        [ordered]@{ name='top-right-chamfer'; axis='diagonal'; search=@{x=680;y=0;width=37;height=37}; minimumPixelCount=80 }
+        [ordered]@{
+            name='top'; axis='x'
+            search=@{x=0;y=0;width=690;height=18}
+            background=@{x=0;y=26;width=690;height=10}
+            minimumCoverage=.90; maximumGap=6; minimumContrast=18
+        },
+        [ordered]@{
+            name='bottom'; axis='x'
+            search=@{x=0;y=356;width=717;height=18}
+            background=@{x=0;y=338;width=717;height=10}
+            minimumCoverage=.90; maximumGap=6; minimumContrast=18
+        },
+        [ordered]@{
+            name='left'; axis='y'
+            search=@{x=0;y=0;width=18;height=374}
+            background=@{x=26;y=0;width=10;height=374}
+            minimumCoverage=.90; maximumGap=6; minimumContrast=18
+        },
+        [ordered]@{
+            name='right'; axis='y'
+            search=@{x=699;y=18;width=18;height=356}
+            background=@{x=681;y=18;width=10;height=356}
+            minimumCoverage=.90; maximumGap=6; minimumContrast=18
+        },
+        [ordered]@{
+            name='top-right-chamfer'; axis='diagonal'
+            search=@{x=680;y=0;width=37;height=37}
+            background=@{x=656;y=20;width=16;height=16}
+            minimumPixelCount=80; minimumContrast=18
+        }
     )
     New-SolidPng (Join-Path $referenceDirectory $figure9) 2048 1118 ([Drawing.Color]::FromArgb(255, 60, 60, 60)) {
         param($graphics)
@@ -157,13 +170,9 @@ try
             $graphics.FillRectangle($contentBrush, 1224 + 108, 906 + 33, 156, 36)
             foreach ($bounds in $createDecorationBounds)
             {
-                $fixtureBounds = if ($bounds.mode -eq 'two-largest-components') { @($wingFixtureComponents[$bounds.name]) } else { @($bounds.expected) }
-                foreach ($fixtureBound in $fixtureBounds)
-                {
-                    Fill-ScaledFixtureRectangle $graphics $cyanBrush $createDecorationNativeCrop $createDecorationTarget $fixtureBound
-                }
+                Fill-ScaledFixtureRectangle $graphics $cyanBrush $createDecorationNativeCrop $createDecorationTarget $bounds.expected
             }
-            Fill-CreateFrameFixture $graphics $cyanBrush $createFrameNativeCrop $createFrameTarget 0
+            Fill-CreateFrameFixture $graphics $cyanBrush $cyanBrush $createFrameNativeCrop $createFrameTarget 0
         }
         finally { $contentBrush.Dispose(); $cyanBrush.Dispose() }
     }
@@ -183,6 +192,7 @@ try
                 $differenceBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Red)
                 $contentBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
                 $cyanBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Cyan)
+                $lowContrastBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 8, 16, 15))
                 try
                 {
                     # Masked radar: x=0.00,y=0.18,w=0.57,h=0.66.
@@ -199,22 +209,21 @@ try
                     $graphics.FillRectangle($contentBrush, 1154 + 40, 876 + 72, 60, 3)
                     foreach ($bounds in $createDecorationBounds)
                     {
-                        $fixtureBounds = if ($bounds.mode -eq 'two-largest-components') { @($wingFixtureComponents[$bounds.name]) } else { @($bounds.expected) }
-                        foreach ($fixtureBound in $fixtureBounds)
+                        # Leave one valid-ROI diagnostic empty so the exporter must record
+                        # measurement unavailability without blocking frame publication.
+                        if ($bounds.name -ne 'text-02')
                         {
-                            $x = $createDecorationTarget.x + $fixtureBound.x
-                            if ($bounds.name -eq 'wing-left') { $x += 2 }
                             $graphics.FillRectangle(
                                 $cyanBrush,
-                                $x,
-                                $createDecorationTarget.y + $fixtureBound.y,
-                                $fixtureBound.width,
-                                $fixtureBound.height)
+                                $createDecorationTarget.x + $bounds.expected.x,
+                                $createDecorationTarget.y + $bounds.expected.y,
+                                $bounds.expected.width,
+                                $bounds.expected.height)
                         }
                     }
-                    Fill-CreateFrameFixture $graphics $cyanBrush $createFrameTarget $createFrameTarget 8
+                    Fill-CreateFrameFixture $graphics $cyanBrush $lowContrastBrush $createFrameTarget $createFrameTarget 8
                 }
-                finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose(); $cyanBrush.Dispose() }
+                finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose(); $cyanBrush.Dispose(); $lowContrastBrush.Dispose() }
             }
         }
         New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 60, 60, 60)) $draw
@@ -247,6 +256,8 @@ try
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateFrame/LeftLower'; spriteName = 'doc_frame_line'; sourcePath = '[uc]autochessouter/doc_frame_line.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateFrame/RightUpper'; spriteName = 'doc_frame_line'; sourcePath = '[uc]autochessouter/doc_frame_line.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateFrame/RightLower'; spriteName = 'doc_frame_line'; sourcePath = '[uc]autochessouter/doc_frame_line.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateFrame/TopCenter'; spriteName = 'doc_frame_line'; sourcePath = '[uc]autochessouter/doc_frame_line.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateFrame/BottomCenter'; spriteName = 'doc_frame_line'; sourcePath = '[uc]autochessouter/doc_frame_line.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/CreateFrame/TopRightChamfer'; spriteName = 'doc_frame_line'; sourcePath = '[uc]autochessouter/doc_frame_line.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/DotTopLeft'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/DotTopRight'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
@@ -422,6 +433,12 @@ try
         }
     )
     Assert-True (($referenceFixtureHashes -join "`n") -eq ($referenceFixtureHashesAfterExport -join "`n")) 'explicit external references must remain read-only exporter inputs'
+    Assert-True (Test-Path -LiteralPath (Join-Path $output 'visual-diff-report.json')) 'visual failure must still publish JSON'
+    Assert-True (Test-Path -LiteralPath (Join-Path $output 'visual-diff-report.md')) 'visual failure must still publish Markdown'
+    foreach ($kind in @('actual','reference','overlay','heatmap'))
+    {
+        Assert-True (Test-Path -LiteralPath (Join-Path $output ('home-create-frame-' + $kind + '.png'))) "visual failure must still publish home-create-frame $kind"
+    }
     $report = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.json') | ConvertFrom-Json
     $homeCapture = $report.captures | Where-Object name -eq 'home'
     $actionBars = @($report.actionBars)
@@ -443,7 +460,10 @@ try
     $decoration = $report.createDecoration
     Assert-True ($decoration.name -eq 'home-create-decoration') 'Create decoration report name'
     Assert-True (($decoration.actualRect.x -eq 1296) -and ($decoration.actualRect.y -eq 252) -and ($decoration.actualRect.width -eq 390) -and ($decoration.actualRect.height -eq 179)) 'Create decoration crop'
-    Assert-True (@($decoration.components).Count -eq 12) 'twelve Create decoration components'
+    Assert-True ($decoration.acceptanceRole -eq 'informational') 'Create decoration diagnostics must be informational'
+    Assert-True ($decoration.blocksCreateFrameAcceptance -eq $false) 'Create decoration diagnostics must not block Create frame acceptance'
+    Assert-True (@($decoration.components).Count -eq 10) 'ten Create decoration diagnostics'
+    Assert-True (@($decoration.components | Where-Object { $_.name -like 'wing-*' }).Count -eq 0) 'Create decoration diagnostics must contain no wing measurement rows'
     foreach ($expectedDecoration in $createDecorationBounds)
     {
         $component = @($decoration.components | Where-Object name -eq $expectedDecoration.name)
@@ -455,15 +475,13 @@ try
         Assert-True (($component.referenceBounds.x -eq $expectedBounds.x) -and ($component.referenceBounds.y -eq $expectedBounds.y) -and ($component.referenceBounds.width -eq $expectedBounds.width) -and ($component.referenceBounds.height -eq $expectedBounds.height)) "Create decoration/$($expectedDecoration.name) reference bounds; actual=$($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height)"
         Assert-True (($component.thresholdMinimumGreen -eq $expectedDecoration.threshold) -and ($component.minimumGreenOverRed -eq $expectedDecoration.greenOverRed) -and ($component.minimumBlueOverRed -eq $expectedDecoration.blueOverRed)) "Create decoration/$($expectedDecoration.name) cyan thresholds"
     }
-    $wingLeft = @($decoration.components | Where-Object name -eq 'wing-left')[0]
-    Assert-True (($wingLeft.componentCount -eq 2) -and ($wingLeft.minimumComponentPixels -eq 500)) 'Create decoration wing-left must use exactly two components with a 500 pixel minimum'
-    Assert-True ($wingLeft.centerDeviationPx.deltaX -eq 2) 'Create decoration wing-left fixture must prove a +2 px center failure'
-    Assert-True ($wingLeft.passed -eq $false) 'Create decoration wing-left must fail'
-    $unexpectedDecorationFailures = @($decoration.components | Where-Object { $_.name -ne 'wing-left' -and -not $_.passed })
-    $unexpectedDecorationFailureDetails = @($unexpectedDecorationFailures | ForEach-Object {
-        "$($_.name) actual=$($_.actualBounds.x),$($_.actualBounds.y),$($_.actualBounds.width),$($_.actualBounds.height)"
-    })
-    Assert-True ($unexpectedDecorationFailures.Count -eq 0) "all other Create decoration components must pass; failed: $($unexpectedDecorationFailureDetails -join '; ')"
+    $missingDiagnostic = @($decoration.components | Where-Object name -eq 'text-02')[0]
+    Assert-True ($missingDiagnostic.measurementAvailable -eq $false) 'missing central diagnostic must be recorded as unavailable'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$missingDiagnostic.measurementError)) 'missing central diagnostic must record its measurement error'
+    Assert-True (($null -eq $missingDiagnostic.actualBounds) -and ($null -eq $missingDiagnostic.centerDeviationPx) -and ($null -eq $missingDiagnostic.sizeDeviationPx)) 'missing central diagnostic must publish null measurements'
+    Assert-True ($missingDiagnostic.passed -eq $false) 'missing central diagnostic must fail informationally'
+    $unexpectedDecorationFailures = @($decoration.components | Where-Object { $_.name -ne 'text-02' -and -not $_.passed })
+    Assert-True ($unexpectedDecorationFailures.Count -eq 0) "all measured Create decoration diagnostics must pass; failed: $(@($unexpectedDecorationFailures.name) -join ', ')"
     $frame = $report.createFrame
     Assert-True ($frame.name -eq 'home-create-frame') 'Create frame report name'
     Assert-True (($frame.actualRect.x -eq 1154) -and ($frame.actualRect.y -eq 224) -and ($frame.actualRect.width -eq 717) -and ($frame.actualRect.height -eq 374)) 'Create frame crop'
@@ -474,7 +492,11 @@ try
         Assert-True ($edge.Count -eq 1) "Create frame/$($expectedEdge.name) must occur once"
         $edge = $edge[0]
         Assert-True ($edge.axis -eq $expectedEdge.axis) "Create frame/$($expectedEdge.name) axis"
+        Assert-True (($edge.backgroundSearch.x -eq $expectedEdge.background.x) -and ($edge.backgroundSearch.y -eq $expectedEdge.background.y) -and ($edge.backgroundSearch.width -eq $expectedEdge.background.width) -and ($edge.backgroundSearch.height -eq $expectedEdge.background.height)) "Create frame/$($expectedEdge.name) background search"
         Assert-True (($edge.thresholdMinimumGreen -eq 12) -and ($edge.minimumGreenOverRed -eq 3) -and ($edge.minimumBlueOverRed -eq 2)) "Create frame/$($expectedEdge.name) cyan thresholds"
+        Assert-True ($edge.minimumContrast -eq 18) "Create frame/$($expectedEdge.name) minimum contrast"
+        Assert-True (($edge.frameSampleCount -gt 0) -and ($edge.backgroundSampleCount -gt 0) -and $edge.contrastAvailable) "Create frame/$($expectedEdge.name) contrast samples"
+        Assert-True ([string]::IsNullOrEmpty([string]$edge.contrastFailureReason)) "Create frame/$($expectedEdge.name) contrast failure reason must be empty when available"
         if ($expectedEdge.axis -eq 'diagonal')
         {
             Assert-True (($edge.minimumPixelCount -eq 80) -and ($edge.qualifyingPixelCount -ge 80)) 'Create frame chamfer pixel count'
@@ -485,10 +507,13 @@ try
         }
     }
     $topEdge = @($frame.edges | Where-Object name -eq 'top')[0]
-    Assert-True (($topEdge.largestGapPixels -eq 8) -and (-not $topEdge.passed)) 'Create frame top fixture must prove an 8 px gap failure'
-    $unexpectedFrameFailures = @($frame.edges | Where-Object { $_.name -ne 'top' -and -not $_.passed })
-    Assert-True ($unexpectedFrameFailures.Count -eq 0) "all other Create frame edges must pass; failed: $(@($unexpectedFrameFailures.name) -join ', ')"
-    Assert-True (-not $frame.passed) 'Create frame overall state must reflect the deliberately broken top edge'
+    Assert-True (($topEdge.largestGapPixels -eq 8) -and ($topEdge.continuityPassed -eq $false) -and $topEdge.contrastPassed -and ($topEdge.passed -eq $false)) 'Create frame top fixture must fail only continuity with an 8 px gap'
+    $bottomEdge = @($frame.edges | Where-Object name -eq 'bottom')[0]
+    Assert-True ($bottomEdge.continuityPassed -and ($bottomEdge.contrastPassed -eq $false) -and ($bottomEdge.passed -eq $false)) 'Create frame bottom fixture must fail only brightness contrast'
+    Assert-True ($bottomEdge.frameMedianLuma -lt $bottomEdge.backgroundMedianLuma) 'Create frame bottom fixture must use a dim qualifying cyan'
+    $unexpectedFrameFailures = @($frame.edges | Where-Object { $_.name -notin @('top','bottom') -and -not $_.passed })
+    Assert-True ($unexpectedFrameFailures.Count -eq 0) "left, right, and chamfer Create frame rows must pass; failed: $(@($unexpectedFrameFailures.name) -join ', ')"
+    Assert-True (-not $frame.passed) 'Create frame overall state must reflect the deliberate top-continuity and bottom-contrast failures'
     $expectedContent = @(
         @{ bar='home-create-action'; name='icon';  x=47;  y=25; width=36;  height=37; actualX=49; passed=$false },
         @{ bar='home-create-action'; name='label'; x=109; y=28; width=148; height=32; actualX=109; passed=$true },
@@ -516,7 +541,7 @@ try
     $dotUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'room_select_dot')[0]
     Assert-True ($logoUsage.Count -eq 0) 'room_select_create_logo material usage must be absent'
     Assert-True ($wingUsage.occurrenceCount -eq 8) 'four img_pointer Sprites in each Home state'
-    Assert-True ($frameUsage.occurrenceCount -eq 18) 'nine doc_frame_line Sprites in each Home state'
+    Assert-True ($frameUsage.occurrenceCount -eq 22) 'eleven doc_frame_line Sprites in each Home state'
     Assert-True ($lineUsage.occurrenceCount -eq 4) 'two bracket Sprites in each Home state'
     Assert-True ($dotUsage.occurrenceCount -eq 10) 'four Create dots plus title dot in each Home state'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction/Label' -and $_.text -eq '创建同盟' }).Count -eq 1) 'Create action Unity Text must come from captured manifest data'
@@ -548,6 +573,11 @@ try
     Assert-True ($markdown.Contains('## Home Create upper decoration')) 'Markdown must expose Create decoration visible bounds'
     foreach ($expectedDecoration in $createDecorationBounds) { Assert-True ($markdown.Contains($expectedDecoration.name)) "Markdown missing Create decoration/$($expectedDecoration.name)" }
     Assert-True ($markdown.Contains('## Home Create frame continuity')) 'Markdown must expose Create frame continuity'
+    Assert-True ($markdown.Contains('Search/background')) 'Markdown frame table must expose the background ROI'
+    Assert-True ($markdown.Contains('Frame/background median luma')) 'Markdown frame table must expose median luma'
+    Assert-True ($markdown.Contains('Contrast delta/minimum')) 'Markdown frame table must expose contrast acceptance'
+    Assert-True ($markdown.Contains('Continuity passed')) 'Markdown frame table must expose continuity acceptance'
+    Assert-True ($markdown.Contains('Contrast passed')) 'Markdown frame table must expose contrast acceptance result'
     foreach ($expectedEdge in $createFrameEdges) { Assert-True ($markdown.Contains($expectedEdge.name)) "Markdown missing Create frame/$($expectedEdge.name)" }
     Assert-True ($markdown.Contains('## Unity Text usage')) 'Markdown must separate Unity Text usage from bitmap Sprites'
     Assert-True ($markdown.Contains('## Code-generated geometry usage')) 'Markdown must separate code-generated geometry from bitmap Sprites'

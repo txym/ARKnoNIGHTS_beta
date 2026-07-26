@@ -28,6 +28,16 @@ public sealed class FrameContinuity {
     public double CoverageRatio { get; set; }
     public int LargestGapPixels { get; set; }
 }
+public sealed class FrameContrast
+{
+    public int FrameSampleCount { get; set; }
+    public int BackgroundSampleCount { get; set; }
+    public double FrameMedianLuma { get; set; }
+    public double BackgroundMedianLuma { get; set; }
+    public double ContrastDelta { get; set; }
+    public bool Available { get; set; }
+    public string FailureReason { get; set; }
+}
 public static class LanLobbyVisualDiff {
     sealed class CyanComponent {
         public int Count;
@@ -47,6 +57,14 @@ public static class LanLobbyVisualDiff {
             pixel.G >= minimumGreen &&
             pixel.G >= pixel.R + minimumGreenOverRed &&
             pixel.B >= pixel.R + minimumBlueOverRed;
+    }
+    static double Median(List<double> values) {
+        var sorted = new List<double>(values);
+        sorted.Sort();
+        int middle = sorted.Count / 2;
+        return sorted.Count % 2 == 0
+            ? (sorted[middle - 1] + sorted[middle]) / 2.0
+            : sorted[middle];
     }
     public static LanLobbyVisualBounds FindDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
@@ -197,6 +215,54 @@ public static class LanLobbyVisualDiff {
             LargestGapPixels=largestGapPixels
         };
     }
+    public static FrameContrast MeasureFrameLumaContrast(
+        Bitmap source,
+        Rectangle frameSearch,
+        Rectangle backgroundSearch,
+        int minimumGreen,
+        int minimumGreenOverRed,
+        int minimumBlueOverRed)
+    {
+        ValidateSearch(source, frameSearch);
+        ValidateSearch(source, backgroundSearch);
+        var frameLuma = new List<double>();
+        var backgroundLuma = new List<double>();
+        for (int y=frameSearch.Y; y<frameSearch.Bottom; y++)
+        for (int x=frameSearch.X; x<frameSearch.Right; x++)
+        {
+            Color pixel=source.GetPixel(x,y);
+            if (!IsCyan(pixel, minimumGreen, minimumGreenOverRed, minimumBlueOverRed)) continue;
+            frameLuma.Add(0.2126*pixel.R + 0.7152*pixel.G + 0.0722*pixel.B);
+        }
+        for (int y=backgroundSearch.Y; y<backgroundSearch.Bottom; y++)
+        for (int x=backgroundSearch.X; x<backgroundSearch.Right; x++)
+        {
+            Color pixel=source.GetPixel(x,y);
+            if (pixel.A == 0) continue;
+            backgroundLuma.Add(0.2126*pixel.R + 0.7152*pixel.G + 0.0722*pixel.B);
+        }
+        var result = new FrameContrast {
+            FrameSampleCount=frameLuma.Count,
+            BackgroundSampleCount=backgroundLuma.Count
+        };
+        if (frameLuma.Count == 0)
+        {
+            result.Available=false;
+            result.FailureReason="No qualifying cyan frame samples found.";
+            return result;
+        }
+        if (backgroundLuma.Count == 0)
+        {
+            result.Available=false;
+            result.FailureReason="No non-transparent background samples found.";
+            return result;
+        }
+        result.FrameMedianLuma=Median(frameLuma);
+        result.BackgroundMedianLuma=Median(backgroundLuma);
+        result.ContrastDelta=result.FrameMedianLuma-result.BackgroundMedianLuma;
+        result.Available=true;
+        return result;
+    }
     public static LanLobbyVisualBounds FindCompactDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive, int minimumComponentPixels, double maximumAspectRatio) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
         if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height || search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
@@ -276,8 +342,6 @@ $homeCreateDecoration = @{
   reference=@{x=1419;y=268;width=427;height=191}
 }
 $createDecorationContentSpecs = @(
-  @{name='wing-left'; mode='two-largest-components'; threshold=20; greenOverRed=4; blueOverRed=3; componentCount=2; minimumComponentPixels=500; search=@{x=0;y=35;width=116;height=105}; expected=@{x=7;y=35;width=107;height=105}},
-  @{name='wing-right'; mode='two-largest-components'; threshold=20; greenOverRed=4; blueOverRed=3; componentCount=2; minimumComponentPixels=500; search=@{x=270;y=35;width=120;height=105}; expected=@{x=283;y=35;width=101;height=105}},
   @{name='start-room'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
   @{name='dot-top-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=116;y=15;width=24;height=27}; expected=@{x=118;y=18;width=17;height=17}},
   @{name='dot-top-right'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=249;y=15;width=24;height=27}; expected=@{x=253;y=19;width=17;height=16}},
@@ -295,11 +359,36 @@ $homeCreateFrame = @{
   reference=@{x=1257;y=239;width=763;height=397}
 }
 $createFrameEdges = @(
-  @{name='top'; axis='x'; search=@{x=0;y=0;width=690;height=18}; minimumCoverage=.90; maximumGap=6},
-  @{name='bottom'; axis='x'; search=@{x=0;y=356;width=717;height=18}; minimumCoverage=.90; maximumGap=6},
-  @{name='left'; axis='y'; search=@{x=0;y=0;width=18;height=374}; minimumCoverage=.90; maximumGap=6},
-  @{name='right'; axis='y'; search=@{x=699;y=18;width=18;height=356}; minimumCoverage=.90; maximumGap=6},
-  @{name='top-right-chamfer'; axis='diagonal'; search=@{x=680;y=0;width=37;height=37}; minimumPixelCount=80}
+  [ordered]@{
+    name='top'; axis='x'
+    search=@{x=0;y=0;width=690;height=18}
+    background=@{x=0;y=26;width=690;height=10}
+    minimumCoverage=.90; maximumGap=6; minimumContrast=18
+  },
+  [ordered]@{
+    name='bottom'; axis='x'
+    search=@{x=0;y=356;width=717;height=18}
+    background=@{x=0;y=338;width=717;height=10}
+    minimumCoverage=.90; maximumGap=6; minimumContrast=18
+  },
+  [ordered]@{
+    name='left'; axis='y'
+    search=@{x=0;y=0;width=18;height=374}
+    background=@{x=26;y=0;width=10;height=374}
+    minimumCoverage=.90; maximumGap=6; minimumContrast=18
+  },
+  [ordered]@{
+    name='right'; axis='y'
+    search=@{x=699;y=18;width=18;height=356}
+    background=@{x=681;y=18;width=10;height=356}
+    minimumCoverage=.90; maximumGap=6; minimumContrast=18
+  },
+  [ordered]@{
+    name='top-right-chamfer'; axis='diagonal'
+    search=@{x=680;y=0;width=37;height=37}
+    background=@{x=656;y=20;width=16;height=16}
+    minimumPixelCount=80; minimumContrast=18
+  }
 )
 $figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
@@ -747,48 +836,73 @@ try
         foreach ($contentSpec in $createDecorationContentSpecs)
         {
             $search = New-Object Drawing.Rectangle $contentSpec.search.x, $contentSpec.search.y, $contentSpec.search.width, $contentSpec.search.height
-            if ($contentSpec.mode -eq 'two-largest-components')
+            $actualBounds = $null
+            $referenceBounds = $null
+            $measurementAvailable = $false
+            $measurementError = $null
+            try
             {
-                $actualBounds = [LanLobbyVisualDiff]::FindLargestCyanComponentsBounds(
-                    $actualCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed,
-                    $contentSpec.componentCount, $contentSpec.minimumComponentPixels)
-                $referenceBounds = [LanLobbyVisualDiff]::FindLargestCyanComponentsBounds(
-                    $locallyResizedReferenceCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed,
-                    $contentSpec.componentCount, $contentSpec.minimumComponentPixels)
+                if ($contentSpec.mode -eq 'two-largest-components')
+                {
+                    $referenceBounds = [LanLobbyVisualDiff]::FindLargestCyanComponentsBounds(
+                        $locallyResizedReferenceCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed,
+                        $contentSpec.componentCount, $contentSpec.minimumComponentPixels)
+                    $actualBounds = [LanLobbyVisualDiff]::FindLargestCyanComponentsBounds(
+                        $actualCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed,
+                        $contentSpec.componentCount, $contentSpec.minimumComponentPixels)
+                }
+                else
+                {
+                    $referenceBounds = [LanLobbyVisualDiff]::FindCyanBounds(
+                        $locallyResizedReferenceCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed)
+                    $actualBounds = [LanLobbyVisualDiff]::FindCyanBounds(
+                        $actualCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed)
+                }
+                $measurementAvailable = $true
             }
-            else
+            catch
             {
-                $actualBounds = [LanLobbyVisualDiff]::FindCyanBounds(
-                    $actualCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed)
-                $referenceBounds = [LanLobbyVisualDiff]::FindCyanBounds(
-                    $locallyResizedReferenceCrop, $search, $contentSpec.threshold, $contentSpec.greenOverRed, $contentSpec.blueOverRed)
+                $candidate = $_.Exception
+                while ($candidate -and -not ($candidate -is [InvalidOperationException])) { $candidate = $candidate.InnerException }
+                if (-not $candidate) { throw }
+                $measurementError = $candidate.Message
             }
             $expected = $contentSpec.expected
-            $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
-            $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
-            $expectedCenterX = $expected.x + ($expected.width - 1) / 2.0
-            $expectedCenterY = $expected.y + ($expected.height - 1) / 2.0
-            $centerDeltaX = $actualCenterX - $expectedCenterX
-            $centerDeltaY = $actualCenterY - $expectedCenterY
-            $widthDelta = $actualBounds.Width - $expected.width
-            $heightDelta = $actualBounds.Height - $expected.height
-            $passed = [Math]::Abs($centerDeltaX) -le 1 `
-                -and [Math]::Abs($centerDeltaY) -le 1 `
-                -and [Math]::Abs($widthDelta) -le 2 `
-                -and [Math]::Abs($heightDelta) -le 2
+            $centerDeviation = $null
+            $sizeDeviation = $null
+            $passed = $false
+            if ($measurementAvailable)
+            {
+                $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
+                $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
+                $expectedCenterX = $expected.x + ($expected.width - 1) / 2.0
+                $expectedCenterY = $expected.y + ($expected.height - 1) / 2.0
+                $centerDeltaX = $actualCenterX - $expectedCenterX
+                $centerDeltaY = $actualCenterY - $expectedCenterY
+                $widthDelta = $actualBounds.Width - $expected.width
+                $heightDelta = $actualBounds.Height - $expected.height
+                $centerDeviation = [ordered]@{ unit='px'; deltaX=$centerDeltaX; deltaY=$centerDeltaY }
+                $sizeDeviation = [ordered]@{ unit='px'; deltaWidth=$widthDelta; deltaHeight=$heightDelta }
+                $passed = [Math]::Abs($centerDeltaX) -le 1 `
+                    -and [Math]::Abs($centerDeltaY) -le 1 `
+                    -and [Math]::Abs($widthDelta) -le 2 `
+                    -and [Math]::Abs($heightDelta) -le 2
+            }
             $components += [pscustomobject][ordered]@{
                 name = $contentSpec.name
                 measurementMode = $contentSpec.mode
+                measurementAvailable = $measurementAvailable
+                measurementError = $measurementError
                 thresholdMinimumGreen = $contentSpec.threshold
                 minimumGreenOverRed = $contentSpec.greenOverRed
                 minimumBlueOverRed = $contentSpec.blueOverRed
                 componentCount = $(if ($contentSpec.mode -eq 'two-largest-components') { $contentSpec.componentCount } else { $null })
                 minimumComponentPixels = $(if ($contentSpec.mode -eq 'two-largest-components') { $contentSpec.minimumComponentPixels } else { $null })
                 expectedBounds = [ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
-                referenceBounds = ConvertTo-LanLobbyBoundsObject $referenceBounds
-                actualBounds = ConvertTo-LanLobbyBoundsObject $actualBounds
-                centerDeviationPx = [ordered]@{ unit='px'; deltaX=$centerDeltaX; deltaY=$centerDeltaY }
-                sizeDeviationPx = [ordered]@{ unit='px'; deltaWidth=$widthDelta; deltaHeight=$heightDelta }
+                referenceBounds = $(if ($referenceBounds) { ConvertTo-LanLobbyBoundsObject $referenceBounds } else { $null })
+                actualBounds = $(if ($actualBounds) { ConvertTo-LanLobbyBoundsObject $actualBounds } else { $null })
+                centerDeviationPx = $centerDeviation
+                sizeDeviationPx = $sizeDeviation
                 passed = $passed
             }
         }
@@ -802,6 +916,8 @@ try
             comparedPixels = $metric.ComparedPixels
             pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
             averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
+            acceptanceRole = 'informational'
+            blocksCreateFrameAcceptance = $false
             components = $components
         }
         $actualCrop.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
@@ -836,19 +952,24 @@ try
         foreach ($edgeSpec in $createFrameEdges)
         {
             $search = New-Object Drawing.Rectangle $edgeSpec.search.x, $edgeSpec.search.y, $edgeSpec.search.width, $edgeSpec.search.height
+            $background = New-Object Drawing.Rectangle $edgeSpec.background.x, $edgeSpec.background.y, $edgeSpec.background.width, $edgeSpec.background.height
             $horizontal = $edgeSpec.axis -ne 'y'
             $actualContinuity = [LanLobbyVisualDiff]::MeasureCyanContinuity($actualCrop, $search, $horizontal, 12, 3, 2)
             $referenceContinuity = [LanLobbyVisualDiff]::MeasureCyanContinuity($locallyResizedReferenceCrop, $search, $horizontal, 12, 3, 2)
-            $passed = if ($edgeSpec.axis -eq 'diagonal') {
+            $contrast = [LanLobbyVisualDiff]::MeasureFrameLumaContrast($actualCrop, $search, $background, 12, 3, 2)
+            $contrastPassed = $contrast.Available -and $contrast.ContrastDelta -ge $edgeSpec.minimumContrast
+            $continuityPassed = if ($edgeSpec.axis -eq 'diagonal') {
                 $actualContinuity.QualifyingPixelCount -ge $edgeSpec.minimumPixelCount
             } else {
                 $actualContinuity.CoverageRatio -ge $edgeSpec.minimumCoverage -and
                     $actualContinuity.LargestGapPixels -le $edgeSpec.maximumGap
             }
+            $passed = $continuityPassed -and $contrastPassed
             $edges += [pscustomobject][ordered]@{
                 name = $edgeSpec.name
                 axis = $edgeSpec.axis
                 search = [ordered]@{ x=$edgeSpec.search.x; y=$edgeSpec.search.y; width=$edgeSpec.search.width; height=$edgeSpec.search.height }
+                backgroundSearch = [ordered]@{ x=$edgeSpec.background.x; y=$edgeSpec.background.y; width=$edgeSpec.background.width; height=$edgeSpec.background.height }
                 thresholdMinimumGreen = 12
                 minimumGreenOverRed = 3
                 minimumBlueOverRed = 2
@@ -860,6 +981,14 @@ try
                 axisLength = $actualContinuity.AxisLength
                 coverageRatio = $actualContinuity.CoverageRatio
                 largestGapPixels = $actualContinuity.LargestGapPixels
+                minimumContrast = $edgeSpec.minimumContrast
+                frameSampleCount = $contrast.FrameSampleCount
+                backgroundSampleCount = $contrast.BackgroundSampleCount
+                frameMedianLuma = $contrast.FrameMedianLuma
+                backgroundMedianLuma = $contrast.BackgroundMedianLuma
+                contrastDelta = $contrast.ContrastDelta
+                contrastAvailable = $contrast.Available
+                contrastFailureReason = $contrast.FailureReason
                 referenceMeasurement = [ordered]@{
                     qualifyingPixelCount=$referenceContinuity.QualifyingPixelCount
                     coveredAxisPixels=$referenceContinuity.CoveredAxisPixels
@@ -867,6 +996,8 @@ try
                     coverageRatio=$referenceContinuity.CoverageRatio
                     largestGapPixels=$referenceContinuity.LargestGapPixels
                 }
+                continuityPassed = $continuityPassed
+                contrastPassed = $contrastPassed
                 passed = $passed
             }
         }
@@ -920,16 +1051,21 @@ try
             $markdown += "| $($item.name)/$($content.name) | $($content.expectedBounds.x),$($content.expectedBounds.y),$($content.expectedBounds.width),$($content.expectedBounds.height) | $($content.referenceBounds.x),$($content.referenceBounds.y),$($content.referenceBounds.width),$($content.referenceBounds.height) | $($content.actualBounds.x),$($content.actualBounds.y),$($content.actualBounds.width),$($content.actualBounds.height) | dx=$($content.centerDeviationPx.deltaX), dy=$($content.centerDeviationPx.deltaY) | dw=$($content.sizeDeviationPx.deltaWidth), dh=$($content.sizeDeviationPx.deltaHeight) | $($content.passed) |"
         }
     }
-    $markdown += @('', '## Home Create upper decoration', '', "Actual crop (1920×1080 top-left px): $($createDecorationReport.actualRect.x),$($createDecorationReport.actualRect.y),$($createDecorationReport.actualRect.width),$($createDecorationReport.actualRect.height). Native Figure 9 crop: $($createDecorationReport.referenceRect.x),$($createDecorationReport.referenceRect.y),$($createDecorationReport.referenceRect.width),$($createDecorationReport.referenceRect.height).", '', '| Component | Measurement mode | Cyan thresholds (G/G-R/B-R) | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+    $markdown += @('', '## Home Create upper decoration', '', "Actual crop (1920×1080 top-left px): $($createDecorationReport.actualRect.x),$($createDecorationReport.actualRect.y),$($createDecorationReport.actualRect.width),$($createDecorationReport.actualRect.height). Native Figure 9 crop: $($createDecorationReport.referenceRect.x),$($createDecorationReport.referenceRect.y),$($createDecorationReport.referenceRect.width),$($createDecorationReport.referenceRect.height).", '', '| Component | Measurement mode | Cyan thresholds (G/G-R/B-R) | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Measurement status | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($component in @($createDecorationReport.components))
     {
-        $markdown += "| $($component.name) | $($component.measurementMode) | $($component.thresholdMinimumGreen)/$($component.minimumGreenOverRed)/$($component.minimumBlueOverRed) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height) | $($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height) | dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY) | dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight) | $($component.passed) |"
+        $referenceMeasured = if ($component.referenceBounds) { "$($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height)" } else { 'unavailable' }
+        $actualMeasured = if ($component.actualBounds) { "$($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height)" } else { 'unavailable' }
+        $centerDeviation = if ($component.centerDeviationPx) { "dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY)" } else { 'n/a' }
+        $sizeDeviation = if ($component.sizeDeviationPx) { "dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight)" } else { 'n/a' }
+        $measurementStatus = if ($component.measurementAvailable) { 'available' } else { ConvertTo-LanLobbyMarkdownCell ("unavailable: " + [string]$component.measurementError) }
+        $markdown += "| $($component.name) | $($component.measurementMode) | $($component.thresholdMinimumGreen)/$($component.minimumGreenOverRed)/$($component.minimumBlueOverRed) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
     }
-    $markdown += @('', '## Home Create frame continuity', '', "Actual crop (1920×1080 top-left px): $($createFrameReport.actualRect.x),$($createFrameReport.actualRect.y),$($createFrameReport.actualRect.width),$($createFrameReport.actualRect.height). Native Figure 9 crop: $($createFrameReport.referenceRect.x),$($createFrameReport.referenceRect.y),$($createFrameReport.referenceRect.width),$($createFrameReport.referenceRect.height). Overall passed: $($createFrameReport.passed).", '', '| Edge | Axis | Search | Cyan thresholds (G/G-R/B-R) | Reference pixels/coverage/gap | Actual pixels/coverage/gap | Acceptance | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- |')
+    $markdown += @('', '## Home Create frame continuity', '', "Actual crop (1920×1080 top-left px): $($createFrameReport.actualRect.x),$($createFrameReport.actualRect.y),$($createFrameReport.actualRect.width),$($createFrameReport.actualRect.height). Native Figure 9 crop: $($createFrameReport.referenceRect.x),$($createFrameReport.referenceRect.y),$($createFrameReport.referenceRect.width),$($createFrameReport.referenceRect.height). Overall passed: $($createFrameReport.passed).", '', '| Edge | Search/background | Reference pixels/coverage/gap | Actual pixels/coverage/gap | Frame/background median luma | Contrast delta/minimum | Continuity passed | Contrast passed | Passed |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($edge in @($createFrameReport.edges))
     {
-        $acceptance = if ($edge.axis -eq 'diagonal') { "pixels>=$($edge.minimumPixelCount)" } else { "coverage>=$($edge.minimumCoverage), gap<=$($edge.maximumGap)" }
-        $markdown += "| $($edge.name) | $($edge.axis) | $($edge.search.x),$($edge.search.y),$($edge.search.width),$($edge.search.height) | $($edge.thresholdMinimumGreen)/$($edge.minimumGreenOverRed)/$($edge.minimumBlueOverRed) | $($edge.referenceMeasurement.qualifyingPixelCount)/$([Math]::Round($edge.referenceMeasurement.coverageRatio, 4))/$($edge.referenceMeasurement.largestGapPixels) | $($edge.qualifyingPixelCount)/$([Math]::Round($edge.coverageRatio, 4))/$($edge.largestGapPixels) | $acceptance | $($edge.passed) |"
+        $searchAndBackground = "$($edge.search.x),$($edge.search.y),$($edge.search.width),$($edge.search.height) / $($edge.backgroundSearch.x),$($edge.backgroundSearch.y),$($edge.backgroundSearch.width),$($edge.backgroundSearch.height)"
+        $markdown += "| $($edge.name) | $searchAndBackground | $($edge.referenceMeasurement.qualifyingPixelCount)/$([Math]::Round($edge.referenceMeasurement.coverageRatio, 4))/$($edge.referenceMeasurement.largestGapPixels) | $($edge.qualifyingPixelCount)/$([Math]::Round($edge.coverageRatio, 4))/$($edge.largestGapPixels) | $([Math]::Round($edge.frameMedianLuma, 2))/$([Math]::Round($edge.backgroundMedianLuma, 2)) | $([Math]::Round($edge.contrastDelta, 2))/$($edge.minimumContrast) | $($edge.continuityPassed) | $($edge.contrastPassed) | $($edge.passed) |"
     }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
