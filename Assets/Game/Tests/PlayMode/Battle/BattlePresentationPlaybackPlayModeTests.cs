@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
 using ArknoNights.Battle.Core;
@@ -61,6 +62,117 @@ namespace ArknoNights.Battle.Tests
                 Assert.IsEmpty(playback.Diagnostics);
             }
 
+            UnityEngine.Object.Destroy(factoryObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RealCatalog_DynamicArcslmiReplayDisposesAndRecreatesExactIds()
+        {
+            var authoritative = RunSingleArcslmaSummonBattle();
+            var result = WithoutDynamicEventSnapshots(authoritative);
+            var dynamicIds = result.Events
+                .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504")
+                .Select(item => item.UnitId)
+                .ToArray();
+            Assert.That(dynamicIds, Is.EqualTo(new[] { "-1", "-2", "-3" }));
+
+            var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
+            var unitSkelType2 = Type.GetType("UnitSkelType2, Assembly-CSharp");
+            var presentationViewType = Type.GetType("UnitSkelPresentationView, Assembly-CSharp");
+            Assert.IsNotNull(factoryType, "Assembly-CSharp real presentation bridge is unavailable.");
+            Assert.IsNotNull(unitSkelType2);
+            Assert.IsNotNull(presentationViewType);
+            var catalog = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
+            Assert.That(catalog.Success, Is.True, string.Join(";", catalog.Errors.Select(item => item.ToString())));
+            Assert.That(catalog.Catalog.TryGet("5504", out var arcslmi), Is.True);
+            Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/arcslmi/enemy_5504_arcslmi_SkeletonData"));
+            var expectedSkeletonData = Resources.Load(arcslmi.SkeletonDataResourcePath);
+            Assert.IsNotNull(expectedSkeletonData);
+            var factoryObject = new GameObject("TASK4_DynamicArcslmiFactory");
+            var factory = factoryObject.AddComponent(factoryType) as IBattlePresentationViewFactory;
+            Assert.IsNotNull(factory);
+            var firstInstanceIds = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            using (var playback = new BattleEventPlaybackController())
+            {
+                Assert.That(playback.Load(result, factory, out var diagnostics), Is.True, string.Join(";", diagnostics));
+                playback.Play();
+                playback.Advance(100f / BattleInput.TicksPerSecond);
+                yield return null;
+
+                foreach (var unitId in dynamicIds)
+                {
+                    var viewObject = FindChild(factoryObject.transform, "BattleView_" + unitId);
+                    Assert.IsNotNull(viewObject, unitId + " must be created at Spawn Tick 100.");
+                    Assert.IsNotNull(viewObject.GetComponent(unitSkelType2), unitId + " must use UnitSkelType2.");
+                    var skeleton = viewObject.GetComponent("SkeletonAnimation");
+                    Assert.IsNotNull(skeleton);
+                    var skeletonDataField = skeleton.GetType().GetField("skeletonDataAsset", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    Assert.IsNotNull(skeletonDataField);
+                    Assert.AreSame(expectedSkeletonData, skeletonDataField.GetValue(skeleton), unitId);
+                    var presentationView = viewObject.GetComponent(presentationViewType);
+                    Assert.AreEqual("Move", GetPrivateString(presentationView, "moveAnimation"));
+                    Assert.AreEqual("Attack", GetPrivateString(presentationView, "attackAnimation"));
+                    Assert.AreEqual("Die", GetPrivateString(presentationView, "deathAnimation"));
+                    firstInstanceIds.Add(unitId, viewObject.GetInstanceID());
+                }
+
+                Assert.That(playback.Replay(out var replayDiagnostics), Is.True, string.Join(";", replayDiagnostics));
+                yield return null;
+                Assert.That(dynamicIds.All(unitId => FindChild(factoryObject.transform, "BattleView_" + unitId) == null), Is.True,
+                    "Replay must dispose dynamic views before their Spawn Tick.");
+
+                playback.Play();
+                playback.Advance(100f / BattleInput.TicksPerSecond);
+                yield return null;
+                foreach (var unitId in dynamicIds)
+                {
+                    var recreated = FindChild(factoryObject.transform, "BattleView_" + unitId);
+                    Assert.IsNotNull(recreated, unitId + " must be recreated with the same dynamic identity.");
+                    Assert.AreNotEqual(firstInstanceIds[unitId], recreated.GetInstanceID(), unitId + " leaked its pre-Replay GameObject.");
+                }
+            }
+
+            yield return null;
+            Assert.That(dynamicIds.All(unitId => FindChild(factoryObject.transform, "BattleView_" + unitId) == null), Is.True,
+                "Playback disposal must remove all dynamic views.");
+            UnityEngine.Object.Destroy(factoryObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RealCatalog_FactoryUsesTheConfiguredCatalogMapping()
+        {
+            const string arcslmiPath = "Characters/arcslmi/enemy_5504_arcslmi_SkeletonData";
+            const string alternatePath = "Characters/arcslma/enemy_5503_arcslma_SkeletonData";
+            var sourceCatalog = Resources.Load<TextAsset>("BattleData/unit-catalog-v1");
+            Assert.IsNotNull(sourceCatalog);
+            Assert.That(sourceCatalog.text, Does.Contain(arcslmiPath));
+            var alternateCatalog = new TextAsset(sourceCatalog.text.Replace(arcslmiPath, alternatePath));
+            var expectedSkeletonData = Resources.Load(alternatePath);
+            Assert.IsNotNull(expectedSkeletonData);
+
+            var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
+            Assert.IsNotNull(factoryType);
+            var catalogProperty = factoryType.GetProperty("UnitCatalogAsset", BindingFlags.Instance | BindingFlags.Public);
+            Assert.IsNotNull(catalogProperty, "The factory needs a catalog injection seam so catalog provenance is behaviorally testable.");
+            var factoryObject = new GameObject("TASK4_CatalogDrivenFactory");
+            var factory = factoryObject.AddComponent(factoryType) as IBattlePresentationViewFactory;
+            catalogProperty.SetValue(factory, alternateCatalog);
+
+            Assert.That(factory.TryCreate("catalog-probe", "5504", out var view, out var diagnostic), Is.True, diagnostic == null ? string.Empty : diagnostic.ToString());
+            var viewObject = FindChild(factoryObject.transform, "BattleView_catalog-probe");
+            Assert.IsNotNull(viewObject);
+            var skeleton = viewObject.GetComponent("SkeletonAnimation");
+            Assert.IsNotNull(skeleton);
+            var skeletonDataField = skeleton.GetType().GetField("skeletonDataAsset", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.IsNotNull(skeletonDataField);
+            Assert.AreSame(expectedSkeletonData, skeletonDataField.GetValue(skeleton),
+                "The created 5504 view must follow the configured UnitCatalog mapping rather than a type-specific hardcoded path.");
+
+            view.Dispose();
+            UnityEngine.Object.Destroy(alternateCatalog);
             UnityEngine.Object.Destroy(factoryObject);
             yield return null;
         }
@@ -179,6 +291,95 @@ namespace ArknoNights.Battle.Tests
             var field = skeleton.GetType().GetField("timeScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             Assert.IsNotNull(field, "SkeletonAnimation.timeScale is unavailable.");
             return (float)field.GetValue(skeleton);
+        }
+
+        private static BattleRunResult RunSingleArcslmaSummonBattle()
+        {
+            var catalog = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
+            Assert.That(catalog.Success, Is.True, string.Join(";", catalog.Errors.Select(item => item.ToString())));
+            var abilities = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalog.Catalog);
+            Assert.That(abilities.Success, Is.True, string.Join(";", abilities.Errors.Select(item => item.ToString())));
+            var specification = new BattleInputSpecification(
+                BattleInput.SupportedSchemaVersion,
+                "presentation-playmode-single-caster",
+                101,
+                catalog.Catalog.Entries.Select(item => item.Definition),
+                abilities.Catalog.Abilities,
+                new[]
+                {
+                    new PlayerSnapshot("home", BattleSide.Home, new[]
+                    {
+                        new UnitSnapshot("caster", "5503", UnitZone.Deployed, new FormationCoordinate(5, 2), Array.Empty<BuffPlaceholder>())
+                    }),
+                    new PlayerSnapshot("away", BattleSide.Away, new[]
+                    {
+                        new UnitSnapshot("enemy", "1000", UnitZone.Deployed, new FormationCoordinate(5, 2), Array.Empty<BuffPlaceholder>())
+                    })
+                });
+            Assert.That(BattleInputFactory.TryCreate(specification, out var input, out var errors), Is.True, string.Join(";", errors.Select(item => item.ToString())));
+            return new BattleRunner(input).RunToCompletion();
+        }
+
+        private static BattleRunResult WithoutDynamicEventSnapshots(BattleRunResult source)
+        {
+            var events = source.Events.Select(item =>
+                item.Type == BattleEventType.Spawn && item.UnitId.StartsWith("-", StringComparison.Ordinal)
+                    ? CloneEvent(item, null)
+                    : item);
+            return new BattleRunResult(
+                source.BattleId,
+                source.HomePlayerId,
+                source.AwayPlayerId,
+                source.InputCanonicalSummary,
+                source.KnownUnitTypeIds,
+                source.CompletedTicks,
+                source.StopReason,
+                source.Winner,
+                source.Trace,
+                new ReadOnlyCollection<BattleEvent>(events.ToArray()),
+                source.FinalUnits,
+                new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
+                    source.UnitSnapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)),
+                source.StableSummary);
+        }
+
+        private static BattleEvent CloneEvent(BattleEvent source, BattleUnitInstanceSnapshot spawnSnapshot)
+        {
+            return new BattleEvent(
+                source.Type,
+                source.Tick,
+                source.Sequence,
+                source.UnitId,
+                source.UnitTypeId,
+                source.UnitSide,
+                source.RelatedUnitId,
+                source.FromPosition,
+                source.ToPosition,
+                source.DamageType,
+                source.DamageAmount,
+                source.HitPointsBefore,
+                source.HitPointsAfter,
+                source.PlannedDamageTick,
+                source.OriginalAnimationTicks,
+                source.EffectiveAnimationTicks,
+                source.Winner,
+                source.Reason,
+                spawnSnapshot);
+        }
+
+        private static GameObject FindChild(Transform root, string name)
+        {
+            return root.GetComponentsInChildren<Transform>(true)
+                .Where(item => item != root && item.name == name)
+                .Select(item => item.gameObject)
+                .SingleOrDefault();
+        }
+
+        private static string GetPrivateString(Component component, string fieldName)
+        {
+            var field = component.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, fieldName);
+            return (string)field.GetValue(component);
         }
 
         private sealed class FakeFactory : IBattlePresentationViewFactory

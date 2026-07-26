@@ -13,6 +13,7 @@ namespace ArknoNights.Battle.Presentation
         private readonly Dictionary<string, ViewRecord> views = new Dictionary<string, ViewRecord>(StringComparer.Ordinal);
         private readonly List<BattlePresentationDiagnostic> diagnostics = new List<BattlePresentationDiagnostic>();
         private IBattlePresentationViewFactory factory;
+        private float playbackSpeed = 1f;
 
         public BattleTrackPlaybackController(BattlefieldWorldProjection projection = null)
         {
@@ -72,6 +73,7 @@ namespace ArknoNights.Battle.Presentation
                     }
                     record = new ViewRecord(unit, view);
                     views.Add(unit.UnitId, record);
+                    view.SetPlaybackSpeed(playbackSpeed);
                 }
                 Apply(record, sample);
             }
@@ -89,6 +91,7 @@ namespace ArknoNights.Battle.Presentation
 
         public void SetPlaybackSpeed(float playbackSpeed)
         {
+            this.playbackSpeed = playbackSpeed;
             foreach (var record in views.Values) record.View.SetPlaybackSpeed(playbackSpeed);
         }
 

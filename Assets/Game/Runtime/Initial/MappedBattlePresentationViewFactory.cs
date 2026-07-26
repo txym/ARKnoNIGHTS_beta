@@ -26,6 +26,18 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
 
     [SerializeField] private Transform unitParent;
     [SerializeField] private Binding[] bindings = Array.Empty<Binding>();
+    [SerializeField] private TextAsset unitCatalogAsset;
+
+    /// <summary>
+    /// Optional Player-safe catalog asset override. When unset, the generated Resources catalog is loaded.
+    /// This keeps resource selection data-driven while allowing a scene or test harness to provide another
+    /// validated catalog without type-specific factory branches.
+    /// </summary>
+    public TextAsset UnitCatalogAsset
+    {
+        get => unitCatalogAsset;
+        set => unitCatalogAsset = value;
+    }
 
     public bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic)
     {
@@ -33,7 +45,9 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
         diagnostic = null;
         var binding = Array.Find(bindings, item => item != null && string.Equals(item.coreTypeId, typeId, StringComparison.Ordinal));
         UnitCatalogEntry catalogEntry = null;
-        var catalogResult = UnitCatalogLoader.LoadFromResources(DefaultCatalogResourcePath);
+        var catalogResult = unitCatalogAsset
+            ? UnitCatalogLoader.LoadFromJson(unitCatalogAsset.text)
+            : UnitCatalogLoader.LoadFromResources(DefaultCatalogResourcePath);
         if (catalogResult.Success) catalogResult.Catalog.TryGet(typeId, out catalogEntry);
         if (binding == null && catalogEntry == null)
         {

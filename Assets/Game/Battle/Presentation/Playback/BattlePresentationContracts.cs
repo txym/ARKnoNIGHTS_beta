@@ -46,7 +46,7 @@ namespace ArknoNights.Battle.Presentation
         public string UnitId { get; }
         public int Tick { get; }
         public int Sequence { get; }
-        public override string ToString() => Code + ": " + Message + " @ " + Tick + "/" + Sequence;
+        public override string ToString() => Code + ": " + Message + " battleId=" + BattleId + " unitId=" + UnitId + " tick=" + Tick + " sequence=" + Sequence;
     }
 
     public sealed class BattlePresentationViewState
