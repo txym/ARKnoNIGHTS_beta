@@ -31,6 +31,14 @@ namespace ArknoNights.Battle.Presentation
                 : new FixedPosition((BattlefieldCoordinate.Width + 1) * FixedPosition.UnitsPerMetre - source.XUnits, (BattlefieldCoordinate.Height + 1) * FixedPosition.UnitsPerMetre - source.YUnits);
         }
 
+        public PresentationPosition Project(PresentationPosition source, BattleObserverView observer) => observer == BattleObserverView.Home ? source : new PresentationPosition(10d - source.XUnits, 9d - source.YUnits);
+
+        public Vector3 ToWorld(PresentationPosition source, BattleObserverView observer)
+        {
+            var projected = Project(source, observer);
+            return Origin + XAxis * (float)(projected.XUnits * FixedPosition.UnitsPerMetre) + YAxis * (float)(projected.YUnits * FixedPosition.UnitsPerMetre);
+        }
+
         public Vector3 ToWorld(FixedPosition source, BattleObserverView observer)
         {
             var projected = Project(source, observer);

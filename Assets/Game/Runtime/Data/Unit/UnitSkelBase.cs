@@ -147,6 +147,11 @@ public abstract class UnitSkelBase : MonoBehaviour
         return true;
     }
 
+    public bool PlayDefaultPresentationAnimation()
+    {
+        return !string.IsNullOrEmpty(defaultAnimation) && PlayPresentationAnimation(defaultAnimation, defaultLoop, 1f);
+    }
+
     public TrackEntry QueueAnimation(string animName, bool loop = true)
     {
         try
