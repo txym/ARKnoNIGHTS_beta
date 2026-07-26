@@ -65,13 +65,14 @@ namespace ArknoNights.Player
 
     public sealed class LocalMatchPlayerSnapshot
     {
-        internal LocalMatchPlayerSnapshot(string playerId, string displayName, string avatarResourcePath, int life, bool isConnected, PlayerStateSnapshot playerState, int level, int gold, bool isReady, IEnumerable<LocalMatchShopSlotSnapshot> shopSlots)
+        internal LocalMatchPlayerSnapshot(string playerId, string displayName, string avatarResourcePath, int life, bool isConnected, bool hasExited, PlayerStateSnapshot playerState, int level, int gold, bool isReady, IEnumerable<LocalMatchShopSlotSnapshot> shopSlots)
         {
             PlayerId = playerId;
             DisplayName = displayName ?? string.Empty;
             AvatarResourcePath = avatarResourcePath ?? string.Empty;
             Life = life;
             IsConnected = isConnected;
+            HasExited = hasExited;
             PlayerState = playerState;
             Level = level;
             Gold = gold;
@@ -84,6 +85,7 @@ namespace ArknoNights.Player
         public string AvatarResourcePath { get; }
         public int Life { get; }
         public bool IsConnected { get; }
+        public bool HasExited { get; }
         public PlayerStateSnapshot PlayerState { get; }
         public int Level { get; }
         public int Gold { get; }
@@ -117,6 +119,7 @@ namespace ArknoNights.Player
             foreach (var player in Players)
             {
                 builder.Append("|P:").Append(player.PlayerId).Append(',').Append(player.Life).Append(',').Append(player.IsConnected ? 1 : 0)
+                    .Append(',').Append(player.HasExited ? 1 : 0)
                     .Append(',').Append(player.Level).Append(',').Append(player.Gold).Append(',').Append(player.IsReady ? 1 : 0)
                     .Append(',').Append(player.PlayerState.CanonicalSummary);
                 foreach (var slot in player.ShopSlots)
@@ -149,7 +152,7 @@ namespace ArknoNights.Player
         public const int MaximumLevel = 9;
         public const int InitialGold = 7;
         public const int RefreshCost = 1;
-        public const int ShopSlotCount = 5;
+        public const int ShopSlotCount = 6;
 
         private static readonly int[] UpgradeCosts = { 4, 6, 8, 10, 12, 14, 16, 18 };
 
@@ -333,7 +336,7 @@ namespace ArknoNights.Player
             {
                 var local = string.Equals(player.PlayerId, localPlayerId, StringComparison.Ordinal);
                 var slots = local ? shopSlots.Select(slot => new LocalMatchShopSlotSnapshot(slot.ShopSlotId, slot.UnitTypeId, slot.IsFrozen, catalog)) : Enumerable.Empty<LocalMatchShopSlotSnapshot>();
-                return new LocalMatchPlayerSnapshot(player.PlayerId, player.DisplayName, player.AvatarResourcePath, player.Life, player.IsConnected, player.PlayerState.Snapshot, local ? level : 0, local ? gold : 0, local && isReady, slots);
+                return new LocalMatchPlayerSnapshot(player.PlayerId, player.DisplayName, player.AvatarResourcePath, player.Life, player.IsConnected, player.HasExited, player.PlayerState.Snapshot, local ? level : 0, local ? gold : 0, local && isReady, slots);
             });
             return new LocalMatchSnapshot(localPlayerId, observedPlayerId, version, players);
         }
@@ -390,7 +393,7 @@ namespace ArknoNights.Player
                 }
                 if (!string.Equals(playerState.PlayerId, source.playerId, StringComparison.Ordinal)) { errors.Add(Error("localMatch.playerState.playerId.mismatch", source.playerId)); continue; }
                 if (playerState.Snapshot.Units.Any(unit => !unitIds.Add(unit.UnitId))) { errors.Add(Error("localMatch.unitId.duplicate", source.playerId)); continue; }
-                players.Add(new LocalMatchPlayerData(source.playerId, source.displayName, source.avatarResourcePath, source.life, source.isConnected, playerState));
+                players.Add(new LocalMatchPlayerData(source.playerId, source.displayName, source.avatarResourcePath, source.life, source.isConnected, source.hasExited, playerState));
             }
 
             if (string.IsNullOrWhiteSpace(dto.localPlayerId) || !playerIds.Contains(dto.localPlayerId)) errors.Add(Error("localMatch.localPlayer.invalid", dto.localPlayerId));
@@ -414,19 +417,20 @@ namespace ArknoNights.Player
         private static LocalMatchValidationError Error(string code, string detail) => new LocalMatchValidationError(code, detail ?? string.Empty);
 
         [Serializable] private sealed class LocalMatchStateDto { public string schemaVersion; public string localPlayerId; public int initialLevel; public int initialGold; public LocalMatchPlayerDto[] players; public LocalMatchShopPageDto[] shopPages; }
-        [Serializable] private sealed class LocalMatchPlayerDto { public string playerId; public string displayName; public string avatarResourcePath; public int life; public bool isConnected; public string playerStateResourcePath; }
+        [Serializable] private sealed class LocalMatchPlayerDto { public string playerId; public string displayName; public string avatarResourcePath; public int life; public bool isConnected; public bool hasExited; public string playerStateResourcePath; }
         [Serializable] private sealed class LocalMatchShopPageDto { public string[] typeIds; }
     }
 
     internal sealed class LocalMatchPlayerData
     {
-        public LocalMatchPlayerData(string playerId, string displayName, string avatarResourcePath, int life, bool isConnected, PlayerState playerState)
+        public LocalMatchPlayerData(string playerId, string displayName, string avatarResourcePath, int life, bool isConnected, bool hasExited, PlayerState playerState)
         {
             PlayerId = playerId;
             DisplayName = displayName;
             AvatarResourcePath = avatarResourcePath;
             Life = life;
             IsConnected = isConnected;
+            HasExited = hasExited;
             PlayerState = playerState;
         }
 
@@ -435,6 +439,7 @@ namespace ArknoNights.Player
         public string AvatarResourcePath { get; }
         public int Life { get; }
         public bool IsConnected { get; }
+        public bool HasExited { get; }
         public PlayerState PlayerState { get; }
     }
 

@@ -102,10 +102,10 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     /// <summary>Right-side HUD geometry. Its reference positions are visual defaults pending scene-level acceptance.</summary>
     public static class ShopReadyHudLayout
     {
-        public static readonly ShopReadyHudRect ReferenceReadyButton = new ShopReadyHudRect(1710f, 400f, 180f, 60f);
+        public static readonly ShopReadyHudRect ReferenceReadyButton = new ShopReadyHudRect(1740f, 400f, 180f, 60f);
         public static readonly ShopReadyHudRect ReferenceLevelPanel = new ShopReadyHudRect(1735f, 930f, 130f, 120f);
         public static readonly ShopReadyHudRect ReferenceShopToggle = ReferenceLevelPanel;
-        public static readonly ShopReadyHudRect ReferenceShopPanel = new ShopReadyHudRect(820f, 600f, 1070f, 280f);
+        public static readonly ShopReadyHudRect ReferenceShopPanel = new ShopReadyHudRect(250f, 550f, 1605f, 420f);
 
         public static ShopReadyHudLayoutResult Calculate(float screenWidth, float screenHeight)
         {

@@ -111,13 +111,16 @@ namespace ArknoNights.UI.PlayerListObserver
     /// <summary>Independent presentation data for exactly one player-list row.</summary>
     public sealed class PlayerListEntryPresentation
     {
+        private const string ExitedAvatarResourcePath = "UI/Texture/player_list/equip_replace_avatart_bg";
+
         internal PlayerListEntryPresentation(LocalMatchPlayerSnapshot player, bool isLocalPlayer, bool isObservedPlayer)
         {
             PlayerId = player.PlayerId;
             DisplayName = player.DisplayName;
-            AvatarResourcePath = player.AvatarResourcePath;
+            AvatarResourcePath = player.HasExited ? ExitedAvatarResourcePath : player.AvatarResourcePath;
             Life = player.Life;
             IsConnected = player.IsConnected;
+            HasExited = player.HasExited;
             IsLocalPlayer = isLocalPlayer;
             IsObservedPlayer = isObservedPlayer;
         }
@@ -127,6 +130,8 @@ namespace ArknoNights.UI.PlayerListObserver
         public string AvatarResourcePath { get; }
         public int Life { get; }
         public bool IsConnected { get; }
+        public bool HasExited { get; }
+        public bool ShowsLostConnection => !IsConnected;
         public bool IsLocalPlayer { get; }
         public bool IsObservedPlayer { get; }
     }
@@ -151,11 +156,14 @@ namespace ArknoNights.UI.PlayerListObserver
     public static class PlayerListLayout
     {
         private const float ReferenceHeight = 1080f;
-        private const float ReferenceLeftPadding = 24f;
+        private const float ReferenceLeftPadding = 8f;
         private const float ReferenceTopPadding = 164f;
-        private const float ReferenceRowWidth = 116f;
-        private const float ReferenceRowHeight = 126f;
-        private const float ReferenceRowSpacing = 10f;
+        private const float ReferenceBackgroundWidth = 116f;
+        private const float ReferenceBackgroundHeight = 534f;
+        private const float ReferencePlayerScale = .85f;
+        private const float ReferenceRowWidth = 116f * ReferencePlayerScale;
+        private const float ReferenceRowHeight = 126f * ReferencePlayerScale;
+        private const float ReferenceRowSpacing = 13f;
 
         public static PlayerListLayoutSnapshot Calculate(float viewportWidth, float viewportHeight, int rowCount, bool isVisible)
         {
@@ -165,15 +173,19 @@ namespace ArknoNights.UI.PlayerListObserver
             var rowHeight = ReferenceRowHeight * scale;
             var rowSpacing = ReferenceRowSpacing * scale;
             var rows = new List<PlayerListRowLayout>(Math.Max(0, rowCount));
-            var top = ReferenceTopPadding * scale;
+            var backgroundWidth = ReferenceBackgroundWidth * scale;
+            var backgroundHeight = ReferenceBackgroundHeight * scale;
+            var backgroundTop = ReferenceTopPadding * scale;
+            var rowGroupHeight = rowCount <= 0 ? 0f : rowHeight * rowCount + rowSpacing * (rowCount - 1);
+            var rowLeft = leftPadding + (backgroundWidth - rowWidth) * .5f - 1f * scale;
+            var rowTop = backgroundTop + (backgroundHeight - rowGroupHeight) * .5f;
             for (var index = 0; index < rowCount; index++)
             {
-                var yMin = top + index * (rowHeight + rowSpacing);
-                rows.Add(new PlayerListRowLayout(index, leftPadding, yMin, rowWidth, rowHeight));
+                var yMin = rowTop + index * (rowHeight + rowSpacing);
+                rows.Add(new PlayerListRowLayout(index, rowLeft, yMin, rowWidth, rowHeight));
             }
 
-            var backgroundHeight = rowCount <= 0 ? 0f : rowHeight * rowCount + rowSpacing * (rowCount - 1);
-            var background = new PlayerListRectLayout(leftPadding, top, rowWidth, backgroundHeight);
+            var background = new PlayerListRectLayout(leftPadding, backgroundTop, backgroundWidth, backgroundHeight);
             return new PlayerListLayoutSnapshot(isVisible, leftPadding, background, new ReadOnlyCollection<PlayerListRowLayout>(rows));
         }
     }

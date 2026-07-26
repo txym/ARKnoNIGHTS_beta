@@ -123,6 +123,7 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
         shopReady = shopRoot.AddComponent<ShopReadyHudController>();
         shopReady.Initialize(match);
         shopReady.FormationInteractionChanged += HandleShopFormationInteractionChanged;
+        shopReady.ShopVisibilityChanged += HandleShopVisibilityChanged;
 
         var playerListRoot = new GameObject("PlayerListPanel", typeof(RectTransform));
         playerListRoot.transform.SetParent(canvas.transform, false);
@@ -150,8 +151,19 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
     private void BindFormalSelection()
     {
         if (formalSelectionBound || formalHud == null || observer == null) return;
-        formalHud.SelectionChanged += observer.SetUnitSelected;
+        formalHud.SelectionChanged += HandleFormalSelectionChanged;
         formalSelectionBound = true;
+    }
+
+    private void HandleFormalSelectionChanged(bool selected)
+    {
+        observer?.SetUnitSelected(selected);
+        if (selected) shopReady?.SetShopVisible(false);
+    }
+
+    private void HandleShopVisibilityChanged(bool visible)
+    {
+        if (visible) formalHud?.ClearSelectionForSceneTransition();
     }
 
     private void HandlePhaseChanged(LocalBattlePhase previous, LocalBattlePhase next)
@@ -242,7 +254,8 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
     private void OnDestroy()
     {
         if (shopReady != null) shopReady.FormationInteractionChanged -= HandleShopFormationInteractionChanged;
-        if (formalSelectionBound && formalHud != null && observer != null) formalHud.SelectionChanged -= observer.SetUnitSelected;
+        if (shopReady != null) shopReady.ShopVisibilityChanged -= HandleShopVisibilityChanged;
+        if (formalSelectionBound && formalHud != null) formalHud.SelectionChanged -= HandleFormalSelectionChanged;
         if (observer != null) observer.Changed -= RefreshPresentation;
         observer?.Dispose();
         observedFormation?.Dispose();
@@ -299,6 +312,8 @@ public sealed class PlayerListHudController : MonoBehaviour
 
     private void BuildRow(PlayerListEntryPresentation entry, PlayerListRowLayout layout)
     {
+        const float referenceRowWidth = 116f;
+        var contentScale = layout.Width / referenceRowWidth;
         var row = new GameObject("Player_" + entry.PlayerId, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         row.transform.SetParent(root, false);
         var rowRect = row.GetComponent<RectTransform>();
@@ -314,48 +329,53 @@ public sealed class PlayerListHudController : MonoBehaviour
         button.onClick.AddListener(() => selectPlayer(entry.PlayerId));
 
         var avatar = Image("Avatar", row.transform, LoadAvatar(entry));
-        Position(avatar.rectTransform, 58f, 70f, 92f, 92f);
+        PositionScaled(avatar.rectTransform, 58f, 70f, 92f, 92f, contentScale);
         avatar.preserveAspect = true;
         var border = Image("AvatarBorder", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/avatar_border"));
-        Position(border.rectTransform, 58f, 70f, 108f, 108f);
+        PositionScaled(border.rectTransform, 58f, 70f, 108f, 108f, contentScale);
         border.preserveAspect = true;
         if (entry.IsLocalPlayer)
         {
             var self = Image("Self", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_self"));
-            Position(self.rectTransform, 28f, 110f, 32f, 32f);
+            PositionScaled(self.rectTransform, 28f, 110f, 32f, 32f, contentScale);
             self.preserveAspect = true;
         }
-        if (!entry.IsConnected)
+        if (entry.ShowsLostConnection)
         {
             var lost = Image("LostConnection", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_lost_connect"));
-            Position(lost.rectTransform, 58f, 70f, 64f, 64f);
+            PositionScaled(lost.rectTransform, 58f, 70f, 64f, 64f, contentScale);
             lost.preserveAspect = true;
         }
         if (entry.IsObservedPlayer && !entry.IsLocalPlayer)
         {
             var observing = Image("Observing", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_observing"));
-            Position(observing.rectTransform, 105f, 112f, 44f, 39f);
+            PositionScaled(observing.rectTransform, 105f, 112f, 44f, 39f, contentScale);
             observing.preserveAspect = true;
         }
 
         // Disconnect is represented exclusively by LostConnection. bg_lose_hp is reserved for
         // a future, explicit post-battle life-loss presentation and must not imply that state here.
         var hp = Image("HealthBackground", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/bg_hp"));
-        Position(hp.rectTransform, 58f, 36f, 92f, 24f);
+        PositionScaled(hp.rectTransform, 58f, 36f, 92f, 24f, contentScale);
         hp.preserveAspect = false;
         var hpIcon = Image("HealthIcon", hp.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_hp"));
-        Position(hpIcon.rectTransform, 14f, 12f, 12f, 18f);
+        PositionScaled(hpIcon.rectTransform, 14f, 12f, 12f, 18f, contentScale);
         hpIcon.preserveAspect = true;
-        var value = Text("Life", hp.transform, 18, TextAnchor.MiddleCenter, Color.white);
+        var value = Text("Life", hp.transform, Mathf.RoundToInt(18f * contentScale), TextAnchor.MiddleCenter, Color.white);
         value.font = StagingHudController.FormalNumericFont;
         value.text = entry.Life.ToString();
-        Position(value.rectTransform, 55f, 12f, 60f, 20f);
+        PositionScaled(value.rectTransform, 55f, 12f, 60f, 20f, contentScale);
         if (entry.IsLocalPlayer && coordinator.IsObservingAnotherPlayer)
         {
             var returnButton = Image("ReturnLocal", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/btn_return_self"));
-            Position(returnButton.rectTransform, 58f, 70f, 110f, 110f);
+            PositionScaled(returnButton.rectTransform, 58f, 70f, 110f, 110f, contentScale);
             returnButton.preserveAspect = true;
         }
+    }
+
+    private static void PositionScaled(RectTransform target, float centerX, float centerY, float width, float height, float scale)
+    {
+        Position(target, centerX * scale, centerY * scale, width * scale, height * scale);
     }
 
     private static Sprite LoadAvatar(PlayerListEntryPresentation entry)

@@ -530,3 +530,59 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 最终全量测试：`Artifacts/BattleHudVisualAudit/final/EditMode/EditModeResults.xml` 为 `135 passed / 0 failed / 0 skipped`；独立审查补齐升级费用背景中心断言后，`Artifacts/BattleHudVisualAudit/final/PlayMode-review/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。两次 Unity 均在结果写入后正常退出。
 - 严格 Windows x64 构建：`Artifacts/BattleHudVisualAudit/final/windows-build.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到 `Artifacts/BattleHudVisualAudit/final/WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告仍为既有 `TagRegistry.freezeAppend` 未使用，与本轮 HUD 修改无关。
 - 尚未自动验证：真实鼠标点击热区、连续悬停效果、按钮在不同 Windows DPI/宽高比下的视觉一致性，以及长时间观察 Spine 动画切换。自动截图命令直接调用正式命令入口，不能替代这些人工交互检查。
+
+## 37. 商店放大与视觉中心修正（2026-07-26）
+
+- Red 基线：`Artifacts/BattleHudVisualAudit/requested-adjustment/red-editmode/EditModeResults.xml` 为 `135 total / 133 passed / 2 failed / 0 skipped`，两项失败分别确认旧商店仍为 `1070×280`、左侧玩家列表仍保留 `24px` 边距；`requested-adjustment/red-playmode/PlayModeResults.xml` 为 `1 failed`，确认场景尚未满足新几何约束。
+- 最终 EditMode：`Artifacts/BattleHudVisualAudit/requested-adjustment/final-editmode/EditModeResults.xml` 为 `135 passed / 0 failed / 0 skipped`。新增断言覆盖商店 `1.5×` 尺寸、等级按钮与商店上/右边缘连接、准备按钮中垂线、玩家列表 `8px` 左边距及 `0.85×` 行尺寸。
+- 最终 PlayMode：`Artifacts/BattleHudVisualAudit/requested-adjustment/final-playmode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。场景集成断言覆盖五张 `237×262.5` 商品卡、`12px` 间距、刷新价格背景、三类价格文字 `3px` 视觉上移、冻结/刷新内容 `9px` 视觉上移、两种等级数字颜色、准备按钮与资源面板共中垂线，以及玩家头像缩放。
+- 严格 Windows x64 构建：`Artifacts/BattleHudVisualAudit/requested-adjustment/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`；唯一警告仍为既有未使用字段。
+- 可见 Player 截图：`Artifacts/BattleHudVisualAudit/requested-adjustment/iteration-1/captures/` 包含 `17` 张互不重复的 `1920×1080` PNG 和结构化 manifest。已逐图检查商店打开、全部非空槽冻结和已准备状态；manifest 记录等级按钮 `1735,30,130,120`、商店 `260,150,1605,420`、准备按钮 `1740,620,180,60`、首名玩家 `8,164,98.6,107.1`，并确认冻结截图中五个非空槽均为 `frozen=True`。Player 日志记录 `[BattleHudCapture][completed] count=17`，未发现捕获失败或运行时异常。
+- 尚未自动验证：真实鼠标点击热区、不同 Windows DPI/非 `16:9` 分辨率下的视觉观感，以及用户对本轮 `1.5×` 商店和 `0.85×` 玩家头像最终大小的主观确认。PlayMode 会在 `4:3` 测试画布验证右锚定关系，但不能替代目标 `1920×1080` 的截图判断。
+
+## 38. 六槽商店、战斗期操作与玩家列表纠正（2026-07-26）
+
+- Red 基线：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/red-editmode/EditModeResults.xml` 为 `136 total / 10 failed / 0 skipped`，失败均来自六槽领域数据、战斗期商店命令、固定玩家列表背景及新几何断言；`red-playmode-8/PlayModeResults.xml` 为 `1 failed`，首个失败明确显示背景仍被错误缩小为 `98.6×453.9`，而期望为 `116×534`。
+- 最终 EditMode：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/green-editmode/EditModeResults.xml` 为 `136 passed / 0 failed / 0 skipped`。覆盖六槽加载、购买/刷新/冻结、战斗阶段购买/刷新/冻结/升级、商店左移以及玩家条目在固定背景内的尺寸和间距。
+- 最终 PlayMode：第一次 Green 仅因旧的“商店右边缘与等级按钮共线”断言失败，实际正好按新规则左移 `10`；更新为本轮明确几何后，`Artifacts/BattleHudVisualAudit/requested-adjustment-2/green-playmode-2/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。场景断言覆盖六张商品卡、三类费用位置、刷新费用贴底、升级确认渐变、商店/单位面板双向互斥、战斗期等级入口与完整商店命令。
+- 严格 Windows x64 构建：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告仍为既有未使用字段。
+- 可见 Player 截图：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/iteration-1/captures/` 包含 `17` 张互不重复的 `1920×1080` PNG 和结构化 manifest。逐图核对确认：`bg_player_list` 保持 `116×534`；四个 `Player_*` 条目为 `98.6×107.1`、左侧 `x=16.7`，以 `13` 间距在背景内居中；商店为六槽且整体左移 `10`；商品/升级费用下移、商品费用左移、刷新费用贴底和升级确认渐变均可见；单位信息面板出现时商店关闭；`12_battle_match_ab_home.png` 明确记录并显示战斗阶段商店已打开。manifest 的所有记录均含 `6` 个商店槽，Player 日志记录 `[BattleHudCapture][completed] count=17`，未发现捕获失败、空白图或运行时异常。
+- 尚未自动验证：真实鼠标连续执行战斗期购买、刷新、冻结和升级；六张商品卡及越过商店面板左边缘的升级按钮在非 `16:9`、不同 DPI 下的点击热区；不同分辨率下玩家头像条目间距的主观观感。自动测试和截图使用正式命令入口，但不能替代上述人工鼠标检查。
+
+## 39. 商店纵向位置、按钮贴边与方正字体修正（2026-07-26）
+
+- Red：`Artifacts/BattleHudVisualAudit/requested-adjustment-3/red-editmode/EditModeResults.xml` 为 `136 total / 2 failed / 0 skipped`，分别证明玩家行仍在 `x=16.7`、商店仍未上移 `40`。随后同一个场景 PlayMode 按断言顺序依次在 `red-playmode-buttons`、`red-playmode-refresh-cost`、`red-playmode-font` 中暴露冻结/刷新按钮旧位置、刷新费用背景仍以中心贴边，以及中文仍为汉仪字体。
+- Green：`Artifacts/BattleHudVisualAudit/requested-adjustment-3/green-editmode/EditModeResults.xml` 为 `136 passed / 0 failed / 0 skipped`；`green-playmode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。断言覆盖玩家行 `x=15.7`、商店面板上移 `40`、冻结右移 `10`、刷新右移 `15`、刷新费用背景底边贴按钮底边，以及商店/准备中文统一使用 `FangZhengHeiTiJianTi-1`。
+- Windows x64：`Artifacts/BattleHudVisualAudit/requested-adjustment-3/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`；唯一警告仍为既有 `TagRegistry.freezeAppend` 未使用。
+- 截图：同目录 `captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest。`02_shop_open.png` 已逐项复核方正字体、商店及按钮位置和刷新价格贴边；manifest 记录商店屏幕矩形为 `(250,110,1605,420)`、首名玩家为 `(15.7,197.3,98.6,107.1)`，并记录 `[BattleHudCapture][completed] count=17`，未发现运行时异常或空白图。
+- 尚未自动验证：真实鼠标点击在新按钮位置的主观手感，以及非 `16:9`、不同 DPI 下字体清晰度和按钮阴影的视觉中心。
+
+## 40. 冻结/刷新下移与退出玩家头像替换（2026-07-26）
+
+- Red：`Artifacts/BattleHudVisualAudit/requested-adjustment-4/red-playmode/PlayModeResults.xml` 以 `1 failed` 证明冻结和刷新按钮仍位于旧的局部 `y=0`；`red-editmode` 与 `red-editmode-overlay` 分别证明领域快照尚无独立退出状态、退出行尚未显式抑制掉线覆盖图。固定 fixture 验收开始后，`red-fixture-editmode/EditModeResults.xml` 为 `7 total / 2 failed / 0 skipped`，两项失败分别确认 Player3 尚未作为掉线样本、Player4 尚未作为退出样本。
+- Green：`Artifacts/BattleHudVisualAudit/requested-adjustment-4/final-editmode/EditModeResults.xml` 为 `137 passed / 0 failed / 0 skipped`；`final-playmode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`，两次 Unity 均在结果写入后正常退出。该轮按当时解释断言冻结/刷新按钮局部 `y=-20`、Player3 继续显示掉线覆盖图，以及 Player4 使用 `equip_replace_avatart_bg` 且不创建 `LostConnection` 子物体；其中退出玩家不显示掉线图标的解释已被第 41 节的用户纠正取代。
+- Windows x64：`Artifacts/BattleHudVisualAudit/requested-adjustment-4/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=2`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`。日志中的唯一不同警告文本仍是既有 `TagRegistry.freezeAppend` 未使用；本轮没有新增编译诊断。
+- 截图：同目录 `captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest，Player 日志记录 `[BattleHudCapture][completed] count=17`。已检查 `02_shop_open.png` 的冻结/刷新整体下移效果，以及 `11_player_disconnect_and_exit_list.png` 中 Player3 的掉线头像和 Player4 的退出替换头像；未发现截图失败、空白图或运行时异常。
+- 尚未自动验证：联网系统真实触发“已退出”的状态迁移、退出后是否仍可观察或参与后续配对，以及真实鼠标在按钮新位置的点击手感；当前本地 Demo 仅从固定 JSON 读取该显示状态。
+
+## 41. 退出玩家掉线图标层级与商店按钮再次下移（2026-07-26）
+
+- Red：`Artifacts/BattleHudVisualAudit/requested-adjustment-5/red-editmode/EditModeResults.xml` 为 `1 failed`，确认旧投影错误地用 `HasExited` 抑制掉线图标；`red-playmode/PlayModeResults.xml` 为 `1 failed`，确认真实场景中的退出玩家缺少 `LostConnection`，且冻结/刷新仍位于旧的局部 `y=-20`。
+- 针对性 Green：未运行全量测试。`green-editmode/EditModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`；`green-playmode/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。场景断言同时核对 Player4 的替换头像、`LostConnection` 子物体晚于头像绘制，以及冻结/刷新按钮局部 `y=-30`。
+- Windows x64：`Artifacts/BattleHudVisualAudit/requested-adjustment-5/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=0`。
+- 截图：同目录 `captures/02_shop_open.png` 和 `11_player_disconnect_and_exit_list.png` 已人工复核；冻结/刷新相对上一轮继续下移 `10`，Player4 的 `icon_lost_connect` 可见于 `equip_replace_avatart_bg` 之上。Player 日志记录 `[BattleHudCapture][completed] count=17`，没有捕获失败或运行时异常。
+- 未验证：本轮按用户要求未运行全量 EditMode/PlayMode；联网系统触发退出的真实流程和真实鼠标热区仍未验证。
+
+## 42. 刷新免费费用 UI-only 接口（2026-07-26）
+
+- Red：`Artifacts/BattleHudVisualAudit/refresh-free-interface/red-playmode/PlayModeResults.xml` 为 `1 failed`；真实 `SampleScene` 已有刷新费用节点，但 `ShopReadyHudController` 尚无可调用的免费表现接口。
+- 针对性 Green：`green-playmode/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。测试直接调用正式控制器的 `SetRefreshFreePresentation(true)`，确认背景切换为 `cost_free`、费用数字隐藏且玩家赤金不变；再调用 `false`，确认恢复 `cost_bg_1` 与费用数字。
+- 未运行全量测试或新一轮截图构建。该接口默认关闭，当前截图流程与实际刷新扣费行为不变。
+
+## 43. HUD 更新最终全量回归与提交前验收（2026-07-26）
+
+- 全量 EditMode：`Artifacts/BattleHudVisualAudit/final-regression/EditMode/EditModeResults.xml` 为 `137 passed / 0 failed / 0 skipped`。结果 XML 完整写入后 Unity 超过 `20` 秒退出宽限，由测试脚本只终止该次测试进程；测试结果已成功解析。
+- 全量 PlayMode：`Artifacts/BattleHudVisualAudit/final-regression/PlayMode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`，Unity 在结果写入后正常退出。
+- 严格 Windows x64：`Artifacts/BattleHudVisualAudit/final-regression/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出为 `WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告是既有 `TagRegistry.freezeAppend` 未使用。
+- 可见 Player 截图：`Artifacts/BattleHudVisualAudit/final-regression/captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest；日志记录 `[BattleHudCapture][completed] count=17`。已重点复核商店、冻结/刷新位置、Player3 掉线表现及 Player4 退出替换头像与掉线图标层级，未发现捕获失败或运行时异常。
+- 提交前范围检查：新退出头像贴图与 `.meta` 成对保留；`.superpowers/` 和 `docs/bonds/` 属于无关未跟踪内容，不纳入 HUD 最终提交。

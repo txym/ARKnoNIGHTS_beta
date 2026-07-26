@@ -98,11 +98,13 @@ public sealed class BattleHudCaptureRunner : MonoBehaviour
 
         formal.ClearSelectionForSceneTransition();
         integration.TryObservePlayer(loop.MatchState.Snapshot.LocalPlayerId);
-        yield return CaptureOne("11_player_disconnected_list");
+        yield return CaptureOne("11_player_disconnect_and_exit_list");
         if (loop.MatchState.Snapshot.LocalPlayer.IsReady) shop.ToggleReady();
         loop.AdvanceForTests(PreparationBattlePhaseMachine.PreparationDurationSeconds);
         yield return null;
+        shop.SetShopVisible(true);
         yield return CaptureOne("12_battle_match_ab_home");
+        shop.SetShopVisible(false);
         integration.TryObservePlayer("local-ui-player-2");
         yield return CaptureOne("13_battle_match_ab_away");
         integration.TryObservePlayer("local-ui-player-3");

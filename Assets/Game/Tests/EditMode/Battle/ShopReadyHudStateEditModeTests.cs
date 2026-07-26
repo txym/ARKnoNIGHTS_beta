@@ -14,13 +14,13 @@ namespace ArknoNights.Battle.Tests
         private const string MatchPath = "PlayerData/local-match-state-v1";
 
         [Test]
-        public void Project_MapsExactlyFiveShopSlotsAndExposesTheirCatalogPrices()
+        public void Project_MapsExactlySixShopSlotsAndExposesTheirCatalogPrices()
         {
             var state = ShopReadyHudState.Project(Load().Snapshot, true, ShopReadyConfirmation.None);
 
-            Assert.AreEqual(5, state.Slots.Count);
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4 }, state.Slots.Select(slot => slot.ShopSlotId));
-            CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 1 }, state.Slots.Select(slot => slot.Price));
+            Assert.AreEqual(6, state.Slots.Count);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5 }, state.Slots.Select(slot => slot.ShopSlotId));
+            CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 1, 1 }, state.Slots.Select(slot => slot.Price));
             Assert.IsTrue(state.ShopCommandsEnabled);
         }
 
@@ -135,7 +135,7 @@ namespace ArknoNights.Battle.Tests
         {
             var match = Load();
             Assert.IsTrue(match.TryToggleFrozen(0).Success);
-            Assert.IsTrue(match.TryPurchase(4).Success);
+            Assert.IsTrue(match.TryPurchase(5).Success);
             var root = new GameObject("BulkShopFreezeTests", typeof(RectTransform));
             try
             {
@@ -148,9 +148,9 @@ namespace ArknoNights.Battle.Tests
                 root.transform.Find("ShopPanel/FreezeButton").GetComponent<Button>().onClick.Invoke();
 
                 Assert.AreEqual(1, changes);
-                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.Take(4).All(slot => slot.IsFrozen));
-                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots[4].IsEmpty);
-                Assert.IsFalse(match.Snapshot.LocalPlayer.ShopSlots[4].IsFrozen);
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.Take(5).All(slot => slot.IsFrozen));
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots[5].IsEmpty);
+                Assert.IsFalse(match.Snapshot.LocalPlayer.ShopSlots[5].IsFrozen);
 
                 changes = 0;
                 root.transform.Find("ShopPanel/FreezeButton").GetComponent<Button>().onClick.Invoke();
@@ -179,9 +179,49 @@ namespace ArknoNights.Battle.Tests
 
                 Assert.AreEqual(before.LocalPlayer.Gold - LocalMatchState.RefreshCost, match.Snapshot.LocalPlayer.Gold);
                 CollectionAssert.AreEqual(
-                    new[] { "5503", "5503", "5503", "5503", "5503" },
+                    new[] { "5503", "5503", "5503", "5503", "5503", "5503" },
                     match.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
                 Assert.AreEqual(ShopReadyConfirmation.None, controller.State.PendingConfirmation);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void Controller_BattlePhaseKeepsShopVisibleAndAllowsPurchaseRefreshFreezeAndUpgrade()
+        {
+            var match = Load();
+            var root = new GameObject("BattlePhaseShopTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+                controller.SetPreparationPhase(false);
+
+                Assert.IsTrue(root.activeSelf);
+                Assert.IsFalse(root.transform.Find("ReadyButton").gameObject.activeSelf);
+                controller.SetShopVisible(true);
+                Assert.IsTrue(controller.State.ShopVisible);
+                Assert.IsTrue(root.transform.Find("ShopPanel").gameObject.activeSelf);
+
+                controller.Purchase(0);
+                controller.Purchase(0);
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots[0].IsEmpty);
+                Assert.AreEqual(6, match.Snapshot.LocalPlayer.Gold);
+
+                controller.RequestRefresh();
+                Assert.AreEqual(5, match.Snapshot.LocalPlayer.Gold);
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.All(slot => !slot.IsEmpty));
+
+                controller.ToggleAllFrozen();
+                Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.All(slot => slot.IsFrozen));
+
+                controller.RequestUpgrade();
+                controller.RequestUpgrade();
+                Assert.AreEqual(2, match.Snapshot.LocalPlayer.Level);
+                Assert.AreEqual(1, match.Snapshot.LocalPlayer.Gold);
             }
             finally
             {
@@ -204,6 +244,17 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(state.Slots.All(slot => slot.CanPurchase));
             Assert.AreEqual(ShopReadyHudLayout.ReferenceReadyButton, layout.ReadyButton);
             Assert.AreEqual(ShopReadyHudLayout.ReferenceShopToggle, layout.ShopToggle);
+            Assert.That(layout.ShopPanel.Width, Is.EqualTo(1605f).Within(.001f));
+            Assert.That(layout.ShopPanel.Height, Is.EqualTo(420f).Within(.001f));
+            Assert.That(layout.ShopPanel.Left, Is.EqualTo(250f).Within(.001f));
+            Assert.That(
+                layout.ShopPanel.Bottom + layout.ShopPanel.Height,
+                Is.EqualTo(layout.LevelPanel.Bottom + 40f).Within(.001f),
+                "The shop panel is shifted forty reference units upward.");
+            Assert.That(
+                layout.ReadyButton.Left + layout.ReadyButton.Width * .5f,
+                Is.EqualTo(1830f).Within(.001f),
+                "Ready must share the cost and gold panels' vertical centerline.");
         }
 
         private static LocalMatchState Load()

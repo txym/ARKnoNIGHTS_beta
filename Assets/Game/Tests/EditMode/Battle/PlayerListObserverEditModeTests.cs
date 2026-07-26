@@ -46,7 +46,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(2, coordinator.LocalEconomyState.Level);
             Assert.AreEqual(3, coordinator.LocalEconomyState.Gold);
             Assert.IsTrue(coordinator.LocalEconomyState.IsReady);
-            Assert.AreEqual(5, coordinator.LocalEconomyState.ShopSlots.Count);
+            Assert.AreEqual(6, coordinator.LocalEconomyState.ShopSlots.Count);
         }
 
         [Test]
@@ -82,9 +82,7 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void FourPlayerPresentation_IndependentlyRepresentsAvatarLifeSelfObservedAndDisconnectedFlags()
         {
-            var source = Resources.Load<TextAsset>(MatchPath).text.Replace(
-                "\"playerId\": \"local-ui-player-4\", \"displayName\": \"Player 4\", \"avatarResourcePath\": \"UI/Texture/player_list/avatar_4\", \"life\": 400, \"isConnected\": true",
-                "\"playerId\": \"local-ui-player-4\", \"displayName\": \"Player 4\", \"avatarResourcePath\": \"UI/Texture/player_list/avatar_4\", \"life\": 400, \"isConnected\": false");
+            var source = Resources.Load<TextAsset>(MatchPath).text;
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
             var load = LocalMatchStateLoader.LoadFromJson(catalog, source);
             Assert.IsTrue(load.Success, string.Join("; ", load.Errors.Select(error => error.ToString())));
@@ -98,7 +96,29 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(400, rows.Single(row => row.PlayerId == "local-ui-player").Life);
             Assert.IsTrue(rows.Single(row => row.PlayerId == "local-ui-player").IsLocalPlayer);
             Assert.IsTrue(rows.Single(row => row.PlayerId == "local-ui-player-3").IsObservedPlayer);
+            Assert.IsFalse(rows.Single(row => row.PlayerId == "local-ui-player-3").IsConnected);
+            Assert.IsTrue(rows.Single(row => row.PlayerId == "local-ui-player-3").ShowsLostConnection);
             Assert.IsFalse(rows.Single(row => row.PlayerId == "local-ui-player-4").IsConnected);
+            Assert.IsTrue(rows.Single(row => row.PlayerId == "local-ui-player-4").HasExited);
+        }
+
+        [Test]
+        public void ExitedPlayerPresentation_ReplacesTheAvatarAndKeepsTheDisconnectedOverlay()
+        {
+            var source = Resources.Load<TextAsset>(MatchPath).text;
+            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
+            var load = LocalMatchStateLoader.LoadFromJson(catalog, source);
+            Assert.IsTrue(load.Success, string.Join("; ", load.Errors.Select(error => error.ToString())));
+            var rows = PlayerListPresentation.Build(new PlayerListObserverCoordinator(load.State));
+            var exited = rows.Single(row => row.PlayerId == "local-ui-player-4");
+
+            Assert.IsTrue(exited.HasExited, "Exit must remain distinct from a temporary disconnect.");
+            Assert.IsTrue(exited.ShowsLostConnection, "The disconnected overlay must remain visible over the exit replacement avatar.");
+            Assert.AreEqual("UI/Texture/player_list/equip_replace_avatart_bg", exited.AvatarResourcePath);
+            Assert.NotNull(
+                ArknoNights.UI.FormalHud.ShopReady.FormalHudSpriteLoader.Load(exited.AvatarResourcePath),
+                "The replacement avatar asset must be loadable by the production HUD loader.");
+            Assert.IsFalse(exited.IsConnected);
         }
 
         [Test]
@@ -108,12 +128,19 @@ namespace ArknoNights.Battle.Tests
 
             Assert.IsTrue(layout.IsVisible);
             Assert.AreEqual(4, layout.Rows.Count);
-            Assert.That(layout.Rows.Select(row => row.X), Is.All.EqualTo(layout.LeftPadding).Within(0.001f));
+            Assert.That(layout.LeftPadding, Is.EqualTo(8f).Within(0.001f));
+            Assert.That(layout.Rows[0].Width, Is.EqualTo(116f * .85f).Within(0.001f));
+            Assert.That(layout.Rows[0].Height, Is.EqualTo(126f * .85f).Within(0.001f));
+            Assert.That(layout.Rows.Select(row => row.X), Is.All.EqualTo(8f + (116f - 116f * .85f) * .5f - 1f).Within(0.001f));
+            Assert.That(layout.Rows[1].YMin - layout.Rows[0].YMax, Is.EqualTo(13f).Within(0.001f));
             Assert.That(layout.Rows.Zip(layout.Rows.Skip(1), (current, next) => current.YMax <= next.YMin), Is.All.True);
             Assert.That(layout.Background.X, Is.EqualTo(layout.LeftPadding).Within(0.001f));
-            Assert.That(layout.Background.YMin, Is.EqualTo(layout.Rows[0].YMin).Within(0.001f));
-            Assert.That(layout.Background.Width, Is.EqualTo(layout.Rows[0].Width).Within(0.001f));
-            Assert.That(layout.Background.YMax, Is.EqualTo(layout.Rows[3].YMax).Within(0.001f));
+            Assert.That(layout.Background.YMin, Is.EqualTo(164f).Within(0.001f));
+            Assert.That(layout.Background.Width, Is.EqualTo(116f).Within(0.001f));
+            Assert.That(layout.Background.Height, Is.EqualTo(534f).Within(0.001f));
+            Assert.That(
+                layout.Rows[0].YMin - layout.Background.YMin,
+                Is.EqualTo(layout.Background.YMax - layout.Rows[3].YMax).Within(0.001f));
         }
 
         private static LocalMatchState Load()

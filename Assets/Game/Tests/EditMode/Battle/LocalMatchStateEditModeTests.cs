@@ -13,7 +13,7 @@ namespace ArknoNights.Battle.Tests
         private const string MatchPath = "PlayerData/local-match-state-v1";
 
         [Test]
-        public void FixedMatch_LoadsFourIndependentPlayersAndTheInitialFiveSlotShopDeterministically()
+        public void FixedMatch_LoadsFourIndependentPlayersAndTheInitialSixSlotShopDeterministically()
         {
             var first = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath);
             var second = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath);
@@ -31,9 +31,9 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(7, local.Gold);
             Assert.AreEqual(400, local.Life);
             Assert.IsFalse(local.IsReady);
-            Assert.AreEqual(5, local.ShopSlots.Count);
-            CollectionAssert.AreEqual(new[] { "1000", "1000", "1000", "1000", "1000" }, local.ShopSlots.Select(slot => slot.UnitTypeId));
-            CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 1 }, local.ShopSlots.Select(slot => slot.Price));
+            Assert.AreEqual(6, local.ShopSlots.Count);
+            CollectionAssert.AreEqual(new[] { "1000", "1000", "1000", "1000", "1000", "1000" }, local.ShopSlots.Select(slot => slot.UnitTypeId));
+            CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 1, 1 }, local.ShopSlots.Select(slot => slot.Price));
             Assert.AreEqual(first.State.Snapshot.CanonicalSummary, second.State.Snapshot.CanonicalSummary);
         }
 
@@ -103,7 +103,7 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(result.Success);
             Assert.AreEqual(6, result.Snapshot.LocalPlayer.Gold);
             Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[0].IsFrozen);
-            CollectionAssert.AreEqual(new[] { "1000", "5503", "5503", "5503", "5503" }, result.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
+            CollectionAssert.AreEqual(new[] { "1000", "5503", "5503", "5503", "5503", "5503" }, result.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
             Assert.IsTrue(state.TryPurchase(0).Success);
             Assert.IsTrue(state.Snapshot.LocalPlayer.ShopSlots[0].IsEmpty);
             Assert.IsFalse(state.Snapshot.LocalPlayer.ShopSlots[0].IsFrozen);
@@ -114,16 +114,16 @@ namespace ArknoNights.Battle.Tests
         {
             var state = Load();
             Assert.IsTrue(state.TryToggleFrozen(0).Success);
-            Assert.IsTrue(state.TryPurchase(4).Success);
+            Assert.IsTrue(state.TryPurchase(5).Success);
             var changes = 0;
             state.Changed += _ => changes++;
             var result = state.TrySetOccupiedShopSlotsFrozen(true);
 
             Assert.IsTrue(result.Success);
             Assert.AreEqual(1, changes);
-            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots.Take(4).All(slot => slot.IsFrozen));
-            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[4].IsEmpty);
-            Assert.IsFalse(result.Snapshot.LocalPlayer.ShopSlots[4].IsFrozen);
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots.Take(5).All(slot => slot.IsFrozen));
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[5].IsEmpty);
+            Assert.IsFalse(result.Snapshot.LocalPlayer.ShopSlots[5].IsFrozen);
         }
 
         [Test]

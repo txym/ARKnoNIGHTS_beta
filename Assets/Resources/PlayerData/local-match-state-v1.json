@@ -4,14 +4,14 @@
   "initialLevel": 1,
   "initialGold": 7,
   "players": [
-    { "playerId": "local-ui-player", "displayName": "Player 1", "avatarResourcePath": "UI/Texture/player_list/avatar_1", "life": 400, "isConnected": true, "playerStateResourcePath": "PlayerData/local-player-state-v1" },
-    { "playerId": "local-ui-player-2", "displayName": "Player 2", "avatarResourcePath": "UI/Texture/player_list/avatar_2", "life": 400, "isConnected": true, "playerStateResourcePath": "PlayerData/local-match-player-2-state-v1" },
-    { "playerId": "local-ui-player-3", "displayName": "Player 3", "avatarResourcePath": "UI/Texture/player_list/avatar_3", "life": 400, "isConnected": true, "playerStateResourcePath": "PlayerData/local-match-player-3-state-v1" },
-    { "playerId": "local-ui-player-4", "displayName": "Player 4", "avatarResourcePath": "UI/Texture/player_list/avatar_4", "life": 400, "isConnected": false, "playerStateResourcePath": "PlayerData/local-match-player-4-state-v1" }
+    { "playerId": "local-ui-player", "displayName": "Player 1", "avatarResourcePath": "UI/Texture/player_list/avatar_1", "life": 400, "isConnected": true, "hasExited": false, "playerStateResourcePath": "PlayerData/local-player-state-v1" },
+    { "playerId": "local-ui-player-2", "displayName": "Player 2", "avatarResourcePath": "UI/Texture/player_list/avatar_2", "life": 400, "isConnected": true, "hasExited": false, "playerStateResourcePath": "PlayerData/local-match-player-2-state-v1" },
+    { "playerId": "local-ui-player-3", "displayName": "Player 3", "avatarResourcePath": "UI/Texture/player_list/avatar_3", "life": 400, "isConnected": false, "hasExited": false, "playerStateResourcePath": "PlayerData/local-match-player-3-state-v1" },
+    { "playerId": "local-ui-player-4", "displayName": "Player 4", "avatarResourcePath": "UI/Texture/player_list/avatar_4", "life": 400, "isConnected": false, "hasExited": true, "playerStateResourcePath": "PlayerData/local-match-player-4-state-v1" }
   ],
   "shopPages": [
-    { "typeIds": ["1000", "1000", "1000", "1000", "1000"] },
-    { "typeIds": ["5503", "5503", "5503", "5503", "5503"] },
-    { "typeIds": ["1000", "5503", "1000", "5503", "1000"] }
+    { "typeIds": ["1000", "1000", "1000", "1000", "1000", "1000"] },
+    { "typeIds": ["5503", "5503", "5503", "5503", "5503", "5503"] },
+    { "typeIds": ["1000", "5503", "1000", "5503", "1000", "5503"] }
   ]
 }
