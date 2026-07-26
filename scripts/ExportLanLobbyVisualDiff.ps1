@@ -15,6 +15,7 @@ if (-not ('LanLobbyVisualDiff.Native' -as [type]))
 {
     Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -35,6 +36,39 @@ public static class LanLobbyVisualDiff {
         }
         if(maxX<minX || maxY<minY) throw new InvalidOperationException("No dark visible pixels found in search rectangle " + search + ".");
         return new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 };
+    }
+    public static LanLobbyVisualBounds FindCompactDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive, int minimumComponentPixels, double maximumAspectRatio) {
+        if (bitmap == null) throw new ArgumentNullException("bitmap");
+        if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height || search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
+        var dark=new bool[search.Width,search.Height];
+        for(int y=0;y<search.Height;y++) for(int x=0;x<search.Width;x++) {
+            Color pixel=bitmap.GetPixel(search.X+x,search.Y+y);
+            int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
+            dark[x,y]=pixel.A>0 && luminance<maximumLuminanceExclusive;
+        }
+        int unionMinX=search.Right, unionMinY=search.Bottom, unionMaxX=-1, unionMaxY=-1;
+        var queue=new Queue<Point>();
+        for(int seedY=0;seedY<search.Height;seedY++) for(int seedX=0;seedX<search.Width;seedX++) {
+            if(!dark[seedX,seedY]) continue;
+            dark[seedX,seedY]=false; queue.Enqueue(new Point(seedX,seedY));
+            int count=0,minX=search.Width,minY=search.Height,maxX=-1,maxY=-1;
+            while(queue.Count>0) {
+                Point point=queue.Dequeue(); count++;
+                minX=Math.Min(minX,point.X);minY=Math.Min(minY,point.Y);maxX=Math.Max(maxX,point.X);maxY=Math.Max(maxY,point.Y);
+                int left=point.X-1,right=point.X+1,up=point.Y-1,down=point.Y+1;
+                if(left>=0 && dark[left,point.Y]) { dark[left,point.Y]=false; queue.Enqueue(new Point(left,point.Y)); }
+                if(right<search.Width && dark[right,point.Y]) { dark[right,point.Y]=false; queue.Enqueue(new Point(right,point.Y)); }
+                if(up>=0 && dark[point.X,up]) { dark[point.X,up]=false; queue.Enqueue(new Point(point.X,up)); }
+                if(down<search.Height && dark[point.X,down]) { dark[point.X,down]=false; queue.Enqueue(new Point(point.X,down)); }
+            }
+            int width=maxX-minX+1,height=maxY-minY+1;
+            double aspect=Math.Max((double)width/height,(double)height/width);
+            if(count<minimumComponentPixels || aspect>maximumAspectRatio) continue;
+            unionMinX=Math.Min(unionMinX,search.X+minX);unionMinY=Math.Min(unionMinY,search.Y+minY);
+            unionMaxX=Math.Max(unionMaxX,search.X+maxX);unionMaxY=Math.Max(unionMaxY,search.Y+maxY);
+        }
+        if(unionMaxX<unionMinX || unionMaxY<unionMinY) throw new InvalidOperationException("No compact dark components found in search rectangle " + search + ".");
+        return new LanLobbyVisualBounds { X=unionMinX, Y=unionMinY, Width=unionMaxX-unionMinX+1, Height=unionMaxY-unionMinY+1 };
     }
     public static LanLobbyVisualDiffMetric[] Compare(Bitmap actual, Bitmap reference, Rectangle[] masks, Rectangle[] regions, bool[] regionMasks, Bitmap heatmap, out long maskedPixels) {
         int width = actual.Width, height = actual.Height, count = width * height;
@@ -68,11 +102,11 @@ $homeActionBars = @(
 )
 $actionContentSpecs = @{
   'home-create-action' = @(
-    @{ name='icon'; search=@{x=40;y=15;width=55;height=60}; expected=@{x=47;y=25;width=36;height=37} },
+    @{ name='icon'; compact=$true; search=@{x=40;y=15;width=55;height=60}; expected=@{x=47;y=25;width=36;height=37} },
     @{ name='label'; search=@{x=100;y=20;width=170;height=50}; expected=@{x=109;y=28;width=148;height=32} }
   )
   'home-join-action' = @(
-    @{ name='icon'; search=@{x=40;y=15;width=60;height=60}; expected=@{x=47;y=20;width=44;height=50} },
+    @{ name='icon'; compact=$true; search=@{x=40;y=15;width=60;height=60}; expected=@{x=47;y=20;width=44;height=50} },
     @{ name='label'; search=@{x=95;y=20;width=170;height=50}; expected=@{x=104;y=31;width=150;height=34} }
   )
 }
@@ -429,8 +463,17 @@ try
             foreach ($contentSpec in @($actionContentSpecs[$spec.name]))
             {
                 $search = New-Object Drawing.Rectangle $contentSpec.search.x, $contentSpec.search.y, $contentSpec.search.width, $contentSpec.search.height
-                $actualBounds = [LanLobbyVisualDiff]::FindDarkBounds($actualCrop, $search, 45)
-                $referenceBounds = [LanLobbyVisualDiff]::FindDarkBounds($locallyResizedReferenceCrop, $search, 45)
+                $usesCompactComponents = $contentSpec.ContainsKey('compact') -and [bool]$contentSpec.compact
+                if ($usesCompactComponents)
+                {
+                    $actualBounds = [LanLobbyVisualDiff]::FindCompactDarkBounds($actualCrop, $search, 45, 40, 4.0)
+                    $referenceBounds = [LanLobbyVisualDiff]::FindCompactDarkBounds($locallyResizedReferenceCrop, $search, 45, 40, 4.0)
+                }
+                else
+                {
+                    $actualBounds = [LanLobbyVisualDiff]::FindDarkBounds($actualCrop, $search, 45)
+                    $referenceBounds = [LanLobbyVisualDiff]::FindDarkBounds($locallyResizedReferenceCrop, $search, 45)
+                }
                 $expected = $contentSpec.expected
                 $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
                 $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
@@ -447,6 +490,9 @@ try
                 $contentVisuals += [pscustomobject][ordered]@{
                     name = $contentSpec.name
                     thresholdLumaExclusive = 45
+                    measurement = if ($usesCompactComponents) { 'compact-components' } else { 'all-dark-pixels' }
+                    minimumComponentPixels = if ($usesCompactComponents) { 40 } else { 0 }
+                    maximumComponentAspectRatio = if ($usesCompactComponents) { 4.0 } else { 0 }
                     expectedBounds = [ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
                     referenceBounds = ConvertTo-LanLobbyBoundsObject $referenceBounds
                     actualBounds = ConvertTo-LanLobbyBoundsObject $actualBounds

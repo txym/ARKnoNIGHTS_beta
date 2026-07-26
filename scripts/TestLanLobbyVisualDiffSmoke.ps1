@@ -108,9 +108,11 @@ try
                     # Create actual crop is (1161,449); its icon is deliberately 2 px right.
                     $graphics.FillRectangle($contentBrush, 1161 + 49, 449 + 25, 36, 37)
                     $graphics.FillRectangle($contentBrush, 1161 + 109, 449 + 28, 148, 32)
+                    $graphics.FillRectangle($contentBrush, 1161 + 54, 449 + 73, 20, 2)
                     # Join actual crop is (1154,876) and matches all approved visible bounds.
                     $graphics.FillRectangle($contentBrush, 1154 + 47, 876 + 20, 44, 50)
                     $graphics.FillRectangle($contentBrush, 1154 + 104, 876 + 31, 150, 34)
+                    $graphics.FillRectangle($contentBrush, 1154 + 40, 876 + 72, 60, 3)
                 }
                 finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose() }
             }
