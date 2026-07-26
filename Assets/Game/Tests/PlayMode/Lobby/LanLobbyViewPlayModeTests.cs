@@ -181,7 +181,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(createFrame.Find("Bottom_2"), Is.Null);
             Assert.That(createFrame.Find("TopRightChamfer"), Is.Null);
             Assert.That(frameImages.All(image => image.gameObject.activeInHierarchy), Is.True);
-            Assert.That(frameImages.All(image => image.color == new Color(.42f, .82f, .76f, .72f)), Is.True);
+            Assert.That(frameImages.All(image => image.color == new Color(.55f, .95f, .88f, 1f)), Is.True);
             var expectedWingTint = new Color(.35f, .65f, .58f, .45f);
             var wingImages = create.Find("Wings").GetComponentsInChildren<UnityEngine.UI.Image>(false);
             Assert.That(wingImages, Has.Length.EqualTo(4));
