@@ -288,6 +288,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             case "room_select_right_bg": case "room_select_title_icon": case "room_select_dot": case "room_select_img_startroom":
             case "room_select_create_btn_bg_down": case "room_select_create_left_line": case "room_select_create_logo":
             case "room_select_create_middleicon": case "room_select_create_text_01": case "room_select_create_text_02":
+            case "img_pointer": case "doc_frame_line":
             case "room_select_join_ban": case "room_select_join_blank": case "room_select_join_btn_bg_down":
             case "room_select_join_left_block": case "room_select_join_logo": case "room_select_join_middle_block":
             case "room_select_join_middle_block_mask": case "room_select_join_right_block": case "room_select_join_text_01":

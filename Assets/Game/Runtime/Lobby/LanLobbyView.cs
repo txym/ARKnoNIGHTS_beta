@@ -266,7 +266,6 @@ public sealed class LanLobbyView : MonoBehaviour
         var roomSelect = Rect("RoomSelect", parent);
         Stretch(roomSelect);
         var layout = LanLobbyLayout.ForSize(1920, 1080, LobbyRoomSnapshot.MaximumMembers);
-        BuildRoomSelectFrame(roomSelect);
         var rightBackground = Image("RightBackground", roomSelect, "Home/room_select_right_bg");
         PositionSprite(rightBackground, new Vector2(.751f, .79f), 820f);
 
@@ -309,40 +308,39 @@ public sealed class LanLobbyView : MonoBehaviour
         statusText.text = "DISCOVERING LOCAL ROOMS";
     }
 
-    private static void BuildRoomSelectFrame(Transform parent)
-    {
-        var frame = Rect("PanelFrame", parent);
-        Position(frame, new Vector2(.751f, .47f), new Vector2(720f, 700f));
-        FrameLine("Top", frame, new Vector2(.5f, 1f), new Vector2(720f, 2f));
-        FrameLine("Bottom", frame, new Vector2(.5f, 0f), new Vector2(720f, 2f));
-        FrameLine("Left", frame, new Vector2(0f, .5f), new Vector2(2f, 700f));
-        FrameLine("Right", frame, new Vector2(1f, .5f), new Vector2(2f, 700f));
-        FrameLine("Divider", frame, new Vector2(.5f, .46f), new Vector2(680f, 2f));
-    }
-
     private void BuildCreateSection(RectTransform parent, LanLobbyRect actionRect)
     {
-        var logoLeft = Image("LogoLeft", parent, "Home/room_select_create_logo");
-        PositionTopLeft(logoLeft.rectTransform, 382f, 159f, 98f, 122.5f);
-        logoLeft.preserveAspect = false;
-        logoLeft.raycastTarget = false;
-        logoLeft.rectTransform.localEulerAngles = new Vector3(0f, 0f, 180f);
+        var createFrame = Rect("CreateFrame", parent);
+        Stretch(createFrame);
+        var frameTint = new Color(.35f, .60f, .55f, .28f);
+        CreateOrientedDecorationSprite("TopLeft", createFrame, "Home/doc_frame_line", 312f, -18f, 380f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("TopRight", createFrame, "Home/doc_frame_line", 635.5f, -18f, 353f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("BottomLeft", createFrame, "Home/doc_frame_line", 312f, 344f, 380f, 12f, 180f, false, frameTint);
+        CreateOrientedDecorationSprite("BottomRight", createFrame, "Home/doc_frame_line", 649f, 344f, 380f, 12f, 180f, false, frameTint);
+        CreateOrientedDecorationSprite("LeftUpper", createFrame, "Home/doc_frame_line", 128f, 76f, 200f, 12f, 90f, false, frameTint);
+        CreateOrientedDecorationSprite("LeftLower", createFrame, "Home/doc_frame_line", 128f, 250f, 200f, 12f, 90f, false, frameTint);
+        CreateOrientedDecorationSprite("RightUpper", createFrame, "Home/doc_frame_line", 833f, 103f, 200f, 12f, 270f, false, frameTint);
+        CreateOrientedDecorationSprite("RightLower", createFrame, "Home/doc_frame_line", 833f, 250f, 200f, 12f, 270f, false, frameTint);
+        CreateOrientedDecorationSprite("TopRightChamfer", createFrame, "Home/doc_frame_line", 826f, -10f, 40f, 12f, 45f, false, frameTint);
 
-        var logoRight = Image("LogoRight", parent, "Home/room_select_create_logo");
-        PositionTopLeft(logoRight.rectTransform, 543f, 24f, 104f, 118f);
-        logoRight.preserveAspect = false;
-        logoRight.raycastTarget = false;
+        var wings = Rect("Wings", parent);
+        Stretch(wings);
+        var wingTint = new Color(.35f, .65f, .58f, .45f);
+        CreateOrientedDecorationSprite("WingLeftUpper", wings, "Home/img_pointer", 325f, 62.5f, 120f, 120f * 23f / 324f, 164f, true, wingTint);
+        CreateOrientedDecorationSprite("WingLeftLower", wings, "Home/img_pointer", 325f, 123.5f, 120f, 120f * 23f / 324f, 196f, true, wingTint);
+        CreateOrientedDecorationSprite("WingRightUpper", wings, "Home/img_pointer", 598f, 62.5f, 115f, 115f * 23f / 324f, 16f, true, wingTint);
+        CreateOrientedDecorationSprite("WingRightLower", wings, "Home/img_pointer", 598f, 123.5f, 115f, 115f * 23f / 324f, 344f, true, wingTint);
 
-        CreateDecorationSprite("DotTopLeft", parent, "Home/room_select_dot", 379f, 18f, 13f, 0f);
-        CreateDecorationSprite("DotTopRight", parent, "Home/room_select_dot", 516f, 21f, 16f, 0f);
-        CreateDecorationSprite("DotBottomLeft", parent, "Home/room_select_dot", 379f, 155f, 12f, 0f);
-        CreateDecorationSprite("DotBottomRight", parent, "Home/room_select_dot", 516f, 155f, 12f, 0f);
-        CreateDecorationSprite("LineLeft", parent, "Home/room_select_create_left_line", 394f, 52f, 13f, 0f);
-        CreateDecorationSprite("LineRight", parent, "Home/room_select_create_left_line", 526f, 122.5f, 16.5f, 180f);
-        CreateDecorationSprite("MiddleIcon", parent, "Home/room_select_create_middleicon", 415f, 44f, 76.5f, 0f);
-        CreateDecorationSprite("Text01", parent, "Home/room_select_create_text_01", 417f, 140f, 61f, 0f);
-        CreateDecorationSprite("Text02", parent, "Home/room_select_create_text_02", 428f, 151f, 66f, 0f);
-        CreateDecorationSprite("StartRoomDecoration", parent, "Home/room_select_img_startroom", 413f, 13f, 46f, 0f);
+        CreateOrientedDecorationSprite("DotTopLeft", parent, "Home/room_select_dot", 390.5f, 30.5f, 17f, 17f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("DotTopRight", parent, "Home/room_select_dot", 525.5f, 31.5f, 17f, 17f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("DotBottomLeft", parent, "Home/room_select_dot", 390f, 167f, 16f, 16f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("DotBottomRight", parent, "Home/room_select_dot", 525.5f, 167.5f, 17f, 17f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("LineLeft", parent, "Home/room_select_create_left_line", 402.1f, 89f, 16.2f, 54f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("LineRight", parent, "Home/room_select_create_left_line", 515.1f, 89f, 16.2f, 54f, 180f, true, Color.white);
+        CreateOrientedDecorationSprite("MiddleIcon", parent, "Home/room_select_create_middleicon", 459.5f, 87.81f, 87f, 87f * 62f / 63f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("Text01", parent, "Home/room_select_create_text_01", 460f, 144.29f, 88f, 88f * 9f / 63f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("Text02", parent, "Home/room_select_create_text_02", 461f, 154.59f, 66f, 66f * 5f / 46f, 0f, true, Color.white);
+        CreateOrientedDecorationSprite("StartRoomDecoration", parent, "Home/room_select_img_startroom", 459f, 22.25f, 84f, 84f * 8f / 64f, 0f, true, Color.white);
         var create = Button("CreateAction", parent, "Home/room_select_create_btn_bg_down", "创建同盟", 32, true);
         PositionBottomLeft(create.GetComponent<RectTransform>(), actionRect);
         create.GetComponent<Image>().preserveAspect = false;
@@ -688,39 +686,29 @@ public sealed class LanLobbyView : MonoBehaviour
         value.preserveAspect = true;
     }
 
-    private static Image CreateDecorationSprite(
+    private static Image CreateOrientedDecorationSprite(
         string name,
         Transform parent,
-        string resource,
-        float left,
-        float top,
+        string spriteName,
+        float centerX,
+        float centerTop,
         float width,
-        float rotation)
+        float height,
+        float rotation,
+        bool preserveAspect,
+        Color color)
     {
-        var image = Image(name, parent, resource);
-        PositionSpriteTopLeft(image, left, top, width);
-        image.rectTransform.localEulerAngles = new Vector3(0f, 0f, rotation);
+        var image = Image(name, parent, spriteName);
+        var rect = image.rectTransform;
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(.5f, .5f);
+        rect.anchoredPosition = new Vector2(centerX, -centerTop);
+        rect.sizeDelta = new Vector2(width, height);
+        rect.localEulerAngles = new Vector3(0f, 0f, rotation);
+        image.preserveAspect = preserveAspect;
+        image.color = color;
         image.raycastTarget = false;
-        return image;
-    }
-
-    private static void PositionTopLeft(RectTransform value, float left, float top, float width, float height)
-    {
-        value.anchorMin = value.anchorMax = new Vector2(0f, 1f);
-        value.pivot = new Vector2(0f, 1f);
-        value.anchoredPosition = new Vector2(left, -top);
-        value.sizeDelta = new Vector2(width, height);
-    }
-
-    private static Image FrameLine(string name, Transform parent, Vector2 anchor, Vector2 size)
-    {
-        var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        value.transform.SetParent(parent, false);
-        var image = value.GetComponent<Image>();
-        image.sprite = null;
-        image.color = new Color(.22f, .48f, .48f, .7f);
-        image.raycastTarget = false;
-        Position(image.rectTransform, anchor, size);
         return image;
     }
 }

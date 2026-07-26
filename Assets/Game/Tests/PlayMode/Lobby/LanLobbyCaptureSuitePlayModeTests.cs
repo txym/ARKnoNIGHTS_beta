@@ -131,23 +131,28 @@ namespace ArknoNights.Lobby.Tests
                 "The Home provenance table must exclude inactive legacy foreground sprites.");
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
                 "Home must count both rendered join_icon instances.");
-            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.EqualTo(2));
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(9));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_left_line"), Is.EqualTo(2));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_dot"), Is.EqualTo(5));
             Assert.That(home.spriteSources
                     .Where(sprite => sprite.spriteName.StartsWith("room_select_create_", StringComparison.Ordinal)
                         || sprite.spriteName == "room_select_dot"
-                        || sprite.spriteName == "room_select_img_startroom")
+                        || sprite.spriteName == "room_select_img_startroom"
+                        || sprite.spriteName == "img_pointer"
+                        || sprite.spriteName == "doc_frame_line")
                     .All(sprite => sprite.sourcePath.StartsWith("[uc]autochessouter/", StringComparison.Ordinal)
-                        && !sprite.sourcePath.Contains("$0")), Is.True);
+                        && !sprite.sourcePath.Contains("$0")
+                        && !sprite.sourcePath.Contains("#0")), Is.True);
             Assert.That(discovered.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
                 "Discovered Home must count both rendered join_icon instances.");
             Assert.That(parsed.captures.Sum(record => record.spriteSources.Count(sprite => sprite.spriteName == "join_icon")), Is.EqualTo(4),
                 "Rendered join_icon occurrences must sum to four across the two Home states.");
             Assert.That(home.spriteSources.Select(sprite => sprite.node), Is.Unique,
                 "Each Sprite usage row must identify one stable rendered node.");
-            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(6),
-                "The Home manifest must report every active non-bitmap Image: OpaqueBlocker plus five frame lines.");
+            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(1),
+                "The Home manifest must report OpaqueBlocker but no code-native Create frame.");
             foreach (var geometry in home.codeNativeGeometry)
             {
                 Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
@@ -157,15 +162,10 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry.width, Is.GreaterThan(0f));
                 Assert.That(geometry.height, Is.GreaterThan(0f));
             }
-            CollectionAssert.AreEquivalent(new[]
-                {
-                    "LanLobbyRoot/OpaqueBlocker",
-                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Top",
-                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Bottom",
-                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Left",
-                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Right",
-                    "LanLobbyRoot/Home/RoomSelect/PanelFrame/Divider"
-                },
+            Assert.That(home.codeNativeGeometry.Any(item =>
+                item.name.StartsWith("LanLobbyRoot/Home/RoomSelect/PanelFrame", StringComparison.Ordinal)), Is.False);
+            CollectionAssert.AreEquivalent(
+                new[] { "LanLobbyRoot/OpaqueBlocker" },
                 home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");

@@ -98,9 +98,10 @@ namespace ArknoNights.Lobby.Tests
             view.ShowHome();
             Assert.That(grid.gameObject.activeSelf, Is.False);
 
-            Assert.That(home.Find("RoomSelect/PanelFrame/Top"), Is.Not.Null);
-            Assert.That(home.Find("RoomSelect/PanelFrame/Bottom"), Is.Not.Null);
-            Assert.That(home.Find("RoomSelect/PanelFrame/Divider"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/PanelFrame"), Is.Null);
+            Assert.That(home.Find("RoomSelect/Create/CreateFrame/TopLeft"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/Create/CreateFrame/BottomRight"), Is.Not.Null);
+            Assert.That(home.Find("RoomSelect/Create/CreateFrame/TopRightChamfer"), Is.Not.Null);
             Assert.That(home.Find("RoomSelect/Join/SimulationInvite"), Is.Not.Null);
             Assert.That(home.Find("RoomSelect/Join/SimulationInvite/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
                 Is.EqualTo("join_icon"));
@@ -127,20 +128,39 @@ namespace ArknoNights.Lobby.Tests
             var joinActionImage = joinAction.GetComponent<UnityEngine.UI.Image>();
             var expected = new[]
             {
-                new DecorationExpectation("LogoLeft", "room_select_create_logo", 382f, 159f, 98f, 122.5f, 180f, false),
-                new DecorationExpectation("LogoRight", "room_select_create_logo", 543f, 24f, 104f, 118f, 0f, false),
-                new DecorationExpectation("DotTopLeft", "room_select_dot", 379f, 18f, 13f, 13f, 0f, true),
-                new DecorationExpectation("DotTopRight", "room_select_dot", 516f, 21f, 16f, 16f, 0f, true),
-                new DecorationExpectation("DotBottomLeft", "room_select_dot", 379f, 155f, 12f, 12f, 0f, true),
-                new DecorationExpectation("DotBottomRight", "room_select_dot", 516f, 155f, 12f, 12f, 0f, true),
-                new DecorationExpectation("LineLeft", "room_select_create_left_line", 394f, 52f, 13f, 13f * 40f / 12f, 0f, true),
-                new DecorationExpectation("LineRight", "room_select_create_left_line", 526f, 122.5f, 16.5f, 16.5f * 40f / 12f, 180f, true),
-                new DecorationExpectation("MiddleIcon", "room_select_create_middleicon", 415f, 44f, 76.5f, 76.5f * 62f / 63f, 0f, true),
-                new DecorationExpectation("Text01", "room_select_create_text_01", 417f, 140f, 61f, 61f * 9f / 63f, 0f, true),
-                new DecorationExpectation("Text02", "room_select_create_text_02", 428f, 151f, 66f, 66f * 5f / 46f, 0f, true),
-                new DecorationExpectation("StartRoomDecoration", "room_select_img_startroom", 413f, 13f, 46f, 46f * 8f / 64f, 0f, true)
+                new OrientedDecorationExpectation("Wings/WingLeftUpper", "img_pointer", 325f, 62.5f, 120f, 120f * 23f / 324f, 164f, true),
+                new OrientedDecorationExpectation("Wings/WingLeftLower", "img_pointer", 325f, 123.5f, 120f, 120f * 23f / 324f, 196f, true),
+                new OrientedDecorationExpectation("Wings/WingRightUpper", "img_pointer", 598f, 62.5f, 115f, 115f * 23f / 324f, 16f, true),
+                new OrientedDecorationExpectation("Wings/WingRightLower", "img_pointer", 598f, 123.5f, 115f, 115f * 23f / 324f, 344f, true),
+                new OrientedDecorationExpectation("DotTopLeft", "room_select_dot", 390.5f, 30.5f, 17f, 17f, 0f, true),
+                new OrientedDecorationExpectation("DotTopRight", "room_select_dot", 525.5f, 31.5f, 17f, 17f, 0f, true),
+                new OrientedDecorationExpectation("DotBottomLeft", "room_select_dot", 390f, 167f, 16f, 16f, 0f, true),
+                new OrientedDecorationExpectation("DotBottomRight", "room_select_dot", 525.5f, 167.5f, 17f, 17f, 0f, true),
+                new OrientedDecorationExpectation("LineLeft", "room_select_create_left_line", 402.1f, 89f, 16.2f, 54f, 0f, true),
+                new OrientedDecorationExpectation("LineRight", "room_select_create_left_line", 515.1f, 89f, 16.2f, 54f, 180f, true),
+                new OrientedDecorationExpectation("MiddleIcon", "room_select_create_middleicon", 459.5f, 87.81f, 87f, 87f * 62f / 63f, 0f, true),
+                new OrientedDecorationExpectation("Text01", "room_select_create_text_01", 460f, 144.29f, 88f, 88f * 9f / 63f, 0f, true),
+                new OrientedDecorationExpectation("Text02", "room_select_create_text_02", 461f, 154.59f, 66f, 66f * 5f / 46f, 0f, true),
+                new OrientedDecorationExpectation("StartRoomDecoration", "room_select_img_startroom", 459f, 22.25f, 84f, 84f * 8f / 64f, 0f, true)
+            };
+            var frameExpected = new[]
+            {
+                new OrientedDecorationExpectation("CreateFrame/TopLeft", "doc_frame_line", 312f, -18f, 380f, 12f, 0f, false),
+                new OrientedDecorationExpectation("CreateFrame/TopRight", "doc_frame_line", 635.5f, -18f, 353f, 12f, 0f, false),
+                new OrientedDecorationExpectation("CreateFrame/BottomLeft", "doc_frame_line", 312f, 344f, 380f, 12f, 180f, false),
+                new OrientedDecorationExpectation("CreateFrame/BottomRight", "doc_frame_line", 649f, 344f, 380f, 12f, 180f, false),
+                new OrientedDecorationExpectation("CreateFrame/LeftUpper", "doc_frame_line", 128f, 76f, 200f, 12f, 90f, false),
+                new OrientedDecorationExpectation("CreateFrame/LeftLower", "doc_frame_line", 128f, 250f, 200f, 12f, 90f, false),
+                new OrientedDecorationExpectation("CreateFrame/RightUpper", "doc_frame_line", 833f, 103f, 200f, 12f, 270f, false),
+                new OrientedDecorationExpectation("CreateFrame/RightLower", "doc_frame_line", 833f, 250f, 200f, 12f, 270f, false),
+                new OrientedDecorationExpectation("CreateFrame/TopRightChamfer", "doc_frame_line", 826f, -10f, 40f, 12f, 45f, false)
             };
 
+            Assert.That(home.Find("RoomSelect/PanelFrame"), Is.Null);
+            Assert.That(create.Find("LogoLeft"), Is.Null);
+            Assert.That(create.Find("LogoRight"), Is.Null);
+            Assert.That(create.Find("CreateFrame").GetComponent<Graphic>(), Is.Null);
+            Assert.That(create.Find("Wings").GetComponent<Graphic>(), Is.Null);
             Assert.That(create.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
             Assert.That(join.anchoredPosition.x, Is.GreaterThanOrEqualTo(960f));
             Assert.That(create.anchoredPosition.x + create.sizeDelta.x, Is.LessThanOrEqualTo(1920f));
@@ -181,16 +201,13 @@ namespace ArknoNights.Lobby.Tests
 
             foreach (var item in expected)
             {
-                var decoration = create.Find(item.Name);
-                Assert.That(decoration, Is.Not.Null, item.Name);
-                var image = decoration.GetComponent<Image>();
-                Assert.That(image, Is.Not.Null, item.Name);
-                AssertTopLeftRect(image.rectTransform, item.Left, item.Top, item.Width, item.Height, .05f);
-                Assert.That(image.sprite.name, Is.EqualTo(item.SpriteName));
-                Assert.That(Mathf.DeltaAngle(image.rectTransform.localEulerAngles.z, item.Rotation), Is.EqualTo(0f).Within(.05f));
-                Assert.That(image.preserveAspect, Is.EqualTo(item.PreserveAspect));
-                Assert.That(image.raycastTarget, Is.False);
-                Assert.That(image.transform.GetSiblingIndex(), Is.LessThan(createAction.GetSiblingIndex()));
+                AssertOrientedDecoration(create, item);
+                AssertDecorationBehindAction(create, item.Path, createAction);
+            }
+            foreach (var item in frameExpected)
+            {
+                AssertOrientedDecoration(create, item);
+                AssertDecorationBehindAction(create, item.Path, createAction);
             }
             yield return null;
         }
@@ -384,32 +401,32 @@ namespace ArknoNights.Lobby.Tests
             joinRequests++;
         }
 
-        private sealed class DecorationExpectation
+        private sealed class OrientedDecorationExpectation
         {
-            public DecorationExpectation(
-                string name,
+            public OrientedDecorationExpectation(
+                string path,
                 string spriteName,
-                float left,
-                float top,
+                float centerX,
+                float centerTop,
                 float width,
                 float height,
                 float rotation,
                 bool preserveAspect)
             {
-                Name = name;
+                Path = path;
                 SpriteName = spriteName;
-                Left = left;
-                Top = top;
+                CenterX = centerX;
+                CenterTop = centerTop;
                 Width = width;
                 Height = height;
                 Rotation = rotation;
                 PreserveAspect = preserveAspect;
             }
 
-            public string Name { get; }
+            public string Path { get; }
             public string SpriteName { get; }
-            public float Left { get; }
-            public float Top { get; }
+            public float CenterX { get; }
+            public float CenterTop { get; }
             public float Width { get; }
             public float Height { get; }
             public float Rotation { get; }
@@ -423,8 +440,19 @@ namespace ArknoNights.Lobby.Tests
                 { "RoomSelect/RightBackground", "room_select_right_bg" },
                 { "RoomSelect/TitleIcon", "room_select_title_icon" },
                 { "RoomSelect/TitleDot", "room_select_dot" },
-                { "RoomSelect/Create/LogoLeft", "room_select_create_logo" },
-                { "RoomSelect/Create/LogoRight", "room_select_create_logo" },
+                { "RoomSelect/Create/CreateFrame/TopLeft", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/TopRight", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/BottomLeft", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/BottomRight", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/LeftUpper", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/LeftLower", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/RightUpper", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/RightLower", "doc_frame_line" },
+                { "RoomSelect/Create/CreateFrame/TopRightChamfer", "doc_frame_line" },
+                { "RoomSelect/Create/Wings/WingLeftUpper", "img_pointer" },
+                { "RoomSelect/Create/Wings/WingLeftLower", "img_pointer" },
+                { "RoomSelect/Create/Wings/WingRightUpper", "img_pointer" },
+                { "RoomSelect/Create/Wings/WingRightLower", "img_pointer" },
                 { "RoomSelect/Create/DotTopLeft", "room_select_dot" },
                 { "RoomSelect/Create/DotTopRight", "room_select_dot" },
                 { "RoomSelect/Create/DotBottomLeft", "room_select_dot" },
@@ -469,12 +497,42 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(image.sprite.name, Is.EqualTo(item.Value), item.Key);
                 if (item.Key != "RoomSelect/Create/CreateAction"
                     && item.Key != "RoomSelect/Join/JoinAction"
-                    && item.Key != "RoomSelect/Create/LogoLeft"
-                    && item.Key != "RoomSelect/Create/LogoRight")
+                    && !item.Key.StartsWith("RoomSelect/Create/CreateFrame/"))
                 {
                     Assert.That(image.preserveAspect, Is.True, item.Key);
                 }
             }
+        }
+
+        private static void AssertOrientedDecoration(
+            RectTransform create,
+            OrientedDecorationExpectation expected,
+            float tolerance = .05f)
+        {
+            var node = create.Find(expected.Path);
+            Assert.That(node, Is.Not.Null, expected.Path);
+            var image = node.GetComponent<UnityEngine.UI.Image>();
+            var rect = node.GetComponent<RectTransform>();
+            Assert.That(image, Is.Not.Null, expected.Path);
+            Assert.That(image.sprite, Is.Not.Null, expected.Path);
+            Assert.That(image.sprite.name, Is.EqualTo(expected.SpriteName));
+            Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(rect.anchorMax, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(rect.pivot, Is.EqualTo(new Vector2(.5f, .5f)));
+            Assert.That(rect.anchoredPosition.x, Is.EqualTo(expected.CenterX).Within(tolerance));
+            Assert.That(rect.anchoredPosition.y, Is.EqualTo(-expected.CenterTop).Within(tolerance));
+            Assert.That(rect.sizeDelta.x, Is.EqualTo(expected.Width).Within(tolerance));
+            Assert.That(rect.sizeDelta.y, Is.EqualTo(expected.Height).Within(tolerance));
+            Assert.That(Mathf.DeltaAngle(rect.localEulerAngles.z, expected.Rotation), Is.EqualTo(0f).Within(tolerance));
+            Assert.That(image.preserveAspect, Is.EqualTo(expected.PreserveAspect));
+            Assert.That(image.raycastTarget, Is.False);
+        }
+
+        private static void AssertDecorationBehindAction(RectTransform create, string path, Transform action)
+        {
+            var directChild = create.Find(path);
+            while (directChild.parent != create) directChild = directChild.parent;
+            Assert.That(directChild.GetSiblingIndex(), Is.LessThan(action.GetSiblingIndex()), path);
         }
 
         private static void AssertActionRect(RectTransform action, RectTransform container, global::LanLobbyRect expected, float tolerance)
