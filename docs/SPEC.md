@@ -456,7 +456,7 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 - `M <= 0` 属于非法表现输入，应隐藏状态条并产生可诊断错误，不得除零或反向修改 Core；
 - 当前阶段的权威战斗尚不产生护盾，战斗回放中的 `currentShield` 默认为 `0`。TASK-007 只建立护盾显示输入与布局，不定义护盾生成、伤害吸收、消耗、叠加或失效规则。
 
-当单位 GameObject 被隐藏、销毁或回放清理时，状态条随单位一起隐藏或清理。本节不额外定义死亡动画期间血条保留多久；在单位对象仍可见期间，`0` 血量且无护盾按上述规则显示空背景，随后跟随既有死亡/隐藏生命周期结束。
+当单位 GameObject 被隐藏、销毁或回放清理时，状态条随单位一起隐藏或清理。连续播放跨过单位的 Death 事件时，单位先完整播放目录映射的死亡动画；动画完成后继续保留 `0.5` 秒，单位 Spine 身体在这 `0.5` 秒内从当时颜色线性变为纯黑，随后隐藏整个单位 GameObject。`0.5` 秒是显示层的现实时间，不写入或反向修改 Core/Track。状态条不参与变黑，在单位对象仍可见期间，`0` 血量且无护盾按上述规则显示空背景，并在单位隐藏时一起隐藏。若目录映射的死亡动画缺失或无法播放，维持诊断后立即隐藏单位的兜底，不伪造动画完成时间。
 
 状态条和单位整体必须显示在战场地图之上，不得被地面遮挡。当前项目使用 Built-in Render Pipeline；实现应优先采用仅作用于单位/状态条的世界位置偏移、Renderer 排序、渲染队列或专用透明材质深度设置，不应为此修改全局渲染管线。若 Renderer 排序不能跨越不透明地图的深度遮挡，可以为状态条使用局部的 `ZWrite Off`/合适 `ZTest` 等价方案，但不得让状态条反向参与物理或战斗计算。
 
@@ -469,7 +469,9 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 - `Idle`、`Move`、`Attack` 或 `Death` 动作类型；
 - 实例级 MaxHP、CurrentHP 和 CurrentShield。
 
-动作优先级为 `Death > Attack > Move > Idle`。Damage 只更新 CurrentHP，不产生 Hit 动作，也不打断 Attack；新 Track 播放路径不得调用 Hit 动画。切换观察目标时只恢复动作类型，动画从该动作开头播放。
+动作优先级为 `Death > Attack > Move > Idle`。Damage 只更新 CurrentHP，不产生 Hit 动作，也不打断 Attack；新 Track 播放路径不得调用 Hit 动画。
+
+连续播放只有在跨过 Death 事件时才为现存单位触发死亡动画、动画完成后的 `0.5` 秒变黑和隐藏。播放控制器从任意 Track Tick 初次绑定、重新绑定或回退重建视图时，该 Tick 已经死亡（`DeathTick <= PresentationTick`）的单位不得创建或显示，也不得从头补播死亡动画；无需还原死亡动画或变黑阶段的准确进度。回退到单位死亡前的 Tick 时，可以按该 Tick 的存活采样重新创建单位。切换观察目标导致重新绑定时遵守同一规则；从 Tick `0` 重播则按完整时间线重新触发后续死亡表现。
 
 Core 当前逐 Tick 输出的连续 Move 事件只在表现 Track 中压缩，原始事件不得删除。压缩后的 Position Segment 按时间线性插值，并且在每个原始 Move Tick 的位置误差不得超过 `1 Unity 世界坐标单位 = 1 cm`。Spawn、Attack、BlockStarted、BlockEnded、Death、BattleEnded、移动开始、移动停止和最终位置必须是误差为 `0` 的精确关键帧；不得跨越没有 Move 的 Tick 压缩。
 
