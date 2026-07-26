@@ -100,6 +100,6 @@ namespace ArknoNights.Details
     {
         public static string Value(int value) => value.ToString(CultureInfo.InvariantCulture);
         public static string MoveSpeed(int centimetresPerSecond) => (centimetresPerSecond / 100f).ToString("0.#", CultureInfo.InvariantCulture);
-        public static string AttackInterval(int ticks) => (ticks / (float)BattleInput.TicksPerSecond).ToString("0.#", CultureInfo.InvariantCulture);
+        public static string AttackInterval(int ticks) => (ticks / (float)BattleInput.TicksPerSecond).ToString("0.##", CultureInfo.InvariantCulture);
     }
 }

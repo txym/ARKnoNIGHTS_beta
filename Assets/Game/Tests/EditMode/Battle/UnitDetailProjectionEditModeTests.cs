@@ -17,7 +17,9 @@ namespace ArknoNights.Battle.Tests
         public void NumberFormatter_UsesValuesWithoutUnitSuffixes()
         {
             Assert.AreEqual("1.9", UnitDetailNumberFormatter.MoveSpeed(190));
-            Assert.AreEqual("1.4", UnitDetailNumberFormatter.AttackInterval(28));
+            Assert.AreEqual("0.7", UnitDetailNumberFormatter.AttackInterval(14));
+            Assert.AreEqual("2", UnitDetailNumberFormatter.AttackInterval(40));
+            Assert.AreEqual("0.75", UnitDetailNumberFormatter.AttackInterval(15));
             Assert.AreEqual("20", UnitDetailNumberFormatter.Value(20));
         }
 

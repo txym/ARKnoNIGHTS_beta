@@ -161,7 +161,7 @@ public static class UnitFactory
         so.def = j.defense;
         so.res = j.magicResistance;
 
-        so.attackInterval = j.attackIntervalSeconds;
+        so.attackInterval = j.BaseAttackIntervalSeconds;
         so.attackRadius = j.attackRadiusMetres;
         so.BlockRadius = j.blockRadiusMetres;
 
