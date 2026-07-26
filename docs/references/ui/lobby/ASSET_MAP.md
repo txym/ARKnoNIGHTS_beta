@@ -48,6 +48,8 @@ All other existing lobby rows remain relative to the approved Unpacked root. The
 | room_select_join_text_02.png | [uc]autochessouter/room_select_join_text_02.png | UI/Lobby/Home/room_select_join_text_02 | Join label ornament 02 | Preserve |
 | room_select_join_text_bg.png | [uc]autochessouter/room_select_join_text_bg.png | UI/Lobby/Home/room_select_join_text_bg | Join label background | Preserve |
 | room_select_join_triangle.png | [uc]autochessouter/room_select_join_triangle.png | UI/Lobby/Home/room_select_join_triangle | Join direction ornament | Preserve |
+| img_pointer.png | [uc]autochessouter/img_pointer.png | UI/Lobby/Home/img_pointer | Create tapered wing segment | Preserve |
+| doc_frame_line.png | [uc]autochessouter/doc_frame_line.png | UI/Lobby/Home/doc_frame_line | Create outline segment | Preserve |
 | icon_amiy.png | Combined/[uc]autochesscommon/icon_amiy.png | UI/Lobby/Home/icon_amiy | Home avatar option | Preserve |
 | icon_clementi.png | Combined/[uc]autochesscommon/icon_clementi.png | UI/Lobby/Home/icon_clementi | Home avatar option | Preserve |
 | icon_kirar.png | Combined/[uc]autochesscommon/icon_kirar.png | UI/Lobby/Home/icon_kirar | Home avatar option | Preserve |
