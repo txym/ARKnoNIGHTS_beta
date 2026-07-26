@@ -61,6 +61,17 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
 
     private void OnDestroy()
     {
+        deathState = DeathPresentationState.Hidden;
+        DetachDeathTrackEntry();
+    }
+
+    private void OnDisable()
+    {
+        if (deathState != DeathPresentationState.Animation &&
+            deathState != DeathPresentationState.Blackening)
+            return;
+
+        deathState = DeathPresentationState.Hidden;
         DetachDeathTrackEntry();
     }
 

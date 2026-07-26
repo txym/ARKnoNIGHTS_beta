@@ -343,6 +343,32 @@ namespace ArknoNights.Battle.Tests
         }
 
         [UnityTest]
+        public IEnumerator RealUnitView_ExternalDisableDuringDeathReleasesTerminalPresentation()
+        {
+            var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
+            Assert.IsNotNull(factoryType);
+            var factoryObject = new GameObject("DeathDisableFactory");
+            var factory = factoryObject.AddComponent(factoryType) as IBattlePresentationViewFactory;
+            Assert.IsNotNull(factory);
+
+            Assert.That(factory.TryCreate("disable-probe", "5504", out var view, out var diagnostic),
+                Is.True, diagnostic == null ? string.Empty : diagnostic.ToString());
+            var viewObject = FindChild(factoryObject.transform, "BattleView_disable-probe");
+            Assert.IsNotNull(viewObject);
+
+            view.PlayDeath();
+            Assert.That(view.HasPendingTerminalPresentation, Is.True);
+            viewObject.SetActive(false);
+
+            Assert.That(view.HasPendingTerminalPresentation, Is.False,
+                "An externally disabled view cannot continue updating and must not keep formal completion pending.");
+
+            view.Dispose();
+            UnityEngine.Object.Destroy(factoryObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator RealUnitView_DisposeDuringDeathImmediatelyHidesBeforeFrameEnd()
         {
             var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");

@@ -42,7 +42,7 @@
 4. `Hidden`：立即停用 GameObject，但不自行销毁。
 5. `Disposed`：播放控制器在 Replay、重新绑定或清理时统一销毁视图。
 
-`PlayDeath` 必须幂等，旧 TrackEntry 的回调在中断、停用或销毁时不得继续改变新状态。`Dispose` 应先立即隐藏再请求 Unity 销毁，避免延迟到帧末的旧视图与新绑定视图短暂重叠。
+`PlayDeath` 必须幂等，旧 TrackEntry 的回调在中断、停用或销毁时不得继续改变新状态。`Dispose` 应先立即隐藏再请求 Unity 销毁，避免延迟到帧末的旧视图与新绑定视图短暂重叠。若播放器之外的生命周期直接停用或销毁正在死亡的视图，该视图必须进入 `Hidden`、退订回调并停止报告待完成终局表现。
 
 正式回合的终局清理只等待当前已经存在的视图处于 `DeathAnimation` 或 `Blackening`。进入 `Hidden`、缺动画 fallback 或中断隐藏后立即视为完成。重新绑定会先 Dispose 旧视图，再按切入 Tick 过滤死亡单位，因此不会为了终局等待重新创建或补播死亡单位。
 
