@@ -98,6 +98,33 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(discovered.members, Is.Empty);
 
             var home = parsed.captures.Single(record => record.name == "home");
+            var homeStates = new[] { home, discovered };
+            foreach (var homeState in homeStates)
+            {
+                Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(11));
+                Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
+                Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
+                Assert.That(homeState.spriteSources.Any(sprite =>
+                    sprite.node == "LanLobbyRoot/Home/RoomSelect/Create/CreateAction"), Is.True,
+                    homeState.name + " must retain the frozen CreateAction after its decorations.");
+
+                const string interiorBackingPath = "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking";
+                Assert.That(homeState.codeNativeGeometry.Any(geometry => geometry.name == interiorBackingPath), Is.True,
+                    homeState.name + " must report the visible sprite-null InteriorBacking.");
+                var interiorBacking = homeState.codeNativeGeometry.Single(geometry => geometry.name == interiorBackingPath);
+                Assert.That(interiorBacking.kind, Is.EqualTo("code-native-geometry"));
+                Assert.That(interiorBacking.isBitmap, Is.False);
+                Assert.That(interiorBacking.color, Is.EqualTo("#000000C7"));
+                Assert.That(interiorBacking.width, Is.GreaterThan(0f));
+                Assert.That(interiorBacking.height, Is.GreaterThan(0f));
+            }
+            Assert.That(homeStates.Sum(record =>
+                record.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line")), Is.EqualTo(22));
+            Assert.That(homeStates.Sum(record =>
+                record.spriteSources.Count(sprite => sprite.spriteName == "img_pointer")), Is.EqualTo(8));
+            Assert.That(homeStates.Sum(record =>
+                record.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo")), Is.Zero);
+
             AssertActionRect(home, "LanLobbyRoot/Home/RoomSelect/Create/CreateAction");
             AssertActionRect(home, "LanLobbyRoot/Home/RoomSelect/Join/JoinAction");
             Assert.That(home.unityText.Any(text => text.text == "LOCAL IDENTITY"), Is.True,
@@ -133,7 +160,7 @@ namespace ArknoNights.Lobby.Tests
                 "Home must count both rendered join_icon instances.");
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
-            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(9));
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(11));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_left_line"), Is.EqualTo(2));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_dot"), Is.EqualTo(5));
             Assert.That(home.spriteSources
@@ -151,8 +178,8 @@ namespace ArknoNights.Lobby.Tests
                 "Rendered join_icon occurrences must sum to four across the two Home states.");
             Assert.That(home.spriteSources.Select(sprite => sprite.node), Is.Unique,
                 "Each Sprite usage row must identify one stable rendered node.");
-            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(1),
-                "The Home manifest must report OpaqueBlocker but no code-native Create frame.");
+            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(2),
+                "The Home manifest must report OpaqueBlocker and the code-native InteriorBacking.");
             foreach (var geometry in home.codeNativeGeometry)
             {
                 Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
@@ -165,7 +192,11 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(home.codeNativeGeometry.Any(item =>
                 item.name.StartsWith("LanLobbyRoot/Home/RoomSelect/PanelFrame", StringComparison.Ordinal)), Is.False);
             CollectionAssert.AreEquivalent(
-                new[] { "LanLobbyRoot/OpaqueBlocker" },
+                new[]
+                {
+                    "LanLobbyRoot/OpaqueBlocker",
+                    "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking"
+                },
                 home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");

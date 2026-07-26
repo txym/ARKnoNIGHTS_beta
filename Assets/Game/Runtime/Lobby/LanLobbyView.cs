@@ -310,17 +310,24 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void BuildCreateSection(RectTransform parent, LanLobbyRect actionRect)
     {
+        CreateSolidDecorationPanel(
+            "InteriorBacking", parent,
+            128f, -12f, 705f, 217f,
+            new Color(0f, 0f, 0f, .78f));
+
         var createFrame = Rect("CreateFrame", parent);
         Stretch(createFrame);
-        var frameTint = new Color(.35f, .60f, .55f, .28f);
-        CreateOrientedDecorationSprite("TopLeft", createFrame, "Home/doc_frame_line", 312f, -18f, 380f, 12f, 0f, false, frameTint);
-        CreateOrientedDecorationSprite("TopRight", createFrame, "Home/doc_frame_line", 635.5f, -18f, 353f, 12f, 0f, false, frameTint);
-        CreateOrientedDecorationSprite("BottomLeft", createFrame, "Home/doc_frame_line", 312f, 344f, 380f, 12f, 180f, false, frameTint);
-        CreateOrientedDecorationSprite("BottomRight", createFrame, "Home/doc_frame_line", 649f, 344f, 380f, 12f, 180f, false, frameTint);
+        var frameTint = new Color(.42f, .82f, .76f, .62f);
+        CreateOrientedDecorationSprite("Top_0", createFrame, "Home/doc_frame_line", 252f, -18f, 260f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("Top_1", createFrame, "Home/doc_frame_line", 491f, -18f, 260f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("Top_2", createFrame, "Home/doc_frame_line", 730f, -18f, 260f, 12f, 0f, false, frameTint);
+        CreateOrientedDecorationSprite("Bottom_0", createFrame, "Home/doc_frame_line", 252f, 344f, 260f, 12f, 180f, false, frameTint);
+        CreateOrientedDecorationSprite("Bottom_1", createFrame, "Home/doc_frame_line", 491f, 344f, 260f, 12f, 180f, false, frameTint);
+        CreateOrientedDecorationSprite("Bottom_2", createFrame, "Home/doc_frame_line", 730f, 344f, 260f, 12f, 180f, false, frameTint);
         CreateOrientedDecorationSprite("LeftUpper", createFrame, "Home/doc_frame_line", 128f, 76f, 200f, 12f, 90f, false, frameTint);
-        CreateOrientedDecorationSprite("LeftLower", createFrame, "Home/doc_frame_line", 128f, 250f, 200f, 12f, 90f, false, frameTint);
-        CreateOrientedDecorationSprite("RightUpper", createFrame, "Home/doc_frame_line", 833f, 103f, 200f, 12f, 270f, false, frameTint);
-        CreateOrientedDecorationSprite("RightLower", createFrame, "Home/doc_frame_line", 833f, 250f, 200f, 12f, 270f, false, frameTint);
+        CreateOrientedDecorationSprite("LeftLower", createFrame, "Home/doc_frame_line", 128f, 253f, 200f, 12f, 90f, false, frameTint);
+        CreateOrientedDecorationSprite("RightUpper", createFrame, "Home/doc_frame_line", 833f, 76f, 200f, 12f, 270f, false, frameTint);
+        CreateOrientedDecorationSprite("RightLower", createFrame, "Home/doc_frame_line", 833f, 253f, 200f, 12f, 270f, false, frameTint);
         CreateOrientedDecorationSprite("TopRightChamfer", createFrame, "Home/doc_frame_line", 826f, -10f, 40f, 12f, 45f, false, frameTint);
 
         var wings = Rect("Wings", parent);
@@ -684,6 +691,30 @@ public sealed class LanLobbyView : MonoBehaviour
         rect.anchoredPosition = new Vector2(left, -top);
         rect.sizeDelta = new Vector2(width, width * sprite.rect.height / sprite.rect.width);
         value.preserveAspect = true;
+    }
+
+    private static Image CreateSolidDecorationPanel(
+        string name,
+        Transform parent,
+        float left,
+        float top,
+        float width,
+        float height,
+        Color color)
+    {
+        var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        value.transform.SetParent(parent, false);
+        var image = value.GetComponent<Image>();
+        image.sprite = null;
+        image.material = null;
+        image.color = color;
+        image.raycastTarget = false;
+        var rect = image.rectTransform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(left, -top);
+        rect.sizeDelta = new Vector2(width, height);
+        return image;
     }
 
     private static Image CreateOrientedDecorationSprite(
