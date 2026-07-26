@@ -57,8 +57,15 @@ namespace ArknoNights.Battle.Tests
             Assert.IsFalse(hud.PlayerState.Snapshot.Units.Any(unit => unit.UnitId == "local-1000-overflow"));
 
             loopType.GetMethod("AdvanceForTests").Invoke(loop, new object[] { 1200f });
-            yield return null;
-            yield return null;
+            Assert.AreEqual("Battle", loopType.GetProperty("Phase").GetValue(loop).ToString(),
+                "The formal round must remain active while terminal death presentation is still playing.");
+            Assert.AreEqual("Playing", multi.GetType().GetProperty("State").GetValue(multi).ToString(),
+                "The multi-battle coordinator must not complete in the same frame that it dispatches terminal Death.");
+
+            var completionDeadline = Time.realtimeSinceStartup + 5f;
+            while (loopType.GetProperty("Phase").GetValue(loop).ToString() == "Battle" &&
+                   Time.realtimeSinceStartup < completionDeadline)
+                yield return null;
 
             Assert.AreEqual("Preparation", loopType.GetProperty("Phase").GetValue(loop).ToString());
             Assert.That((float)loopType.GetProperty("RemainingPreparationSeconds").GetValue(loop), Is.InRange(29f, 30f));

@@ -25,6 +25,7 @@ namespace ArknoNights.Battle.Presentation
         public double PresentationTick { get; private set; }
         public IReadOnlyList<BattlePresentationDiagnostic> Diagnostics => new ReadOnlyCollection<BattlePresentationDiagnostic>(diagnostics);
         public IReadOnlyList<BattlePresentationViewState> ViewStates => new ReadOnlyCollection<BattlePresentationViewState>(views.Values.OrderBy(item => item.Unit.UnitId, StringComparer.Ordinal).Select(item => item.ToState(PresentationTick)).ToArray());
+        public bool HasPendingTerminalPresentation => views.Values.Any(item => item.View.HasPendingTerminalPresentation);
 
         public bool Bind(BattlePresentationTrack track, IBattlePresentationViewFactory viewFactory, BattleObserverView observer, double presentationTick, out IReadOnlyList<BattlePresentationDiagnostic> bindDiagnostics)
         {

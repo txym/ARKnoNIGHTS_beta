@@ -298,7 +298,7 @@ Buff 的效果、语义等价和规范化规则仍未确认。当前本地测试
 - `MatchAB`：玩家 1 为 Home，玩家 2 为 Away；
 - `MatchCD`：玩家 3 为 Home，玩家 4 为 Away。
 
-两场战斗分别由各自双方的封存快照生成并调用确定性战斗 Core；每份输入只计算一次并编译为可按任意演示 Tick 采样的只读表现 Track。两场 Track 共用一个演示时钟和播放速度；未显示的战斗也随该时钟推进。切换观察目标只切换所选战斗及 Home/Away 观察视角，不重新计算战斗，也不从 Tick 0 重新推进事件。切换时精确恢复位置、生命、护盾、死亡和动作类型，但 Spine 动画只从当前动作类型的开头播放，不恢复动画内部进度。较早结束的战斗保持最终状态；全局演示 Tick 到达两场 Track 中最大的结束 Tick 后返回准备阶段。
+两场战斗分别由各自双方的封存快照生成并调用确定性战斗 Core；每份输入只计算一次并编译为可按任意演示 Tick 采样的只读表现 Track。两场 Track 共用一个演示时钟和播放速度；未显示的战斗也随该时钟推进。切换观察目标只切换所选战斗及 Home/Away 观察视角，不重新计算战斗，也不从 Tick 0 重新推进事件。切换时精确恢复位置、生命、护盾、死亡和动作类型，但 Spine 动画只从当前动作类型的开头播放，不恢复动画内部进度。较早结束的战斗保持最终状态；全局演示 Tick 到达两场 Track 中最大的结束 Tick 后停止推进权威 Tick，但正式回合必须等待当前已经显示的终局死亡视图完成死亡动画、变黑并隐藏，随后才进入 Completed 并返回准备阶段。该等待由视图完成状态驱动，不使用固定的回合结束延时；若切入终局 Tick 时没有创建任何已死亡单位，则可以立即完成。
 
 移动路径、入场顺序、等待时间和异常处理方式后续补充。
 
@@ -471,7 +471,7 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 
 动作优先级为 `Death > Attack > Move > Idle`。Damage 只更新 CurrentHP，不产生 Hit 动作，也不打断 Attack；新 Track 播放路径不得调用 Hit 动画。
 
-连续播放只有在跨过 Death 事件时才为现存单位触发死亡动画、动画完成后的 `0.5` 秒变黑和隐藏。播放控制器从任意 Track Tick 初次绑定、重新绑定或回退重建视图时，该 Tick 已经死亡（`DeathTick <= PresentationTick`）的单位不得创建或显示，也不得从头补播死亡动画；无需还原死亡动画或变黑阶段的准确进度。回退到单位死亡前的 Tick 时，可以按该 Tick 的存活采样重新创建单位。切换观察目标导致重新绑定时遵守同一规则；从 Tick `0` 重播则按完整时间线重新触发后续死亡表现。
+连续播放只有在跨过 Death 事件时才为现存单位触发死亡动画、动画完成后的 `0.5` 秒变黑和隐藏。播放控制器从任意 Track Tick 初次绑定、重新绑定或回退重建视图时，该 Tick 已经死亡（`DeathTick <= PresentationTick`）的单位不得创建或显示，也不得从头补播死亡动画；无需还原死亡动画或变黑阶段的准确进度。回退到单位死亡前的 Tick 时，可以按该 Tick 的存活采样重新创建单位。切换观察目标导致重新绑定时遵守同一规则；从 Tick `0` 重播则按完整时间线重新触发后续死亡表现。正式回合到达最大 Track EndTick 时不得在派发终局 Death 的同一帧清理视图，必须等当前可见视图不再报告待完成的终局表现后再重置显示层。
 
 Core 当前逐 Tick 输出的连续 Move 事件只在表现 Track 中压缩，原始事件不得删除。压缩后的 Position Segment 按时间线性插值，并且在每个原始 Move Tick 的位置误差不得超过 `1 Unity 世界坐标单位 = 1 cm`。Spawn、Attack、BlockStarted、BlockEnded、Death、BattleEnded、移动开始、移动停止和最终位置必须是误差为 `0` 的精确关键帧；不得跨越没有 Move 的 Tick 压缩。
 
@@ -569,7 +569,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 `SampleScene` 的本地 UI 接入流程为 `Preparation(30 秒) → Battle → Preparation`。倒计时使用 Unity unscaled time，但 Battle Core 仍在播放前以固定 20 TPS 完整计算，绝不受倒计时或渲染帧率影响。准备结束时先锁定 UI-003 部署/撤退输入并取消临时交互，永久移除所有 Overflow；若部署区为空，则从待部署单位中选择唯一“费用最高且当前 Cost 可支付”的实例，以正常 `TryDeploy` 命令部署到一基 `(5,2)` 并扣费。现有固定数据的该候选为唯一的 `local-5503-alpha`；若真实数据出现最高费用并列，流程进入显式 Error，不依赖容器顺序猜测决胜。
 
-随后将持续 PlayerState 的快照与 `task004a-real-1v1` 中固定且非空的 Away 快照组成经 `BattleInputFactory` 验证的不可变 `local-battle-v1` 输入。只有 Deployed 单位参与 Core；Staging/Shop 仅作为输入快照。若没有可自动部署单位，Home 保持为空，Core 按既有规则由固定 Away 获胜，不创建伪单位。战斗 Completed 后才销毁战斗视图、恢复准备投影和交互并重置 30 秒；Overflow 删除、自动部署、Cost、阵型、精英化和 Buff 保留，而 HP、死亡和 winner 永不写回 PlayerState。当前临时商店和赤金操作已接入局内玩家状态；玩家生命扣除、完整结算与多人同步仍未实现。
+随后将持续 PlayerState 的快照与 `task004a-real-1v1` 中固定且非空的 Away 快照组成经 `BattleInputFactory` 验证的不可变 `local-battle-v1` 输入。只有 Deployed 单位参与 Core；Staging/Shop 仅作为输入快照。若没有可自动部署单位，Home 保持为空，Core 按既有规则由固定 Away 获胜，不创建伪单位。全局演示 Tick 到达最大 EndTick 且当前可见终局死亡表现已经结束后，战斗才进入 Completed；随后才销毁战斗视图、恢复准备投影和交互并重置 30 秒。Overflow 删除、自动部署、Cost、阵型、精英化和 Buff 保留，而 HP、死亡和 winner 永不写回 PlayerState。当前临时商店和赤金操作已接入局内玩家状态；玩家生命扣除、完整结算与多人同步仍未实现。
 
 ## 13. UNIT-DATA-001 单位源数据契约（2026-07-23）
 

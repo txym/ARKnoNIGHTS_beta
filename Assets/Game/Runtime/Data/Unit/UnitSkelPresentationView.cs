@@ -35,6 +35,10 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     private float deathBlackeningElapsed;
     private Color deathBlackeningStartColor = Color.white;
 
+    public bool HasPendingTerminalPresentation =>
+        deathState == DeathPresentationState.Animation ||
+        deathState == DeathPresentationState.Blackening;
+
     private void Awake()
     {
         if (!unitSkel) unitSkel = GetComponent<UnitSkelBase>();

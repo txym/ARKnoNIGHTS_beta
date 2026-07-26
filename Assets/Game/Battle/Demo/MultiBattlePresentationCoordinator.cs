@@ -192,7 +192,7 @@ namespace ArknoNights.Battle.Demo
                 Fail("multi.playback.render.failed", string.Join(";", diagnostics.Select(item => item.ToString()).ToArray()));
                 return;
             }
-            if (presentationTick >= maximumEndTick)
+            if (presentationTick >= maximumEndTick && !playback.HasPendingTerminalPresentation)
             {
                 State = MultiBattlePresentationState.Completed;
                 CompletionTransitionCount++;

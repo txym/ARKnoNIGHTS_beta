@@ -53,7 +53,19 @@ namespace ArknoNights.Battle.Tests
                 Assert.That(ReadString(coordinatorType, coordinator, "SelectedMatchId"), Is.EqualTo("match-cd"));
                 Assert.That(coordinatorType.GetProperty("Observer").GetValue(coordinator), Is.EqualTo(BattleObserverView.Away));
 
+                factory.HoldTerminalPresentation = true;
                 coordinatorType.GetMethod("Advance").Invoke(coordinator, new object[] { 1000f });
+                Assert.That(coordinatorType.GetProperty("State").GetValue(coordinator).ToString(), Is.EqualTo("Playing"),
+                    "Reaching the final Track tick must wait for existing terminal death views.");
+                Assert.That(factory.PendingTerminalPresentationCount, Is.GreaterThan(0));
+
+                Assert.That((bool)coordinatorType.GetMethod("Pause").Invoke(coordinator, null), Is.True);
+                factory.CompleteTerminalPresentations();
+                coordinatorType.GetMethod("Advance").Invoke(coordinator, new object[] { 0.05f });
+                Assert.That(coordinatorType.GetProperty("State").GetValue(coordinator).ToString(), Is.EqualTo("Paused"),
+                    "A paused coordinator must not transition to Completed.");
+                Assert.That((bool)coordinatorType.GetMethod("Resume").Invoke(coordinator, null), Is.True);
+                coordinatorType.GetMethod("Advance").Invoke(coordinator, new object[] { 0.05f });
                 Assert.That(coordinatorType.GetProperty("State").GetValue(coordinator).ToString(), Is.EqualTo("Completed"));
                 var createdBeforeReplay = factory.CreatedCount;
                 Assert.That((bool)coordinatorType.GetMethod("Replay").Invoke(coordinator, null), Is.True, ReadString(coordinatorType, coordinator, "LastError"));
@@ -79,28 +91,44 @@ namespace ArknoNights.Battle.Tests
 
         private sealed class Factory : IBattlePresentationViewFactory
         {
+            private readonly System.Collections.Generic.List<View> views = new System.Collections.Generic.List<View>();
+
             public int CreatedCount { get; private set; }
+            public bool HoldTerminalPresentation { get; set; }
+            public int PendingTerminalPresentationCount => views.Count(item => item.HasPendingTerminalPresentation);
 
             public bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic)
             {
                 CreatedCount++;
-                view = new View();
+                var created = new View(this);
+                views.Add(created);
+                view = created;
                 diagnostic = null;
                 return true;
+            }
+
+            public void CompleteTerminalPresentations()
+            {
+                foreach (var view in views) view.CompleteTerminalPresentation();
             }
         }
 
         private sealed class View : IBattlePresentationView
         {
+            private readonly Factory owner;
+
+            public View(Factory owner) { this.owner = owner; }
+            public bool HasPendingTerminalPresentation { get; private set; }
             public void SetWorldPosition(Vector3 position) { }
             public void SetFacing(Vector3 direction) { }
             public void SetPlaybackSpeed(float playbackSpeed) { }
             public void PlayMove() { }
             public void PlayAttack(float animationSpeedMultiplier) { }
             public void PlayHit() { }
-            public void PlayDeath() { }
+            public void PlayDeath() => HasPendingTerminalPresentation = owner.HoldTerminalPresentation;
             public void SetStatusBarState(string unitId, bool isEnemy, int currentHitPoints, int currentShield) { }
-            public void Dispose() { }
+            public void Dispose() => HasPendingTerminalPresentation = false;
+            public void CompleteTerminalPresentation() => HasPendingTerminalPresentation = false;
         }
     }
 }

@@ -6,6 +6,7 @@ namespace ArknoNights.Battle.Presentation
 {
     public interface IBattlePresentationView : IDisposable
     {
+        bool HasPendingTerminalPresentation => false;
         void SetWorldPosition(Vector3 position);
         void SetFacing(Vector3 direction);
         void SetPlaybackSpeed(float playbackSpeed);

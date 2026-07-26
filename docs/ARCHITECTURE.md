@@ -206,7 +206,7 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `BattlefieldWorldProjection` 使用主场直投影与客场 180 度变换；连续定点位置按同一中心变换，`1` 个 Core 厘米单位对应 `1` 个 Unity 世界坐标单位，即 `1m = 100` Unity 单位。
 - 回放在相邻 Move 事件的一个 Tick 区间内插值 Transform，并在事件 Tick 对齐权威最终位置。Attack、Damage、Death 分别驱动攻击、受击、死亡命令；攻击局部倍速使用 `originalAnimationTicks / effectiveAnimationTicks`。`UnitSkelPresentationView` 缺少动画时记录诊断，死亡动画缺失时采用隐藏这个已由事件确认死亡的对象的降级策略。
 - Track 点采样的 `ShouldDisplay` 表示从该 Tick 切入时的视图创建资格：死亡单位仍保留权威终态、HP、位置和 `Death` 动作采样，但初次绑定、重新绑定或回退重建不会为其创建视图。连续播放中已经存在的视图不受创建过滤影响，仍会在跨过 Death 时接收一次死亡命令。
-- 真实 Spine 视图保留本次死亡 `TrackEntry` 并监听完成回调；动画完成后以 `0.5` 秒现实时间把 Skeleton RGB 线性变为纯黑，再停用整个单位 GameObject。状态条不参与着色但随对象停用；Replay、重新绑定和清理仍由播放控制器统一 Dispose，Dispose 会先立即隐藏再在帧末销毁，避免旧视图与新视图短暂重叠。
+- 真实 Spine 视图保留本次死亡 `TrackEntry` 并监听完成回调；动画完成后以 `0.5` 秒现实时间把 Skeleton RGB 线性变为纯黑，再停用整个单位 GameObject。状态条不参与着色但随对象停用；Replay、重新绑定和清理仍由播放控制器统一 Dispose，Dispose 会先立即隐藏再在帧末销毁，避免旧视图与新视图短暂重叠。视图在死亡动画或变黑阶段通过 `IBattlePresentationView.HasPendingTerminalPresentation` 报告尚未完成，默认接口实现为 `false`，不会破坏不需要异步收尾的既有视图。
 - 同一单位的连续 Move 事件只启动一次循环移动动画，不会每 Tick 重置 Spine Track。Attack 从其事件 Tick 持续到 `effectiveAnimationTicks` 结束，期间仍可按 Core 结果更新 Transform，但后续 Move 事件不得覆盖攻击动画；暂停将视图播放倍率置为 `0`，恢复时才还原当前演示倍率。上述演示策略不改变事件、坐标、阻挡、伤害或 winner。
 - `UnitSkelPresentationView` 与 `MappedBattlePresentationViewFactory` 位于 `Assembly-CSharp`，作为旧 `DefaultUnit`、`UnitIdentity`、`UnitSkelBase`/Spine 原型对隔离 Presentation 程序集的单向桥接。后者只接受 Inspector 明确配置的 `coreTypeId → prefab / SkeletonDataAsset / legacy type ID` 绑定；未配置时返回 `resource.mapping.missing`，不会猜测绑定。没有反向把 Unity 对象、Transform 或动画状态带入 Core。
 - `task003-minimal-v1` 的 `home-striker`、`away-guard` 是合成算法测试类型，仍没有也不应被猜测为 `gopro`/`arcslma` 资源映射。因此实际 Spine/Prefab 创建与视觉播放保持未验证；规划中的 TASK-004A 必须先建立真实单位目录与玩家对战快照的连接并完成真实资源回归，TASK-005 才能接场景。
@@ -284,7 +284,7 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 - `LocalMatchState` 现在保留 fixture 中的玩家源顺序，并提供按玩家 ID 的只读查询。`PreparationBattleLoopController` 把正式 HUD 已创建的本地 `PlayerState` 作为本地覆盖项传给 `LocalMatchStateLoader`；因此没有为本地玩家创建第二份权威状态，其他三名玩家仍是 fixture 快照。
 - `FourPlayerBattleRoundSealer` 在一次准备阶段转换中按源顺序封存四名玩家，并固定配对 `P1/P2 -> MatchAB`、`P3/P4 -> MatchCD`。每名玩家只执行一次 Overflow 清理和自动部署，然后以该封存快照构造两份独立的 `BattleInput`。最高费用候选若在 `typeId`、精英化等级及完整 Buff 集合上严格相同，按稳定 `unitId` 选择首项；其他并列最高候选仍返回结构化歧义错误。该规则只解决已确认的严格堆叠实例，不扩展部署规则。
-- `MultiBattlePresentationCoordinator` 是 UI-009 的场景外协调层：它对每份输入仅运行一次 `BattleRunner`，保存不可变结果及其 Presentation Track，并把四名玩家稳定映射到 `(matchId, BattleObserverView)`。它只为当前观察目标绑定场景视图，以一个共享演示 Tick、暂停/倍速和重播控制两场已完成结果；切换观察目标不会重跑 Core 或写回任何 `PlayerState`。两场 Track 都完成后仅报告一次完成转换。
+- `MultiBattlePresentationCoordinator` 是 UI-009 的场景外协调层：它对每份输入仅运行一次 `BattleRunner`，保存不可变结果及其 Presentation Track，并把四名玩家稳定映射到 `(matchId, BattleObserverView)`。它只为当前观察目标绑定场景视图，以一个共享演示 Tick、暂停/倍速和重播控制两场已完成结果；切换观察目标不会重跑 Core 或写回任何 `PlayerState`。共享 Tick 到达最大 EndTick 后，`BattleTrackPlaybackController` 聚合当前视图的终局表现状态；协调器保持 Playing，直到死亡动画与变黑视图全部结束后才报告一次完成转换，正式循环此后才 Reset。这里没有硬编码终局等待时间，终局 Tick 切入未创建死亡视图时可以立即完成。
 - `PreparationBattleLoopController` 在 `Preparation -> Battle` 时调用四玩家 sealer 和多战斗协调器，复用现有 `BattleDemoRoot` 的已序列化 Presentation Factory 及视图根，不创建第二套相机、Demo 根或权威 runner。`TryObserveBattlePlayer` 仅在战斗阶段接受已知玩家 ID，并把 `LocalMatchState` 的观察变化转交给协调器；`BattleHudSceneCoordinator` 将左侧玩家列表按钮接入该入口。
 - `FormalBattleHudController` 与 `UnitInformationCaptureRunner` 优先读取当前多战斗 Track 的观察侧和状态，保留旧单场 `BattleDemoCoordinator` 作为兼容回退。因此状态栏敌人数、战斗单位选择和详情面板不会把旧 Demo 的 Idle 状态误当作当前战斗。
 - `BattleTrackPlaybackController.ViewStates` 按当前 `PresentationTick` 采样 Track，而非采样最终 Tick；这保证了血量、死亡、动作和位置在共享时间轴上的场景投影与已封存结果一致。演示层仍没有修改战斗结果的路径。

@@ -276,6 +276,8 @@ namespace ArknoNights.Battle.Tests
                 Is.True, diagnostic == null ? string.Empty : diagnostic.ToString());
             var viewObject = FindChild(factoryObject.transform, "BattleView_death-probe");
             Assert.IsNotNull(viewObject);
+            var presentationView = view as Component;
+            Assert.IsNotNull(presentationView);
             var skeleton = viewObject.GetComponent("SkeletonAnimation");
             Assert.IsNotNull(skeleton);
             var statusBarRoot = viewObject.transform.Find("WorldStatusBar");
@@ -287,31 +289,53 @@ namespace ArknoNights.Battle.Tests
             view.SetPlaybackSpeed(10f);
             view.PlayDeath();
             view.PlayDeath();
+            Assert.That(view.HasPendingTerminalPresentation, Is.True);
 
-            var fadeDeadline = Time.realtimeSinceStartup + 3f;
-            while (viewObject.activeSelf &&
-                   !HasAnyRgbDecreased(initialColor, GetSkeletonColor(skeleton)) &&
-                   Time.realtimeSinceStartup < fadeDeadline)
+            var animationDeadline = Time.realtimeSinceStartup + 3f;
+            while (GetPrivateFieldValue(presentationView, "deathState").ToString() == "Animation" &&
+                   Time.realtimeSinceStartup < animationDeadline)
+            {
+                var animationColor = GetSkeletonColor(skeleton);
+                Assert.That(animationColor.r, Is.EqualTo(initialColor.r).Within(0.0001f));
+                Assert.That(animationColor.g, Is.EqualTo(initialColor.g).Within(0.0001f));
+                Assert.That(animationColor.b, Is.EqualTo(initialColor.b).Within(0.0001f),
+                    "RGB must remain unchanged until the real Spine death TrackEntry completes.");
                 yield return null;
+            }
 
+            Assert.That(GetPrivateFieldValue(presentationView, "deathState").ToString(), Is.EqualTo("Blackening"));
             Assert.That(viewObject.activeSelf, Is.True, "The view must remain visible when blackening begins.");
-            var earlyFadeColor = GetSkeletonColor(skeleton);
-            Assert.That(HasAnyRgbDecreased(initialColor, earlyFadeColor), Is.True,
-                "The death animation must be followed by a visible RGB blackening phase.");
             Assert.That(statusBarRoot.gameObject.activeInHierarchy, Is.True,
                 "The status bar remains visible while the owning unit remains visible.");
 
-            yield return new WaitForSecondsRealtime(0.15f);
-            var laterFadeColor = GetSkeletonColor(skeleton);
-            Assert.That(laterFadeColor.r, Is.LessThan(earlyFadeColor.r));
-            Assert.That(laterFadeColor.g, Is.LessThan(earlyFadeColor.g));
-            Assert.That(laterFadeColor.b, Is.LessThan(earlyFadeColor.b));
-            Assert.That(laterFadeColor.a, Is.EqualTo(initialColor.a).Within(0.0001f));
-            Assert.That(viewObject.activeSelf, Is.True);
+            var observedFadeSeconds = 0f;
+            while (viewObject.activeSelf && observedFadeSeconds < 0.2f)
+            {
+                yield return null;
+                observedFadeSeconds += Time.unscaledDeltaTime;
+            }
 
-            yield return new WaitForSecondsRealtime(0.45f);
+            Assert.That(viewObject.activeSelf, Is.True);
+            var middleFadeColor = GetSkeletonColor(skeleton);
+            Assert.That(middleFadeColor.r, Is.LessThan(initialColor.r));
+            Assert.That(middleFadeColor.g, Is.LessThan(initialColor.g));
+            Assert.That(middleFadeColor.b, Is.LessThan(initialColor.b));
+            Assert.That(middleFadeColor.r, Is.GreaterThan(0f));
+            Assert.That(middleFadeColor.g, Is.GreaterThan(0f));
+            Assert.That(middleFadeColor.b, Is.GreaterThan(0f));
+            Assert.That(middleFadeColor.a, Is.EqualTo(initialColor.a).Within(0.0001f));
+
+            while (viewObject.activeSelf && observedFadeSeconds < 1f)
+            {
+                yield return null;
+                observedFadeSeconds += Time.unscaledDeltaTime;
+            }
+
             Assert.That(viewObject.activeSelf, Is.False);
             Assert.That(statusBarRoot.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.HasPendingTerminalPresentation, Is.False);
+            Assert.That(observedFadeSeconds, Is.InRange(0.45f, 0.65f),
+                "The view must hide about 0.5 unscaled seconds after Spine reports death animation completion.");
 
             view.Dispose();
             UnityEngine.Object.Destroy(factoryObject);
@@ -387,11 +411,6 @@ namespace ArknoNights.Battle.Tests
                 (float)type.GetProperty("B").GetValue(skeleton, null),
                 (float)type.GetProperty("A").GetValue(skeleton, null));
         }
-
-        private static bool HasAnyRgbDecreased(Color before, Color after)
-            => after.r < before.r - 0.0001f ||
-               after.g < before.g - 0.0001f ||
-               after.b < before.b - 0.0001f;
 
         private static BattleRunResult RunSingleArcslmaSummonBattle()
         {
@@ -480,6 +499,13 @@ namespace ArknoNights.Battle.Tests
             var field = component.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, fieldName);
             return (string)field.GetValue(component);
+        }
+
+        private static object GetPrivateFieldValue(Component component, string fieldName)
+        {
+            var field = component.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, fieldName);
+            return field.GetValue(component);
         }
 
         private sealed class FakeFactory : IBattlePresentationViewFactory
