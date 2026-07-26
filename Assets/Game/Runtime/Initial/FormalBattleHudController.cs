@@ -17,11 +17,11 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// UI-005's scene-local, read-only projection. It deliberately owns no PlayerState, clock, Core runner,
+/// Scene-local, read-only formal battle HUD projection. It deliberately owns no PlayerState, clock, Core runner,
 /// or presentation object: the existing UI-002/003/004 components remain the command and data owners.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class FormalBattleHudUi005 : MonoBehaviour
+public sealed class FormalBattleHudController : MonoBehaviour
 {
     private const string AtlasPath = "UI/Texture/SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged";
     private const string ClockPath = "UI/Texture/BattleStatusPanelClockIcon_Transparent";
@@ -77,11 +77,11 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
 
     public string SelectedUnitId => selectedUnitId;
     public bool SelectedBattleEnemy => selectedBattleEnemy;
-    /// <summary>Raised when the single HUD selection becomes visible or is cleared; UI-010 uses it to hide/show the player list.</summary>
+    /// <summary>Raised when the single HUD selection becomes visible or is cleared; the scene coordinator uses it to hide/show the player list.</summary>
     public event Action<bool> SelectionChanged;
 
     /// <summary>
-    /// UI-010 supplies the locally owned session values.  This presentation component stores only
+    /// The scene coordinator supplies the locally owned session values. This presentation component stores only
     /// their last read-only projection; it never writes economy, life, readiness, or observation.
     /// </summary>
     public void SetSessionHudValues(int gold, int life, string nextOpponent)
@@ -121,11 +121,11 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         }
         if (hud == null || !hud.InitializationSucceeded || deployment == null || loop == null || demo == null)
         {
-            Debug.LogError("[UI-005][hud.dependencies.missing]", this);
+            Debug.LogError("[FormalBattleHud][dependencies.missing]", this);
             yield break;
         }
         var catalogLoad = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
-        if (!catalogLoad.Success) { Debug.LogError("[UI-005][catalog.load.failed]", this); yield break; }
+        if (!catalogLoad.Success) { Debug.LogError("[FormalBattleHud][catalog.load.failed]", this); yield break; }
         catalog = catalogLoad.Catalog;
         Build();
         hud.StagingSelectionChanged += SelectStagingSlot;
@@ -175,7 +175,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         Refresh();
     }
 
-    /// <summary>Read-only preparation inspection for the player currently displayed by UI-010 observation.</summary>
+    /// <summary>Read-only preparation inspection for the player currently displayed by the observation coordinator.</summary>
     public void SelectObservedPreparationUnitForHud(string unitId)
     {
         if (loop == null || loop.Phase != LocalBattlePhase.Preparation || string.IsNullOrWhiteSpace(unitId)) return;
@@ -188,8 +188,8 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         Refresh();
     }
 
-    /// <summary>Explicit UI-010 lifecycle boundary for phase and observation changes.</summary>
-    public void ClearSelectionForUi010() => ClearSelection();
+    /// <summary>Explicit lifecycle boundary for phase and observation changes.</summary>
+    public void ClearSelectionForSceneTransition() => ClearSelection();
 
     private void SelectStagingSlot(string slotId)
     {
@@ -225,9 +225,9 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         foreach (var sprite in Resources.LoadAll<Sprite>(AtlasPath)) if (sprite != null) sprites[sprite.name] = sprite;
         foreach (var sprite in Resources.LoadAll<Sprite>("UI/Texture/unit_panal")) if (sprite != null) sprites[sprite.name] = sprite;
         var canvas = GetComponentInChildren<Canvas>();
-        if (canvas == null) { Debug.LogError("[UI-005][canvas.missing]", this); return; }
-        root = Rect("FormalHudUi005", canvas.transform);
-        root.SetAsFirstSibling(); // all UI-005 elements remain behind the pre-existing staging command UI.
+        if (canvas == null) { Debug.LogError("[FormalBattleHud][canvas.missing]", this); return; }
+        root = Rect("FormalHud", canvas.transform);
+        root.SetAsFirstSibling(); // Formal HUD elements remain behind the pre-existing staging command UI.
         Stretch(root);
         BuildInformationPanel();
         BuildStatusPanel();
@@ -242,7 +242,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         panel.anchoredPosition = new Vector2(0f, 300f); panel.sizeDelta = new Vector2(180f, 80f);
         var background = Image("Background", panel, Sprite("ResourcePanelBackground")); Stretch(background.rectTransform); background.preserveAspect = false;
         // Gold deliberately uses the same left-icon/right-value anchors as DeploymentCostPanel.
-        // UI-010 supplies its read-only value from the loop-owned LocalMatchState.
+        // The scene coordinator supplies its read-only value from the loop-owned LocalMatchState.
         var icon = Image("Icon", panel, Resources.Load<Sprite>(GoldIconPath)); icon.rectTransform.anchorMin = icon.rectTransform.anchorMax = Vector2.zero; icon.rectTransform.pivot = new Vector2(.5f, .5f); icon.rectTransform.anchoredPosition = new Vector2(40f, 40f); icon.rectTransform.sizeDelta = new Vector2(48f, 37f); icon.preserveAspect = true;
         goldValue = NumberText("Value", panel, 54, TextAnchor.MiddleCenter, new Color(1f, .82f, .15f)); goldValue.text = sessionGold.ToString(); goldValue.rectTransform.anchorMin = goldValue.rectTransform.anchorMax = Vector2.zero; goldValue.rectTransform.pivot = new Vector2(.5f, .5f); goldValue.rectTransform.anchoredPosition = new Vector2(116f, 35f); goldValue.rectTransform.sizeDelta = new Vector2(90f, 54f);
     }
@@ -254,7 +254,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
         // The sprite carries a shadow margin; these anchors align its visible gear body with the reference's safe inset.
         var rect = buttonRoot.GetComponent<RectTransform>(); rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f); rect.pivot = new Vector2(0f, 1f); rect.anchoredPosition = new Vector2(24f, -13f); rect.sizeDelta = new Vector2(187f, 161f);
         var image = buttonRoot.GetComponent<Image>(); image.sprite = Sprite("SettingsButtonIcon"); image.preserveAspect = true;
-        var button = buttonRoot.GetComponent<Button>(); button.targetGraphic = image; button.onClick.AddListener(() => Debug.Log("[UI-005][settings.notImplemented]", this));
+        var button = buttonRoot.GetComponent<Button>(); button.targetGraphic = image; button.onClick.AddListener(() => Debug.Log("[FormalBattleHud][settings.notImplemented]", this));
     }
 
     private void BuildStatusPanel()
@@ -536,7 +536,7 @@ public sealed class FormalBattleHudUi005 : MonoBehaviour
     }
 }
 
-internal static class FormalBattleHudUi005Bootstrap
+internal static class FormalBattleHudBootstrap
 {
     private static bool subscribed;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)] private static void Attach()
@@ -547,6 +547,6 @@ internal static class FormalBattleHudUi005Bootstrap
     private static void AttachToLoadedScene()
     {
         var hud = UnityEngine.Object.FindObjectOfType<StagingHudController>();
-        if (hud != null && hud.GetComponent<FormalBattleHudUi005>() == null) hud.gameObject.AddComponent<FormalBattleHudUi005>();
+        if (hud != null && hud.GetComponent<FormalBattleHudController>() == null) hud.gameObject.AddComponent<FormalBattleHudController>();
     }
 }

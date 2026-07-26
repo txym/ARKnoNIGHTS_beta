@@ -3,38 +3,70 @@ using System.Collections.Generic;
 using System.Linq;
 using ArknoNights.Player;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace ArknoNights.UI.FormalHud.ShopReady
 {
-    /// <summary>Scene-attachable right HUD. UI-010 owns attaching it and supplies the already-loaded LocalMatchState.</summary>
+    /// <summary>
+    /// Scene-attachable presentation for the local player's level, shop, and ready state.
+    /// The authoritative economy and commands remain in <see cref="LocalMatchState"/>.
+    /// </summary>
     public sealed class ShopReadyHudController : MonoBehaviour
     {
+        private const int MaximumLevel = 9;
+        private const int RefreshCost = 1;
+        private static readonly int[] UpgradeCosts = { 4, 6, 8, 10, 12, 14, 16, 18 };
+
         private sealed class SlotWidgets
         {
             public int SlotId;
-            public GameObject Root;
-            public Text Label;
+            public RectTransform Root;
             public Button Purchase;
-            public Button Freeze;
+            public Image Background;
+            public Image Portrait;
+            public Image Unaffordable;
+            public Image Outline;
+            public Image Frame;
+            public Image Confirmation;
+            public Image Frozen;
+            public Image CostBackground;
+            public Text Name;
+            public Text Price;
         }
 
         private readonly List<SlotWidgets> slotWidgets = new List<SlotWidgets>();
+        private readonly ShopReadyPendingCommand pendingCommand = new ShopReadyPendingCommand();
         private LocalMatchState match;
         private ShopReadyHudState state;
         private RectTransform root;
-        private RectTransform levelPanel;
+        private RectTransform levelButtonRoot;
         private RectTransform shopPanel;
-        private Button shopToggle;
+        private RectTransform readyButtonRoot;
+        private Button levelButton;
         private Button readyButton;
         private Button refreshButton;
         private Button upgradeButton;
+        private Button freezeButton;
+        private Image readyBackground;
+        private Image readyFrame;
+        private Image readyIcon;
+        private Image refreshBackground;
+        private Image refreshIcon;
+        private Image upgradeBackground;
+        private Image upgradeFrame;
+        private Image upgradeGradient;
+        private Image freezeBackground;
+        private Image freezeIcon;
         private Text levelText;
-        private Text goldText;
-        private Text confirmationText;
+        private Text readyText;
+        private Text refreshText;
+        private Text refreshCostText;
+        private Text upgradeLevelText;
+        private Text upgradeCostText;
+        private Text freezeText;
         private bool shopVisible;
         private bool preparationPhase = true;
-        private readonly ShopReadyPendingCommand pendingCommand = new ShopReadyPendingCommand();
 
         public event Action<bool> FormationInteractionChanged;
         public event Action<LocalMatchOperationCode> CommandCompleted;
@@ -56,13 +88,13 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         public void SetShopVisible(bool visible)
         {
             shopVisible = preparationPhase && visible;
-            if (!visible) pendingCommand.Clear();
+            if (!shopVisible) pendingCommand.Clear();
             if (match != null) Refresh(match.Snapshot);
         }
 
         public void ToggleShopVisible() => SetShopVisible(!shopVisible);
 
-        /// <summary>UI-010 phase boundary. Battle hides and disables only this presentation surface; it never mutates shop state.</summary>
+        /// <summary>Battle hides this surface and clears transient confirmations without mutating shop state.</summary>
         public void SetPreparationPhase(bool isPreparation)
         {
             preparationPhase = isPreparation;
@@ -71,46 +103,64 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 shopVisible = false;
                 pendingCommand.Clear();
             }
+
             if (match != null) Refresh(match.Snapshot);
             if (root != null) root.gameObject.SetActive(preparationPhase);
         }
 
         public void RequestRefresh()
         {
-            if (!preparationPhase) return;
+            if (!preparationPhase || match == null || state == null || state.Gold < RefreshCost) return;
             if (!EnsureConfirmation(ShopReadyConfirmation.Refresh)) return;
             Complete(match.TryRefresh());
         }
 
         public void RequestUpgrade()
         {
-            if (!preparationPhase) return;
+            if (!preparationPhase || match == null || state == null) return;
+            var upgradeCost = UpgradeCost(state.Level);
+            if (state.Level >= MaximumLevel || state.Gold < upgradeCost) return;
             if (!EnsureConfirmation(ShopReadyConfirmation.Upgrade)) return;
             Complete(match.TryUpgrade());
         }
 
         public void Purchase(int shopSlotId)
         {
-            if (!preparationPhase || match == null || state == null || !state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanPurchase)) return;
+            if (!preparationPhase || match == null || state == null) return;
+            var slot = state.Slots.FirstOrDefault(item => item.ShopSlotId == shopSlotId);
+            if (slot == null || !slot.CanPurchase) return;
             if (!pendingCommand.RequestPurchase(shopSlotId))
             {
                 Refresh(match.Snapshot);
                 return;
             }
+
             Refresh(match.Snapshot);
-            if (!state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanPurchase)) return;
+            if (!state.Slots.Any(item => item.ShopSlotId == shopSlotId && item.CanPurchase)) return;
             Complete(match.TryPurchase(shopSlotId));
         }
 
         public void ToggleFrozen(int shopSlotId)
         {
-            if (!preparationPhase || state == null || !state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanToggleFrozen)) return;
+            if (!preparationPhase || state == null) return;
+            if (!state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanToggleFrozen)) return;
             Complete(match.TryToggleFrozen(shopSlotId));
         }
 
         public void ToggleReady()
         {
             if (preparationPhase && match != null) Complete(match.TryToggleReady());
+        }
+
+        private void ToggleFocusedFrozen()
+        {
+            if (state == null) return;
+            var selected = state.Slots.FirstOrDefault(slot =>
+                slot.ShopSlotId == pendingCommand.ShopSlotId && slot.CanToggleFrozen);
+            var target = selected
+                ?? state.Slots.FirstOrDefault(slot => slot.IsFrozen && slot.CanToggleFrozen)
+                ?? state.Slots.FirstOrDefault(slot => slot.CanToggleFrozen);
+            if (target != null) ToggleFrozen(target.ShopSlotId);
         }
 
         private void OnDestroy()
@@ -123,11 +173,14 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             if (root != null && state != null) ApplyLayout();
         }
 
-        private void OnMatchChanged(LocalMatchSnapshot snapshot) { pendingCommand.Clear(); Refresh(snapshot); }
+        private void OnMatchChanged(LocalMatchSnapshot snapshot)
+        {
+            pendingCommand.Clear();
+            Refresh(snapshot);
+        }
 
         private bool EnsureConfirmation(ShopReadyConfirmation requested)
         {
-            if (match == null) return false;
             var confirmed = pendingCommand.RequestFixed(requested);
             if (!confirmed) Refresh(match.Snapshot);
             return confirmed;
@@ -145,17 +198,45 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             if (snapshot == null) return;
             EnsureView();
             state = ShopReadyHudState.Project(snapshot, shopVisible, pendingCommand.Kind);
-            levelText.text = "LV " + state.Level;
-            goldText.text = "G " + state.Gold;
-            readyButton.GetComponentInChildren<Text>().text = state.IsReady ? "\u53d6\u6d88\u51c6\u5907" : "\u51c6\u5907\u5c31\u7eea";
+
+            levelText.text = state.Level.ToString();
+            readyText.text = state.IsReady ? "取消准备" : "准备就绪";
+            readyIcon.sprite = FormalHudSpriteLoader.Load(
+                state.IsReady ? "UI/Texture/ready/ready_icon" : "UI/Texture/ready/icon_ready");
+
             shopPanel.gameObject.SetActive(state.ShopVisible);
-            confirmationText.gameObject.SetActive(state.PendingConfirmation != ShopReadyConfirmation.None);
-            confirmationText.text = state.PendingConfirmation == ShopReadyConfirmation.Purchase
-                ? "\u518d\u6b21\u70b9\u51fb\u8d2d\u4e70\u4ee5\u786e\u8ba4"
-                : state.PendingConfirmation == ShopReadyConfirmation.Refresh
-                    ? "\u518d\u6b21\u70b9\u51fb\u5237\u65b0\u4ee5\u786e\u8ba4"
-                    : "\u518d\u6b21\u70b9\u51fb\u5347\u7ea7\u4ee5\u786e\u8ba4";
-            RebuildSlots();
+            var upgradeCost = UpgradeCost(state.Level);
+            var canUpgrade = state.Level < MaximumLevel && state.Gold >= upgradeCost;
+            upgradeButton.interactable = canUpgrade;
+            upgradeBackground.sprite = FormalHudSpriteLoader.Load(
+                canUpgrade ? "UI/Texture/shop/upgrade_max" : "UI/Texture/shop/upgrade_disable");
+            upgradeLevelText.text = state.Level.ToString();
+            upgradeCostText.text = state.Level >= MaximumLevel ? "MAX" : upgradeCost.ToString();
+            var upgradePending = pendingCommand.Kind == ShopReadyConfirmation.Upgrade;
+            upgradeFrame.gameObject.SetActive(upgradePending);
+            upgradeGradient.gameObject.SetActive(upgradePending);
+
+            refreshButton.interactable = state.Gold >= RefreshCost;
+            refreshIcon.sprite = FormalHudSpriteLoader.Load(
+                refreshButton.interactable ? "UI/Texture/shop/refresh_icon" : "UI/Texture/shop/refresh_icon_lock");
+            refreshCostText.text = RefreshCost.ToString();
+
+            EnsureSlots();
+            for (var index = 0; index < state.Slots.Count; index++)
+                BindSlot(slotWidgets[index], state.Slots[index]);
+
+            var frozenTarget = state.Slots.FirstOrDefault(slot =>
+                slot.ShopSlotId == pendingCommand.ShopSlotId && slot.CanToggleFrozen)
+                ?? state.Slots.FirstOrDefault(slot => slot.IsFrozen && slot.CanToggleFrozen)
+                ?? state.Slots.FirstOrDefault(slot => slot.CanToggleFrozen);
+            freezeButton.interactable = frozenTarget != null;
+            var unfreezing = frozenTarget != null && frozenTarget.IsFrozen;
+            freezeBackground.sprite = FormalHudSpriteLoader.Load(
+                unfreezing ? "UI/Texture/shop/frozen_bg_unselect" : "UI/Texture/shop/frozen_bg_normal");
+            freezeIcon.sprite = FormalHudSpriteLoader.Load(
+                unfreezing ? "UI/Texture/shop/frozen_icon2" : "UI/Texture/shop/frozen_icon");
+            freezeText.text = unfreezing ? "解除冻结" : "冻结";
+
             ApplyLayout();
             FormationInteractionChanged?.Invoke(preparationPhase && state.FormationInteractionEnabled);
         }
@@ -164,110 +245,230 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         {
             if (root != null) return;
             root = GetComponent<RectTransform>();
-            if (root == null) root = gameObject.AddComponent<RectTransform>();
-            levelPanel = Panel("LevelPanel", root, new Color(.08f, .12f, .18f, .94f));
-            SetSprite(levelPanel.GetComponent<Image>(), "UI/Texture/shop/level");
-            levelText = Label("Level", levelPanel, 24, TextAnchor.MiddleCenter);
-            Stretch(levelText.rectTransform);
-            shopPanel = Panel("ShopPanel", root, new Color(.08f, .12f, .18f, .94f));
-            shopToggle = Button("ShopToggle", root, "SHOP", ToggleShopVisible);
-            readyButton = Button("Ready", root, "READY", ToggleReady);
-            refreshButton = Button("Refresh", shopPanel, "REFRESH", RequestRefresh);
-            upgradeButton = Button("Upgrade", shopPanel, "UPGRADE", RequestUpgrade);
-            goldText = Label("Gold", shopPanel, 20, TextAnchor.MiddleLeft);
-            confirmationText = Label("Confirmation", shopPanel, 18, TextAnchor.MiddleCenter);
+            if (root == null)
+            {
+                var view = new GameObject("ShopReadyHudView", typeof(RectTransform));
+                view.transform.SetParent(transform, false);
+                root = view.GetComponent<RectTransform>();
+                root.sizeDelta = new Vector2(1920f, 1080f);
+            }
+
+            levelButtonRoot = ButtonRoot("ShopLevelButton", root, ToggleShopVisible, out levelButton);
+            var levelBackground = Image("Background", levelButtonRoot, "UI/Texture/shop/level");
+            Stretch(levelBackground.rectTransform);
+            levelBackground.preserveAspect = true;
+            levelText = Label("Level", levelButtonRoot, 44, TextAnchor.MiddleCenter, Color.white);
+
+            shopPanel = Rect("ShopPanel", root);
+            var upgradeRoot = ButtonRoot("UpgradeButton", shopPanel, RequestUpgrade, out upgradeButton);
+            upgradeBackground = Image("Background", upgradeRoot, "UI/Texture/shop/upgrade_max");
+            Stretch(upgradeBackground.rectTransform);
+            upgradeFrame = Image("ConfirmationFrame", upgradeRoot, "UI/Texture/shop/check_frame");
+            Stretch(upgradeFrame.rectTransform);
+            upgradeGradient = Image("ConfirmationGradient", upgradeRoot, "UI/Texture/shop/check_grad");
+            upgradeLevelText = Label("Level", upgradeRoot, 42, TextAnchor.MiddleCenter, Color.white);
+            upgradeCostText = Label("Cost", upgradeRoot, 18, TextAnchor.MiddleCenter, new Color(1f, .82f, .08f));
+
+            var freezeRoot = ButtonRoot("FreezeButton", shopPanel, ToggleFocusedFrozen, out freezeButton);
+            freezeBackground = Image("Background", freezeRoot, "UI/Texture/shop/frozen_bg_normal");
+            Stretch(freezeBackground.rectTransform);
+            freezeIcon = Image("Icon", freezeRoot, "UI/Texture/shop/frozen_icon");
+            freezeText = Label("Label", freezeRoot, 21, TextAnchor.MiddleCenter, Color.white);
+
+            var refreshRoot = ButtonRoot("RefreshButton", shopPanel, RequestRefresh, out refreshButton);
+            refreshBackground = Image("Background", refreshRoot, "UI/Texture/shop/refresh_bg_normal");
+            Stretch(refreshBackground.rectTransform);
+            refreshIcon = Image("Icon", refreshRoot, "UI/Texture/shop/refresh_icon");
+            refreshText = Label("Label", refreshRoot, 21, TextAnchor.MiddleCenter, Color.white);
+            refreshText.text = "刷新";
+            refreshCostText = Label("Cost", refreshRoot, 18, TextAnchor.MiddleCenter, new Color(1f, .82f, .08f));
+
+            readyButtonRoot = ButtonRoot("ReadyButton", root, ToggleReady, out readyButton);
+            readyBackground = Image("Background", readyButtonRoot, "UI/Texture/ready/ready_bg");
+            Stretch(readyBackground.rectTransform);
+            readyFrame = Image("Frame", readyButtonRoot, "UI/Texture/ready/ready_frame");
+            Stretch(readyFrame.rectTransform);
+            readyIcon = Image("Icon", readyButtonRoot, "UI/Texture/ready/icon_ready");
+            readyText = Label("Label", readyButtonRoot, 24, TextAnchor.MiddleCenter, Color.white);
         }
 
-        private void RebuildSlots()
+        private void EnsureSlots()
         {
+            if (slotWidgets.Count == state.Slots.Count) return;
             foreach (var widget in slotWidgets)
             {
-                if (Application.isPlaying) Destroy(widget.Root);
-                else DestroyImmediate(widget.Root);
+                if (Application.isPlaying) Destroy(widget.Root.gameObject);
+                else DestroyImmediate(widget.Root.gameObject);
             }
+
             slotWidgets.Clear();
             foreach (var slot in state.Slots)
             {
-                var widget = new SlotWidgets { SlotId = slot.ShopSlotId, Root = new GameObject("ShopSlot_" + slot.ShopSlotId, typeof(RectTransform), typeof(Image)) };
-                widget.Root.transform.SetParent(shopPanel, false);
-                SetSprite(widget.Root.GetComponent<Image>(), slot.IsEmpty ? "UI/Texture/shop/bg_empty" : "UI/Texture/shop/bg_black");
-                widget.Label = Label("Label", widget.Root.transform, 16, TextAnchor.MiddleLeft);
-                widget.Label.text = slot.IsEmpty ? "EMPTY" : slot.UnitTypeId + "  " + slot.Price;
-                widget.Purchase = Button("Purchase", widget.Root.transform, "BUY", () => Purchase(slot.ShopSlotId));
-                widget.Purchase.interactable = slot.CanPurchase;
-                widget.Freeze = Button("Freeze", widget.Root.transform, slot.IsFrozen ? "UNFREEZE" : "FREEZE", () => ToggleFrozen(slot.ShopSlotId));
-                widget.Freeze.interactable = slot.CanToggleFrozen;
-                slotWidgets.Add(widget);
-                SetSprite(widget.Purchase.GetComponent<Image>(), slot.CanPurchase ? "UI/Texture/shop/cost_bg_1" : "UI/Texture/shop/cost_bg_2");
-                SetSprite(widget.Freeze.GetComponent<Image>(), slot.IsFrozen ? "UI/Texture/shop/frozen_bg_unselect" : "UI/Texture/shop/frozen_bg_normal");
+                var rootRect = ButtonRoot("ShopSlot_" + slot.ShopSlotId, shopPanel, () => Purchase(slot.ShopSlotId), out var button);
+                var background = Image("Background", rootRect, "UI/Texture/shop/bg_black");
+                var portraitClip = Rect("PortraitClip", rootRect);
+                portraitClip.gameObject.AddComponent<RectMask2D>();
+                var portrait = Image("Portrait", portraitClip, null);
+                var unaffordable = Image("UnaffordableOverlay", rootRect, "UI/Texture/shop/bg_common");
+                var outline = Image("HoverOutline", rootRect, "UI/Texture/shop/frame_outline");
+                var frame = Image("RarityFrame", rootRect, "UI/Texture/shop/frame_lv1");
+                var confirmation = Image("PurchaseConfirmation", rootRect, "UI/Texture/shop/bg_doublecheck1");
+                var name = Label("UnitName", rootRect, 16, TextAnchor.MiddleLeft, Color.white);
+                var costBackground = Image("CostBackground", rootRect, "UI/Texture/shop/cost_bg_1");
+                var price = Label("Price", rootRect, 20, TextAnchor.MiddleCenter, Color.white);
+                var frozen = Image("FrozenOverlay", rootRect, "UI/Texture/shop/ice_matte");
+                var pointer = rootRect.gameObject.AddComponent<ShopSlotPointerView>();
+                pointer.Initialize(outline);
+                slotWidgets.Add(new SlotWidgets
+                {
+                    SlotId = slot.ShopSlotId,
+                    Root = rootRect,
+                    Purchase = button,
+                    Background = background,
+                    Portrait = portrait,
+                    Unaffordable = unaffordable,
+                    Outline = outline,
+                    Frame = frame,
+                    Confirmation = confirmation,
+                    Frozen = frozen,
+                    CostBackground = costBackground,
+                    Name = name,
+                    Price = price
+                });
             }
+        }
+
+        private void BindSlot(SlotWidgets widget, ShopReadySlotViewState slot)
+        {
+            widget.Purchase.interactable = !slot.IsEmpty;
+            widget.Background.sprite = FormalHudSpriteLoader.Load(
+                slot.IsEmpty ? "UI/Texture/shop/bg_empty" : "UI/Texture/shop/bg_black");
+            widget.Portrait.sprite = slot.IsEmpty ? null : FormalHudSpriteLoader.Load(slot.PortraitResourcePath);
+            widget.Portrait.gameObject.SetActive(widget.Portrait.sprite != null);
+            widget.Portrait.preserveAspect = true;
+            widget.Unaffordable.gameObject.SetActive(!slot.IsEmpty && !slot.CanPurchase);
+            widget.Frame.sprite = FormalHudSpriteLoader.Load("UI/Texture/shop/frame_lv" + FrameLevel(slot.Rarity));
+            widget.Frame.gameObject.SetActive(!slot.IsEmpty);
+            widget.Confirmation.gameObject.SetActive(
+                !slot.IsEmpty
+                && pendingCommand.Kind == ShopReadyConfirmation.Purchase
+                && pendingCommand.ShopSlotId == slot.ShopSlotId);
+            widget.Frozen.gameObject.SetActive(!slot.IsEmpty && slot.IsFrozen);
+            widget.CostBackground.sprite = FormalHudSpriteLoader.Load(
+                slot.CanPurchase ? "UI/Texture/shop/cost_bg_1" : "UI/Texture/shop/cost_bg_2");
+            widget.CostBackground.gameObject.SetActive(!slot.IsEmpty);
+            widget.Name.gameObject.SetActive(!slot.IsEmpty);
+            widget.Name.text = string.IsNullOrWhiteSpace(slot.DisplayName) ? slot.UnitTypeId : slot.DisplayName;
+            widget.Price.gameObject.SetActive(!slot.IsEmpty);
+            widget.Price.text = slot.Price.ToString();
         }
 
         private void ApplyLayout()
         {
-            if (root.rect.width <= 0f || root.rect.height <= 0f) return;
+            if (root == null || root.rect.width <= 0f || root.rect.height <= 0f) return;
             var layout = ShopReadyHudLayout.Calculate(root.rect.width, root.rect.height);
-            SetRect(levelPanel, layout.LevelPanel);
+            var scale = layout.Scale;
+            SetRect(levelButtonRoot, layout.LevelPanel);
             SetRect(shopPanel, layout.ShopPanel);
-            SetRect(shopToggle.GetComponent<RectTransform>(), layout.ShopToggle);
-            SetRect(readyButton.GetComponent<RectTransform>(), layout.ReadyButton);
-            Position(refreshButton.GetComponent<RectTransform>(), 110f, 30f, 92f, 36f);
-            Position(upgradeButton.GetComponent<RectTransform>(), 210f, 30f, 92f, 36f);
-            Position(goldText.rectTransform, 30f, 30f, 110f, 36f);
-            Position(confirmationText.rectTransform, 255f, 275f, 230f, 30f);
+            SetRect(readyButtonRoot, layout.ReadyButton);
+
+            Stretch(levelText.rectTransform);
+            levelText.rectTransform.anchoredPosition = new Vector2(0f, -8f * scale);
+
+            PositionBottomLeft(upgradeButton.GetComponent<RectTransform>(), 0f, 78f, 111f, 175f, scale);
+            Stretch(upgradeBackground.rectTransform);
+            Stretch(upgradeFrame.rectTransform);
+            PositionBottomLeft(upgradeGradient.rectTransform, 0f, 18f, 111f, 136f, scale);
+            PositionBottomLeft(upgradeLevelText.rectTransform, 8f, 44f, 95f, 92f, scale);
+            PositionBottomLeft(upgradeCostText.rectTransform, 8f, 143f, 95f, 27f, scale);
+
+            PositionBottomLeft(freezeButton.GetComponent<RectTransform>(), 744f, 0f, 149f, 77f, scale);
+            PositionBottomLeft(freezeIcon.rectTransform, 15f, 23f, 31f, 31f, scale);
+            PositionBottomLeft(freezeText.rectTransform, 45f, 18f, 96f, 40f, scale);
+
+            PositionBottomLeft(refreshButton.GetComponent<RectTransform>(), 902f, 0f, 147f, 77f, scale);
+            PositionBottomLeft(refreshIcon.rectTransform, 15f, 23f, 31f, 31f, scale);
+            PositionBottomLeft(refreshText.rectTransform, 45f, 18f, 92f, 40f, scale);
+            PositionBottomLeft(refreshCostText.rectTransform, 112f, 55f, 31f, 22f, scale);
+
+            PositionBottomLeft(readyIcon.rectTransform, 18f, 15f, 30f, 30f, scale);
+            PositionBottomLeft(readyText.rectTransform, 48f, 7f, 124f, 46f, scale);
+
             for (var index = 0; index < slotWidgets.Count; index++)
             {
                 var widget = slotWidgets[index];
-                var slotRoot = widget.Root.GetComponent<RectTransform>();
-                Position(slotRoot, 255f, 236f - index * 42f, 480f, 36f);
-                Position(widget.Label.rectTransform, 135f, 18f, 250f, 32f);
-                Position(widget.Purchase.GetComponent<RectTransform>(), 350f, 18f, 80f, 30f);
-                Position(widget.Freeze.GetComponent<RectTransform>(), 435f, 18f, 80f, 30f);
+                PositionBottomLeft(widget.Root, 132f + index * 166f, 78f, 158f, 175f, scale);
+                Stretch(widget.Background.rectTransform);
+                PositionBottomLeft(widget.Portrait.transform.parent as RectTransform, 5f, 22f, 148f, 146f, scale);
+                PositionBottomLeft(widget.Portrait.rectTransform, -4f, -3f, 156f, 156f, scale);
+                PositionBottomLeft(widget.Unaffordable.rectTransform, 1f, 2f, 156f, 171f, scale);
+                Stretch(widget.Outline.rectTransform);
+                Stretch(widget.Frame.rectTransform);
+                PositionBottomLeft(widget.Confirmation.rectTransform, 0f, 0f, 158f, 125f, scale);
+                PositionBottomLeft(widget.Name.rectTransform, 9f, 3f, 140f, 27f, scale);
+                PositionBottomLeft(widget.CostBackground.rectTransform, 57f, 162f, 44f, 35f, scale);
+                PositionBottomLeft(widget.Price.rectTransform, 57f, 162f, 44f, 35f, scale);
+                PositionBottomLeft(widget.Frozen.rectTransform, 0f, 0f, 157f, 66f, scale);
             }
         }
 
-        private static RectTransform Panel(string name, Transform parent, Color color)
+        private static int UpgradeCost(int level)
         {
-            var panel = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            panel.transform.SetParent(parent, false);
-            panel.GetComponent<Image>().color = color;
-            return panel.GetComponent<RectTransform>();
+            return level >= 1 && level < MaximumLevel ? UpgradeCosts[level - 1] : 0;
         }
 
-        private static void SetSprite(Image image, string resourcePath)
+        private static int FrameLevel(int rarity)
         {
-            if (image == null) return;
-            var sprite = Resources.Load<Sprite>(resourcePath);
-            if (sprite == null) return;
-            image.sprite = sprite;
-            image.type = Image.Type.Sliced;
+            if (rarity >= 6) return 3;
+            return rarity >= 4 ? 2 : 1;
+        }
+
+        private static RectTransform Rect(string name, Transform parent)
+        {
+            var value = new GameObject(name, typeof(RectTransform));
+            value.transform.SetParent(parent, false);
+            return value.GetComponent<RectTransform>();
+        }
+
+        private static RectTransform ButtonRoot(string name, Transform parent, UnityEngine.Events.UnityAction action, out Button button)
+        {
+            var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            value.transform.SetParent(parent, false);
+            var hitTarget = value.GetComponent<Image>();
+            hitTarget.color = new Color(1f, 1f, 1f, .001f);
+            button = value.GetComponent<Button>();
+            button.targetGraphic = hitTarget;
+            button.transition = Selectable.Transition.ColorTint;
+            button.onClick.AddListener(action);
+            return value.GetComponent<RectTransform>();
+        }
+
+        private static Image Image(string name, Transform parent, string resourcePath)
+        {
+            var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            value.transform.SetParent(parent, false);
+            var image = value.GetComponent<Image>();
+            image.sprite = FormalHudSpriteLoader.Load(resourcePath);
             image.color = Color.white;
+            image.type = UnityEngine.UI.Image.Type.Simple;
+            image.raycastTarget = false;
+            return image;
         }
 
-        private static Text Label(string name, Transform parent, int fontSize, TextAnchor alignment)
+        private static Text Label(string name, Transform parent, int fontSize, TextAnchor alignment, Color color)
         {
             var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
             value.transform.SetParent(parent, false);
             var text = value.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = StagingHudController.FormalUiFont;
             text.fontSize = fontSize;
             text.alignment = alignment;
-            text.color = Color.white;
+            text.color = color;
             text.raycastTarget = false;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 11;
+            text.resizeTextMaxSize = fontSize;
             return text;
-        }
-
-        private static Button Button(string name, Transform parent, string label, UnityEngine.Events.UnityAction action)
-        {
-            var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-            value.transform.SetParent(parent, false);
-            value.GetComponent<Image>().color = new Color(.23f, .42f, .62f, 1f);
-            var button = value.GetComponent<Button>();
-            button.onClick.AddListener(action);
-            var text = Label("Text", value.transform, 16, TextAnchor.MiddleCenter);
-            text.text = label;
-            Stretch(text.rectTransform);
-            return button;
         }
 
         private static void SetRect(RectTransform target, ShopReadyHudRect rect)
@@ -279,19 +480,73 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             target.sizeDelta = new Vector2(rect.Width, rect.Height);
         }
 
-        private static void Position(RectTransform target, float x, float y, float width, float height)
+        private static void PositionBottomLeft(RectTransform target, float left, float bottom, float width, float height, float scale)
         {
-            target.anchorMin = target.anchorMax = new Vector2(.5f, .5f);
-            target.pivot = new Vector2(.5f, .5f);
-            target.anchoredPosition = new Vector2(x, y);
-            target.sizeDelta = new Vector2(width, height);
+            target.anchorMin = Vector2.zero;
+            target.anchorMax = Vector2.zero;
+            target.pivot = Vector2.zero;
+            target.anchoredPosition = new Vector2(left * scale, bottom * scale);
+            target.sizeDelta = new Vector2(width * scale, height * scale);
         }
 
         private static void Stretch(RectTransform target)
         {
             target.anchorMin = Vector2.zero;
             target.anchorMax = Vector2.one;
-            target.offsetMin = target.offsetMax = Vector2.zero;
+            target.pivot = new Vector2(.5f, .5f);
+            target.offsetMin = Vector2.zero;
+            target.offsetMax = Vector2.zero;
+        }
+    }
+
+    /// <summary>Loads both Sprite-imported and Texture-imported HUD artwork without changing source GUIDs.</summary>
+    public static class FormalHudSpriteLoader
+    {
+        private static readonly Dictionary<string, Sprite> Cache = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+
+        public static Sprite Load(string resourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(resourcePath)) return null;
+            if (Cache.TryGetValue(resourcePath, out var cached)) return cached;
+
+            var sprite = Resources.Load<Sprite>(resourcePath);
+            if (sprite == null)
+            {
+                var texture = Resources.Load<Texture2D>(resourcePath);
+                if (texture != null)
+                {
+                    sprite = Sprite.Create(
+                        texture,
+                        new Rect(0f, 0f, texture.width, texture.height),
+                        new Vector2(.5f, .5f),
+                        100f);
+                    sprite.name = texture.name;
+                }
+            }
+
+            Cache[resourcePath] = sprite;
+            return sprite;
+        }
+    }
+
+    internal sealed class ShopSlotPointerView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+    {
+        private Image outline;
+
+        public void Initialize(Image target)
+        {
+            outline = target;
+            if (outline != null) outline.gameObject.SetActive(false);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (outline != null) outline.gameObject.SetActive(true);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            if (outline != null) outline.gameObject.SetActive(false);
         }
     }
 }

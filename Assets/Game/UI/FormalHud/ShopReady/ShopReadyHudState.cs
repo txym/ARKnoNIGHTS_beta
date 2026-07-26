@@ -84,14 +84,16 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
     public sealed class ShopReadyHudLayoutResult
     {
-        internal ShopReadyHudLayoutResult(ShopReadyHudRect levelPanel, ShopReadyHudRect shopPanel, ShopReadyHudRect shopToggle, ShopReadyHudRect readyButton)
+        internal ShopReadyHudLayoutResult(float scale, ShopReadyHudRect levelPanel, ShopReadyHudRect shopPanel, ShopReadyHudRect shopToggle, ShopReadyHudRect readyButton)
         {
+            Scale = scale;
             LevelPanel = levelPanel;
             ShopPanel = shopPanel;
             ShopToggle = shopToggle;
             ReadyButton = readyButton;
         }
 
+        public float Scale { get; }
         public ShopReadyHudRect LevelPanel { get; }
         public ShopReadyHudRect ShopPanel { get; }
         public ShopReadyHudRect ShopToggle { get; }
@@ -101,15 +103,16 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     /// <summary>Right-side HUD geometry. Its reference positions are visual defaults pending scene-level acceptance.</summary>
     public static class ShopReadyHudLayout
     {
-        public static readonly ShopReadyHudRect ReferenceReadyButton = new ShopReadyHudRect(1710f, 120f, 180f, 54f);
-        public static readonly ShopReadyHudRect ReferenceShopToggle = new ShopReadyHudRect(1710f, 188f, 180f, 54f);
-        private static readonly ShopReadyHudRect ReferenceLevelPanel = new ShopReadyHudRect(1710f, 936f, 180f, 72f);
-        private static readonly ShopReadyHudRect ReferenceShopPanel = new ShopReadyHudRect(1380f, 256f, 510f, 300f);
+        public static readonly ShopReadyHudRect ReferenceReadyButton = new ShopReadyHudRect(1710f, 400f, 180f, 60f);
+        public static readonly ShopReadyHudRect ReferenceLevelPanel = new ShopReadyHudRect(1735f, 930f, 130f, 120f);
+        public static readonly ShopReadyHudRect ReferenceShopToggle = ReferenceLevelPanel;
+        public static readonly ShopReadyHudRect ReferenceShopPanel = new ShopReadyHudRect(820f, 600f, 1070f, 280f);
 
         public static ShopReadyHudLayoutResult Calculate(float screenWidth, float screenHeight)
         {
             var scale = screenHeight <= 0f ? 1f : screenHeight / 1080f;
             return new ShopReadyHudLayoutResult(
+                scale,
                 ScaleRightAnchored(ReferenceLevelPanel, screenWidth, scale),
                 ScaleRightAnchored(ReferenceShopPanel, screenWidth, scale),
                 ScaleRightAnchored(ReferenceShopToggle, screenWidth, scale),
@@ -130,6 +133,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             ShopSlotId = source.ShopSlotId;
             UnitTypeId = source.UnitTypeId;
             Price = source.Price;
+            Rarity = source.Rarity;
+            DisplayName = source.DisplayName;
+            PortraitResourcePath = source.PortraitResourcePath;
             IsEmpty = source.IsEmpty;
             IsFrozen = source.IsFrozen;
             CanPurchase = !IsEmpty && gold >= Price;
@@ -139,6 +145,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         public int ShopSlotId { get; }
         public string UnitTypeId { get; }
         public int Price { get; }
+        public int Rarity { get; }
+        public string DisplayName { get; }
+        public string PortraitResourcePath { get; }
         public bool IsEmpty { get; }
         public bool IsFrozen { get; }
         public bool CanPurchase { get; }

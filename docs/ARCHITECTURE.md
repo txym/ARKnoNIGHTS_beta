@@ -268,13 +268,13 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 ## 21. UI-INFO-001 详情投影边界（2026-07-24）
 
-数据单向流为 `PlayerStateSnapshot -> BattleInput -> PresentationViewState -> UnitDetailResolver -> FormalBattleHudUi005`。`ARKnoNIGHTS.Details` 承载不可变详情 DTO 和解析器，Core 不反向依赖该程序集。
+数据单向流为 `PlayerStateSnapshot -> BattleInput -> PresentationViewState -> UnitDetailResolver -> FormalBattleHudController`。`ARKnoNIGHTS.Details` 承载不可变详情 DTO 和解析器，Core 不反向依赖该程序集。
 
-- `FormalBattleHudUi005` 在既有 `FormalBattleHudRoot` 上建立正式顶部状态栏、玩家 Cost/占位资源区、待部署槽和单位信息面板；它只读取既有 `PlayerState`、`PreparationBattleLoopController`、`StateDrivenDeploymentController` 与 BattleDemo 的状态，不复制玩家状态或重新计算战斗结果。
+- `FormalBattleHudController` 在既有 `FormalBattleHudRoot` 上建立正式顶部状态栏、玩家 Cost/占位资源区、待部署槽和单位信息面板；它只读取既有 `PlayerState`、`PreparationBattleLoopController`、`StateDrivenDeploymentController` 与 BattleDemo 的状态，不复制玩家状态或重新计算战斗结果。
 - 信息面板选择由统一路由维护：选择待部署槽、已部署单位或战斗敌人会清除另两个来源，避免多个单位面板同时成为权威。面板血条独立于 TASK-007 的世界空间条；`HealthValue` 左上锚定在剩余血条右上，数值超过 9 个字符时缩小字号。
 - 中文字体为 Noto Sans SC normal，数字字体为 Novecento Wide Normal Regular；未确认的赤金、玩家生命和页签业务保持显式占位或禁用。
-- `UI005CaptureSuite` 通过 Player 命令行入口产出固定状态 PNG 与布局 JSON 清单，记录 capture stage、Canvas scale、详情组件 screen rect、文本字体/字号/对齐/字符串、图标资源和参考映射。默认 `-uiCaptureSuite` 只使用真实生产状态；额外的 `-uiCaptureVisualFixture` 才会渲染空名和中等长度中文名夹具，且不会写入 `PlayerState`、单位目录或战斗输入。`scripts/ExportUiInfoEvidence.ps1` 基于清单生成面板裁切、参考并排图和调整记录，作为逐图审查的可追溯证据，不能替代人工 GUI 流程验收。
-- UI-INFO-002 将 `UnitInformationPanelLayout` 作为上半部统一缩放的几何来源；`FormalBattleHudUi005` 构建时缓存九个图标，并为默认导入的独立 PNG 一次性创建 Sprite。
+- `UnitInformationCaptureRunner` 通过 Player 命令行入口产出固定状态 PNG 与布局 JSON 清单，记录 capture stage、Canvas scale、详情组件 screen rect、文本字体/字号/对齐/字符串、图标资源和参考映射。默认 `-uiCaptureSuite` 只使用真实生产状态；额外的 `-uiCaptureVisualFixture` 才会渲染空名和中等长度中文名夹具，且不会写入 `PlayerState`、单位目录或战斗输入。`scripts/ExportUiInfoEvidence.ps1` 基于清单生成面板裁切、参考并排图和调整记录，作为逐图审查的可追溯证据，不能替代人工 GUI 流程验收。
+- UI-INFO-002 将 `UnitInformationPanelLayout` 作为上半部统一缩放的几何来源；`FormalBattleHudController` 构建时缓存九个图标，并为默认导入的独立 PNG 一次性创建 Sprite。
 - `PreparationBattleLoopController` 是 `FormalBattleHudRoot` 的运行时幂等桥。它等待 UI-002/003 初始化，加载 Player-safe catalog 与固定 `task004a-real-1v1` 的 Away 快照，锁定输入并隐藏 `PreparationUnitViews` 后启动运行时战斗；Completed 时释放 `BattleDemoViews`、恢复准备投影/交互并重置时钟。场景重载通过 `SceneManager.sceneLoaded` 重新附加，且不会创建多个桥。
 - `BattleDemoCoordinator.StartRuntimeBattle` 是固定 Resources 入口之外的加法入口：它接收已验证 `BattleInput + UnitCatalog`，仍由局部 `BattleRunner` 先计算再复用原 Playback 生命周期。正式循环模式会阻止调试 Start/Recalculate 重载固定输入，但保留暂停、速度、观察视角和同一封存结果 Replay。Core 的 HP、死亡和 winner 未回写 PlayerState。
 
@@ -283,16 +283,17 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 - `LocalMatchState` 现在保留 fixture 中的玩家源顺序，并提供按玩家 ID 的只读查询。`PreparationBattleLoopController` 把正式 HUD 已创建的本地 `PlayerState` 作为本地覆盖项传给 `LocalMatchStateLoader`；因此没有为本地玩家创建第二份权威状态，其他三名玩家仍是 fixture 快照。
 - `FourPlayerBattleRoundSealer` 在一次准备阶段转换中按源顺序封存四名玩家，并固定配对 `P1/P2 -> MatchAB`、`P3/P4 -> MatchCD`。每名玩家只执行一次 Overflow 清理和自动部署，然后以该封存快照构造两份独立的 `BattleInput`。最高费用候选若在 `typeId`、精英化等级及完整 Buff 集合上严格相同，按稳定 `unitId` 选择首项；其他并列最高候选仍返回结构化歧义错误。该规则只解决已确认的严格堆叠实例，不扩展部署规则。
 - `MultiBattlePresentationCoordinator` 是 UI-009 的场景外协调层：它对每份输入仅运行一次 `BattleRunner`，保存不可变结果及其 Presentation Track，并把四名玩家稳定映射到 `(matchId, BattleObserverView)`。它只为当前观察目标绑定场景视图，以一个共享演示 Tick、暂停/倍速和重播控制两场已完成结果；切换观察目标不会重跑 Core 或写回任何 `PlayerState`。两场 Track 都完成后仅报告一次完成转换。
-- `PreparationBattleLoopController` 在 `Preparation -> Battle` 时调用四玩家 sealer 和多战斗协调器，复用现有 `BattleDemoRoot` 的已序列化 Presentation Factory 及视图根，不创建第二套相机、Demo 根或权威 runner。`TryObserveBattlePlayer` 仅在战斗阶段接受已知玩家 ID，并把 `LocalMatchState` 的观察变化转交给协调器；完整玩家列表按钮的图形绑定仍属于 UI-010。
-- `FormalBattleHudUi005` 与 `UI005CaptureSuite` 优先读取当前多战斗 Track 的观察侧和状态，保留旧单场 `BattleDemoCoordinator` 作为兼容回退。因此状态栏敌人数、战斗单位选择和详情面板不会把旧 Demo 的 Idle 状态误当作当前战斗。
+- `PreparationBattleLoopController` 在 `Preparation -> Battle` 时调用四玩家 sealer 和多战斗协调器，复用现有 `BattleDemoRoot` 的已序列化 Presentation Factory 及视图根，不创建第二套相机、Demo 根或权威 runner。`TryObserveBattlePlayer` 仅在战斗阶段接受已知玩家 ID，并把 `LocalMatchState` 的观察变化转交给协调器；`BattleHudSceneCoordinator` 将左侧玩家列表按钮接入该入口。
+- `FormalBattleHudController` 与 `UnitInformationCaptureRunner` 优先读取当前多战斗 Track 的观察侧和状态，保留旧单场 `BattleDemoCoordinator` 作为兼容回退。因此状态栏敌人数、战斗单位选择和详情面板不会把旧 Demo 的 Idle 状态误当作当前战斗。
 - `BattleTrackPlaybackController.ViewStates` 按当前 `PresentationTick` 采样 Track，而非采样最终 Tick；这保证了血量、死亡、动作和位置在共享时间轴上的场景投影与已封存结果一致。演示层仍没有修改战斗结果的路径。
-- 本任务没有修改 `SampleScene`、Prefab、Package 或项目设置；既有 `FormalBattleHudRoot`、`PreparationBattleLoopController` 和 `BattleDemoRoot` 的接线已足以自动进入此流程。商店/准备按钮、完整左侧玩家列表的可点击组件、截图 manifest 扩展和人工视觉拟合仍由 UI-010 负责，不能据此声称已完成最终 UI 验收。
+- `SampleScene`、Prefab、Package 和项目设置没有因正式 HUD 组合而修改；既有 `FormalBattleHudRoot`、`PreparationBattleLoopController` 和 `BattleDemoRoot` 的接线足以自动进入此流程。商店、准备按钮和玩家列表由运行时组合层创建。
 
-## 23. UI-010 场景生命周期与证据入口（2026-07-26）
+## 23. 正式 HUD 场景生命周期与证据入口（2026-07-26）
 
-- `UI010SceneIntegrationController` 由 `SceneManager.sceneLoaded` 幂等附加到既有 `FormalBattleHudRoot`。它是组合层，不保存第二份 `PlayerState`、`LocalMatchState`、`BattleRunner` 或 Track；`LocalMatchState`、`PreparationBattleLoopController`、`ShopReadyHudController`、`PlayerListObserverCoordinator` 和 `FormalBattleHudUi005` 仍分别拥有既有数据与职责。
+- `BattleHudSceneCoordinator` 由 `SceneManager.sceneLoaded` 幂等附加到既有 `FormalBattleHudRoot`。它是组合层，不保存第二份 `PlayerState`、`LocalMatchState`、`BattleRunner` 或 Track；`LocalMatchState`、`PreparationBattleLoopController`、`ShopReadyHudController`、`PlayerListObserverCoordinator` 和 `FormalBattleHudController` 仍分别拥有既有数据与职责。
 - 唯一阵型命令门控为 `Preparation && !观察他人 && !本地已准备`。观察远端时，`StagingHudController.DisplayedSnapshot` 只替换只读显示快照，命令仍只使用 `Snapshot`（本地玩家）；本地 `PreparationUnitViews` 隐藏，远端已部署单位通过 `BattlefieldWorldProjection` 的 Away/180° 投影生成只读观察视图。切回本地会恢复本地快照和本地准备视图。
 - 阶段进入战斗会清除部署/待部署选择与商店二次确认并隐藏商店；战斗完成回到准备时，`LocalMatchState.ResetPreparationUiState()` 仅重置本地 `ready=false` 和观察目标为本地玩家，绝不改写单位、阵型、赤金、商店、生命或已封存战斗结果。商店命令在准备阶段仍可使用，即使本地玩家已准备；阵型命令仍被锁定。
-- `UI010PlayerListHud` 把 UI-008 的纯列表模型投影为左侧四行可点击行，显示本地、被观察、断线、生命与返回本地状态。当前测试 fixture 将 Player4 标记为断线，仅验证图标显示；断线不改变当前本地 Demo 的固定配对或战斗输入。JSON 中当前未提供的 `avatar_1..4` 会稳定回退到已有 `ProfilePicture` 资源；该回退只影响外观，不修改玩家档案或命令归属。选择任意单位时由 `FormalBattleHudUi005.SelectionChanged` 隐藏列表。
-- `FormalBattleHudUi005.SetSessionHudValues` 只显示 loop-owned 本地赤金、生命和下一对手名称。当前固定测试数据因此显示赤金 `7`、生命 `400`，而非旧的 `--` 占位；生命扣除、淘汰及经济规则仍未实现。
-- `UI010CaptureSuite` 仅在 Player 参数 `-ui010CaptureSuite` 时运行，按真实商店/观察/阶段命令请求截图，并把阶段、本地/观察玩家、准备状态、商店五槽、选中比赛/观察侧、共享演示 Tick、各 Track 摘要及位置压缩统计、Canvas scale 和关键 RectTransform 写入 `ui010-manifest.json`。若截图全黑或写入超时，入口明确失败并写入 `ui010-capture-failed.txt`，不生成“通过”的 manifest。
+- `PlayerListHudController` 把纯列表模型投影为左侧四张可点击头像卡，显示本地、被观察、断线、生命与返回本地状态。当前测试 fixture 将 Player4 标记为断线；断线不改变当前本地 Demo 的固定配对或战斗输入。JSON 中当前未提供的 `avatar_1..4` 会稳定回退到已有 `ProfilePicture` 资源；该回退只影响外观，不修改玩家档案或命令归属。选择任意单位时由 `FormalBattleHudController.SelectionChanged` 隐藏列表。
+- `FormalBattleHudController.SetSessionHudValues` 只显示 loop-owned 本地赤金、生命和下一对手名称。当前固定测试数据因此显示赤金 `7`、生命 `400`；生命扣除、淘汰及经济规则仍未实现。
+- `ShopReadyHudController` 使用全屏锚定的组合根，但等级、商店和准备按钮均按 `1920×1080` 参考矩形计算。商店由左侧升级卡、右侧五张 `158×175` 商品卡及下方冻结/刷新按钮组成；准备按钮固定在赤金和部署费用区上方。`FormalHudSpriteLoader` 同时支持 Sprite 与 Texture 导入的现有 Resources PNG，避免未改导入类型的贴图显示为默认白块。
+- `BattleHudCaptureRunner` 仅在 Player 参数 `-battleHudCapture` 时运行，按真实商店、观察和阶段命令生成 `17` 张截图，并把阶段、本地/观察玩家、准备状态、商店五槽、选中比赛/观察侧、共享演示 Tick、Track 摘要、Canvas scale 和关键 RectTransform 写入 `battle-hud-manifest.json`。若截图全黑或写入超时，入口明确失败并写入 `battle-hud-capture-failed.txt`。

@@ -43,7 +43,13 @@ namespace ArknoNights.Player
             UnitTypeId = unitTypeId ?? string.Empty;
             IsFrozen = !string.IsNullOrEmpty(UnitTypeId) && isFrozen;
             IsEmpty = string.IsNullOrEmpty(UnitTypeId);
-            if (!IsEmpty && catalog.TryGet(UnitTypeId, out var type)) Price = type.Rarity;
+            if (!IsEmpty && catalog.TryGet(UnitTypeId, out var type))
+            {
+                Price = type.Rarity;
+                Rarity = type.Rarity;
+                DisplayName = type.DisplayNameZhHans;
+                PortraitResourcePath = type.PortraitResourcePath;
+            }
         }
 
         public int ShopSlotId { get; }
@@ -52,6 +58,9 @@ namespace ArknoNights.Player
         public bool IsEmpty { get; }
         /// <summary>Derived every snapshot from UnitCatalogEntry.Rarity; it is not shop configuration.</summary>
         public int Price { get; }
+        public int Rarity { get; }
+        public string DisplayName { get; } = string.Empty;
+        public string PortraitResourcePath { get; } = string.Empty;
     }
 
     public sealed class LocalMatchPlayerSnapshot

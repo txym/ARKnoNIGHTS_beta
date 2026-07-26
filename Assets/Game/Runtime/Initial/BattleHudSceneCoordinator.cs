@@ -16,20 +16,20 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// UI-010's scene composition root.  It joins the existing local-shop, player-observation,
+/// Scene composition root for the formal battle HUD. It joins the existing local-shop, player-observation,
 /// deployment, information-panel and UI-009 presentation components without owning a second
 /// PlayerState, battle runner, match state, or presentation clock.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class UI010SceneIntegrationController : MonoBehaviour
+public sealed class BattleHudSceneCoordinator : MonoBehaviour
 {
     private StagingHudController hud;
     private StateDrivenDeploymentController deployment;
     private PreparationBattleLoopController loop;
-    private FormalBattleHudUi005 formalHud;
+    private FormalBattleHudController formalHud;
     private ShopReadyHudController shopReady;
     private PlayerListObserverCoordinator observer;
-    private UI010PlayerListHud playerList;
+    private PlayerListHudController playerList;
     private ObservedPreparationFormation observedFormation;
     private LocalBattlePhase observedPhase = LocalBattlePhase.Loading;
     private bool initialized;
@@ -40,7 +40,7 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
     /// <summary>The existing UI-008 read-only display/command-ownership boundary.</summary>
     public PlayerListObserverCoordinator Observer => observer;
     /// <summary>Scene-owned player-list projection; it has no match data of its own.</summary>
-    public UI010PlayerListHud PlayerList => playerList;
+    public PlayerListHudController PlayerList => playerList;
     public bool IsInitialized => initialized;
 
     private IEnumerator Start()
@@ -52,7 +52,7 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
             hud = GetComponent<StagingHudController>();
             deployment = GetComponent<StateDrivenDeploymentController>();
             loop = GetComponent<PreparationBattleLoopController>();
-            formalHud = GetComponent<FormalBattleHudUi005>();
+            formalHud = GetComponent<FormalBattleHudController>();
             if (hud != null && hud.InitializationSucceeded && deployment != null && loop != null && loop.MatchState != null)
                 break;
             yield return null;
@@ -60,7 +60,7 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
 
         if (hud == null || !hud.InitializationSucceeded || deployment == null || loop == null || loop.MatchState == null)
         {
-            Debug.LogError("[UI-010][scene.dependencies.missing]", this);
+            Debug.LogError("[BattleHud][scene.dependencies.missing]", this);
             yield break;
         }
 
@@ -73,7 +73,7 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
 
         if (!formalSelectionBound)
         {
-            if (formalHud == null) formalHud = GetComponent<FormalBattleHudUi005>();
+            if (formalHud == null) formalHud = GetComponent<FormalBattleHudController>();
             BindFormalSelection();
             RefreshFormalSessionValues();
         }
@@ -111,21 +111,23 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
         var canvas = hud.GetComponentInChildren<Canvas>();
         if (canvas == null)
         {
-            Debug.LogError("[UI-010][canvas.missing]", this);
+            Debug.LogError("[BattleHud][canvas.missing]", this);
             observer.Dispose();
             observer = null;
             return;
         }
 
-        var shopRoot = new GameObject("UI010ShopReady", typeof(RectTransform));
+        var shopRoot = new GameObject("ShopReadyHud", typeof(RectTransform));
         shopRoot.transform.SetParent(canvas.transform, false);
+        StretchToParent(shopRoot.GetComponent<RectTransform>());
         shopReady = shopRoot.AddComponent<ShopReadyHudController>();
         shopReady.Initialize(match);
         shopReady.FormationInteractionChanged += HandleShopFormationInteractionChanged;
 
-        var playerListRoot = new GameObject("UI010PlayerList", typeof(RectTransform));
+        var playerListRoot = new GameObject("PlayerListPanel", typeof(RectTransform));
         playerListRoot.transform.SetParent(canvas.transform, false);
-        playerList = playerListRoot.AddComponent<UI010PlayerListHud>();
+        StretchToParent(playerListRoot.GetComponent<RectTransform>());
+        playerList = playerListRoot.AddComponent<PlayerListHudController>();
         playerList.Initialize(observer, TryObservePlayer);
 
         observedFormation = new ObservedPreparationFormation(transform);
@@ -133,7 +135,16 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
         BindFormalSelection();
         initialized = true;
         RefreshPresentation();
-        Debug.Log("[UI-010][scene.initialized] local=" + observer.LocalCommandPlayerState.PlayerId + "; observed=" + observer.DisplayedPlayerState.PlayerId, this);
+        Debug.Log("[BattleHud][scene.initialized] local=" + observer.LocalCommandPlayerState.PlayerId + "; observed=" + observer.DisplayedPlayerState.PlayerId, this);
+    }
+
+    private static void StretchToParent(RectTransform target)
+    {
+        target.anchorMin = Vector2.zero;
+        target.anchorMax = Vector2.one;
+        target.pivot = new Vector2(.5f, .5f);
+        target.offsetMin = Vector2.zero;
+        target.offsetMax = Vector2.zero;
     }
 
     private void BindFormalSelection()
@@ -150,11 +161,11 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
         if (previous == LocalBattlePhase.Battle && next == LocalBattlePhase.Preparation)
         {
             loop.MatchState.ResetPreparationUiState();
-            formalHud?.ClearSelectionForUi010();
+            formalHud?.ClearSelectionForSceneTransition();
         }
         else if (next == LocalBattlePhase.Battle)
         {
-            formalHud?.ClearSelectionForUi010();
+            formalHud?.ClearSelectionForSceneTransition();
         }
 
         RefreshPresentation();
@@ -238,11 +249,10 @@ public sealed class UI010SceneIntegrationController : MonoBehaviour
     }
 }
 
-/// <summary>Small presentation-only UGUI adapter for UI-008's pure player-list model.</summary>
+/// <summary>Presentation-only UGUI adapter for the pure player-list model.</summary>
 [DisallowMultipleComponent]
-public sealed class UI010PlayerListHud : MonoBehaviour
+public sealed class PlayerListHudController : MonoBehaviour
 {
-    private const string PlayerListPath = "UI/Texture/player_list/";
     private static readonly string[] FallbackAvatarPaths =
     {
         "ProfilePicture/UIImage_gopro",
@@ -275,7 +285,9 @@ public sealed class UI010PlayerListHud : MonoBehaviour
         foreach (Transform child in root) Destroy(child.gameObject);
 
         var entries = PlayerListPresentation.Build(coordinator);
-        var layout = PlayerListLayout.Calculate(Screen.width, Screen.height, entries.Count, coordinator.IsPlayerListVisible);
+        var width = root.rect.width > 0f ? root.rect.width : Screen.width;
+        var height = root.rect.height > 0f ? root.rect.height : Screen.height;
+        var layout = PlayerListLayout.Calculate(width, height, entries.Count, coordinator.IsPlayerListVisible);
         for (var index = 0; index < entries.Count; index++)
         {
             BuildRow(entries[index], layout.Rows[index]);
@@ -291,59 +303,63 @@ public sealed class UI010PlayerListHud : MonoBehaviour
         rowRect.pivot = new Vector2(0f, 1f);
         rowRect.anchoredPosition = new Vector2(layout.X, -layout.YMin);
         rowRect.sizeDelta = new Vector2(layout.Width, layout.Height);
-        row.GetComponent<Image>().color = entry.IsObservedPlayer ? new Color(.25f, .5f, .75f, .42f) : new Color(0f, 0f, 0f, .2f);
-        row.GetComponent<Button>().onClick.AddListener(() => selectPlayer(entry.PlayerId));
+        var hitTarget = row.GetComponent<Image>();
+        hitTarget.color = new Color(1f, 1f, 1f, .001f);
+        var button = row.GetComponent<Button>();
+        button.transition = Selectable.Transition.None;
+        button.targetGraphic = hitTarget;
+        button.onClick.AddListener(() => selectPlayer(entry.PlayerId));
 
         var avatar = Image("Avatar", row.transform, LoadAvatar(entry));
-        Position(avatar.rectTransform, 42f, 46f, 78f, 78f);
+        Position(avatar.rectTransform, 58f, 70f, 92f, 92f);
         avatar.preserveAspect = true;
-        var border = Image("AvatarBorder", row.transform, LoadSprite("avatar_border"));
-        Position(border.rectTransform, 42f, 46f, 88f, 88f);
+        var border = Image("AvatarBorder", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/avatar_border"));
+        Position(border.rectTransform, 58f, 70f, 108f, 108f);
         border.preserveAspect = true;
         if (entry.IsLocalPlayer)
         {
-            var self = Image("Self", row.transform, LoadSprite("icon_self"));
-            Position(self.rectTransform, 10f, 82f, 30f, 30f);
+            var self = Image("Self", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_self"));
+            Position(self.rectTransform, 8f, 118f, 36f, 36f);
             self.preserveAspect = true;
         }
         if (!entry.IsConnected)
         {
-            var lost = Image("LostConnection", row.transform, LoadSprite("icon_lost_connect"));
-            Position(lost.rectTransform, 72f, 72f, 34f, 34f);
+            var lost = Image("LostConnection", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_lost_connect"));
+            Position(lost.rectTransform, 58f, 70f, 64f, 64f);
             lost.preserveAspect = true;
         }
         if (entry.IsObservedPlayer && !entry.IsLocalPlayer)
         {
-            var observing = Image("Observing", row.transform, LoadSprite("icon_observing"));
-            Position(observing.rectTransform, 72f, 72f, 34f, 34f);
+            var observing = Image("Observing", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_observing"));
+            Position(observing.rectTransform, 105f, 112f, 44f, 39f);
             observing.preserveAspect = true;
         }
 
-        var name = Text("Name", row.transform, 18, TextAnchor.MiddleLeft, Color.white);
-        name.text = entry.DisplayName;
-        Position(name.rectTransform, 92f, 58f, 160f, 30f);
-        var hp = Image("HealthBackground", row.transform, LoadSprite(entry.IsConnected ? "bg_hp" : "bg_lose_hp"));
-        Position(hp.rectTransform, 132f, 26f, 160f, 28f);
+        // Disconnect is represented exclusively by LostConnection. bg_lose_hp is reserved for
+        // a future, explicit post-battle life-loss presentation and must not imply that state here.
+        var hp = Image("HealthBackground", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/bg_hp"));
+        Position(hp.rectTransform, 58f, 17f, 92f, 36f);
         hp.preserveAspect = false;
-        var hpIcon = Image("HealthIcon", hp.transform, LoadSprite("icon_hp"));
-        Position(hpIcon.rectTransform, 15f, 14f, 22f, 22f);
-        var value = Text("Life", hp.transform, 16, TextAnchor.MiddleCenter, Color.white);
+        var hpIcon = Image("HealthIcon", hp.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/icon_hp"));
+        Position(hpIcon.rectTransform, 20f, 18f, 14f, 22f);
+        hpIcon.preserveAspect = true;
+        var value = Text("Life", hp.transform, 18, TextAnchor.MiddleCenter, Color.white);
         value.text = entry.Life.ToString();
-        Position(value.rectTransform, 98f, 14f, 105f, 26f);
-        if (entry.IsLocalPlayer && !entry.IsObservedPlayer)
+        Position(value.rectTransform, 59f, 18f, 54f, 30f);
+        if (entry.IsLocalPlayer && coordinator.IsObservingAnotherPlayer)
         {
-            var returnButton = Image("ReturnLocal", row.transform, LoadSprite("btn_return_self"));
-            Position(returnButton.rectTransform, 224f, 48f, 56f, 44f);
+            var returnButton = Image("ReturnLocal", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/btn_return_self"));
+            Position(returnButton.rectTransform, 58f, 70f, 110f, 110f);
             returnButton.preserveAspect = true;
         }
     }
 
     private static Sprite LoadAvatar(PlayerListEntryPresentation entry)
     {
-        var avatar = Resources.Load<Sprite>(entry.AvatarResourcePath);
+        var avatar = FormalHudSpriteLoader.Load(entry.AvatarResourcePath);
         if (avatar != null) return avatar;
         var fallbackIndex = StableAvatarIndex(entry.PlayerId);
-        return Resources.Load<Sprite>(FallbackAvatarPaths[fallbackIndex]);
+        return FormalHudSpriteLoader.Load(FallbackAvatarPaths[fallbackIndex]);
     }
 
     private static int StableAvatarIndex(string playerId)
@@ -356,8 +372,6 @@ public sealed class UI010PlayerListHud : MonoBehaviour
         }
     }
 
-    private static Sprite LoadSprite(string name) => Resources.Load<Sprite>(PlayerListPath + name);
-
     private static Image Image(string name, Transform parent, Sprite sprite)
     {
         var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -365,6 +379,7 @@ public sealed class UI010PlayerListHud : MonoBehaviour
         var image = value.GetComponent<Image>();
         image.sprite = sprite;
         image.color = Color.white;
+        image.raycastTarget = false;
         return image;
     }
 
@@ -413,7 +428,7 @@ internal sealed class ObservedPreparationFormation : IDisposable
         {
             if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, parent, false, out var instance, out var diagnostic))
             {
-                Debug.LogError("[UI-010][observedFormation.create.failed] unit=" + unit.UnitId + "; code=" + diagnostic);
+                Debug.LogError("[BattleHud][observedFormation.create.failed] unit=" + unit.UnitId + "; code=" + diagnostic);
                 continue;
             }
             var view = instance.GetComponent<PreparationUnitView>();
@@ -433,8 +448,8 @@ internal sealed class ObservedPreparationFormation : IDisposable
     public void Dispose() => Hide();
 }
 
-/// <summary>Attaches UI-010 to the established FormalBattleHud root without serializing SampleScene changes.</summary>
-internal static class UI010SceneIntegrationBootstrap
+/// <summary>Attaches the formal HUD scene coordinator without serializing SampleScene changes.</summary>
+internal static class BattleHudSceneBootstrap
 {
     private static bool subscribed;
 
@@ -454,7 +469,7 @@ internal static class UI010SceneIntegrationBootstrap
     private static void AttachToLoadedScene()
     {
         var hud = UnityEngine.Object.FindObjectOfType<StagingHudController>();
-        if (hud != null && hud.GetComponent<UI010SceneIntegrationController>() == null)
-            hud.gameObject.AddComponent<UI010SceneIntegrationController>();
+        if (hud != null && hud.GetComponent<BattleHudSceneCoordinator>() == null)
+            hud.gameObject.AddComponent<BattleHudSceneCoordinator>();
     }
 }

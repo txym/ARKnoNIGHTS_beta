@@ -14,7 +14,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class StagingHudScenePlayModeTests
     {
         [UnityTest]
-        public IEnumerator SampleScene_UI005UsesExistingHudAndShowsLoopOwnedSessionValues()
+        public IEnumerator SampleScene_FormalHudUsesExistingHudAndShowsLoopOwnedSessionValues()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
             for (var frame = 0; frame < 16; frame++) yield return null;
@@ -23,18 +23,18 @@ namespace ArknoNights.Battle.Tests
             Assert.NotNull(hud);
             var numericFont = Resources.Load<Font>("Fonts/Novecento wide Normal Regular.woff2");
             Assert.NotNull(numericFont, "The supplied Novecento Wide Normal Regular resource must be loadable by the Player.");
-            var extension = hud.GetComponent("FormalBattleHudUi005");
-            Assert.NotNull(extension, "UI-005 must extend the existing formal HUD instead of creating another PlayerState root.");
+            var extension = hud.GetComponent("FormalBattleHudController");
+            Assert.NotNull(extension, "The information panel must extend the existing formal HUD instead of creating another PlayerState root.");
             var canvas = hud.transform.Find("FormalBattleHudCanvas");
             Assert.NotNull(canvas);
             Assert.AreEqual(1, hud.GetComponentsInChildren<Canvas>().Length);
-            Assert.AreEqual("7", canvas.Find("FormalHudUi005/GoldCurrencyPanel/Value").GetComponent<Text>().text);
-            Assert.AreEqual("400", canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().text);
+            Assert.AreEqual("7", canvas.Find("FormalHud/GoldCurrencyPanel/Value").GetComponent<Text>().text);
+            Assert.AreEqual("400", canvas.Find("FormalHud/BattleStatusPanel/PlayerHealth").GetComponent<Text>().text);
             Assert.That(canvas.Find("DeploymentCostPanel/Cost").GetComponent<RectTransform>().anchoredPosition.y, Is.EqualTo(40f).Within(0.01f));
             Assert.AreSame(numericFont, canvas.Find("DeploymentCostPanel/Cost").GetComponent<Text>().font);
             Assert.AreSame(numericFont, canvas.Find("StagingArea/StagingSlot/Header/Cost").GetComponent<Text>().font);
             Assert.AreSame(numericFont, canvas.Find("StagingArea/StagingSlot/StackCount").GetComponent<Text>().font);
-            Assert.AreSame(numericFont, canvas.Find("FormalHudUi005/BattleStatusPanel/Middle").GetComponent<Text>().font);
+            Assert.AreSame(numericFont, canvas.Find("FormalHud/BattleStatusPanel/Middle").GetComponent<Text>().font);
             var firstSlot = canvas.Find("StagingArea/StagingSlot");
             var portraitSize = firstSlot.Find("PortraitClip/Portrait").GetComponent<RectTransform>().rect.width;
             Assert.That(firstSlot.Find("EliteIcon").GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(portraitSize / 30f, portraitSize / 30f)));
@@ -45,7 +45,7 @@ namespace ArknoNights.Battle.Tests
 
             hud.ToggleSelection(StagingHudController.BuildSlotId(hud.Snapshot.StagingSlots[0]));
             yield return null;
-            var information = canvas.Find("FormalHudUi005/UnitInformationPanel");
+            var information = canvas.Find("FormalHud/UnitInformationPanel");
             Assert.IsTrue(information.gameObject.activeSelf);
             Assert.That(information.Find("HealthBackground/HealthFill").GetComponent<RectTransform>().sizeDelta.x, Is.EqualTo(556f).Within(0.01f));
             var healthValue = information.Find("HealthValue").GetComponent<RectTransform>();
@@ -77,8 +77,8 @@ namespace ArknoNights.Battle.Tests
             Assert.That(firstStat.rect.width, Is.EqualTo(secondStat.rect.width).Within(0.01f));
             Assert.That(firstStat.rect.height, Is.EqualTo(secondStat.rect.height).Within(0.01f));
             Assert.That(firstStat.anchoredPosition.y, Is.EqualTo(secondStat.anchoredPosition.y).Within(0.01f));
-            Assert.That(canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color, Is.EqualTo(new Color(1f, .47058824f, .47058824f)));
-            Assert.That(information.Find("TargetValue/Value").GetComponent<Text>().color, Is.EqualTo(canvas.Find("FormalHudUi005/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color), "Target value must use the same color as the battle status player health.");
+            Assert.That(canvas.Find("FormalHud/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color, Is.EqualTo(new Color(1f, .47058824f, .47058824f)));
+            Assert.That(information.Find("TargetValue/Value").GetComponent<Text>().color, Is.EqualTo(canvas.Find("FormalHud/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color), "Target value must use the same color as the battle status player health.");
             Assert.IsTrue(information.Find("Tab_技能").GetComponent<Text>().text.Contains("未接入"));
         }
 
@@ -108,19 +108,19 @@ namespace ArknoNights.Battle.Tests
         }
 
         [UnityTest]
-        public IEnumerator SampleScene_UI005VisualFixtureIsExplicitAndCoversEmptyAndMediumNames()
+        public IEnumerator SampleScene_FormalHudVisualFixtureIsExplicitAndCoversEmptyAndMediumNames()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
             for (var frame = 0; frame < 16; frame++) yield return null;
 
             var hud = Object.FindObjectOfType<StagingHudController>();
-            var formalHud = hud.GetComponent("FormalBattleHudUi005");
+            var formalHud = hud.GetComponent("FormalBattleHudController");
             var showFixture = formalHud.GetType().GetMethod("ShowVisualFixtureForCapture");
             Assert.NotNull(showFixture, "The UI capture suite must have an explicit, opt-in visual fixture entry point.");
 
             showFixture.Invoke(formalHud, new object[] { "empty-name" });
             yield return null;
-            var information = hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/UnitInformationPanel");
+            var information = hud.transform.Find("FormalBattleHudCanvas/FormalHud/UnitInformationPanel");
             Assert.IsTrue(information.gameObject.activeSelf);
             Assert.AreEqual("--", information.Find("UnitName").GetComponent<Text>().text);
             Assert.AreEqual("18000", information.Find("Stat_maxHp/Value").GetComponent<Text>().text);
@@ -138,21 +138,21 @@ namespace ArknoNights.Battle.Tests
         }
 
         [UnityTest]
-        public IEnumerator SampleScene_UI005MakesBattleAndStagingInformationSelectionsMutuallyExclusive()
+        public IEnumerator SampleScene_FormalHudMakesBattleAndStagingInformationSelectionsMutuallyExclusive()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
             for (var frame = 0; frame < 20; frame++) yield return null;
 
             var hud = Object.FindObjectOfType<StagingHudController>();
-            var formalHud = hud.GetComponent("FormalBattleHudUi005");
+            var formalHud = hud.GetComponent("FormalBattleHudController");
             var loop = hud.GetComponent("PreparationBattleLoopController");
             Assert.NotNull(formalHud);
             Assert.NotNull(loop);
 
             loop.GetType().GetMethod("AdvanceForTests").Invoke(loop, new object[] { 30f });
             yield return null;
-            Assert.AreSame(Resources.Load<Font>("Fonts/Novecento wide Normal Regular.woff2"), hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/BattleStatusPanel/Left").GetComponent<Text>().font);
-            Assert.IsFalse(hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/BattleStatusPanel/Left").GetComponent<Text>().text.Contains(" "));
+            Assert.AreSame(Resources.Load<Font>("Fonts/Novecento wide Normal Regular.woff2"), hud.transform.Find("FormalBattleHudCanvas/FormalHud/BattleStatusPanel/Left").GetComponent<Text>().font);
+            Assert.IsFalse(hud.transform.Find("FormalBattleHudCanvas/FormalHud/BattleStatusPanel/Left").GetComponent<Text>().text.Contains(" "));
             var multi = loop.GetType().GetProperty("MultiBattle").GetValue(loop);
             Assert.NotNull(multi);
             var states = (IEnumerable)multi.GetType().GetProperty("PresentationViewStates").GetValue(multi);

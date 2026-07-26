@@ -51,7 +51,7 @@ namespace ArknoNights.UI
         public PlayerState PlayerState => playerState;
         /// <summary>Always the local command owner's snapshot. Existing deployment commands must keep using this value.</summary>
         public PlayerStateSnapshot Snapshot => snapshot;
-        /// <summary>Read-only projection used by UI-010 while observing another local fixture player.</summary>
+        /// <summary>Read-only projection used while observing another local fixture player.</summary>
         public PlayerStateSnapshot DisplayedSnapshot => displayedSnapshot ?? snapshot;
         public bool IsDisplayingReadOnlySnapshot => displayedReadOnly;
         public string SelectedSlotId => selectedSlotId;

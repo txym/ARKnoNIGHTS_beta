@@ -56,7 +56,7 @@ namespace ArknoNights.UI.PlayerListObserver
         public bool CanSubmitFormationCommand => GetFormationCommandPermission() == PlayerListObserverCommandPermission.Allowed;
 
         /// <summary>
-        /// Returns a command gate for UI-010. The caller must use LocalCommandPlayerState as the
+        /// Returns a command gate for the HUD scene coordinator. The caller must use LocalCommandPlayerState as the
         /// command source when this returns Allowed; a non-local display target is intentionally read-only.
         /// </summary>
         public PlayerListObserverCommandPermission GetFormationCommandPermission()
@@ -86,7 +86,7 @@ namespace ArknoNights.UI.PlayerListObserver
 
         /// <summary>
         /// Unit selection is a visibility concern only. It must not clear observation or write a formation.
-        /// UI-010 should forward its unified unit-selection lifecycle to this method.
+        /// The HUD scene coordinator forwards its unified unit-selection lifecycle to this method.
         /// </summary>
         public void SetUnitSelected(bool selected)
         {
@@ -152,10 +152,10 @@ namespace ArknoNights.UI.PlayerListObserver
     {
         private const float ReferenceHeight = 1080f;
         private const float ReferenceLeftPadding = 24f;
-        private const float ReferenceTopPadding = 120f;
-        private const float ReferenceRowWidth = 260f;
-        private const float ReferenceRowHeight = 88f;
-        private const float ReferenceRowSpacing = 12f;
+        private const float ReferenceTopPadding = 164f;
+        private const float ReferenceRowWidth = 116f;
+        private const float ReferenceRowHeight = 126f;
+        private const float ReferenceRowSpacing = 10f;
 
         public static PlayerListLayoutSnapshot Calculate(float viewportWidth, float viewportHeight, int rowCount, bool isVisible)
         {

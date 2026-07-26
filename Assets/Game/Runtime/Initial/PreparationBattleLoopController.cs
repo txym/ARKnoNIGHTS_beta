@@ -41,7 +41,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
     public FourPlayerBattleRoundSealResult ActiveSeal => activeSeal;
     /// <summary>Shared-clock presentation session for UI-009. It is null before the first battle or after teardown.</summary>
     public MultiBattlePresentationCoordinator MultiBattle => multiBattle;
-    /// <summary>Fixture player/economy source; UI-010 owns attaching its shop and player-list surfaces.</summary>
+    /// <summary>Fixture player/economy source; the formal HUD scene coordinator attaches its shop and player-list surfaces.</summary>
     public LocalMatchState MatchState => matchState;
     public string LastBattleSummary { get; private set; } = string.Empty;
 

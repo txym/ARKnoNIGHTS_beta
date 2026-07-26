@@ -12,9 +12,9 @@ using ArknoNights.UI;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Explicit Player-only UI-005 visual acceptance entry. It uses production layout and commands,
+/// <summary>Explicit Player-only unit-information visual acceptance entry. It uses production layout and commands,
 /// waits for end-of-frame rendering, validates each written PNG, and writes a JSON manifest beside captures.</summary>
-public sealed class UI005CaptureSuite : MonoBehaviour
+public sealed class UnitInformationCaptureRunner : MonoBehaviour
 {
     private readonly List<CaptureRecord> captures = new List<CaptureRecord>();
     private static readonly string[] InformationElementPaths =
@@ -31,7 +31,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
     };
     private string outputDirectory;
     private StagingHudController hud;
-    private FormalBattleHudUi005 formalHud;
+    private FormalBattleHudController formalHud;
     private StateDrivenDeploymentController deployment;
     private PreparationBattleLoopController loop;
     private bool captureVisualFixtures;
@@ -40,7 +40,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
     private void Awake()
     {
         if (!Environment.GetCommandLineArgs().Any(arg => string.Equals(arg, "-uiCaptureSuite", StringComparison.OrdinalIgnoreCase))) { Destroy(this); return; }
-        outputDirectory = CommandLineValue("-uiCaptureOutput") ?? Path.Combine(Application.dataPath, "..", "UI-005-Captures");
+        outputDirectory = CommandLineValue("-uiCaptureOutput") ?? Path.Combine(Application.dataPath, "..", "UnitInformationCaptures");
         outputDirectory = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(outputDirectory);
         captureVisualFixtures = HasCommandLineFlag("-uiCaptureVisualFixture");
@@ -52,7 +52,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         for (var frame = 0; frame < 32; frame++)
         {
             hud = FindObjectOfType<StagingHudController>();
-            formalHud = FindObjectOfType<FormalBattleHudUi005>();
+            formalHud = FindObjectOfType<FormalBattleHudController>();
             deployment = hud == null ? null : hud.GetComponent<StateDrivenDeploymentController>();
             loop = hud == null ? null : hud.GetComponent<PreparationBattleLoopController>();
             if (hud != null && formalHud != null && deployment != null && loop != null && hud.InitializationSucceeded) break;
@@ -95,7 +95,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
             activeVisualFixtureId = null;
         }
         File.WriteAllText(Path.Combine(outputDirectory, "manifest.json"), JsonUtility.ToJson(new CaptureManifest { captures = captures.ToArray() }, true));
-        Debug.Log("[UI-005][capture.completed] count=" + captures.Count + "; output=" + outputDirectory, this);
+        Debug.Log("[UnitInformationCapture][completed] count=" + captures.Count + "; output=" + outputDirectory, this);
         Application.Quit(0);
     }
 
@@ -132,7 +132,7 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         Destroy(probe);
         if (!valid) { Fail("screenshot.invalid:" + name); yield break; }
         var detail = ResolveDetail(selectedUnitId);
-        var panel = hud.transform.Find("FormalBattleHudCanvas/FormalHudUi005/UnitInformationPanel") as RectTransform;
+        var panel = hud.transform.Find("FormalBattleHudCanvas/FormalHud/UnitInformationPanel") as RectTransform;
         var visualFixture = !string.IsNullOrEmpty(activeVisualFixtureId);
         captures.Add(new CaptureRecord
         {
@@ -207,10 +207,10 @@ public sealed class UI005CaptureSuite : MonoBehaviour
         Screen.SetResolution(width, height, false);
         for (var frame = 0; frame < 180 && (Screen.width != width || Screen.height != height); frame++) yield return null;
         if (Screen.width != width || Screen.height != height)
-            Debug.LogWarning("[UI-005][capture.resolution.pending] requested=" + width + "x" + height + "; actual=" + Screen.width + "x" + Screen.height);
+            Debug.LogWarning("[UnitInformationCapture][resolution.pending] requested=" + width + "x" + height + "; actual=" + Screen.width + "x" + Screen.height);
     }
 
-    private void Fail(string detail) { Debug.LogError("[UI-005][capture.failed] " + detail, this); Application.Quit(1); }
+    private void Fail(string detail) { Debug.LogError("[UnitInformationCapture][failed] " + detail, this); Application.Quit(1); }
     private static string CommandLineValue(string flag) { var args = Environment.GetCommandLineArgs(); for (var index = 0; index + 1 < args.Length; index++) if (args[index] == flag) return args[index + 1]; return null; }
     private static bool HasCommandLineFlag(string flag) => Environment.GetCommandLineArgs().Any(arg => string.Equals(arg, flag, StringComparison.OrdinalIgnoreCase));
     [Serializable] private sealed class CaptureManifest { public CaptureRecord[] captures; }
@@ -232,13 +232,13 @@ internal static class UiCaptureTransformExtensions
     }
 }
 
-internal static class UI005CaptureSuiteBootstrap
+internal static class UnitInformationCaptureBootstrap
 {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)] private static void Attach()
     {
         if (!Environment.GetCommandLineArgs().Any(arg => string.Equals(arg, "-uiCaptureSuite", StringComparison.OrdinalIgnoreCase))) return;
-        var holder = new GameObject("UI005CaptureSuite");
+        var holder = new GameObject("UnitInformationCaptureRunner");
         UnityEngine.Object.DontDestroyOnLoad(holder);
-        holder.AddComponent<UI005CaptureSuite>();
+        holder.AddComponent<UnitInformationCaptureRunner>();
     }
 }

@@ -109,6 +109,28 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void Controller_DoesNotEnterUpgradeConfirmationWhenGoldIsInsufficient()
+        {
+            var match = LoadWithGold(1);
+            var root = new GameObject("ShopReadyHudInvalidConfirmationTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+
+                controller.RequestUpgrade();
+
+                Assert.AreEqual(ShopReadyConfirmation.None, controller.State.PendingConfirmation);
+                Assert.AreEqual(1, match.Snapshot.LocalPlayer.Level);
+                Assert.AreEqual(1, match.Snapshot.LocalPlayer.Gold);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void Project_ReadyLocksOnlyFormationWhileShopAndFixedButtonsRemainAvailable()
         {
             var match = Load();
