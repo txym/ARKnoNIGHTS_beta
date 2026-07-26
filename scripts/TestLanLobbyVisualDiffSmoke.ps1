@@ -143,18 +143,91 @@ try
         $manifestJson,
         (New-Object Text.UTF8Encoding($false)))
 
-    $missingActionCaptureDirectory = Join-Path $scratch 'missing-action-captures'
-    New-Item -ItemType Directory -Force -Path $missingActionCaptureDirectory | Out-Null
-    foreach ($name in $names) { Copy-Item -LiteralPath (Join-Path $captureDirectory ($name + '.png')) -Destination (Join-Path $missingActionCaptureDirectory ($name + '.png')) }
-    $missingActionManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $captureDirectory 'manifest.json') | ConvertFrom-Json
-    foreach ($record in $missingActionManifest.captures) { $record.path = Join-Path $missingActionCaptureDirectory ($record.name + '.png') }
-    $missingActionHome = $missingActionManifest.captures | Where-Object name -eq 'home'
-    $missingActionHome.rects = @($missingActionHome.rects | Where-Object name -ne 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction')
-    $missingActionManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $missingActionCaptureDirectory 'manifest.json') -Encoding UTF8
-    $missingActionOutput = Join-Path $scratch 'missing-action-output'
-    Assert-FailsWithoutOutput {
-        & $exportScript -CaptureDirectory $missingActionCaptureDirectory -OutputDirectory $missingActionOutput -ReferenceDirectory $referenceDirectory
-    } $missingActionOutput 'Create action Rect'
+    $createActionRectName = 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction'
+    $invalidActionCases = @(
+        [pscustomobject]@{
+            name = 'missing-create'
+            expectedMessage = 'Create action Rect must occur exactly once'
+            mutate = {
+                param($homeCaptureRecord)
+                $homeCaptureRecord.rects = @($homeCaptureRecord.rects | Where-Object name -ne $createActionRectName)
+            }
+        },
+        [pscustomobject]@{
+            name = 'duplicate-create'
+            expectedMessage = 'Create action Rect must occur exactly once'
+            mutate = {
+                param($homeCaptureRecord)
+                $create = @($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]
+                $duplicate = $create | ConvertTo-Json -Depth 4 | ConvertFrom-Json
+                $homeCaptureRecord.rects = @($homeCaptureRecord.rects) + $duplicate
+            }
+        },
+        [pscustomobject]@{
+            name = 'non-numeric-create-x'
+            expectedMessage = 'Cannot convert value'
+            mutate = {
+                param($homeCaptureRecord)
+                (@($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]).x = 'not-a-number'
+            }
+        },
+        [pscustomobject]@{
+            name = 'wrong-create-origin'
+            expectedMessage = 'coordinateOrigin=screen-bottom-left and unit=px'
+            mutate = {
+                param($homeCaptureRecord)
+                (@($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]).coordinateOrigin = 'screen-top-left'
+            }
+        },
+        [pscustomobject]@{
+            name = 'wrong-create-unit'
+            expectedMessage = 'coordinateOrigin=screen-bottom-left and unit=px'
+            mutate = {
+                param($homeCaptureRecord)
+                (@($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]).unit = 'normalized'
+            }
+        },
+        [pscustomobject]@{
+            name = 'zero-create-width'
+            expectedMessage = 'invalid or outside'
+            mutate = {
+                param($homeCaptureRecord)
+                (@($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]).width = 0
+            }
+        },
+        [pscustomobject]@{
+            name = 'zero-create-height'
+            expectedMessage = 'invalid or outside'
+            mutate = {
+                param($homeCaptureRecord)
+                (@($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]).height = 0
+            }
+        },
+        [pscustomobject]@{
+            name = 'out-of-bounds-create'
+            expectedMessage = 'invalid or outside'
+            mutate = {
+                param($homeCaptureRecord)
+                (@($homeCaptureRecord.rects | Where-Object name -eq $createActionRectName)[0]).x = 1800
+            }
+        }
+    )
+    foreach ($invalidActionCase in $invalidActionCases)
+    {
+        $caseCaptureDirectory = Join-Path $scratch ($invalidActionCase.name + '-captures')
+        Copy-Item -LiteralPath $captureDirectory -Destination $caseCaptureDirectory -Recurse
+        $caseManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $caseCaptureDirectory 'manifest.json') | ConvertFrom-Json
+        foreach ($record in $caseManifest.captures) { $record.path = Join-Path $caseCaptureDirectory ($record.name + '.png') }
+        $caseHome = @($caseManifest.captures | Where-Object name -eq 'home')[0]
+        $mutate = $invalidActionCase.mutate
+        & $mutate $caseHome
+        $caseManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $caseCaptureDirectory 'manifest.json') -Encoding UTF8
+
+        $caseOutput = Join-Path $scratch ($invalidActionCase.name + '-output')
+        Assert-FailsWithoutOutput {
+            & $exportScript -CaptureDirectory $caseCaptureDirectory -OutputDirectory $caseOutput -ReferenceDirectory $referenceDirectory
+        } $caseOutput $invalidActionCase.expectedMessage
+    }
 
     $invalidCaptureDirectory = Join-Path $scratch 'invalid-captures'
     New-Item -ItemType Directory -Force -Path $invalidCaptureDirectory | Out-Null
