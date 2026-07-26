@@ -309,19 +309,19 @@ $createDecorationContentSpecs = @(
   @{name='logo-left'; threshold=20; search=@{x=0;y=20;width=116;height=145}; expected=@{x=8;y=26;width=106;height=126}},
   @{name='logo-right'; threshold=20; search=@{x=270;y=20;width=120;height=145}; expected=@{x=276;y=27;width=108;height=124}},
   @{name='start-room'; threshold=35; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
-  @{name='dot-top-left'; threshold=35; search=@{x=112;y=12;width=28;height=30}; expected=@{x=118;y=18;width=17;height=17}},
-  @{name='dot-top-right'; threshold=35; search=@{x=247;y=12;width=30;height=30}; expected=@{x=253;y=19;width=17;height=16}},
-  @{name='middle-icon'; threshold=35; search=@{x=145;y=34;width=100;height=100}; expected=@{x=152;y=41;width=87;height=86}},
+  @{name='dot-top-left'; threshold=35; search=@{x=116;y=15;width=24;height=27}; expected=@{x=118;y=18;width=17;height=17}},
+  @{name='dot-top-right'; threshold=35; search=@{x=249;y=15;width=24;height=27}; expected=@{x=253;y=19;width=17;height=16}},
+  @{name='middle-icon'; threshold=35; search=@{x=150;y=34;width=92;height=100}; expected=@{x=152;y=41;width=87;height=86}},
   @{name='left-bracket'; threshold=35; search=@{x=124;y=50;width=28;height=75}; expected=@{x=130;y=58;width=18;height=54}},
   @{name='right-bracket'; threshold=35; search=@{x=240;y=50;width=25;height=75}; expected=@{x=243;y=58;width=18;height=54}},
-  @{name='text-01'; threshold=35; search=@{x=145;y=128;width=100;height=20}; expected=@{x=152;y=134;width=88;height=13}},
-  @{name='text-02'; threshold=35; search=@{x=160;y=145;width=75;height=12}; expected=@{x=164;y=147;width=66;height=7}},
-  @{name='dot-bottom-left'; threshold=35; search=@{x=112;y=149;width=28;height=30}; expected=@{x=118;y=155;width=16;height=17}},
-  @{name='dot-bottom-right'; threshold=35; search=@{x=247;y=149;width=30;height=30}; expected=@{x=253;y=155;width=17;height=17}}
+  @{name='text-01'; threshold=35; search=@{x=145;y=128;width=100;height=19}; expected=@{x=152;y=134;width=88;height=13}},
+  @{name='text-02'; threshold=35; search=@{x=160;y=147;width=75;height=10}; expected=@{x=164;y=147;width=66;height=7}},
+  @{name='dot-bottom-left'; threshold=35; search=@{x=116;y=152;width=24;height=27}; expected=@{x=118;y=155;width=16;height=17}},
+  @{name='dot-bottom-right'; threshold=35; search=@{x=249;y=152;width=24;height=27}; expected=@{x=253;y=155;width=17;height=17}}
 )
 ```
 
-The twelve rows are four dots, two wings, two brackets, `middle-icon`, two lower text layers, and `start-room`. The explicit count prevents a dot or label from being silently omitted.
+The twelve rows are four dots, two wings, two brackets, `middle-icon`, two lower text layers, and `start-room`. Their search Rects are intentionally non-overlapping where adjacent cyan components would otherwise merge; the user confirmed this ROI correction after the original overlapping fixture proved geometrically unsatisfiable. The explicit count prevents a dot or label from being silently omitted.
 
 - [ ] **Step 5: Export the crop, measurements, and Markdown**
 
