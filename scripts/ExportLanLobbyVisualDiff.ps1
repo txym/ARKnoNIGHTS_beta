@@ -37,6 +37,31 @@ public static class LanLobbyVisualDiff {
         if(maxX<minX || maxY<minY) throw new InvalidOperationException("No dark visible pixels found in search rectangle " + search + ".");
         return new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 };
     }
+    public static LanLobbyVisualBounds FindCyanBounds(
+        Bitmap bitmap,
+        Rectangle search,
+        int minimumGreen,
+        int minimumGreenOverRed,
+        int minimumBlueOverRed)
+    {
+        if (bitmap == null) throw new ArgumentNullException("bitmap");
+        if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height ||
+            search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1;
+        for (int y=search.Y; y<search.Bottom; y++)
+        for (int x=search.X; x<search.Right; x++)
+        {
+            Color pixel=bitmap.GetPixel(x,y);
+            if (pixel.A == 0 || pixel.G < minimumGreen ||
+                pixel.G < pixel.R + minimumGreenOverRed ||
+                pixel.B < pixel.R + minimumBlueOverRed) continue;
+            minX=Math.Min(minX,x); minY=Math.Min(minY,y);
+            maxX=Math.Max(maxX,x); maxY=Math.Max(maxY,y);
+        }
+        if (maxX < minX || maxY < minY)
+            throw new InvalidOperationException("No cyan visible pixels found in search rectangle " + search + ".");
+        return new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 };
+    }
     public static LanLobbyVisualBounds FindCompactDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive, int minimumComponentPixels, double maximumAspectRatio) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
         if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height || search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
@@ -110,6 +135,25 @@ $actionContentSpecs = @{
     @{ name='label'; search=@{x=95;y=20;width=170;height=50}; expected=@{x=104;y=31;width=150;height=34} }
   )
 }
+$homeCreateDecoration = @{
+  name='home-create-decoration'
+  approvedTarget=@{x=1296;y=252;width=390;height=179}
+  reference=@{x=1419;y=268;width=427;height=191}
+}
+$createDecorationContentSpecs = @(
+  @{name='logo-left'; threshold=20; search=@{x=0;y=20;width=116;height=145}; expected=@{x=8;y=26;width=106;height=126}},
+  @{name='logo-right'; threshold=20; search=@{x=270;y=20;width=120;height=145}; expected=@{x=276;y=27;width=108;height=124}},
+  @{name='start-room'; threshold=35; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
+  @{name='dot-top-left'; threshold=35; search=@{x=116;y=15;width=24;height=27}; expected=@{x=118;y=18;width=17;height=17}},
+  @{name='dot-top-right'; threshold=35; search=@{x=249;y=15;width=24;height=27}; expected=@{x=253;y=19;width=17;height=16}},
+  @{name='middle-icon'; threshold=35; search=@{x=150;y=34;width=92;height=100}; expected=@{x=152;y=41;width=87;height=86}},
+  @{name='left-bracket'; threshold=35; search=@{x=124;y=50;width=28;height=75}; expected=@{x=130;y=58;width=18;height=54}},
+  @{name='right-bracket'; threshold=35; search=@{x=240;y=50;width=25;height=75}; expected=@{x=243;y=58;width=18;height=54}},
+  @{name='text-01'; threshold=35; search=@{x=145;y=128;width=100;height=19}; expected=@{x=152;y=134;width=88;height=13}},
+  @{name='text-02'; threshold=35; search=@{x=160;y=147;width=75;height=10}; expected=@{x=164;y=147;width=66;height=7}},
+  @{name='dot-bottom-left'; threshold=35; search=@{x=116;y=152;width=24;height=27}; expected=@{x=118;y=155;width=16;height=17}},
+  @{name='dot-bottom-right'; threshold=35; search=@{x=249;y=152;width=24;height=27}; expected=@{x=253;y=155;width=17;height=17}}
+)
 $figure9MeasurementSize = @{ width=2102; height=1149 }
 $roomRegions = @(
   @{ name='ignored-top-left'; x=0.00; y=0.00; width=0.22; height=0.15; mask=$true },
@@ -377,6 +421,7 @@ $codeGeneratedGeometry = @($geometryOccurrences | Group-Object Name, Kind, IsBit
 })
 $reportCaptures = @()
 $actionBarReports = @()
+$createDecorationReport = $null
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
@@ -524,11 +569,84 @@ try
         }
         finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($comparisonReferenceCrop) { $comparisonReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     }
+    $actual = $null
+    $nativeReference = $null
+    $actualCrop = $null
+    $nativeReferenceCrop = $null
+    $locallyResizedReferenceCrop = $null
+    $overlay = $null
+    $heatmap = $null
+    try
+    {
+        $actual = [Drawing.Bitmap]::FromFile($homeCapture.path)
+        $nativeReference = [Drawing.Bitmap]::FromFile($referenceHome)
+        $actualSpec = $homeCreateDecoration.approvedTarget
+        $actualRectangle = New-Object Drawing.Rectangle $actualSpec.x, $actualSpec.y, $actualSpec.width, $actualSpec.height
+        $scaledReference = Convert-ActionReferenceRectangle $homeCreateDecoration.reference $nativeReference.Width $nativeReference.Height
+        $actualCrop = New-LanLobbyBitmapCrop $actual $actualRectangle
+        $nativeReferenceCrop = New-LanLobbyBitmapCrop $nativeReference $scaledReference
+        $locallyResizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualSpec.width $actualSpec.height
+        $overlay = New-LanLobbyActionOverlay $actualCrop $locallyResizedReferenceCrop
+        $heatmap = New-Object Drawing.Bitmap $actualCrop.Width, $actualCrop.Height
+        $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height
+        [long]$maskedPixels = 0
+        $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $locallyResizedReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
+        $components = @()
+        foreach ($contentSpec in $createDecorationContentSpecs)
+        {
+            $search = New-Object Drawing.Rectangle $contentSpec.search.x, $contentSpec.search.y, $contentSpec.search.width, $contentSpec.search.height
+            $actualBounds = [LanLobbyVisualDiff]::FindCyanBounds($actualCrop, $search, $contentSpec.threshold, 8, 5)
+            $referenceBounds = [LanLobbyVisualDiff]::FindCyanBounds($locallyResizedReferenceCrop, $search, $contentSpec.threshold, 8, 5)
+            $expected = $contentSpec.expected
+            $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
+            $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
+            $expectedCenterX = $expected.x + ($expected.width - 1) / 2.0
+            $expectedCenterY = $expected.y + ($expected.height - 1) / 2.0
+            $centerDeltaX = $actualCenterX - $expectedCenterX
+            $centerDeltaY = $actualCenterY - $expectedCenterY
+            $widthDelta = $actualBounds.Width - $expected.width
+            $heightDelta = $actualBounds.Height - $expected.height
+            $passed = [Math]::Abs($centerDeltaX) -le 1 `
+                -and [Math]::Abs($centerDeltaY) -le 1 `
+                -and [Math]::Abs($widthDelta) -le 2 `
+                -and [Math]::Abs($heightDelta) -le 2
+            $components += [pscustomobject][ordered]@{
+                name = $contentSpec.name
+                thresholdMinimumGreen = $contentSpec.threshold
+                minimumGreenOverRed = 8
+                minimumBlueOverRed = 5
+                expectedBounds = [ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
+                referenceBounds = ConvertTo-LanLobbyBoundsObject $referenceBounds
+                actualBounds = ConvertTo-LanLobbyBoundsObject $actualBounds
+                centerDeviationPx = [ordered]@{ unit='px'; deltaX=$centerDeltaX; deltaY=$centerDeltaY }
+                sizeDeviationPx = [ordered]@{ unit='px'; deltaWidth=$widthDelta; deltaHeight=$heightDelta }
+                passed = $passed
+            }
+        }
+        $createDecorationReport = [pscustomobject][ordered]@{
+            name = $homeCreateDecoration.name
+            capture = 'home'
+            actualRect = [ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$actualSpec.x; y=$actualSpec.y; width=$actualSpec.width; height=$actualSpec.height }
+            referenceRect = [ordered]@{ x=$scaledReference.X; y=$scaledReference.Y; width=$scaledReference.Width; height=$scaledReference.Height }
+            referenceMeasurementCanvas = [ordered]@{ width=$figure9MeasurementSize.width; height=$figure9MeasurementSize.height }
+            locallyResizedReferenceSizePx = [ordered]@{ unit='px'; width=$locallyResizedReferenceCrop.Width; height=$locallyResizedReferenceCrop.Height }
+            comparedPixels = $metric.ComparedPixels
+            pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
+            averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
+            components = $components
+        }
+        $actualCrop.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $overlay.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $heatmap.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     $report = [ordered]@{
         generatedAtUtc=[DateTime]::UtcNow.ToString('o')
         referenceNormalization='independent-xy'
         captures=$reportCaptures
         actionBars=$actionBarReports
+        createDecoration=$createDecorationReport
         assets=$assets
         materialUsage=[ordered]@{
             bitmapSprites=$assets
@@ -552,6 +670,11 @@ try
         {
             $markdown += "| $($item.name)/$($content.name) | $($content.expectedBounds.x),$($content.expectedBounds.y),$($content.expectedBounds.width),$($content.expectedBounds.height) | $($content.referenceBounds.x),$($content.referenceBounds.y),$($content.referenceBounds.width),$($content.referenceBounds.height) | $($content.actualBounds.x),$($content.actualBounds.y),$($content.actualBounds.width),$($content.actualBounds.height) | dx=$($content.centerDeviationPx.deltaX), dy=$($content.centerDeviationPx.deltaY) | dw=$($content.sizeDeviationPx.deltaWidth), dh=$($content.sizeDeviationPx.deltaHeight) | $($content.passed) |"
         }
+    }
+    $markdown += @('', '## Home Create upper decoration', '', "Actual crop (1920×1080 top-left px): $($createDecorationReport.actualRect.x),$($createDecorationReport.actualRect.y),$($createDecorationReport.actualRect.width),$($createDecorationReport.actualRect.height). Native Figure 9 crop: $($createDecorationReport.referenceRect.x),$($createDecorationReport.referenceRect.y),$($createDecorationReport.referenceRect.width),$($createDecorationReport.referenceRect.height).", '', '| Component | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Passed |', '| --- | --- | --- | --- | --- | --- | --- |')
+    foreach ($component in @($createDecorationReport.components))
+    {
+        $markdown += "| $($component.name) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height) | $($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height) | dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY) | dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight) | $($component.passed) |"
     }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }

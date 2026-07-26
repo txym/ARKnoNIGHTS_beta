@@ -62,6 +62,15 @@ function New-SolidPng([string] $Path, [int] $Width, [int] $Height, [Drawing.Colo
     }
 }
 
+function Fill-ScaledFixtureRectangle($Graphics, $Brush, $NativeCrop, $TargetSize, $Bounds)
+{
+    $x = $NativeCrop.x + [int][Math]::Round($Bounds.x * $NativeCrop.width / $TargetSize.width)
+    $y = $NativeCrop.y + [int][Math]::Round($Bounds.y * $NativeCrop.height / $TargetSize.height)
+    $right = $NativeCrop.x + [int][Math]::Round(($Bounds.x + $Bounds.width) * $NativeCrop.width / $TargetSize.width)
+    $bottom = $NativeCrop.y + [int][Math]::Round(($Bounds.y + $Bounds.height) * $NativeCrop.height / $TargetSize.height)
+    $Graphics.FillRectangle($Brush, $x, $y, [Math]::Max(1, $right-$x), [Math]::Max(1, $bottom-$y))
+}
+
 try
 {
     New-Item -ItemType Directory -Force -Path $scratch | Out-Null
@@ -71,9 +80,26 @@ try
 
     $figure9 = ([char]0x56FE).ToString() + '9.png'
     $figure10 = ([char]0x56FE).ToString() + '10.png'
-    New-SolidPng (Join-Path $referenceDirectory $figure9) 2048 1118 ([Drawing.Color]::FromArgb(255, 40, 50, 60)) {
+    $createDecorationTarget = [ordered]@{ x=1296; y=252; width=390; height=179 }
+    $createDecorationNativeCrop = [ordered]@{ x=1382; y=260; width=417; height=187 }
+    $createDecorationBounds = @(
+        [ordered]@{ name='logo-left'; threshold=20; x=8; y=26; width=106; height=126 },
+        [ordered]@{ name='logo-right'; threshold=20; x=276; y=27; width=108; height=124 },
+        [ordered]@{ name='start-room'; threshold=35; x=153; y=13; width=84; height=9 },
+        [ordered]@{ name='dot-top-left'; threshold=35; x=118; y=18; width=17; height=17 },
+        [ordered]@{ name='dot-top-right'; threshold=35; x=253; y=19; width=17; height=16 },
+        [ordered]@{ name='middle-icon'; threshold=35; x=152; y=41; width=87; height=86 },
+        [ordered]@{ name='left-bracket'; threshold=35; x=130; y=58; width=18; height=54 },
+        [ordered]@{ name='right-bracket'; threshold=35; x=243; y=58; width=18; height=54 },
+        [ordered]@{ name='text-01'; threshold=35; x=152; y=134; width=88; height=13 },
+        [ordered]@{ name='text-02'; threshold=35; x=164; y=147; width=66; height=7 },
+        [ordered]@{ name='dot-bottom-left'; threshold=35; x=118; y=155; width=16; height=17 },
+        [ordered]@{ name='dot-bottom-right'; threshold=35; x=253; y=155; width=17; height=17 }
+    )
+    New-SolidPng (Join-Path $referenceDirectory $figure9) 2048 1118 ([Drawing.Color]::FromArgb(255, 60, 60, 60)) {
         param($graphics)
         $contentBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
+        $cyanBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Cyan)
         try
         {
             # Native fixture coordinates that become the approved visible bounds after each 745x104 action crop is resized to 717x99.
@@ -81,8 +107,12 @@ try
             $graphics.FillRectangle($contentBrush, 1224 + 113, 468 + 29, 154, 34)
             $graphics.FillRectangle($contentBrush, 1224 + 49, 906 + 21, 46, 53)
             $graphics.FillRectangle($contentBrush, 1224 + 108, 906 + 33, 156, 36)
+            foreach ($bounds in $createDecorationBounds)
+            {
+                Fill-ScaledFixtureRectangle $graphics $cyanBrush $createDecorationNativeCrop $createDecorationTarget $bounds
+            }
         }
-        finally { $contentBrush.Dispose() }
+        finally { $contentBrush.Dispose(); $cyanBrush.Dispose() }
     }
     New-SolidPng (Join-Path $referenceDirectory $figure10) 2048 1118 ([Drawing.Color]::FromArgb(255, 65, 75, 85)) $null
 
@@ -99,6 +129,7 @@ try
                 $maskedBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::White)
                 $differenceBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Red)
                 $contentBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
+                $cyanBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Cyan)
                 try
                 {
                     # Masked radar: x=0.00,y=0.18,w=0.57,h=0.66.
@@ -113,11 +144,22 @@ try
                     $graphics.FillRectangle($contentBrush, 1154 + 47, 876 + 20, 44, 50)
                     $graphics.FillRectangle($contentBrush, 1154 + 104, 876 + 31, 150, 34)
                     $graphics.FillRectangle($contentBrush, 1154 + 40, 876 + 72, 60, 3)
+                    foreach ($bounds in $createDecorationBounds)
+                    {
+                        $x = $createDecorationTarget.x + $bounds.x
+                        if ($bounds.name -eq 'logo-left') { $x += 2 }
+                        $graphics.FillRectangle(
+                            $cyanBrush,
+                            $x,
+                            $createDecorationTarget.y + $bounds.y,
+                            $bounds.width,
+                            $bounds.height)
+                    }
                 }
-                finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose() }
+                finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose(); $cyanBrush.Dispose() }
             }
         }
-        New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 40, 50, 60)) $draw
+        New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 60, 60, 60)) $draw
         $actionRects = if ($name -eq 'home') {
             @(
                 # Deliberately offset and resize Create so the report must derive non-zero deltas.
@@ -132,7 +174,23 @@ try
             height = 1080
             spriteSources = @(
                 [ordered]@{ node = 'LanLobbyRoot/Terrain'; spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' }
-            ) + $(if ($name -eq 'home') {
+            ) + $(if ($name -in @('home', 'discovered-prefill')) {
+                @(
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/TitleDot'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/LogoLeft'; spriteName = 'room_select_create_logo'; sourcePath = '[uc]autochessouter/room_select_create_logo.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/LogoRight'; spriteName = 'room_select_create_logo'; sourcePath = '[uc]autochessouter/room_select_create_logo.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/DotTopLeft'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/DotTopRight'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/DotBottomLeft'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/DotBottomRight'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/LineLeft'; spriteName = 'room_select_create_left_line'; sourcePath = '[uc]autochessouter/room_select_create_left_line.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/LineRight'; spriteName = 'room_select_create_left_line'; sourcePath = '[uc]autochessouter/room_select_create_left_line.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/MiddleIcon'; spriteName = 'room_select_create_middleicon'; sourcePath = '[uc]autochessouter/room_select_create_middleicon.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/Text01'; spriteName = 'room_select_create_text_01'; sourcePath = '[uc]autochessouter/room_select_create_text_01.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/Text02'; spriteName = 'room_select_create_text_02'; sourcePath = '[uc]autochessouter/room_select_create_text_02.png' },
+                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/StartRoomDecoration'; spriteName = 'room_select_img_startroom'; sourcePath = '[uc]autochessouter/room_select_img_startroom.png' }
+                )
+            } else { @() }) + $(if ($name -eq 'home') {
                 @(
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/SimulationInvite/Icon'; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Join/JoinAction/ActionIcon'; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' }
@@ -313,6 +371,26 @@ try
     Assert-True (($joinAction.locallyResizedReferenceSizePx.width -eq 717) -and ($joinAction.locallyResizedReferenceSizePx.height -eq 99)) 'Join local reference target must be 717x99'
     Assert-True (($joinAction.comparisonReferenceSizePx.width -eq 717) -and ($joinAction.comparisonReferenceSizePx.height -eq 99)) 'Join metric comparison size must be explicit'
     Assert-True (($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0) -and ($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0)) 'Join size delta must remain zero'
+    $decoration = $report.createDecoration
+    Assert-True ($decoration.name -eq 'home-create-decoration') 'Create decoration report name'
+    Assert-True (($decoration.actualRect.x -eq 1296) -and ($decoration.actualRect.y -eq 252) -and ($decoration.actualRect.width -eq 390) -and ($decoration.actualRect.height -eq 179)) 'Create decoration crop'
+    Assert-True (@($decoration.components).Count -eq 12) 'twelve Create decoration components'
+    foreach ($expectedDecoration in $createDecorationBounds)
+    {
+        $component = @($decoration.components | Where-Object name -eq $expectedDecoration.name)
+        Assert-True ($component.Count -eq 1) "Create decoration/$($expectedDecoration.name) visible bounds must occur once"
+        $component = $component[0]
+        Assert-True (($component.expectedBounds.x -eq $expectedDecoration.x) -and ($component.expectedBounds.y -eq $expectedDecoration.y) -and ($component.expectedBounds.width -eq $expectedDecoration.width) -and ($component.expectedBounds.height -eq $expectedDecoration.height)) "Create decoration/$($expectedDecoration.name) expected bounds"
+        Assert-True (($component.thresholdMinimumGreen -eq $expectedDecoration.threshold) -and ($component.minimumGreenOverRed -eq 8) -and ($component.minimumBlueOverRed -eq 5)) "Create decoration/$($expectedDecoration.name) cyan thresholds"
+    }
+    $logoLeft = @($decoration.components | Where-Object name -eq 'logo-left')[0]
+    Assert-True ($logoLeft.centerDeviationPx.deltaX -eq 2) 'Create decoration logo-left fixture must prove a +2 px center failure'
+    Assert-True ($logoLeft.passed -eq $false) 'Create decoration logo-left must fail'
+    $unexpectedDecorationFailures = @($decoration.components | Where-Object { $_.name -ne 'logo-left' -and -not $_.passed })
+    $unexpectedDecorationFailureDetails = @($unexpectedDecorationFailures | ForEach-Object {
+        "$($_.name) actual=$($_.actualBounds.x),$($_.actualBounds.y),$($_.actualBounds.width),$($_.actualBounds.height)"
+    })
+    Assert-True ($unexpectedDecorationFailures.Count -eq 0) "all other Create decoration components must pass; failed: $($unexpectedDecorationFailureDetails -join '; ')"
     $expectedContent = @(
         @{ bar='home-create-action'; name='icon';  x=47;  y=25; width=36;  height=37; actualX=49; passed=$false },
         @{ bar='home-create-action'; name='label'; x=109; y=28; width=148; height=32; actualX=109; passed=$true },
@@ -333,12 +411,19 @@ try
     Assert-True (($createIconVisual.centerDeviationPx.deltaX -eq 2) -and ($createIconVisual.centerDeviationPx.deltaY -eq 0)) 'Create icon fixture must prove a +2 px center failure'
     Assert-True (@($report.materialUsage.bitmapSprites).Count -gt 0) 'material usage must separately list bitmap Sprites'
     Assert-True (($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'join_icon').occurrenceCount -eq 2) 'Sprite occurrence count must sum rendered instances, not capture presence'
+    $logoUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'room_select_create_logo')[0]
+    $lineUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'room_select_create_left_line')[0]
+    $dotUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'room_select_dot')[0]
+    Assert-True ($logoUsage.occurrenceCount -eq 4) 'two wing Sprites in each Home state'
+    Assert-True ($lineUsage.occurrenceCount -eq 4) 'two bracket Sprites in each Home state'
+    Assert-True ($dotUsage.occurrenceCount -eq 10) 'four Create dots plus title dot in each Home state'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Home/RoomSelect/Create/CreateAction/Label' -and $_.text -eq '创建同盟' }).Count -eq 1) 'Create action Unity Text must come from captured manifest data'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Home/IdentityPanel/Title' -and $_.text -eq 'LOCAL IDENTITY' }).Count -eq 1) 'Home identity text must come from captured manifest data'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.node -eq 'LanLobbyRoot/Room/Latency' -and $_.text -eq '18 ms' }).Count -eq 1) 'Room text must come from captured manifest data'
     Assert-True (@($report.materialUsage.codeGeneratedGeometry).Count -gt 0) 'material usage must separately list code-generated geometry'
     Assert-True (@($report.materialUsage.unityText | Where-Object { $_.PSObject.Properties.Name -contains 'sourcePath' }).Count -eq 0) 'Unity Text must not be represented as a Sprite source'
     foreach ($name in @('home-create-action','home-join-action')) { foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ($name + '-' + $kind + '.png'))) "missing $name $kind" } }
+    foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ('home-create-decoration-' + $kind + '.png'))) "missing home-create-decoration $kind" }
     Assert-True (($report.captures | Measure-Object).Count -eq 5) 'five captures must be reported'
     Assert-True (($report.referenceNormalization -eq 'independent-xy') -and ($homeCapture.actualWidth -eq 1920) -and ($homeCapture.actualHeight -eq 1080) -and ($homeCapture.referenceWidth -eq 2048) -and ($homeCapture.referenceHeight -eq 1118)) 'report must retain native dimensions and independent normalization'
     Assert-True ($homeCapture.maskedPixels -gt 0) 'home must record masked pixels'
@@ -357,6 +442,8 @@ try
     Assert-True ($markdown.Contains('dw=-6, dh=-4')) 'Markdown must contain the exact Create size delta'
     Assert-True ($markdown.Contains('## Home action content visible bounds')) 'Markdown must expose action-content visible bounds'
     foreach ($expected in $expectedContent) { Assert-True ($markdown.Contains("$($expected.bar)/$($expected.name)")) "Markdown missing $($expected.bar)/$($expected.name)" }
+    Assert-True ($markdown.Contains('## Home Create upper decoration')) 'Markdown must expose Create decoration visible bounds'
+    foreach ($expectedDecoration in $createDecorationBounds) { Assert-True ($markdown.Contains($expectedDecoration.name)) "Markdown missing Create decoration/$($expectedDecoration.name)" }
     Assert-True ($markdown.Contains('## Unity Text usage')) 'Markdown must separate Unity Text usage from bitmap Sprites'
     Assert-True ($markdown.Contains('## Code-generated geometry usage')) 'Markdown must separate code-generated geometry from bitmap Sprites'
     Assert-True ((@($report.captures | Where-Object { $_.name -like 'room-*' } | ForEach-Object { @($_.roomCards).Count } | Measure-Object -Sum).Sum -eq 12)) 'room reports must retain four actual RoomCard rectangles each'
