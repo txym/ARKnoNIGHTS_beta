@@ -360,46 +360,60 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void BuildJoinSection(RectTransform parent, LanLobbyRect actionRect)
     {
+        CreateSolidDecorationPanel(
+            "InteriorBacking", parent,
+            122f, 11f, 717f, 280f,
+            new Color(0f, 0f, 0f, .82f));
+        var outlineColor = new Color(48f / 255f, 48f / 255f, 48f / 255f, .55f);
+        CreateSolidDecorationPanel("OutlineTop", parent, 122f, 11f, 717f, 2f, outlineColor);
+        CreateSolidDecorationPanel("OutlineLeft", parent, 122f, 11f, 2f, 280f, outlineColor);
+        CreateSolidDecorationPanel("OutlineRight", parent, 837f, 11f, 2f, 280f, outlineColor);
+        var guideColor = new Color(1f, 165f / 255f, 0f, .55f);
+        CreateSolidDecorationPanel("GuideHorizontal", parent, 122f, 110f, 717f, 2f, guideColor);
+        CreateSolidDecorationPanel("GuideVertical", parent, 474f, 11f, 2f, 196f, guideColor);
+
         for (var index = 0; index < 2; index++)
         {
             var leftBlock = Image("LeftBlock_" + index, parent, "Home/room_select_join_left_block");
-            PositionSprite(leftBlock, new Vector2(.1f + index * .08f, .7f - index * .04f), 100f);
-            var rightBlock = Image("RightBlock_" + index, parent, "Home/room_select_join_right_block");
-            PositionSprite(rightBlock, new Vector2(.82f - index * .08f, .7f - index * .04f), 97f);
+            PositionSpriteTopLeft(leftBlock, 167f + index * 84f, 118f, 125f);
         }
         for (var index = 0; index < 4; index++)
         {
             var middleBlock = Image("MiddleBlock_" + index, parent, "Home/room_select_join_middle_block");
-            PositionSprite(middleBlock, new Vector2(.31f + index * .13f, .67f), 86f);
+            PositionSpriteTopLeft(middleBlock, 335f + index * 67f, 118f, 108f);
         }
-        var logo = Image("Logo", parent, "Home/room_select_join_logo");
-        PositionSprite(logo, new Vector2(.18f, .9f), 172f);
-        var text01 = Image("Text01", parent, "Home/room_select_join_text_01");
-        PositionSprite(text01, new Vector2(.38f, .9f), 141f);
-        var text02 = Image("Text02", parent, "Home/room_select_join_text_02");
-        PositionSprite(text02, new Vector2(.75f, .9f), 132f);
-        var simulationInvite = Button("SimulationInvite", parent, "Home/room_select_join_text_bg", "模拟邀约", 24, true);
-        PositionSprite(simulationInvite.GetComponent<Image>(), new Vector2(.78f, .94f), 290f);
-        simulationInvite.GetComponent<Image>().color = new Color(1f, .53f, .18f, .85f);
-        var inviteIcon = Image("ActionIcon", simulationInvite.transform, "join_icon");
-        PositionSprite(inviteIcon, new Vector2(.12f, .5f), 28f);
-        simulationInvite.GetComponentInChildren<Text>().color = Color.white;
-        var triangle = Image("Triangle", parent, "Home/room_select_join_triangle");
-        PositionSprite(triangle, new Vector2(.5f, .5f), 48f);
-        for (var index = 0; index < LobbyRoomCode.Length; index++)
+        for (var index = 0; index < 2; index++)
         {
-            var blank = Image("Blank_" + index, parent, "Home/room_select_join_blank");
-            PositionSprite(blank, new Vector2(.365f + index * .055f, .67f), 43f);
+            var rightBlock = Image("RightBlock_" + index, parent, "Home/room_select_join_right_block");
+            PositionSpriteTopLeft(rightBlock, 603f + index * 80f, 118f, 121f);
         }
+
+        var middleMask = Image("MiddleMask", parent, "Home/room_select_join_middle_block_mask");
+        PositionSpriteTopLeft(middleMask, 445f, 73f, 60f);
+        var blank = Image("Blank", parent, "Home/room_select_join_blank");
+        PositionSpriteTopLeftExact(blank, 445f, 79f, 60f, 60f);
+        for (var index = 0; index < 4; index++)
+        {
+            var ban = Image("Ban_" + index, parent, "Home/room_select_join_ban");
+            PositionSpriteTopLeft(ban, 456f + index % 2 * 22f, 94f + index / 2 * 19f, 13f);
+        }
+        var triangle = Image("Triangle", parent, "Home/room_select_join_triangle");
+        PositionSpriteTopLeftExact(triangle, 460f, 58f, 30f, 17f);
+
+        var logo = Image("Logo", parent, "Home/room_select_join_logo");
+        PositionSpriteTopLeft(logo, 213f, 75f, 118f);
+        var text01 = Image("Text01", parent, "Home/room_select_join_text_01");
+        PositionSpriteTopLeft(text01, 513f, 67f, 65f);
+        var text02 = Image("Text02", parent, "Home/room_select_join_text_02");
+        PositionSpriteTopLeft(text02, 648f, 73f, 89f);
+
         roomCodeInput = Input("RoomCodeInput", parent, "输入同盟密钥", 30, "Home/room_select_join_text_bg");
         roomCodeInput.characterLimit = LobbyRoomCode.Length;
         roomCodeInput.contentType = InputField.ContentType.IntegerNumber;
-        roomCodeInput.GetComponent<Image>().preserveAspect = true;
         roomCodeInput.textComponent.alignment = TextAnchor.MiddleCenter;
-        PositionSprite(roomCodeInput.GetComponent<Image>(), new Vector2(.5f, .32f), 470f);
+        PositionSpriteTopLeftExact(roomCodeInput.GetComponent<Image>(), 237f, 215f, 482f, 60f);
         roomCodeInput.onValueChanged.AddListener(_ => EvaluateJoinAvailability());
-        var ban = Image("Ban", parent, "Home/room_select_join_ban");
-        PositionSprite(ban, new Vector2(.5f, .67f), 24f);
+
         joinButton = Button("JoinAction", parent, "Home/room_select_join_btn_bg_down", "加入同盟", 32, true);
         PositionBottomLeft(joinButton.GetComponent<RectTransform>(), actionRect);
         joinButton.GetComponent<Image>().preserveAspect = false;
@@ -687,6 +701,25 @@ public sealed class LanLobbyView : MonoBehaviour
         rect.anchoredPosition = new Vector2(left, -top);
         rect.sizeDelta = new Vector2(width, width * sprite.rect.height / sprite.rect.width);
         value.preserveAspect = true;
+    }
+
+    private static void PositionSpriteTopLeftExact(
+        Image value,
+        float left,
+        float top,
+        float width,
+        float height,
+        bool preserveAspect = false)
+    {
+        if (value == null || value.sprite == null)
+            throw new InvalidOperationException("Room-select sprite must be assigned before positioning.");
+
+        var rect = value.rectTransform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(left, -top);
+        rect.sizeDelta = new Vector2(width, height);
+        value.preserveAspect = preserveAspect;
     }
 
     private static Image CreateSolidDecorationPanel(
