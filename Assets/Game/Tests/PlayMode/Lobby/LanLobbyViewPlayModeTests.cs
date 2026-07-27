@@ -366,6 +366,9 @@ namespace ArknoNights.Lobby.Tests
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Triangle").GetComponent<Image>(), roomSelect, 1492f, 643f, 30f, 17f, 2f);
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect, 1477f, 664f, 60f, 61f, 2f);
             AssertVisibleSpriteScreenTopLeftRect(input.GetComponent<Image>(), roomSelect, 1269f, 800f, 482f, 60f, 2f);
+            Assert.That(join.Find("Triangle").GetComponent<Image>().preserveAspect, Is.False);
+            Assert.That(join.Find("Blank").GetComponent<Image>().preserveAspect, Is.False);
+            Assert.That(input.GetComponent<Image>().preserveAspect, Is.False);
 
             var blankRect = VisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect);
             var bans = ChildrenWithPrefix(join, "Ban_").Select(item => VisibleSpriteScreenTopLeftRect(item.GetComponent<Image>(), roomSelect)).ToArray();
@@ -726,11 +729,14 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(image, Is.Not.Null, item.Key);
                 Assert.That(image.sprite, Is.Not.Null, item.Key);
                 Assert.That(image.sprite.name, Is.EqualTo(item.Value), item.Key);
+                var usesExactJoinRectangle = item.Key == "RoomSelect/Join/Triangle"
+                    || item.Key == "RoomSelect/Join/Blank"
+                    || item.Key == "RoomSelect/Join/RoomCodeInput";
                 if (item.Key != "RoomSelect/Create/CreateAction"
                     && item.Key != "RoomSelect/Join/JoinAction"
                     && !item.Key.StartsWith("RoomSelect/Create/CreateFrame/"))
                 {
-                    Assert.That(image.preserveAspect, Is.True, item.Key);
+                    Assert.That(image.preserveAspect, Is.EqualTo(!usesExactJoinRectangle), item.Key);
                 }
             }
         }
@@ -790,7 +796,7 @@ namespace ArknoNights.Lobby.Tests
 
         private static Rect VisibleSpriteScreenTopLeftRect(Image image, RectTransform designRoot)
         {
-            return ScreenTopLeftRect(VisibleSpriteDesignRect(image, designRoot), designRoot);
+            return ScreenTopLeftRect(VisibleSpriteDesignRect(image, designRoot));
         }
 
         private static Rect VisibleSpriteDesignRect(Image image, RectTransform designRoot)
@@ -815,10 +821,9 @@ namespace ArknoNights.Lobby.Tests
             return rect;
         }
 
-        private static Rect ScreenTopLeftRect(Rect designRect, RectTransform designRoot = null)
+        private static Rect ScreenTopLeftRect(Rect designRect)
         {
-            var height = designRoot == null ? 1080f : designRoot.rect.height;
-            return new Rect(designRect.x, height - designRect.yMax, designRect.width, designRect.height);
+            return new Rect(designRect.x, 1080f - designRect.yMax, designRect.width, designRect.height);
         }
 
         private static Rect Union(IEnumerable<Rect> rects)
