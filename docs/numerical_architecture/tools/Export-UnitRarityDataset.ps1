@@ -45,6 +45,84 @@ function Get-LevelZero {
     return $matches[0]
 }
 
+function Get-PhysicalDamage {
+    param(
+        [Parameter(Mandatory = $true)][int]$Attack,
+        [Parameter(Mandatory = $true)][int]$Defense
+    )
+
+    return [int][Math]::Max($Attack - $Defense, [Math]::Floor($Attack * 5.0 / 100.0))
+}
+
+function Get-MagicDamage {
+    param(
+        [Parameter(Mandatory = $true)][int]$Attack,
+        [Parameter(Mandatory = $true)][int]$MagicResistance
+    )
+
+    return [int][Math]::Max(
+        [Math]::Floor($Attack * (100.0 - $MagicResistance) / 100.0),
+        [Math]::Floor($Attack * 5.0 / 100.0)
+    )
+}
+
+function Get-OrdinaryAttackDamage {
+    param(
+        [Parameter(Mandatory = $true)]$Attacker,
+        [Parameter(Mandatory = $true)]$Defender
+    )
+
+    switch ([string]$Attacker.DamageType) {
+        'Physical' { return Get-PhysicalDamage -Attack $Attacker.Attack -Defense $Defender.Defense }
+        'Magic' { return Get-MagicDamage -Attack $Attacker.Attack -MagicResistance $Defender.MagicResistance }
+        'True' { return [int]$Attacker.Attack }
+        default { throw "Cannot calculate ordinary attack damage for type ID $($Attacker.TypeId) with damage type '$($Attacker.DamageType)'." }
+    }
+}
+
+function Get-Percentile {
+    param(
+        [Parameter(Mandatory = $true)][decimal[]]$Values,
+        [Parameter(Mandatory = $true)][decimal]$Percentile
+    )
+
+    Assert-Condition ($Values.Count -gt 0) 'Cannot calculate a percentile from an empty sample.'
+    Assert-Condition ($Percentile -ge 0 -and $Percentile -le 1) "Invalid percentile $Percentile."
+
+    $sortedValues = @($Values | Sort-Object)
+    $position = ([decimal]($sortedValues.Count - 1)) * $Percentile
+    $lowerIndex = [int][Math]::Floor([double]$position)
+    $upperIndex = [int][Math]::Ceiling([double]$position)
+    if ($lowerIndex -eq $upperIndex) {
+        return $sortedValues[$lowerIndex]
+    }
+
+    $fraction = $position - $lowerIndex
+    return $sortedValues[$lowerIndex] + (($sortedValues[$upperIndex] - $sortedValues[$lowerIndex]) * $fraction)
+}
+
+function Get-Median {
+    param([Parameter(Mandatory = $true)][decimal[]]$Values)
+
+    return Get-Percentile -Values $Values -Percentile ([decimal]0.5)
+}
+
+function Get-FirstPassQuantileSummary {
+    param([Parameter(Mandatory = $true)]$Defenders)
+
+    $percentiles = [ordered]@{ P25 = [decimal]0.25; P50 = [decimal]0.5; P75 = [decimal]0.75; P90 = [decimal]0.9 }
+    $summary = [ordered]@{}
+    foreach ($property in @('Defense', 'MagicResistance', 'MaxHitPoints')) {
+        $values = [decimal[]]@($Defenders | ForEach-Object { [decimal]$_.$property })
+        $summary[$property] = [ordered]@{}
+        foreach ($label in $percentiles.Keys) {
+            $summary[$property][$label] = Get-Percentile -Values $values -Percentile $percentiles[$label]
+        }
+    }
+
+    return $summary
+}
+
 $BondSpecPath = Resolve-ExistingPath $BondSpecPath
 $StagingRoot = Resolve-ExistingPath $StagingRoot
 $OutputCsvPath = [System.IO.Path]::GetFullPath($OutputCsvPath)
@@ -156,6 +234,117 @@ $shopRows = @($rows | Where-Object IsShopCandidate)
 $nonShopRows = @($rows | Where-Object { -not $_.IsShopCandidate })
 Assert-Condition ($shopRows.Count -eq 83) "Expected 83 unique shop candidates; found $($shopRows.Count)."
 Assert-Condition ($nonShopRows.Count -eq 4) "Expected 4 unique non-shop units; found $($nonShopRows.Count)."
+
+$unattackableDroneTypeIds = [System.Collections.Generic.HashSet[int]]::new()
+foreach ($typeId in @(1017, 1042, 1355, 1146)) {
+    [void]$unattackableDroneTypeIds.Add($typeId)
+}
+$defenderRows = @($shopRows | Where-Object { -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) })
+Assert-Condition ($defenderRows.Count -eq 79) "Expected 79 first-pass defenders; found $($defenderRows.Count)."
+
+$firstPassQuantiles = Get-FirstPassQuantileSummary -Defenders $defenderRows
+$expectedFirstPassQuantiles = @{
+    Defense = @{ P25 = 100; P50 = 300; P75 = 775; P90 = 1040 }
+    MagicResistance = @{ P25 = 0; P50 = 20; P75 = 32.5; P90 = 50 }
+    MaxHitPoints = @{ P25 = 3100; P50 = 6000; P75 = 11500; P90 = 20000 }
+}
+foreach ($property in $expectedFirstPassQuantiles.Keys) {
+    foreach ($label in $expectedFirstPassQuantiles[$property].Keys) {
+        Assert-Condition (
+            $firstPassQuantiles[$property][$label] -eq [decimal]$expectedFirstPassQuantiles[$property][$label]
+        ) "Expected first-pass $property $label=$($expectedFirstPassQuantiles[$property][$label]); found $($firstPassQuantiles[$property][$label])."
+    }
+}
+
+$attackingRows = @($shopRows | Where-Object { $_.DamageType -ne 'None' })
+foreach ($row in $shopRows) {
+    Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$row.DamageType)) "Type ID $($row.TypeId) is missing a damage type."
+}
+foreach ($row in $attackingRows) {
+    Assert-Condition ($row.EffectiveAttackIntervalSeconds -gt 0) "Type ID $($row.TypeId) has a nonpositive effective attack interval."
+}
+
+$attackMetricsByTypeId = @{}
+foreach ($attacker in $attackingRows) {
+    $damages = [System.Collections.Generic.List[decimal]]::new()
+    $dpsValues = [System.Collections.Generic.List[decimal]]::new()
+    $ttks = [System.Collections.Generic.List[decimal]]::new()
+    $physicalFloorTargets = 0
+    foreach ($defender in $defenderRows) {
+        $damage = Get-OrdinaryAttackDamage -Attacker $attacker -Defender $defender
+        $effectiveInterval = [decimal]$attacker.EffectiveAttackIntervalSeconds
+        [void]$damages.Add($damage)
+        [void]$dpsValues.Add(([decimal]$damage / $effectiveInterval))
+        [void]$ttks.Add(([decimal][Math]::Ceiling([double]([decimal]$defender.MaxHitPoints / $damage))) * $effectiveInterval)
+        if ($attacker.DamageType -eq 'Physical' -and $damage -eq [Math]::Floor($attacker.Attack * 5.0 / 100.0)) {
+            $physicalFloorTargets++
+        }
+    }
+
+    $attackMetricsByTypeId[[int]$attacker.TypeId] = [pscustomobject]@{
+        MedianDamagePerHit = Get-Median -Values $damages.ToArray()
+        MedianDps = Get-Median -Values $dpsValues.ToArray()
+        MedianTtkSeconds = Get-Median -Values $ttks.ToArray()
+        P75TtkSeconds = Get-Percentile -Values $ttks.ToArray() -Percentile ([decimal]0.75)
+        PhysicalFloorTargetRate = if ($attacker.DamageType -eq 'Physical') { [decimal]$physicalFloorTargets / $defenderRows.Count } else { $null }
+    }
+}
+
+$medianIncomingTtdByTypeId = @{}
+foreach ($defender in $shopRows) {
+    $incomingTtks = [System.Collections.Generic.List[decimal]]::new()
+    foreach ($attacker in $attackingRows) {
+        $damage = Get-OrdinaryAttackDamage -Attacker $attacker -Defender $defender
+        [void]$incomingTtks.Add(([decimal][Math]::Ceiling([double]([decimal]$defender.MaxHitPoints / $damage))) * [decimal]$attacker.EffectiveAttackIntervalSeconds)
+    }
+    $medianIncomingTtdByTypeId[[int]$defender.TypeId] = Get-Median -Values $incomingTtks.ToArray()
+}
+
+$rows = foreach ($row in $rows) {
+    $metrics = if ($attackMetricsByTypeId.ContainsKey([int]$row.TypeId)) { $attackMetricsByTypeId[[int]$row.TypeId] } else { $null }
+    [pscustomobject][ordered]@{
+        TypeId = $row.TypeId
+        DisplayName = $row.DisplayName
+        Category = $row.Category
+        CurrentRarity = $row.CurrentRarity
+        IsShopCandidate = $row.IsShopCandidate
+        Regions = $row.Regions
+        ResourceDirectory = $row.ResourceDirectory
+        DamageType = $row.DamageType
+        MaxHitPoints = $row.MaxHitPoints
+        Attack = $row.Attack
+        Defense = $row.Defense
+        MagicResistance = $row.MagicResistance
+        AttackIntervalSeconds = $row.AttackIntervalSeconds
+        EffectiveAttackIntervalSeconds = $row.EffectiveAttackIntervalSeconds
+        MoveSpeedMetresPerSecond = $row.MoveSpeedMetresPerSecond
+        LifeDeduct = $row.LifeDeduct
+        HasElite2 = $row.HasElite2
+        HasElite3 = $row.HasElite3
+        MedianDamagePerHit = if ($null -ne $metrics) { $metrics.MedianDamagePerHit } else { $null }
+        MedianDps = if ($null -ne $metrics) { $metrics.MedianDps } else { $null }
+        MedianTtkSeconds = if ($null -ne $metrics) { $metrics.MedianTtkSeconds } else { $null }
+        P75TtkSeconds = if ($null -ne $metrics) { $metrics.P75TtkSeconds } else { $null }
+        PhysicalFloorTargetRate = if ($null -ne $metrics) { $metrics.PhysicalFloorTargetRate } else { $null }
+        MedianIncomingTtdSeconds = if ($medianIncomingTtdByTypeId.ContainsKey([int]$row.TypeId)) { $medianIncomingTtdByTypeId[[int]$row.TypeId] } else { $null }
+        BaseChassisNotes = if ($row.DamageType -eq 'None') { 'ability-only' } elseif ($row.IsShopCandidate) { 'raw-base ordinary attacks only; ability adjustment pending' } else { 'non-shop; raw-base survival reference only' }
+    }
+}
+
+foreach ($row in $rows) {
+    foreach ($property in @('MedianDamagePerHit', 'MedianDps', 'MedianTtkSeconds', 'P75TtkSeconds', 'PhysicalFloorTargetRate', 'MedianIncomingTtdSeconds')) {
+        $value = $row.$property
+        if ($null -eq $value) {
+            continue
+        }
+        Assert-Condition (-not [double]::IsNaN([double]$value) -and -not [double]::IsInfinity([double]$value)) "Type ID $($row.TypeId) has invalid $property=$value."
+    }
+    foreach ($property in @('MedianTtkSeconds', 'P75TtkSeconds', 'MedianIncomingTtdSeconds')) {
+        if ($null -ne $row.$property) {
+            Assert-Condition ($row.$property -ge 0) "Type ID $($row.TypeId) has negative $property=$($row.$property)."
+        }
+    }
+}
 
 $expectedRows = @{
     1000 = @{ MaxHitPoints = 820; Attack = 190; Defense = 0; MagicResistance = 20; AttackIntervalSeconds = [decimal]1.4; DamageType = 'Physical' }
