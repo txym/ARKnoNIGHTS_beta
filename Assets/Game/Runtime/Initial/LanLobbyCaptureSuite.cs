@@ -206,11 +206,23 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
                 var spriteName = image.sprite.name;
                 if (!TryGetApprovedSource(spriteName, out var source))
                     throw new InvalidOperationException("Lobby capture uses an unmapped sprite: " + spriteName);
+                var corners = new Vector3[4];
+                image.rectTransform.GetWorldCorners(corners);
+                var minX = corners.Min(corner => corner.x);
+                var minY = corners.Min(corner => corner.y);
+                var maxX = corners.Max(corner => corner.x);
+                var maxY = corners.Max(corner => corner.y);
                 return new SpriteSource
                 {
                     node = HierarchyPath(image.transform, view.transform),
                     spriteName = spriteName,
-                    sourcePath = source
+                    sourcePath = source,
+                    coordinateOrigin = "screen-bottom-left",
+                    unit = "px",
+                    x = minX,
+                    y = minY,
+                    width = maxX - minX,
+                    height = maxY - minY
                 };
             })
             .OrderBy(value => value.node, StringComparer.Ordinal)
@@ -252,16 +264,23 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             {
                 var corners = new Vector3[4];
                 image.rectTransform.GetWorldCorners(corners);
+                var minX = corners.Min(corner => corner.x);
+                var minY = corners.Min(corner => corner.y);
+                var maxX = corners.Max(corner => corner.x);
+                var maxY = corners.Max(corner => corner.y);
                 return new CodeNativeGeometry
                 {
                     name = HierarchyPath(image.transform, view.transform),
                     kind = "code-native-geometry",
                     isBitmap = false,
                     color = "#" + ColorUtility.ToHtmlStringRGBA(image.color),
-                    x = corners[0].x,
-                    y = corners[0].y,
-                    width = corners[2].x - corners[0].x,
-                    height = corners[2].y - corners[0].y
+                    coordinateOrigin = "screen-bottom-left",
+                    unit = "px",
+                    raycastTarget = image.raycastTarget,
+                    x = minX,
+                    y = minY,
+                    width = maxX - minX,
+                    height = maxY - minY
                 };
             })
             .OrderBy(value => value.name, StringComparer.Ordinal)
@@ -458,9 +477,9 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public float canvasScale; public string roomCode; public CaptureMember[] members; public long localLatencyMilliseconds; public CaptureRect[] rects; public SpriteSource[] spriteSources; public UnityText[] unityText; public CodeNativeGeometry[] codeNativeGeometry; }
     [Serializable] private sealed class CaptureMember { public string playerId; public string displayName; public int avatarIndex; public bool isReady; public long latencyMilliseconds; }
     [Serializable] private sealed class CaptureRect { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
-    [Serializable] private sealed class SpriteSource { public string node; public string spriteName; public string sourcePath; }
+    [Serializable] private sealed class SpriteSource { public string node; public string spriteName; public string sourcePath; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
     [Serializable] private sealed class UnityText { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
-    [Serializable] private sealed class CodeNativeGeometry { public string name; public string kind; public bool isBitmap; public string color; public float x; public float y; public float width; public float height; }
+    [Serializable] private sealed class CodeNativeGeometry { public string name; public string kind; public bool isBitmap; public string color; public string coordinateOrigin; public string unit; public bool raycastTarget; public float x; public float y; public float width; public float height; }
 }
 
 internal static class LanLobbyCaptureSuiteBootstrap

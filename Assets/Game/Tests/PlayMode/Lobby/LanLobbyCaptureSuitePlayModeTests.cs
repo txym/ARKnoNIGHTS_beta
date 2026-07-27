@@ -77,6 +77,10 @@ namespace ArknoNights.Lobby.Tests
                     Assert.That(spriteSource.node, Is.Not.Null.And.Not.Empty);
                     Assert.That(spriteSource.spriteName, Is.Not.Null.And.Not.Empty);
                     Assert.That(spriteSource.sourcePath, Is.Not.Null.And.Not.Empty);
+                    Assert.That(spriteSource.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+                    Assert.That(spriteSource.unit, Is.EqualTo("px"));
+                    Assert.That(spriteSource.width, Is.GreaterThan(0f));
+                    Assert.That(spriteSource.height, Is.GreaterThan(0f));
                 }
                 Assert.That(captureRecord.unityText, Is.Not.Null.And.Not.Empty,
                     captureRecord.name + " must enumerate current active rendered Unity Text.");
@@ -238,6 +242,10 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(occurrence.sourcePath, Is.EqualTo("[uc]autochessouter/" + item.Value + ".png"));
                 Assert.That(occurrence.sourcePath.Contains("$0") || occurrence.sourcePath.Contains("#0"), Is.False,
                     capture.name + ": " + item.Key + " must not use a forbidden source variant.");
+                Assert.That(occurrence.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+                Assert.That(occurrence.unit, Is.EqualTo("px"));
+                Assert.That(occurrence.width, Is.GreaterThan(0f), item.Key + " must expose rendered Sprite width.");
+                Assert.That(occurrence.height, Is.GreaterThan(0f), item.Key + " must expose rendered Sprite height.");
             }
         }
 
@@ -258,6 +266,9 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry, Is.Not.Null, capture.name + ": missing " + item.Name);
                 Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
                 Assert.That(geometry.isBitmap, Is.False, item.Name + " must be sprite-null geometry.");
+                Assert.That(geometry.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+                Assert.That(geometry.unit, Is.EqualTo("px"));
+                Assert.That(geometry.raycastTarget, Is.False, item.Name + " must remain non-interactive.");
                 Assert.That(geometry.x / capture.canvasScale, Is.EqualTo(item.X).Within(.05f));
                 Assert.That(geometry.y / capture.canvasScale, Is.EqualTo(item.Y).Within(.05f));
                 Assert.That(geometry.width / capture.canvasScale, Is.EqualTo(item.Width).Within(.05f));
@@ -271,6 +282,8 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
                 Assert.That(geometry.isBitmap, Is.False);
                 Assert.That(geometry.color, Is.Not.Null.And.Not.Empty);
+                Assert.That(geometry.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+                Assert.That(geometry.unit, Is.EqualTo("px"));
                 Assert.That(geometry.width, Is.GreaterThan(0f));
                 Assert.That(geometry.height, Is.GreaterThan(0f));
             }
@@ -371,8 +384,8 @@ namespace ArknoNights.Lobby.Tests
         [Serializable] private sealed class CaptureRecordProbe { public string name; public float canvasScale; public string roomCode; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; }
         [Serializable] private sealed class CaptureMemberProbe { public string playerId; }
         [Serializable] private sealed class CaptureRectProbe { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
-        [Serializable] private sealed class SpriteSourceProbe { public string node; public string spriteName; public string sourcePath; }
+        [Serializable] private sealed class SpriteSourceProbe { public string node; public string spriteName; public string sourcePath; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class UnityTextProbe { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
-        [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public float x; public float y; public float width; public float height; }
+        [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public string coordinateOrigin; public string unit; public bool raycastTarget; public float x; public float y; public float width; public float height; }
     }
 }

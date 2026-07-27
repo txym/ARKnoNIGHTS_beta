@@ -557,6 +557,111 @@ function Get-RoomCardGeometry($Capture)
     return @($cards | ForEach-Object { [pscustomobject][ordered]@{ name=[string]$_.name; x=[double]$_.x; y=[double]$_.y; width=[double]$_.width; height=[double]$_.height } })
 }
 
+function Test-LanLobbyJsonNumber($Value)
+{
+    return $Value -is [sbyte] -or
+        $Value -is [byte] -or
+        $Value -is [int16] -or
+        $Value -is [uint16] -or
+        $Value -is [int32] -or
+        $Value -is [uint32] -or
+        $Value -is [int64] -or
+        $Value -is [uint64] -or
+        $Value -is [single] -or
+        $Value -is [double] -or
+        $Value -is [decimal]
+}
+
+function Assert-LanLobbyCapturedRectangleSchema($Record, [string] $Label)
+{
+    foreach ($propertyName in @('coordinateOrigin','unit','x','y','width','height'))
+    {
+        if ($null -eq $Record.PSObject.Properties[$propertyName])
+        {
+            throw "$Label is missing required capture field '$propertyName'."
+        }
+    }
+    if ([string]$Record.coordinateOrigin -cne 'screen-bottom-left' -or [string]$Record.unit -cne 'px')
+    {
+        throw "$Label must declare coordinateOrigin=screen-bottom-left and unit=px."
+    }
+    if (-not (Test-LanLobbyJsonNumber $Record.x) -or
+        -not (Test-LanLobbyJsonNumber $Record.y) -or
+        -not (Test-LanLobbyJsonNumber $Record.width) -or
+        -not (Test-LanLobbyJsonNumber $Record.height))
+    {
+        throw "$Label must declare numeric x, y, width, and height."
+    }
+    $numbers = @([double]$Record.x, [double]$Record.y, [double]$Record.width, [double]$Record.height)
+    if (@($numbers | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) }).Count -gt 0 -or
+        $numbers[2] -le 0 -or $numbers[3] -le 0)
+    {
+        throw "$Label must declare finite coordinates and positive dimensions."
+    }
+}
+
+function Assert-LanLobbyCaptureEvidenceSchema($Manifest)
+{
+    foreach ($capture in @($Manifest.captures))
+    {
+        foreach ($collectionName in @('spriteSources','codeNativeGeometry'))
+        {
+            if ($null -eq $capture.PSObject.Properties[$collectionName] -or $null -eq $capture.$collectionName)
+            {
+                throw "Capture '$($capture.name)' is missing required '$collectionName' evidence."
+            }
+        }
+
+        foreach ($sprite in @($capture.spriteSources))
+        {
+            foreach ($propertyName in @('node','spriteName','sourcePath'))
+            {
+                if ($null -eq $sprite.PSObject.Properties[$propertyName] -or
+                    [string]::IsNullOrWhiteSpace([string]$sprite.$propertyName))
+                {
+                    throw "Capture '$($capture.name)' SpriteSource is missing required capture field '$propertyName'."
+                }
+            }
+            Assert-LanLobbyCapturedRectangleSchema $sprite "SpriteSource '$($sprite.node)'"
+        }
+
+        foreach ($geometry in @($capture.codeNativeGeometry))
+        {
+            foreach ($propertyName in @('name','kind','isBitmap','color','raycastTarget'))
+            {
+                if ($null -eq $geometry.PSObject.Properties[$propertyName])
+                {
+                    throw "Capture '$($capture.name)' CodeNativeGeometry is missing required capture field '$propertyName'."
+                }
+            }
+            if ($null -ne $geometry.PSObject.Properties['spriteName'])
+            {
+                throw "CodeNativeGeometry '$($geometry.name)' must not declare spriteName."
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$geometry.name) -or
+                [string]$geometry.kind -cne 'code-native-geometry' -or
+                $geometry.isBitmap -isnot [bool] -or
+                $geometry.isBitmap)
+            {
+                throw "CodeNativeGeometry '$($geometry.name)' must declare kind=code-native-geometry and isBitmap=false."
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$geometry.color))
+            {
+                throw "CodeNativeGeometry '$($geometry.name)' must declare a nonempty color."
+            }
+            if ($geometry.raycastTarget -isnot [bool])
+            {
+                throw "CodeNativeGeometry '$($geometry.name)' must declare a Boolean raycastTarget."
+            }
+            if ([string]$geometry.name -like 'LanLobbyRoot/Home/RoomSelect/Join/*' -and $geometry.raycastTarget)
+            {
+                throw "Join geometry '$($geometry.name)' must declare raycastTarget=false."
+            }
+            Assert-LanLobbyCapturedRectangleSchema $geometry "CodeNativeGeometry '$($geometry.name)'"
+        }
+    }
+}
+
 function Convert-CapturedActionRectangle($Capture, $Spec)
 {
     $captureWidth = [double]$Capture.width
@@ -601,11 +706,38 @@ function Convert-CapturedActionRectangle($Capture, $Spec)
 
 function Convert-CapturedJoinGeometryRectangle($Capture, $Geometry)
 {
+    foreach ($propertyName in @('name','kind','isBitmap','color','coordinateOrigin','unit','raycastTarget','x','y','width','height'))
+    {
+        if ($null -eq $Geometry.PSObject.Properties[$propertyName])
+        {
+            throw "Join geometry is missing required capture field '$propertyName'."
+        }
+    }
+    if ($null -ne $Geometry.PSObject.Properties['spriteName'])
+    {
+        throw "Join geometry '$($Geometry.name)' must not declare spriteName."
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$Geometry.name) -or
+        [string]$Geometry.kind -cne 'code-native-geometry' -or
+        $Geometry.isBitmap -isnot [bool] -or
+        $Geometry.isBitmap)
+    {
+        throw "Join geometry '$($Geometry.name)' must declare kind=code-native-geometry and isBitmap=false."
+    }
     if ([string]$Geometry.coordinateOrigin -cne 'screen-bottom-left' -or [string]$Geometry.unit -cne 'px')
     {
-        throw "Join geometry $($Geometry.name) must declare coordinateOrigin=screen-bottom-left and unit=px."
+        throw "Join geometry '$($Geometry.name)' must declare coordinateOrigin=screen-bottom-left and unit=px."
     }
-    $numbers = @([double]$Geometry.x, [double]$Geometry.y, [double]$Geometry.width, [double]$Geometry.height)
+    if ($Geometry.raycastTarget -isnot [bool] -or $Geometry.raycastTarget)
+    {
+        throw "Join geometry '$($Geometry.name)' must declare raycastTarget=false."
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$Geometry.color))
+    {
+        throw "Join geometry '$($Geometry.name)' must declare a nonempty color."
+    }
+    try { $numbers = @([double]$Geometry.x, [double]$Geometry.y, [double]$Geometry.width, [double]$Geometry.height) }
+    catch { throw "Join geometry '$($Geometry.name)' has non-numeric captured geometry." }
     if (@($numbers | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) }).Count -gt 0 -or
         $numbers[0] -lt 0 -or $numbers[1] -lt 0 -or $numbers[2] -le 0 -or $numbers[3] -le 0 -or
         ($numbers[0] + $numbers[2]) -gt [double]$Capture.width -or ($numbers[1] + $numbers[3]) -gt [double]$Capture.height)
@@ -627,8 +759,19 @@ function Convert-CapturedJoinGraphicRectangle($Capture, $Sprite)
     $result = [ordered]@{ name=[string]$Sprite.node; spriteName=[string]$Sprite.spriteName; available=$false; failureReason=$null; x=$null; y=$null; width=$null; height=$null }
     try
     {
-        if ([string]$Sprite.coordinateOrigin -cne 'screen-top-left' -or [string]$Sprite.unit -cne 'px') { throw 'must declare coordinateOrigin=screen-top-left and unit=px' }
-        $numbers = @([double]$Sprite.x, [double]$Sprite.y, [double]$Sprite.width, [double]$Sprite.height)
+        foreach ($propertyName in @('node','spriteName','sourcePath','coordinateOrigin','unit','x','y','width','height'))
+        {
+            if ($null -eq $Sprite.PSObject.Properties[$propertyName]) { throw "is missing required capture field '$propertyName'" }
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$Sprite.node) -or
+            [string]::IsNullOrWhiteSpace([string]$Sprite.spriteName) -or
+            [string]::IsNullOrWhiteSpace([string]$Sprite.sourcePath))
+        {
+            throw 'must declare nonempty node, spriteName, and sourcePath'
+        }
+        if ([string]$Sprite.coordinateOrigin -cne 'screen-bottom-left' -or [string]$Sprite.unit -cne 'px') { throw 'must declare coordinateOrigin=screen-bottom-left and unit=px' }
+        try { $numbers = @([double]$Sprite.x, [double]$Sprite.y, [double]$Sprite.width, [double]$Sprite.height) }
+        catch { throw 'has non-numeric captured geometry' }
         if (@($numbers | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) }).Count -gt 0 -or
             $numbers[0] -lt 0 -or $numbers[1] -lt 0 -or $numbers[2] -le 0 -or $numbers[3] -le 0 -or
             ($numbers[0] + $numbers[2]) -gt [double]$Capture.width -or ($numbers[1] + $numbers[3]) -gt [double]$Capture.height)
@@ -637,7 +780,7 @@ function Convert-CapturedJoinGraphicRectangle($Capture, $Sprite)
         }
         $result.available=$true
         $result.x=[int][Math]::Round($numbers[0] * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
-        $result.y=[int][Math]::Round($numbers[1] * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+        $result.y=[int][Math]::Round(([double]$Capture.height - ($numbers[1] + $numbers[3])) * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
         $result.width=[int][Math]::Round($numbers[2] * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
         $result.height=[int][Math]::Round($numbers[3] * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
     }
@@ -671,6 +814,7 @@ $outputDirectory = Assert-LanLobbySafeOutputDirectory -ProjectRoot $projectRoot 
 $referenceDirectories = if ($ReferenceDirectory -and $ReferenceDirectory.Count -gt 0) { @($ReferenceDirectory | ForEach-Object { [IO.Path]::GetFullPath($_) }) } else { @(Join-Path $projectRoot 'docs/references/ui/battle_hud') }
 $manifestPath = Join-Path $captureDirectory 'manifest.json'
 $manifest = Get-LanLobbyCaptureManifest -ManifestPath $manifestPath
+Assert-LanLobbyCaptureEvidenceSchema $manifest
 $assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
 $spriteUsage = Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $manifest -AssetMapPath $assetMapPath
 $referenceHome = Resolve-LanLobbyReferenceImage -Suffix '9' -ReferenceDirectory $referenceDirectories
@@ -1166,10 +1310,6 @@ try
         $joinGeometryRects = @(
             foreach ($geometry in $joinGeometry)
             {
-                if ([bool]$geometry.isBitmap -or -not [string]::IsNullOrEmpty([string]$geometry.spriteName) -or [bool]$geometry.raycastTarget)
-                {
-                    throw "Join geometry $($geometry.name) must be sprite-null and non-interactive."
-                }
                 $converted = Convert-CapturedJoinGeometryRectangle $homeCapture $geometry
                 [pscustomobject][ordered]@{ name=[string]$geometry.name; x=$converted.x; y=$converted.y; width=$converted.width; height=$converted.height }
             }
@@ -1196,6 +1336,7 @@ try
         $joinGraphicRows = @(
             foreach ($sprite in @($homeCapture.spriteSources | Where-Object {
                 $_ -and [string]$_.node -like ($joinGeometryPrefix + '*') -and
+                [string]$_.node -cne ($joinGeometryPrefix + 'JoinAction') -and
                 [string]$_.node -notlike ($joinGeometryPrefix + 'JoinAction/*')
             }))
             {

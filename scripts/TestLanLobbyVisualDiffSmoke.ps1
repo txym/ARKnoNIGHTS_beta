@@ -120,18 +120,19 @@ function New-JoinDecorationSpriteSources()
 {
     $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
     return @(
-        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/LeftBlock_$_"; spriteName = 'room_select_join_left_block'; sourcePath = '[uc]autochessouter/room_select_join_left_block.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1199 + 84 * $_); y=703; width=125; height=89 } }
-        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/MiddleBlock_$_"; spriteName = 'room_select_join_middle_block'; sourcePath = '[uc]autochessouter/room_select_join_middle_block.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1367 + 67 * $_); y=703; width=108; height=89 } }
-        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/RightBlock_$_"; spriteName = 'room_select_join_right_block'; sourcePath = '[uc]autochessouter/room_select_join_right_block.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1635 + 80 * $_); y=703; width=121; height=89 } }
-        [ordered]@{ node = "$prefix/MiddleMask"; spriteName = 'room_select_join_middle_block_mask'; sourcePath = '[uc]autochessouter/room_select_join_middle_block_mask.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1477; y=658; width=60; height=60 }
-        [ordered]@{ node = "$prefix/Blank"; spriteName = 'room_select_join_blank'; sourcePath = '[uc]autochessouter/room_select_join_blank.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1477; y=664; width=60; height=61 }
-        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/Ban_$_"; spriteName = 'room_select_join_ban'; sourcePath = '[uc]autochessouter/room_select_join_ban.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1488 + 22 * ($_ % 2)); y=(679 + 19 * [int]($_ / 2)); width=13; height=13 } }
-        [ordered]@{ node = "$prefix/Triangle"; spriteName = 'room_select_join_triangle'; sourcePath = '[uc]autochessouter/room_select_join_triangle.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1492; y=643; width=30; height=17 }
-        [ordered]@{ node = "$prefix/Logo"; spriteName = 'room_select_join_logo'; sourcePath = '[uc]autochessouter/room_select_join_logo.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1245; y=660; width=118; height=20 }
-        [ordered]@{ node = "$prefix/Text01"; spriteName = 'room_select_join_text_01'; sourcePath = '[uc]autochessouter/room_select_join_text_01.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1545; y=652; width=65; height=8 }
-        [ordered]@{ node = "$prefix/Text02"; spriteName = 'room_select_join_text_02'; sourcePath = '[uc]autochessouter/room_select_join_text_02.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1680; y=658; width=89; height=11 }
-        [ordered]@{ node = "$prefix/RoomCodeInput"; spriteName = 'room_select_join_text_bg'; sourcePath = '[uc]autochessouter/room_select_join_text_bg.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1269; y=800; width=482; height=60 }
-        [ordered]@{ node = "$prefix/JoinAction/ActionIcon"; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' }
+        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/LeftBlock_$_"; spriteName = 'room_select_join_left_block'; sourcePath = '[uc]autochessouter/room_select_join_left_block.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=(1199 + 84 * $_); y=288; width=125; height=89 } }
+        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/MiddleBlock_$_"; spriteName = 'room_select_join_middle_block'; sourcePath = '[uc]autochessouter/room_select_join_middle_block.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=(1367 + 67 * $_); y=288; width=108; height=89 } }
+        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/RightBlock_$_"; spriteName = 'room_select_join_right_block'; sourcePath = '[uc]autochessouter/room_select_join_right_block.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=(1635 + 80 * $_); y=288; width=121; height=89 } }
+        [ordered]@{ node = "$prefix/MiddleMask"; spriteName = 'room_select_join_middle_block_mask'; sourcePath = '[uc]autochessouter/room_select_join_middle_block_mask.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1477; y=362; width=60; height=60 }
+        [ordered]@{ node = "$prefix/Blank"; spriteName = 'room_select_join_blank'; sourcePath = '[uc]autochessouter/room_select_join_blank.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1477; y=355; width=60; height=61 }
+        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/Ban_$_"; spriteName = 'room_select_join_ban'; sourcePath = '[uc]autochessouter/room_select_join_ban.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=(1488 + 22 * ($_ % 2)); y=(388 - 19 * [int]($_ / 2)); width=13; height=13 } }
+        [ordered]@{ node = "$prefix/Triangle"; spriteName = 'room_select_join_triangle'; sourcePath = '[uc]autochessouter/room_select_join_triangle.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1492; y=420; width=30; height=17 }
+        [ordered]@{ node = "$prefix/Logo"; spriteName = 'room_select_join_logo'; sourcePath = '[uc]autochessouter/room_select_join_logo.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1245; y=400; width=118; height=20 }
+        [ordered]@{ node = "$prefix/Text01"; spriteName = 'room_select_join_text_01'; sourcePath = '[uc]autochessouter/room_select_join_text_01.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1545; y=420; width=65; height=8 }
+        [ordered]@{ node = "$prefix/Text02"; spriteName = 'room_select_join_text_02'; sourcePath = '[uc]autochessouter/room_select_join_text_02.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1680; y=411; width=89; height=11 }
+        [ordered]@{ node = "$prefix/RoomCodeInput"; spriteName = 'room_select_join_text_bg'; sourcePath = '[uc]autochessouter/room_select_join_text_bg.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1269; y=220; width=482; height=60 }
+        [ordered]@{ node = "$prefix/JoinAction"; spriteName = 'room_select_join_btn_bg_down'; sourcePath = '[uc]autochessouter/room_select_join_btn_bg_down.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1154; y=105; width=717; height=99 }
+        [ordered]@{ node = "$prefix/JoinAction/ActionIcon"; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png'; coordinateOrigin='screen-bottom-left'; unit='px'; x=1201; y=134; width=44; height=50 }
     )
 }
 
@@ -156,12 +157,12 @@ function New-JoinDecorationGeometry()
 {
     $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
     return @(
-        [ordered]@{ name = "$prefix/InteriorBacking"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#000000D1'; x = 1154; y = 204; width = 717; height = 280; spriteName = $null; raycastTarget = $false }
-        [ordered]@{ name = "$prefix/OutlineTop"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; x = 1154; y = 482; width = 717; height = 2; spriteName = $null; raycastTarget = $false }
-        [ordered]@{ name = "$prefix/OutlineLeft"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; x = 1154; y = 204; width = 2; height = 280; spriteName = $null; raycastTarget = $false }
-        [ordered]@{ name = "$prefix/OutlineRight"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; x = 1869; y = 204; width = 2; height = 280; spriteName = $null; raycastTarget = $false }
-        [ordered]@{ name = "$prefix/GuideHorizontal"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; x = 1154; y = 383; width = 717; height = 2; spriteName = $null; raycastTarget = $false }
-        [ordered]@{ name = "$prefix/GuideVertical"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; x = 1506; y = 288; width = 2; height = 196; spriteName = $null; raycastTarget = $false }
+        [ordered]@{ name = "$prefix/InteriorBacking"; kind = 'code-native-geometry'; isBitmap = $false; color = '#000000D1'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 204; width = 717; height = 280 }
+        [ordered]@{ name = "$prefix/OutlineTop"; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 482; width = 717; height = 2 }
+        [ordered]@{ name = "$prefix/OutlineLeft"; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 204; width = 2; height = 280 }
+        [ordered]@{ name = "$prefix/OutlineRight"; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1869; y = 204; width = 2; height = 280 }
+        [ordered]@{ name = "$prefix/GuideHorizontal"; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 383; width = 717; height = 2 }
+        [ordered]@{ name = "$prefix/GuideVertical"; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1506; y = 288; width = 2; height = 196 }
     )
 }
 
@@ -362,8 +363,23 @@ try
                 @([ordered]@{ node = 'LanLobbyRoot/Room/Latency'; text = '18 ms'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' })
             })
             codeNativeGeometry = @(
-                [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; x = 0; y = 0; width = 1920; height = 1080 }
+                [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 0; y = 0; width = 1920; height = 1080 }
             ) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationGeometry } else { @() })
+        }
+    }
+    foreach ($record in $records)
+    {
+        foreach ($spriteSource in $record.spriteSources)
+        {
+            if (-not $spriteSource.Contains('coordinateOrigin'))
+            {
+                $spriteSource['coordinateOrigin'] = 'screen-bottom-left'
+                $spriteSource['unit'] = 'px'
+                $spriteSource['x'] = 10
+                $spriteSource['y'] = 10
+                $spriteSource['width'] = 10
+                $spriteSource['height'] = 10
+            }
         }
     }
     $manifestJson = [ordered]@{ captures = $records } | ConvertTo-Json -Depth 12
@@ -457,6 +473,69 @@ try
             & $exportScript -CaptureDirectory $caseCaptureDirectory -OutputDirectory $caseOutput -ReferenceDirectory $referenceDirectory
         } $caseOutput $invalidActionCase.expectedMessage
     }
+
+    $invalidJoinGeometryCases = @(
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-bitmap'
+            expectedMessage = 'must declare kind=code-native-geometry and isBitmap=false'
+            mutate = { param($geometry) $geometry.isBitmap = $true }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-raycast'
+            expectedMessage = 'must declare raycastTarget=false'
+            mutate = { param($geometry) $geometry.raycastTarget = $true }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-origin'
+            expectedMessage = 'must declare coordinateOrigin=screen-bottom-left and unit=px'
+            mutate = { param($geometry) $geometry.coordinateOrigin = 'screen-top-left' }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-sprite-name'
+            expectedMessage = 'must not declare spriteName'
+            mutate = { param($geometry) $geometry | Add-Member -NotePropertyName spriteName -NotePropertyValue 'forbidden' }
+        }
+    )
+    foreach ($invalidJoinGeometryCase in $invalidJoinGeometryCases)
+    {
+        $invalidJoinGeometryCaptureDirectory = Join-Path $scratch ($invalidJoinGeometryCase.name + '-captures')
+        Copy-Item -LiteralPath $captureDirectory -Destination $invalidJoinGeometryCaptureDirectory -Recurse
+        $invalidJoinGeometryManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $invalidJoinGeometryCaptureDirectory 'manifest.json') | ConvertFrom-Json
+        foreach ($record in $invalidJoinGeometryManifest.captures) { $record.path = Join-Path $invalidJoinGeometryCaptureDirectory ($record.name + '.png') }
+        $invalidJoinGeometryHome = @($invalidJoinGeometryManifest.captures | Where-Object name -eq 'home')[0]
+        $invalidJoinGeometry = @($invalidJoinGeometryHome.codeNativeGeometry | Where-Object name -eq 'LanLobbyRoot/Home/RoomSelect/Join/OutlineTop')[0]
+        $mutateJoinGeometry = $invalidJoinGeometryCase.mutate
+        & $mutateJoinGeometry $invalidJoinGeometry
+        $invalidJoinGeometryManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $invalidJoinGeometryCaptureDirectory 'manifest.json') -Encoding UTF8
+        $invalidJoinGeometryOutput = Join-Path $scratch ($invalidJoinGeometryCase.name + '-output')
+        Assert-FailsWithoutOutput {
+            & $exportScript -CaptureDirectory $invalidJoinGeometryCaptureDirectory -OutputDirectory $invalidJoinGeometryOutput -ReferenceDirectory $referenceDirectory
+        } $invalidJoinGeometryOutput $invalidJoinGeometryCase.expectedMessage
+    }
+
+    $invalidJoinSpriteCaptureDirectory = Join-Path $scratch 'invalid-join-sprite-origin-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $invalidJoinSpriteCaptureDirectory -Recurse
+    $invalidJoinSpriteManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $invalidJoinSpriteCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $invalidJoinSpriteManifest.captures) { $record.path = Join-Path $invalidJoinSpriteCaptureDirectory ($record.name + '.png') }
+    $invalidJoinSpriteHome = @($invalidJoinSpriteManifest.captures | Where-Object name -eq 'home')[0]
+    (@($invalidJoinSpriteHome.spriteSources | Where-Object node -eq 'LanLobbyRoot/Home/RoomSelect/Join/Logo')[0]).coordinateOrigin = 'screen-top-left'
+    $invalidJoinSpriteManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $invalidJoinSpriteCaptureDirectory 'manifest.json') -Encoding UTF8
+    $invalidJoinSpriteOutput = Join-Path $scratch 'invalid-join-sprite-origin-output'
+    Assert-FailsWithoutOutput {
+        & $exportScript -CaptureDirectory $invalidJoinSpriteCaptureDirectory -OutputDirectory $invalidJoinSpriteOutput -ReferenceDirectory $referenceDirectory
+    } $invalidJoinSpriteOutput 'must declare coordinateOrigin=screen-bottom-left and unit=px'
+
+    $invalidSpriteNumberCaptureDirectory = Join-Path $scratch 'invalid-sprite-null-coordinate-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $invalidSpriteNumberCaptureDirectory -Recurse
+    $invalidSpriteNumberManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $invalidSpriteNumberCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $invalidSpriteNumberManifest.captures) { $record.path = Join-Path $invalidSpriteNumberCaptureDirectory ($record.name + '.png') }
+    $invalidSpriteNumberHome = @($invalidSpriteNumberManifest.captures | Where-Object name -eq 'home')[0]
+    (@($invalidSpriteNumberHome.spriteSources | Where-Object node -eq 'LanLobbyRoot/Terrain')[0]).x = $null
+    $invalidSpriteNumberManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $invalidSpriteNumberCaptureDirectory 'manifest.json') -Encoding UTF8
+    $invalidSpriteNumberOutput = Join-Path $scratch 'invalid-sprite-null-coordinate-output'
+    Assert-FailsWithoutOutput {
+        & $exportScript -CaptureDirectory $invalidSpriteNumberCaptureDirectory -OutputDirectory $invalidSpriteNumberOutput -ReferenceDirectory $referenceDirectory
+    } $invalidSpriteNumberOutput 'must declare numeric x, y, width, and height'
 
     $invalidCaptureDirectory = Join-Path $scratch 'invalid-captures'
     New-Item -ItemType Directory -Force -Path $invalidCaptureDirectory | Out-Null
@@ -746,7 +825,7 @@ try
             mutate = {
                 param($homeCaptureRecord)
                 $logo = @($homeCaptureRecord.spriteSources | Where-Object node -eq ($joinGeometryPrefix + 'Logo'))[0]
-                $logo.y = 870
+                $logo.y = 184
                 $logo.height = 20
             }
         },
