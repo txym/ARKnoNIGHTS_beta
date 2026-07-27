@@ -107,6 +107,7 @@ function Fill-JoinDecorationFixture($Graphics, $NativeCrop, $TargetSize, $Bounds
         [Drawing.Color]::FromArgb(255, 171, 71, 60)
     })
     $centralBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
+    $blockTopologyBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
     $blockBrush = New-Object Drawing.SolidBrush $(if ($UseCycle2ActualColors) {
         [Drawing.Color]::FromArgb(255, 143, 143, 143)
     } else {
@@ -137,6 +138,13 @@ function Fill-JoinDecorationFixture($Graphics, $NativeCrop, $TargetSize, $Bounds
             }
             $brush = if ($bound.name -eq 'block-bank') { $blockBrush } elseif ($bound.name -eq 'input') { $inputBrush } else { $orangeBrush }
             Fill-ScaledFixtureRectangle $Graphics $brush $NativeCrop $TargetSize $drawBounds
+        }
+        foreach ($topologyRun in @(
+            [ordered]@{ x=150; y=140; width=70; height=10 },
+            [ordered]@{ x=222; y=140; width=366; height=10 }
+        ))
+        {
+            Fill-ScaledFixtureRectangle $Graphics $blockTopologyBrush $NativeCrop $TargetSize $topologyRun
         }
         foreach ($bound in @($Bounds | Where-Object { $_.name -notin @('block-bank', 'input') }))
         {
@@ -179,6 +187,7 @@ function Fill-JoinDecorationFixture($Graphics, $NativeCrop, $TargetSize, $Bounds
         $logoBrush.Dispose()
         $text02Brush.Dispose()
         $centralBrush.Dispose()
+        $blockTopologyBrush.Dispose()
         $blockBrush.Dispose()
         $inputBackgroundBrush.Dispose()
         $inputBrush.Dispose()
@@ -230,11 +239,14 @@ function Shift-JoinBlockBankFixture([string] $Path, [int] $DeltaX)
     $graphics = [Drawing.Graphics]::FromImage($bitmap)
     $backgroundBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 60, 60, 60))
     $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 143, 143, 143))
+    $topologyBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
     $centralBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
     try
     {
         $graphics.FillRectangle($backgroundBrush, 1209, 704, 638, 87)
         $graphics.FillRectangle($blockBrush, 1209 + $DeltaX, 704, 638, 87)
+        $graphics.FillRectangle($topologyBrush, 1304 + $DeltaX, 736, 70, 10)
+        $graphics.FillRectangle($topologyBrush, 1376 + $DeltaX, 736, 366, 10)
         # Restore the overlapping central decoration after moving the bank body.
         $graphics.FillRectangle($centralBrush, 1478, 665, 58, 58)
         $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
@@ -242,8 +254,35 @@ function Shift-JoinBlockBankFixture([string] $Path, [int] $DeltaX)
     finally
     {
         $centralBrush.Dispose()
+        $topologyBrush.Dispose()
         $blockBrush.Dispose()
         $backgroundBrush.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
+function Scramble-JoinBlockInternalTopologyFixture([string] $Path)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 143, 143, 143))
+    $topologyBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
+    try
+    {
+        $graphics.FillRectangle($blockBrush, 1304, 736, 70, 10)
+        $graphics.FillRectangle($blockBrush, 1376, 736, 366, 10)
+        # Preserve the exact outer bank body while replacing the two reference
+        # occupancy runs with the retained Player's single compressed run.
+        $graphics.FillRectangle($topologyBrush, 1368, 736, 304, 10)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $topologyBrush.Dispose()
+        $blockBrush.Dispose()
         $graphics.Dispose()
         $bitmap.Dispose()
     }
@@ -783,6 +822,18 @@ try
     Assert-True ([string]$joinBlockBank.boundsAdjustment.reason -like '*near-background/transparent*') 'Join block-bank adjustment reason'
     Assert-True (($joinBlockBank.referenceBounds.x -eq 45) -and ($joinBlockBank.referenceBounds.y -eq 107) -and ($joinBlockBank.referenceBounds.width -eq 639) -and ($joinBlockBank.referenceBounds.height -eq 89)) 'Join block-bank adjusted reference bounds'
     Assert-True (($joinBlockBank.actualBounds.x -eq 45) -and ($joinBlockBank.actualBounds.y -eq 107) -and ($joinBlockBank.actualBounds.width -eq 639) -and ($joinBlockBank.actualBounds.height -eq 89)) 'Join block-bank adjusted actual bounds'
+    $blockTopology = $joinBlockBank.internalTopology
+    Assert-True ($null -ne $blockTopology) 'Join block-bank must publish nested internal orange topology without adding an eighth component row'
+    Assert-True (($blockTopology.measurement -eq 'orange-column-occupancy-profile') -and ($blockTopology.acceptanceRole -eq 'blocking')) 'Join block-bank internal topology contract'
+    Assert-True (($blockTopology.search.x -eq 35) -and ($blockTopology.search.y -eq 107) -and ($blockTopology.search.width -eq 660) -and ($blockTopology.search.height -eq 89)) 'Join block-bank internal topology search ROI'
+    Assert-True (($blockTopology.thresholds.minimumRed -eq 100) -and ($blockTopology.thresholds.minimumRedOverGreen -eq 15) -and ($blockTopology.thresholds.maximumBlue -eq 130) -and ($blockTopology.thresholds.minimumQualifyingPixelsPerColumn -eq 3)) 'Join block-bank internal orange occupancy thresholds'
+    Assert-True (($blockTopology.acceptance.maximumSpanEdgeDeviationPx -eq 4) -and ($blockTopology.acceptance.maximumOccupiedColumnCountDelta -eq 20) -and ($blockTopology.acceptance.minimumProfileJaccard -eq 0.95)) 'Join block-bank internal topology acceptance thresholds'
+    Assert-True ($blockTopology.measurementAvailable -and $blockTopology.referenceSelfPassed -and $blockTopology.passed) 'valid Join block-bank topology must be measurable, reference-self-consistent, and passing'
+    Assert-True (($blockTopology.referenceRaw.span.startX -eq 150) -and ($blockTopology.referenceRaw.span.endXInclusive -eq 587) -and ($blockTopology.referenceRaw.occupiedColumnCount -eq 436)) 'Join block-bank reference orange span/profile'
+    Assert-True (($blockTopology.actualRaw.span.startX -eq 150) -and ($blockTopology.actualRaw.span.endXInclusive -eq 587) -and ($blockTopology.actualRaw.occupiedColumnCount -eq 436)) 'Join block-bank actual orange span/profile'
+    Assert-True ((@($blockTopology.referenceRaw.runs).Count -eq 2) -and (@($blockTopology.actualRaw.runs).Count -eq 2)) 'valid Join block-bank topology must preserve both occupied-column runs'
+    Assert-True (($blockTopology.comparison.profileJaccard -eq 1) -and ($blockTopology.comparison.occupiedColumnCountDelta -eq 0) -and ($blockTopology.comparison.spanStartDeltaPx -eq 0) -and ($blockTopology.comparison.spanEndDeltaPx -eq 0)) 'valid Join block-bank topology profile comparison'
+    Assert-True ($joinBlockBank.boundsPassed -and $joinBlockBank.passed) 'valid Join block-bank outer bounds and internal topology must both pass'
     $joinInput = @($joinDecoration.components | Where-Object name -eq 'input')[0]
     Assert-True ($joinInput.measurement -eq 'neutral-largest-component') 'Join input must measure the largest decoded neutral panel'
     Assert-True (($joinInput.thresholds.minimumLuminanceInclusive -eq 40) -and ($joinInput.thresholds.maximumLuminanceInclusive -eq 140) -and ($joinInput.thresholds.maximumChannelSpread -eq 5)) 'Join input panel thresholds'
@@ -944,6 +995,9 @@ try
     Assert-True ($markdown.Contains('Bounds adjustment')) 'Markdown must publish the explicit Join bounds adjustment'
     Assert-True ($markdown.Contains('Reference adjusted')) 'Markdown must distinguish adjusted Join bounds'
     Assert-True ($markdown.Contains('near-background/transparent left margin')) 'Markdown must publish the block-bank adjustment reason'
+    Assert-True ($markdown.Contains('Block-bank internal orange topology')) 'Markdown must publish the nested blocking block-bank topology'
+    Assert-True ($markdown.Contains('Profile Jaccard')) 'Markdown must publish the stable internal column-profile metric'
+    Assert-True ($markdown.Contains('150..219, 222..587')) 'Markdown must publish the fixed reference orange occupancy runs'
     Assert-True ($markdown.Contains('Search/background')) 'Markdown frame table must expose the background ROI'
     Assert-True ($markdown.Contains('Frame/background median luma')) 'Markdown frame table must expose median luma'
     Assert-True ($markdown.Contains('Contrast delta/minimum')) 'Markdown frame table must expose contrast acceptance'
@@ -984,9 +1038,33 @@ try
     $adjustedBlockShiftX = $shiftedBlock.actualBounds.x - $joinBlockBank.actualBounds.x
     Assert-True (($rawBlockShiftX -eq -6) -and ($adjustedBlockShiftX -eq -6)) 'block-bank adjustment must preserve the full decoded -6 px shift'
     Assert-True (($shiftedBlock.actualRawBounds.width -eq $joinBlockBank.actualRawBounds.width) -and ($shiftedBlock.actualBounds.width -eq $joinBlockBank.actualBounds.width)) 'block-bank adjustment must preserve an unchanged decoded width'
+    Assert-True (($shiftedBlock.internalTopology.comparison.spanStartDeltaPx -eq -6) -and ($shiftedBlock.internalTopology.comparison.spanEndDeltaPx -eq -6) -and ($shiftedBlock.internalTopology.passed -eq $false)) 'uniform -6 px internal topology translation must remain independently blocking'
     Assert-True (($shiftedBlock.centerDeviationPx.deltaX -eq -6) -and ($shiftedBlock.passed -eq $false)) 'meaningful block-bank position delta must remain blocking'
     Assert-True (@($shiftedBlockReport.joinDecoration.components | Where-Object { -not $_.passed }).Count -eq 1) 'shifted block-bank fixture must isolate its visual-bound failure'
     Assert-True ($shiftedBlockReport.joinDecoration.passed -eq $false) 'shifted block-bank must block overall Join acceptance'
+
+    $scrambledTopologyCaptureDirectory = Join-Path $scratch 'scrambled-join-block-topology-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $scrambledTopologyCaptureDirectory -Recurse
+    $scrambledTopologyManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $scrambledTopologyCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $scrambledTopologyManifest.captures) { $record.path = Join-Path $scrambledTopologyCaptureDirectory ($record.name + '.png') }
+    $scrambledTopologyManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $scrambledTopologyCaptureDirectory 'manifest.json') -Encoding UTF8
+    $scrambledTopologyHome = Join-Path $scrambledTopologyCaptureDirectory 'home.png'
+    Repair-JoinText01Fixture $scrambledTopologyHome
+    Scramble-JoinBlockInternalTopologyFixture $scrambledTopologyHome
+    $scrambledTopologyOutput = Join-Path $scratch 'scrambled-join-block-topology-output'
+    & $exportScript -CaptureDirectory $scrambledTopologyCaptureDirectory -OutputDirectory $scrambledTopologyOutput -ReferenceDirectory $referenceDirectory | Out-Null
+    $scrambledTopologyReport = Get-Content -Raw -LiteralPath (Join-Path $scrambledTopologyOutput 'visual-diff-report.json') | ConvertFrom-Json
+    Assert-True (@($scrambledTopologyReport.joinDecoration.components).Count -eq 7) 'internal topology must not add an eighth Join component row'
+    $scrambledBlock = @($scrambledTopologyReport.joinDecoration.components | Where-Object name -eq 'block-bank')[0]
+    Assert-True (($scrambledBlock.actualRawBounds.x -eq $joinBlockBank.actualRawBounds.x) -and ($scrambledBlock.actualRawBounds.y -eq $joinBlockBank.actualRawBounds.y) -and ($scrambledBlock.actualRawBounds.width -eq $joinBlockBank.actualRawBounds.width) -and ($scrambledBlock.actualRawBounds.height -eq $joinBlockBank.actualRawBounds.height)) 'scrambled internal topology must preserve identical outer raw bank bounds'
+    Assert-True ($scrambledBlock.boundsPassed -eq $true) 'scrambled internal topology must preserve the passing outer bounds gate'
+    Assert-True ($scrambledBlock.internalTopology.measurementAvailable -and $scrambledBlock.internalTopology.referenceSelfPassed) 'scrambled internal topology must remain measurable with a self-consistent fixed reference'
+    Assert-True (($scrambledBlock.internalTopology.actualRaw.span.startX -eq 214) -and ($scrambledBlock.internalTopology.actualRaw.span.endXInclusive -eq 517) -and ($scrambledBlock.internalTopology.actualRaw.occupiedColumnCount -eq 304)) 'scrambled topology must reproduce the retained Player compressed orange span'
+    Assert-True ((@($scrambledBlock.internalTopology.actualRaw.runs).Count -eq 1) -and ($scrambledBlock.internalTopology.comparison.occupiedColumnCountDelta -eq -132)) 'scrambled topology must publish its single run and occupied-column deficit'
+    Assert-True (([Math]::Round($scrambledBlock.internalTopology.comparison.profileJaccard, 6) -eq 0.689498) -and ($scrambledBlock.internalTopology.comparison.spanStartDeltaPx -eq 64) -and ($scrambledBlock.internalTopology.comparison.spanEndDeltaPx -eq -70) -and ($scrambledBlock.internalTopology.comparison.spanWidthDeltaPx -eq -134)) 'scrambled topology must publish the exact profile and span-size deviations'
+    Assert-True (($scrambledBlock.internalTopology.passed -eq $false) -and ($scrambledBlock.passed -eq $false)) 'scrambled internal topology must block its named component despite identical outer bounds'
+    Assert-True (@($scrambledTopologyReport.joinDecoration.components | Where-Object { -not $_.passed }).Count -eq 1) 'scrambled topology fixture must isolate the block-bank internal failure'
+    Assert-True ($scrambledTopologyReport.joinDecoration.passed -eq $false) 'scrambled internal topology must block overall Join acceptance'
 
     $joinGeometryPrefix = 'LanLobbyRoot/Home/RoomSelect/Join/'
     $joinNegativeCases = @(

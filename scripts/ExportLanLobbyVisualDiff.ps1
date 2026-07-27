@@ -96,6 +96,19 @@ public static class LanLobbyVisualDiff {
         }
         return AvailableBounds(minX,minY,maxX,maxY);
     }
+    public static int[] CountOrangePixelsPerColumn(
+        Bitmap bitmap, Rectangle search, int minimumRed, int maximumBlue, int minimumRedOverGreen)
+    {
+        ValidateSearch(bitmap, search);
+        int[] counts=new int[search.Width];
+        for(int x=search.X;x<search.Right;x++) for(int y=search.Y;y<search.Bottom;y++) {
+            Color pixel=bitmap.GetPixel(x,y);
+            if(pixel.A==0 || pixel.R<minimumRed || pixel.B>maximumBlue ||
+                pixel.R<pixel.G+minimumRedOverGreen) continue;
+            counts[x-search.X]++;
+        }
+        return counts;
+    }
     public static LanLobbyBoundsMeasurement FindLumaBounds(
         Bitmap bitmap, Rectangle search, int minimumLuminanceInclusive, int maximumLuminanceInclusive)
     {
@@ -659,6 +672,22 @@ $joinDecorationContentSpecs = @(
       ignoredRegionHeight=48
       ignoredRegionReason='Exclude the overlapping central icon from the block-bank edge union.'
     }
+    internalTopology=@{
+      measurement='orange-column-occupancy-profile'
+      search=@{x=35;y=107;width=660;height=89}
+      thresholds=@{
+        minimumRed=100
+        minimumRedOverGreen=15
+        maximumBlue=130
+        minimumQualifyingPixelsPerColumn=3
+        reason='Reference-calibrated decoded orange columns within the fixed block-bank content band.'
+      }
+      acceptance=@{
+        maximumSpanEdgeDeviationPx=4
+        maximumOccupiedColumnCountDelta=20
+        minimumProfileJaccard=0.95
+      }
+    }
     boundsAdjustment=@{
       coordinateOrigin='crop-top-left'
       unit='px'
@@ -804,6 +833,131 @@ function Add-LanLobbyBoundsAdjustment($Measurement, $Adjustment, [string] $Label
     $adjusted.Bounds = $adjustedBounds
     $adjusted.FailureReason = $null
     return $adjusted
+}
+
+function Measure-LanLobbyOrangeColumnTopology(
+    [Drawing.Bitmap] $Bitmap,
+    [Drawing.Rectangle] $Search,
+    $Thresholds)
+{
+    $columnCounts = @(
+        [LanLobbyVisualDiff]::CountOrangePixelsPerColumn(
+            $Bitmap,
+            $Search,
+            [int]$Thresholds.minimumRed,
+            [int]$Thresholds.maximumBlue,
+            [int]$Thresholds.minimumRedOverGreen)
+    )
+    $occupiedColumns = @(
+        for ($offset = 0; $offset -lt $columnCounts.Count; $offset++)
+        {
+            if ($columnCounts[$offset] -ge [int]$Thresholds.minimumQualifyingPixelsPerColumn)
+            {
+                $Search.X + $offset
+            }
+        }
+    )
+    if ($occupiedColumns.Count -eq 0)
+    {
+        return [pscustomobject][ordered]@{
+            available=$false
+            failureReason='No decoded orange columns met the minimum occupancy.'
+            occupiedColumns=@()
+            raw=$null
+        }
+    }
+
+    $runs = @()
+    $runStart = $occupiedColumns[0]
+    $previous = $occupiedColumns[0]
+    foreach ($column in @($occupiedColumns | Select-Object -Skip 1))
+    {
+        if ($column -ne $previous + 1)
+        {
+            $runs += [pscustomobject][ordered]@{
+                coordinateOrigin='crop-top-left'
+                unit='px'
+                startX=$runStart
+                endXInclusive=$previous
+                width=($previous - $runStart + 1)
+            }
+            $runStart = $column
+        }
+        $previous = $column
+    }
+    $runs += [pscustomobject][ordered]@{
+        coordinateOrigin='crop-top-left'
+        unit='px'
+        startX=$runStart
+        endXInclusive=$previous
+        width=($previous - $runStart + 1)
+    }
+
+    $spanStart = $occupiedColumns[0]
+    $spanEnd = $occupiedColumns[-1]
+    $raw = [pscustomobject][ordered]@{
+        profileEncoding='occupied-column-runs'
+        span=[pscustomobject][ordered]@{
+            coordinateOrigin='crop-top-left'
+            unit='px'
+            startX=$spanStart
+            endXInclusive=$spanEnd
+            width=($spanEnd - $spanStart + 1)
+        }
+        runs=@($runs)
+        occupiedColumnCount=$occupiedColumns.Count
+        searchColumnCount=$Search.Width
+        occupiedColumnDensity=[Math]::Round($occupiedColumns.Count / [double]$Search.Width, 6)
+    }
+    return [pscustomobject][ordered]@{
+        available=$true
+        failureReason=$null
+        occupiedColumns=@($occupiedColumns)
+        raw=$raw
+    }
+}
+
+function Compare-LanLobbyOrangeColumnTopology($Reference, $Actual, $Acceptance)
+{
+    if (-not $Reference.available -or -not $Actual.available)
+    {
+        return [pscustomobject][ordered]@{
+            available=$false
+            failureReason=@($Reference.failureReason, $Actual.failureReason | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' / '
+            passed=$false
+        }
+    }
+
+    $intersectionCount = @(
+        $Reference.occupiedColumns |
+            Where-Object { $Actual.occupiedColumns -contains $_ }
+    ).Count
+    $unionCount = @(
+        $Reference.occupiedColumns + $Actual.occupiedColumns |
+            Sort-Object -Unique
+    ).Count
+    $profileJaccard = if ($unionCount -eq 0) { 1.0 } else { $intersectionCount / [double]$unionCount }
+    $spanStartDelta = $Actual.raw.span.startX - $Reference.raw.span.startX
+    $spanEndDelta = $Actual.raw.span.endXInclusive - $Reference.raw.span.endXInclusive
+    $spanWidthDelta = $Actual.raw.span.width - $Reference.raw.span.width
+    $occupiedColumnCountDelta = $Actual.raw.occupiedColumnCount - $Reference.raw.occupiedColumnCount
+    $passed = [Math]::Abs($spanStartDelta) -le [int]$Acceptance.maximumSpanEdgeDeviationPx -and
+        [Math]::Abs($spanEndDelta) -le [int]$Acceptance.maximumSpanEdgeDeviationPx -and
+        [Math]::Abs($occupiedColumnCountDelta) -le [int]$Acceptance.maximumOccupiedColumnCountDelta -and
+        $profileJaccard -ge [double]$Acceptance.minimumProfileJaccard
+    return [pscustomobject][ordered]@{
+        available=$true
+        failureReason=$null
+        unit='px'
+        spanStartDeltaPx=$spanStartDelta
+        spanEndDeltaPx=$spanEndDelta
+        spanWidthDeltaPx=$spanWidthDelta
+        occupiedColumnCountDelta=$occupiedColumnCountDelta
+        profileIntersectionOccupiedColumnCount=$intersectionCount
+        profileUnionOccupiedColumnCount=$unionCount
+        profileJaccard=[Math]::Round($profileJaccard, 6)
+        passed=$passed
+    }
 }
 
 function New-LanLobbyActionOverlay([Drawing.Bitmap] $Actual, [Drawing.Bitmap] $Reference)
@@ -1583,6 +1737,52 @@ try
                     [Math]::Abs($sizeDeviation.deltaWidth) -le $contentSpec.tolerance -and
                     [Math]::Abs($sizeDeviation.deltaHeight) -le $contentSpec.tolerance
             }
+            $boundsPassed = $passed
+            $internalTopology = $null
+            if ($contentSpec.ContainsKey('internalTopology'))
+            {
+                $topologySpec = $contentSpec.internalTopology
+                $topologySearch = New-Object Drawing.Rectangle $topologySpec.search.x, $topologySpec.search.y, $topologySpec.search.width, $topologySpec.search.height
+                $referenceTopology = Measure-LanLobbyOrangeColumnTopology $locallyResizedReferenceCrop $topologySearch $topologySpec.thresholds
+                $actualTopology = Measure-LanLobbyOrangeColumnTopology $actualCrop $topologySearch $topologySpec.thresholds
+                $referenceSelfComparison = Compare-LanLobbyOrangeColumnTopology $referenceTopology $referenceTopology $topologySpec.acceptance
+                $topologyComparison = Compare-LanLobbyOrangeColumnTopology $referenceTopology $actualTopology $topologySpec.acceptance
+                $topologyMeasurementAvailable = $referenceTopology.available -and $actualTopology.available
+                $topologyMeasurementError = @(
+                    $referenceTopology.failureReason,
+                    $actualTopology.failureReason |
+                        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+                ) -join ' / '
+                $topologyThresholds = [ordered]@{}
+                foreach ($key in $topologySpec.thresholds.Keys) { $topologyThresholds[$key] = $topologySpec.thresholds[$key] }
+                $topologyAcceptance = [ordered]@{}
+                foreach ($key in $topologySpec.acceptance.Keys) { $topologyAcceptance[$key] = $topologySpec.acceptance[$key] }
+                $referenceSelfPassed = $referenceSelfComparison.available -and $referenceSelfComparison.passed
+                $topologyPassed = $topologyMeasurementAvailable -and $referenceSelfPassed -and $topologyComparison.passed
+                $internalTopology = [pscustomobject][ordered]@{
+                    measurement=$topologySpec.measurement
+                    acceptanceRole='blocking'
+                    search=[pscustomobject][ordered]@{
+                        coordinateOrigin='crop-top-left'
+                        unit='px'
+                        x=$topologySpec.search.x
+                        y=$topologySpec.search.y
+                        width=$topologySpec.search.width
+                        height=$topologySpec.search.height
+                    }
+                    thresholds=[pscustomobject]$topologyThresholds
+                    acceptance=[pscustomobject]$topologyAcceptance
+                    measurementAvailable=$topologyMeasurementAvailable
+                    measurementError=$(if ($topologyMeasurementAvailable) { $null } else { $topologyMeasurementError })
+                    referenceRaw=$referenceTopology.raw
+                    actualRaw=$actualTopology.raw
+                    referenceSelfComparison=$referenceSelfComparison
+                    referenceSelfPassed=$referenceSelfPassed
+                    comparison=$topologyComparison
+                    passed=$topologyPassed
+                }
+                $passed = $boundsPassed -and $topologyPassed
+            }
             $components += [pscustomobject][ordered]@{
                 name=$contentSpec.name
                 measurement=$contentSpec.measurement
@@ -1599,6 +1799,8 @@ try
                 actualBounds=$(if ($actualMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $actualMeasurement.Bounds } else { $null })
                 centerDeviationPx=$centerDeviation
                 sizeDeviationPx=$sizeDeviation
+                boundsPassed=$boundsPassed
+                internalTopology=$internalTopology
                 passed=$passed
             }
         }
@@ -1876,6 +2078,46 @@ try
         $thresholds = @($component.thresholds.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '
         $measurementStatus = if ($component.measurementAvailable) { 'available' } else { ConvertTo-LanLobbyMarkdownCell ('unavailable: ' + [string]$component.measurementError) }
         $markdown += "| $($component.name) | $($component.measurement) | $($component.search.x),$($component.search.y),$($component.search.width),$($component.search.height) | $thresholds | $($component.tolerancePx) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceRaw | $actualRaw | $adjustment | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
+    }
+    $blockTopologyRows = @($joinDecorationReport.components | Where-Object { $_.name -eq 'block-bank' -and $null -ne $_.internalTopology })
+    if ($blockTopologyRows.Count -eq 1)
+    {
+        $blockTopology = $blockTopologyRows[0].internalTopology
+        $referenceTopologyRuns = if ($blockTopology.referenceRaw) {
+            @($blockTopology.referenceRaw.runs | ForEach-Object { "$($_.startX)..$($_.endXInclusive)" }) -join ', '
+        } else { 'unavailable' }
+        $actualTopologyRuns = if ($blockTopology.actualRaw) {
+            @($blockTopology.actualRaw.runs | ForEach-Object { "$($_.startX)..$($_.endXInclusive)" }) -join ', '
+        } else { 'unavailable' }
+        $referenceTopologySpan = if ($blockTopology.referenceRaw) {
+            "$($blockTopology.referenceRaw.span.startX)..$($blockTopology.referenceRaw.span.endXInclusive)"
+        } else { 'unavailable' }
+        $actualTopologySpan = if ($blockTopology.actualRaw) {
+            "$($blockTopology.actualRaw.span.startX)..$($blockTopology.actualRaw.span.endXInclusive)"
+        } else { 'unavailable' }
+        $topologyMeasurementStatus = if ($blockTopology.measurementAvailable) {
+            'available'
+        } else {
+            ConvertTo-LanLobbyMarkdownCell ('unavailable: ' + [string]$blockTopology.measurementError)
+        }
+        $markdown += @(
+            '',
+            '### Block-bank internal orange topology',
+            '',
+            "Blocking nested measurement: $($blockTopology.measurement). Status: $topologyMeasurementStatus. Reference self passed: $($blockTopology.referenceSelfPassed). Passed: $($blockTopology.passed).",
+            "Decoded-pixel rule: R >= $($blockTopology.thresholds.minimumRed), R-G >= $($blockTopology.thresholds.minimumRedOverGreen), B <= $($blockTopology.thresholds.maximumBlue); a column is occupied at >= $($blockTopology.thresholds.minimumQualifyingPixelsPerColumn) qualifying pixels. Search (crop-top-left px): $($blockTopology.search.x),$($blockTopology.search.y),$($blockTopology.search.width),$($blockTopology.search.height).",
+            "Acceptance: maximum span-edge deviation $($blockTopology.acceptance.maximumSpanEdgeDeviationPx) px; maximum occupied-column-count delta $($blockTopology.acceptance.maximumOccupiedColumnCountDelta); minimum Profile Jaccard $($blockTopology.acceptance.minimumProfileJaccard).",
+            '',
+            '| Raw profile | Span | Occupied columns | Runs | Density |',
+            '| --- | --- | ---: | --- | ---: |',
+            "| Reference raw | $referenceTopologySpan | $($blockTopology.referenceRaw.occupiedColumnCount) | $referenceTopologyRuns | $($blockTopology.referenceRaw.occupiedColumnDensity) |",
+            "| Actual raw | $actualTopologySpan | $($blockTopology.actualRaw.occupiedColumnCount) | $actualTopologyRuns | $($blockTopology.actualRaw.occupiedColumnDensity) |",
+            '',
+            '| Comparison | Profile Jaccard | Occupied-column delta | Span start/end/width delta (px) | Passed |',
+            '| --- | ---: | ---: | --- | --- |',
+            "| Reference vs actual | $($blockTopology.comparison.profileJaccard) | $($blockTopology.comparison.occupiedColumnCountDelta) | $($blockTopology.comparison.spanStartDeltaPx)/$($blockTopology.comparison.spanEndDeltaPx)/$($blockTopology.comparison.spanWidthDeltaPx) | $($blockTopology.comparison.passed) |",
+            "| Reference vs self | $($blockTopology.referenceSelfComparison.profileJaccard) | $($blockTopology.referenceSelfComparison.occupiedColumnCountDelta) | $($blockTopology.referenceSelfComparison.spanStartDeltaPx)/$($blockTopology.referenceSelfComparison.spanEndDeltaPx)/$($blockTopology.referenceSelfComparison.spanWidthDeltaPx) | $($blockTopology.referenceSelfPassed) |"
+        )
     }
     $markdown += @('', "Join backing: $($joinDecorationReport.backingRect.x),$($joinDecorationReport.backingRect.y),$($joinDecorationReport.backingRect.width),$($joinDecorationReport.backingRect.height) top-left px; bottom screen Y: $($joinDecorationReport.backingBottomScreenY). SimulationInvite absent: $($joinDecorationReport.simulationInviteAbsent). OutlineBottom absent: $($joinDecorationReport.outlineBottomAbsent). Geometry crosses backing bottom: $($joinDecorationReport.geometryCrossesBackingBottom). Accepted Join action/content passed: $($joinDecorationReport.joinActionPassed).")
     $markdown += @('', "Join backing target passed: $($joinDecorationReport.backingTargetPassed); tolerance: $($joinDecorationReport.backingTargetTolerancePx) px; deviation: dx=$($joinDecorationReport.backingTargetDeviationPx.deltaX), dy=$($joinDecorationReport.backingTargetDeviationPx.deltaY), dw=$($joinDecorationReport.backingTargetDeviationPx.deltaWidth), dh=$($joinDecorationReport.backingTargetDeviationPx.deltaHeight). Fixed action boundary: y=$($joinDecorationReport.actionBoundaryScreenY); graphic/geometry boundary available: $($joinDecorationReport.graphicsOrGeometryBoundaryAvailable); graphic/geometry crosses boundary: $($joinDecorationReport.graphicsOrGeometryCrossesActionBoundary). Required Sprite inventory passed: $($joinDecorationReport.requiredSpriteInventoryPassed).", '', '| Required Join Sprite | Expected occurrences | Actual occurrences | Expected source | Actual source | Passed |', '| --- | ---: | ---: | --- | --- | --- |')
