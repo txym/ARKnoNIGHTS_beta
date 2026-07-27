@@ -141,6 +141,10 @@ foreach ($typeId in $PendingRemovalIds) {
 $specLines = Get-Content -LiteralPath $BondSpecPath -Encoding UTF8
 $rarityLabel = [string]::Concat([char]0x7A00, [char]0x6709)
 $regionSectionHeader = [string]::Concat('# ', [char]0x76EE, [char]0x524D, [char]0x8003, [char]0x8651, [char]0x4F7F, [char]0x7528, [char]0x7684, [char]0x5730, [char]0x533A)
+$pendingRemovalCategory = -join @([char]0x5F85, [char]0x79FB, [char]0x9664)
+$originalCategoryPrefix = -join @([char]0x539F, [char]0x5206, [char]0x7C7B, [char]0xFF1A)
+$metadataDelimiter = [string][char]0xFF1B
+$originalCategoryPattern = [regex]::Escape($originalCategoryPrefix) + '(?<OriginalCategory>[^' + $metadataDelimiter + ']+)' + [regex]::Escape($metadataDelimiter)
 $unitPattern = '^(?<TypeId>\d+)\s+(?<DisplayName>.+?)\s+' + $rarityLabel + '(?<Rarity>[1-6])(?:\s|$)'
 $categoryPattern = '^##\s+(.+?)\s*$'
 $nonShopTypeIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
@@ -165,10 +169,25 @@ foreach ($line in $specLines) {
         throw "Duplicate unit type ID '$typeId' in '$BondSpecPath'."
     }
 
+    $resolvedCategory = $category
+    if ($category -ceq $pendingRemovalCategory) {
+        $originalCategoryMatches = [regex]::Matches($line, $originalCategoryPattern)
+        if ($originalCategoryMatches.Count -eq 0) {
+            throw "Pending-removal roster entry '$typeId' is missing required original-category metadata."
+        }
+        if ($originalCategoryMatches.Count -gt 1) {
+            throw "Pending-removal roster entry '$typeId' contains $($originalCategoryMatches.Count) original-category metadata values; expected exactly one."
+        }
+        $resolvedCategory = $originalCategoryMatches[0].Groups['OriginalCategory'].Value.Trim()
+        if ([string]::IsNullOrWhiteSpace($resolvedCategory) -or $resolvedCategory -ceq $pendingRemovalCategory) {
+            throw "Pending-removal roster entry '$typeId' has invalid original category '$resolvedCategory'."
+        }
+    }
+
     $roster.Add($typeId, [pscustomobject]@{
         TypeId = $typeId
         DisplayName = $Matches.DisplayName.Trim()
-        Category = $category
+        Category = $resolvedCategory
         CurrentRarity = [int]$Matches.Rarity
         IsShopCandidate = -not $nonShopTypeIds.Contains($typeId)
     })
