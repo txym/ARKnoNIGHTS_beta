@@ -520,3 +520,15 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.
 
 This visual rule does not change Create/Join actions or LAN-room creation, discovery, prefill, joining, readiness, start, or disconnect-recovery behavior.
+
+## LAN Home 加入同盟上部装饰规则（2026-07-27）
+
+LAN Home 右侧的 `加入同盟` 区域按图 9 构成一个连续的橙灰色上部装饰区。在 `1920×1080` 顶左屏幕坐标中，上部区域占据 `(1154,596,717,280)`，并在既有 `加入同盟` 操作条顶边 `y=876` 处结束。其可见构成包括两块重复左段、四块重复中段、两块重复右段及其相互重叠，一个中部遮罩，一个居中的装饰空白块、空白块内以 `2×2` 排列的四个重复 X 标记，一个对齐三角形，以及图 9 对应的三组标题装饰。
+
+`模拟邀约` 胶囊及其图标不再显示，也不以隐藏或移出屏幕的节点保留。上部装饰只保留一个中央空白块和四个 X 标记，不再使用六个房间号位图格表示房间号。
+
+六位房间号输入框位于 `(1269,800,482,60)`，占位文字固定为 `输入同盟密钥`，使用字号 `28`、不透明中性灰色 `RGB(214,214,214)`，并在输入框内水平、垂直居中，且不得与输入框左侧烘焙图标重叠。输入仍只接受整数、最多六个字符；点击已发现房间只预填六位房间号，不自动加入。玩家仍须显式点击 `加入同盟`，且界面不显示或要求输入 IP 地址、端口。
+
+既有 `加入同盟` 操作条保持 `(1154,876,717,99)`，背景、图标、文字、点击区域、层级和事件行为不变；输入框和所有装饰不得遮挡该操作条。房间发现、预填、加入条件、局域网通信、房间页、准备、开始和断连恢复行为不因本视觉规则改变。
+
+除代码原生的纯色暗底、轮廓和引导线外，所有位图均须来自已批准的 autochess 素材库。Join 直接素材使用 `G:\素材\11.14\Unpacked_1763129662\Android\ui\autochess` 中非 `$0` 的 `[uc]autochessouter` 文件；现有头像可使用 `G:\素材\11.14\Combined_1763139377\Android\ui\autochess` 中已批准的 Combined 来源。禁止 `$0`/`#0`、atlas 条目和派生/预合成 Join 位图；允许并要求重复、重叠使用同一批准 Sprite。

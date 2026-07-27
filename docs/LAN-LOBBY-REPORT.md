@@ -8,7 +8,7 @@ Run `scripts/ExportLanLobbyEvidence.ps1 -CaptureDirectory <ignored-directory>` a
 
 ## Visual-difference evidence (2026-07-26)
 
-The visual-difference exporter is non-blocking: it reports `ATTENTION` when a measured, unmasked region differs; it does not make a Player run or LAN room flow fail. It emits actual, normalized-reference, overlay, and heatmap PNGs, plus Markdown/JSON reports and a source-audited Sprite usage table. Masked regions are transparent black in heatmaps and excluded from measurements. Reference images are input evidence only and are never copied to or changed in their source directory.
+Full-image visual-difference metrics are non-blocking: `ATTENTION` on a broad unmasked region does not by itself make a Player run or LAN room flow fail. A task-specific report may additionally define named component, structure, action, absence, and provenance gates as blocking visual acceptance; the current Join gates are recorded below. The exporter emits actual, normalized-reference, overlay, and heatmap PNGs, plus Markdown/JSON reports and a source-audited Sprite usage table. Masked regions are transparent black in heatmaps and excluded from measurements. Reference images are input evidence only and are never copied to or changed in their source directory.
 
 For an isolated worktree which does not contain exact `图9.png` and `图10.png`, provide the primary worktree reference directory explicitly and treat it as read-only:
 
@@ -77,9 +77,9 @@ This retained run is superseded by the evidence-derived-capture correction below
 - The manifest contains no forbidden `$0`/`#0` Unpacked source. Manual inspection opened `home.png`, `discovered-prefill.png`, `home-create-action-overlay.png`, and `home-join-action-overlay.png`: neither Status nor the discovered room item covers the Join bar. The local difference metrics remain non-blocking and the remaining decorative composition is still not accepted.
 - Smoke verification: `scripts/TestLanLobbyVisualDiffSmoke.ps1` and `scripts/TestExportLanLobbyEvidenceSmoke.ps1` both print `PASS` and exit `0`.
 
-## Home room-select evidence-derived capture correction (2026-07-26)
+## Home room-select evidence-derived capture correction (historical; superseded for Join, 2026-07-26)
 
-This is the current authoritative retained evidence. Current proof is limited to the focused XML under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and the build, Player capture, manifest, and visual report under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/`. Action crops, Unity Text rows, and Sprite occurrence totals come from the production Player capture manifest rather than exporter constants or a manually curated list.
+This is historical pre-reconstruction evidence. It remains useful for its action-bar baseline, but its Join hierarchy, `join_icon=4`, and `SimulationInvite` records are superseded by the 2026-07-27 Join evidence below. Proof for this historical run is limited to the focused XML under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and the build, Player capture, manifest, and visual report under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/`.
 
 - Persistent focused results are under `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/`:
   - `Layout/EditModeResults.xml`: `result=Passed`, total/passed/failed/skipped `6/6/0/0`; shutdown `forced-stop-after-results` after valid XML, grace `20s`.
@@ -94,12 +94,12 @@ This is the current authoritative retained evidence. Current proof is limited to
   - Create: actual/target `(1154,453,717,99)`, native reference `(1257,482,763,105)`, locally resized reference `717x99`, comparison reference `717x99`, position `dx=0px,dy=0px`, size `dw=0px,dh=0px`, ratio `0.53635377484749869`, mean RGB error `27.899919699082879`.
   - Join: actual/target `(1154,876,717,99)`, native reference `(1257,932,763,105)`, locally resized reference `717x99`, comparison reference `717x99`, position `dx=0px,dy=0px`, size `dw=0px,dh=0px`, ratio `0.45760252454813122`, mean RGB error `28.19097060798595`.
 - Material usage is manifest-derived and separated into `bitmapSprites`, `unityText`, and `codeGeneratedGeometry`:
-  - 128 active rendered Sprite instances aggregate to 34 audited bitmap rows with Resources path, approved source, SHA-256, captures, and occurrence count. `join_icon` correctly totals `4`: two nodes in `home` and two in `discovered-prefill`.
+  - This historical manifest had 128 active rendered Sprite instances aggregated to 34 audited bitmap rows with Resources path, approved source, SHA-256, captures, and occurrence count. Its `join_icon` total was `4` because `SimulationInvite` still existed; the current Join total is `2`.
   - 59 active rendered `UnityEngine.UI.Text` instances aggregate by node/text/font to 37 rows. They cover Home identity/title/input/buttons/discovery/status and the Room page; each row reports runtime `fontName`, an empty unprovable `fontResourcePath`, `hasBitmapSource=false`, and an empty `bitmapSourcePath`. Dormant/non-rendered Text is explicitly excluded.
   - Code-generated non-bitmap geometry remains six grouped rows.
 - The manifest contains no forbidden `$0`/`#0` Unpacked source. Manual inspection opened `CapturesFinal/home.png`, `CapturesFinal/discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `VisualDiff/home-join-action-overlay.png`; the bars are unobstructed, and the local overlays retain both captured/reference contours. Metrics remain non-blocking, and other decoration placement remains outside this iteration's acceptance.
 
-## Home action icon/text visual-center calibration (current authoritative, 2026-07-26)
+## Home action icon/text visual-center calibration (historical action baseline; superseded for Join, 2026-07-26)
 
 The prior action-bar evidence remains the provenance and background-Rect baseline. This calibration supersedes it for the visible placement of the two action icons and the “创建同盟” / “加入同盟” labels. It does not claim that the rest of the Home decoration is fully reproduced.
 
@@ -126,7 +126,7 @@ The prior action-bar evidence remains the provenance and background-Rect baselin
 - Measurement details: actual and reference use integer luminance `<45`. Icon rows union four-neighbour components with at least `40` pixels and component aspect ratio no greater than `4.0`; this removes detached thin bar texture without cropping the disconnected Join glyph. Label rows use all dark pixels in their dedicated search regions. Passing requires center error at most `1 px` per axis and width/height error at most `2 px`.
 - Material use is unchanged and capture-derived:
   - `create_icon`: Resources `UI/Lobby/create_icon`; source `[uc]autochessouter/create_icon.png`; SHA-256 `AE047958EE4E7D43F368D3205110307200D30F79BCF393B36CBBDE37A8A00BA7`; two occurrences across `home` and `discovered-prefill`.
-  - `join_icon`: Resources `UI/Lobby/join_icon`; source `[uc]autochessouter/join_icon.png`; SHA-256 `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09`; four occurrences because each Home state also renders the Simulation Invite icon.
+  - `join_icon`: Resources `UI/Lobby/join_icon`; source `[uc]autochessouter/join_icon.png`; SHA-256 `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09`; this historical run had four occurrences because each Home state also rendered the now-removed Simulation Invite icon.
   - `room_select_create_btn_bg_down`: source `[uc]autochessouter/room_select_create_btn_bg_down.png`; SHA-256 `8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149`.
   - `room_select_join_btn_bg_down`: source `[uc]autochessouter/room_select_join_btn_bg_down.png`; SHA-256 `71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468`.
   - “创建同盟” and “加入同盟” are Unity Text, use runtime font `Novecento wide Normal Regular.woff2`, and report `hasBitmapSource=false`; they are not represented as material-library bitmaps.
@@ -137,7 +137,7 @@ The prior action-bar evidence remains the provenance and background-Rect baselin
 
 ## Automated result (historical context)
 
-All `Temp/UnityTests/...` XML paths in the following four bullets were parsed at run time, have since been cleaned, and are non-persistent historical output. They cannot be cited as current proof; only `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/` are current authoritative evidence.
+All `Temp/UnityTests/...` XML paths in the following four bullets were parsed at run time, have since been cleaned, and are non-persistent historical output. They cannot be cited as current proof. The two 2026-07-26 `HomeRoomSelectActionBars*` roots remain historical action-bar evidence; current Join proof is the `JoinDecoration/Verification-Final` record below.
 
 - Historical run-time parsed red baseline (cleaned; not current proof): `Temp/UnityTests/20260725-184254/PlayModeResults.xml` recorded `LanLobbyCaptureSuitePlayModeTests` as `0/1` before the suite existed.
 - Historical run-time parsed focused capture PlayMode (cleaned; not current proof): `Temp/UnityTests/20260725-192044/PlayModeResults.xml` recorded `1/1` passed. Its batchmode seam checked the production view's five fixture states and manifest; it used a decodeable test probe because a batchmode backbuffer cannot produce a valid visual screenshot.
@@ -173,3 +173,164 @@ Authoritative final record: commit `e3a99cbd6645ad3505bfdd42f71140dc1afb7b52` (`
 - Final focused XML and matching summaries passed: Layout `6/6/0/0`, View `14/14/0/0`, Capture `3/3/0/0`, Controller `3/3/0/0`, aggregate `26/26`, failed/skipped `0`. `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, and `TestLanLobbyEvidenceCommonSmoke.ps1` each printed `PASS` and exited `0`.
 
 Manual inspection of `VisualDiff-2/home-actual.png` and the Create-frame actual/reference/overlay/heatmap agrees: the action bar visibly provides the lower boundary without a cyan bottom segment, but the top and right strokes remain faint. The permitted two cycles are exhausted; a further tint attempt or Cycle 3 requires a new architectural/acceptance decision.
+
+## Home Join decoration — final retained evidence (current authoritative, 2026-07-27)
+
+Authoritative Join record: commit `24806571adddee9dc48855967fd7b0a3e44ecbb6`. The Figure 9 Join upper decoration, room-code input background, centered `输入同盟密钥` placeholder, removed `SimulationInvite`, repeated-Sprite inventory, accepted Join action, and material provenance pass their current blocking gates. This result does not repair or supersede the separate Create open-frame visual failure above; it proves only that the Join work left Create unchanged.
+
+### Final build and visible Player capture
+
+- Windows x86_64 build output: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/WindowsStandalone/ARKnoNIGHTS.exe`.
+- Build log: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/WindowsStandaloneBuild.log`.
+- Unity process exit: `0`.
+- BuildReport: `result=Succeeded`, `errors=0`, `warnings=0`, `totalSize=184845930`, `totalTime=00:00:09.6019372`.
+- The Player was launched visibly with D3D11 at `1920×1080`, without `-batchmode`, a hidden-window argument, or a background service.
+- Player evidence: PID `8548`, process session `1`, Explorer interactive session `1`, nonzero window handle `46534514`, visible title `ArkNoNight`, exit `0`.
+- Player log: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/PlayerCapture.log`; it records `[LanLobby][capture.completed] count=5` and has zero case-insensitive `error|exception|warning` matches.
+- Capture directory: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures`.
+- Manifest: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/manifest.json`; `119302` bytes, BOM-less UTF-8, valid JSON, exactly five capture records.
+
+| Capture | Exact path | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| `home` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/home.png` | 646420 | `E690B268C66C4A728EDEAF8E94C4F354A1B280DA95EF23E9D5E64D11A3002C9E` |
+| `discovered-prefill` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/discovered-prefill.png` | 652259 | `F08F48E5431FF5F7157A2DB25C530957BBDFB91ACA35AFE049DB95329E096147` |
+| `room-host` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/room-host.png` | 740070 | `487E7E99397377F7C22316E4EC71CF902EE745DA7C7B22D690D35F7641DD8395` |
+| `room-ready` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/room-ready.png` | 691294 | `73B5CD77DFD4866015ACDCFB9B2264743FE5A731B6F2F8B3F97AE43F059C033F` |
+| `room-full` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/room-full.png` | 700509 | `BB2E6C8BF8BD549F8B149FB3582EDCA376C1C216BF0BF22815533FAB85A8DBC1` |
+
+Every PNG is non-empty, decodes successfully, and is exactly `1920×1080`.
+
+### Final Join VisualDiff
+
+Exporter exit: `0`. Exact retained files:
+
+- JSON: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/visual-diff-report.json`;
+- Markdown: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/visual-diff-report.md`;
+- actual crop: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-actual.png`;
+- normalized Figure 9 crop: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-reference.png`;
+- overlay: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-overlay.png`;
+- heatmap: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-heatmap.png`.
+
+The native Figure 9 crop is `(1257,635,763,297)` on `2102×1149`. The normalized actual/target crop and Join backing are `(1154,596,717,280)` on `1920×1080`, ending at the accepted Join action top `y=876`. All seven adjusted decoded-pixel rows are measurable and pass:
+
+| Row | Reference adjusted | Player adjusted | Center delta | Size delta | Tolerance | Result |
+| --- | --- | --- | --- | --- | ---: | --- |
+| `logo` | `(91,64,119,20)` | `(92,64,116,21)` | `(0,0.5)` | `(-2,+1)` | `2 px` | PASS |
+| `text-01` | `(391,56,65,8)` | `(391,56,65,10)` | `(0,+1)` | `(0,+2)` | `2 px` | PASS |
+| `text-02` | `(526,62,89,11)` | `(527,62,88,10)` | `(+0.5,-0.5)` | `(-1,-1)` | `2 px` | PASS |
+| `triangle` | `(338,47,30,17)` | `(337,47,32,17)` | `(0,0)` | `(+2,0)` | `2 px` | PASS |
+| `central-blank` | `(323,68,60,61)` | `(324,65,59,63)` | `(+0.5,-2)` | `(-1,+2)` | `2 px` | PASS |
+| `block-bank` | `(45,107,639,89)` | `(45,106,639,91)` | `(0,0)` | `(0,+2)` | `4 px` | PASS |
+| `input` | `(115,204,482,60)` | `(115,204,482,60)` | `(0,0)` | `(0,0)` | `2 px` | PASS |
+
+`joinDecoration.passed=true`. Its blocking structural results are:
+
+- backing target passed with zero deviation;
+- backing bottom is `876`; no Join geometry crosses it;
+- Graphic/geometry boundary data is available and no Join decoration Graphic or geometry crosses the fixed action boundary `y=876`;
+- `SimulationInvite` is absent;
+- `OutlineBottom` is absent;
+- accepted `home-join-action` passes at `(1154,876,717,99)` with unchanged icon/label content;
+- required repeated Sprite inventory and approved provenance pass.
+
+The placeholder was independently measured inside the `717×280` crop. Final actual bounds are `(272,220,166,27)` versus normalized Figure 9 `(271,221,168,25)`: center delta `(0,0)`, edge deltas left `+1`, top `-1`, right `-1`, bottom `+1`, and size delta `(-2,+2)`. The baked search icon is `(130,217,30,35)` and placeholder text starts at `x=272`, leaving `112 px` of clear horizontal space; the text is centered and does not overlap the icon.
+
+### Bounded-cycle history
+
+1. `Cycle-1`: build/capture produced five valid Player screenshots, but the real manifest lacked the explicit coordinate/raycast schema assumed by the synthetic fixture. Export failed before output (`spriteName` property mismatch); `Cycle-1/VisualDiff` is absent. Cycle 1 is preserved as invalid schema evidence, not visual acceptance.
+2. `Cycle-2`: numeric build exit `0`, visible Player exit `0`, and five captures succeeded. The first `Cycle-2/VisualDiff` report failed because fixed-reference detector thresholds made `logo`, `text-02`, `block-bank`, and `input` unavailable. After the detector-only correction, `Cycle-2/VisualDiff-DetectorFix-R2` made all seven rows measurable, but `triangle` and `block-bank` still failed their unchanged tolerances; manual Join acceptance remained failed.
+3. `Cycle-3`: the final allowed geometry correction changed only the measured triangle and outer block placement. `Cycle-3/VisualDiff` passed all seven rows and every structural gate, but manual inspection retained a placeholder horizontal-position/font-size caveat. No fourth calibration cycle was run.
+4. `Verification-Final`: after the focused placeholder-only correction at `24806571`, a fresh build, visible Player, five captures, manifest, exporter, manual inspection, and placeholder measurement passed. This is the final evidence root; it is post-correction verification, not a fourth calibration cycle.
+
+### Complete final bitmap material table
+
+The final report contains `36` bitmap rows, `36` active Unity Text rows, and `8` code-native geometry rows. Every bitmap row below has a nonempty Resources path, approved source path, uppercase 64-hex imported SHA-256, capture list, and positive rendered occurrence count.
+
+| Sprite | Resources path | Approved source | Imported SHA-256 | Captures | Occurrences |
+| --- | --- | --- | --- | --- | ---: |
+| `bg_terrain` | `UI/Lobby/bg_terrain` | `[uc]autochessouter/bg_terrain.png` | `ECE7B6159268276287C20E3B3A82A5165BCC1D344EDFA6DE3B88EE24A76F988C` | `discovered-prefill, home, room-full, room-host, room-ready` | 5 |
+| `btn_match_cancel` | `UI/Lobby/btn_match_cancel` | `[uc]autochessouter/btn_match_cancel.png` | `6DA0D4FD99A7A3595F5FE3C79ABA99A1F41006A4114E7555D324E059419A97B3` | `room-full, room-host, room-ready` | 3 |
+| `btn_match_grey` | `UI/Lobby/btn_match_grey` | `[uc]autochessouter/btn_match_grey.png` | `E774CB0533EB67BD2FE45F50339E36D0A6221BAF594E6AEE5E5C256469A4BA78` | `discovered-prefill, home, room-full, room-host, room-ready` | 7 |
+| `btn_match_host_grey` | `UI/Lobby/btn_match_host_grey` | `[uc]autochessouter/btn_match_host_grey.png` | `C4CD3326EA4D04777AAA540525405DF8AA217D2E972443FDE95C202333F93614` | `room-full, room-host, room-ready` | 3 |
+| `create_icon` | `UI/Lobby/create_icon` | `[uc]autochessouter/create_icon.png` | `AE047958EE4E7D43F368D3205110307200D30F79BCF393B36CBBDE37A8A00BA7` | `discovered-prefill, home` | 2 |
+| `doc_frame_line` | `UI/Lobby/Home/doc_frame_line` | `[uc]autochessouter/doc_frame_line.png` | `4E4D96093514340112A0799D61611A65DA41153ACBD21F271184E0C0BB311C97` | `discovered-prefill, home` | 14 |
+| `icon_amiy` | `UI/Lobby/Home/icon_amiy` | `Combined/[uc]autochesscommon/icon_amiy.png` | `14D5F8D3A8026751B511942517B9815BA3E04438857FEA649EF8A8A02B64868B` | `discovered-prefill, home` | 2 |
+| `img_player_bkg` | `UI/Lobby/img_player_bkg` | `[uc]autochessouter/img_player_bkg.png` | `CB940ECA5FE84527D9AD4546C617120A90F94CD88663F98C66261EE60D45185A` | `discovered-prefill, home` | 4 |
+| `img_pointer` | `UI/Lobby/Home/img_pointer` | `[uc]autochessouter/img_pointer.png` | `3CD944DC7F0F3B7DE675E8BBE23EEA9640D95DE65B4B2E91F14648385284F697` | `discovered-prefill, home` | 8 |
+| `join_icon` | `UI/Lobby/join_icon` | `[uc]autochessouter/join_icon.png` | `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09` | `discovered-prefill, home` | 2 |
+| `player_card_ready` | `UI/Lobby/player_card_ready` | `[uc]autochessouter/player_card_ready.png` | `F34786A3E832E97121EB03614B6D584C871B78E4C5CDD1FA6C5F9CB7D191A4C0` | `room-full, room-ready` | 4 |
+| `player_card_waiting` | `UI/Lobby/player_card_waiting` | `[uc]autochessouter/player_card_waiting.png` | `3B87EBB1DD62B7A8BD4D525F7F2E7E4358F2F1C0B04A65997BA34E79E97F0C8C` | `discovered-prefill, room-full, room-host, room-ready` | 9 |
+| `room_create_btn_bg` | `UI/Lobby/room_create_btn_bg` | `[uc]autochessouter/room_create_btn_bg.png` | `2782FDCBE671CDD760FF46FD2B3A83CEB3F6396BC44FF48673220C8B21521606` | `discovered-prefill, home` | 2 |
+| `room_select_create_btn_bg_down` | `UI/Lobby/Home/room_select_create_btn_bg_down` | `[uc]autochessouter/room_select_create_btn_bg_down.png` | `8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149` | `discovered-prefill, home` | 2 |
+| `room_select_create_left_line` | `UI/Lobby/Home/room_select_create_left_line` | `[uc]autochessouter/room_select_create_left_line.png` | `4893EDC89BF8D9DFE3914673B0446D764D0663327579DAE19744E17C74296CA4` | `discovered-prefill, home` | 4 |
+| `room_select_create_middleicon` | `UI/Lobby/Home/room_select_create_middleicon` | `[uc]autochessouter/room_select_create_middleicon.png` | `F728D411AA11A67775AA2A3CBBB1CBED665B914E1BE645DCCDB6BD34BCE288C2` | `discovered-prefill, home` | 2 |
+| `room_select_create_text_01` | `UI/Lobby/Home/room_select_create_text_01` | `[uc]autochessouter/room_select_create_text_01.png` | `52DC9A7C8E48DEC53AAF69D91A6FD0E0AA60483C1EE1412E32A007B8DF2E2D72` | `discovered-prefill, home` | 2 |
+| `room_select_create_text_02` | `UI/Lobby/Home/room_select_create_text_02` | `[uc]autochessouter/room_select_create_text_02.png` | `9C87A8FE6DFB72362BA8A84B089B66BC80F01822E2E3C0713396499D93F2CE33` | `discovered-prefill, home` | 2 |
+| `room_select_dot` | `UI/Lobby/Home/room_select_dot` | `[uc]autochessouter/room_select_dot.png` | `056E14212EA8E02D175D03582C4726FABA09AD518E89DB318CD3EF793E996DB0` | `discovered-prefill, home` | 10 |
+| `room_select_img_startroom` | `UI/Lobby/Home/room_select_img_startroom` | `[uc]autochessouter/room_select_img_startroom.png` | `495AA8F2BD5CD97EE12192DACC2CFD8A15731F0E131F9CD74F936B92A49E7E02` | `discovered-prefill, home` | 2 |
+| `room_select_join_ban` | `UI/Lobby/Home/room_select_join_ban` | `[uc]autochessouter/room_select_join_ban.png` | `F1ACA192CCCD6399884810A52CDC15E733C415E83579325779E67EB700EB052E` | `discovered-prefill, home` | 8 |
+| `room_select_join_blank` | `UI/Lobby/Home/room_select_join_blank` | `[uc]autochessouter/room_select_join_blank.png` | `099A060B78BCA5E39CA82E9747C94BFBC011868DE4AC18CB11C9149BC99AA2CD` | `discovered-prefill, home` | 2 |
+| `room_select_join_btn_bg_down` | `UI/Lobby/Home/room_select_join_btn_bg_down` | `[uc]autochessouter/room_select_join_btn_bg_down.png` | `71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468` | `discovered-prefill, home` | 2 |
+| `room_select_join_left_block` | `UI/Lobby/Home/room_select_join_left_block` | `[uc]autochessouter/room_select_join_left_block.png` | `1D10B384025DCF05972D7AEAFDF438FD88DB9B3B9B829DFD541E15103F100D10` | `discovered-prefill, home` | 4 |
+| `room_select_join_logo` | `UI/Lobby/Home/room_select_join_logo` | `[uc]autochessouter/room_select_join_logo.png` | `85FB957F0BC4A5172B0F454F77F6195068484B6DEBBD6DFCEE2A2AD1D5D93B59` | `discovered-prefill, home` | 2 |
+| `room_select_join_middle_block` | `UI/Lobby/Home/room_select_join_middle_block` | `[uc]autochessouter/room_select_join_middle_block.png` | `997CF5A781848535654D21D9B97D6105DA07F959AECB134DF1FB2F570E9861CA` | `discovered-prefill, home` | 8 |
+| `room_select_join_middle_block_mask` | `UI/Lobby/Home/room_select_join_middle_block_mask` | `[uc]autochessouter/room_select_join_middle_block_mask.png` | `95D0FAAF36EEF6681486944D95AB3F453DB0D9B70F23CD2E0DE12F57E2609EC5` | `discovered-prefill, home` | 2 |
+| `room_select_join_right_block` | `UI/Lobby/Home/room_select_join_right_block` | `[uc]autochessouter/room_select_join_right_block.png` | `11C872C6DE561E4409085E958D1CDEFA7647E9EEC5883ED91E45162B2B9FE6B8` | `discovered-prefill, home` | 4 |
+| `room_select_join_text_01` | `UI/Lobby/Home/room_select_join_text_01` | `[uc]autochessouter/room_select_join_text_01.png` | `F09FD74598C6EEF1066FB53CDA294681FAEA469981B6F215B7E7DD674E63CC39` | `discovered-prefill, home` | 2 |
+| `room_select_join_text_02` | `UI/Lobby/Home/room_select_join_text_02` | `[uc]autochessouter/room_select_join_text_02.png` | `F9DCC617D9BB74218E1554939A0897F39516B7965D9400EAD6CCB2DE85E19DD0` | `discovered-prefill, home` | 2 |
+| `room_select_join_text_bg` | `UI/Lobby/Home/room_select_join_text_bg` | `[uc]autochessouter/room_select_join_text_bg.png` | `36260875697359E27930467D123D2B684A2DE51D2448A5B295885D06AA518472` | `discovered-prefill, home` | 2 |
+| `room_select_join_triangle` | `UI/Lobby/Home/room_select_join_triangle` | `[uc]autochessouter/room_select_join_triangle.png` | `BA585545BC5EF8F6CC126BBFDE59F63A1C75D4B761646A22CCFEA195CB9B7FF7` | `discovered-prefill, home` | 2 |
+| `room_select_right_bg` | `UI/Lobby/Home/room_select_right_bg` | `[uc]autochessouter/room_select_right_bg.png` | `F65BE15390749F0FA175B49C310E90E9F3A29C753F2D320068B0831A5EBFDE53` | `discovered-prefill, home` | 2 |
+| `room_select_title_icon` | `UI/Lobby/Home/room_select_title_icon` | `[uc]autochessouter/room_select_title_icon.png` | `7C0E9E67D349013FC49DBAF33E1F462C0DF4171B1C6681DB50517629B4BDFF6C` | `discovered-prefill, home` | 2 |
+| `shallow_main` | `UI/Lobby/shallow_main` | `[uc]autochessouter/shallow_main.png` | `054110DDEE56F1D19FAFA846D821E6CBD83D47BEB70D4C399A84DA4035A11945` | `room-full, room-host, room-ready` | 3 |
+| `team_icon_frame` | `UI/Lobby/team_icon_frame` | `[uc]autochessouter/team_icon_frame.png` | `B05BFEAE52C1E54E9382936F653E291D118A976DA0B1AA6DE14720FC9CCC4380` | `discovered-prefill, home, room-full, room-host, room-ready` | 14 |
+
+No bitmap source path contains `$0`, `#0`, `atlas`, or `derived`. All direct UI bitmaps map to approved non-`$0` `[uc]autochessouter` files; the only Combined row is the approved avatar `Combined/[uc]autochesscommon/icon_amiy.png`. No Join atlas entry, generated bitmap, derived bitmap, or precomposited Join image was introduced.
+
+The exact aggregate Join Sprite occurrence counts are:
+
+| Sprite | Occurrences | Captures |
+| --- | ---: | --- |
+| `join_icon` | 2 | `discovered-prefill, home` |
+| `room_select_join_ban` | 8 | `discovered-prefill, home` |
+| `room_select_join_blank` | 2 | `discovered-prefill, home` |
+| `room_select_join_btn_bg_down` | 2 | `discovered-prefill, home` |
+| `room_select_join_left_block` | 4 | `discovered-prefill, home` |
+| `room_select_join_logo` | 2 | `discovered-prefill, home` |
+| `room_select_join_middle_block` | 8 | `discovered-prefill, home` |
+| `room_select_join_middle_block_mask` | 2 | `discovered-prefill, home` |
+| `room_select_join_right_block` | 4 | `discovered-prefill, home` |
+| `room_select_join_text_01` | 2 | `discovered-prefill, home` |
+| `room_select_join_text_02` | 2 | `discovered-prefill, home` |
+| `room_select_join_text_bg` | 2 | `discovered-prefill, home` |
+| `room_select_join_triangle` | 2 | `discovered-prefill, home` |
+
+Each Home state therefore has exactly one Join action icon; the removed Simulation Invite no longer contributes a second icon.
+
+### Code-native geometry
+
+The final material report contains these eight sprite-null geometry groups:
+
+| Name | Kind | `isBitmap` | Color | Captures | Occurrences |
+| --- | --- | --- | --- | --- | ---: |
+| `LanLobbyRoot/OpaqueBlocker` | `code-native-geometry` | `false` | `#060F14FF` | all five | 5 |
+| `LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking` | `code-native-geometry` | `false` | `#000000C7` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking` | `code-native-geometry` | `false` | `#000000D1` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/OutlineTop` | `code-native-geometry` | `false` | `#3030308C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft` | `code-native-geometry` | `false` | `#3030308C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/OutlineRight` | `code-native-geometry` | `false` | `#3030308C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal` | `code-native-geometry` | `false` | `#FFA5008C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/GuideVertical` | `code-native-geometry` | `false` | `#FFA5008C` | `discovered-prefill, home` | 2 |
+
+For each `home` and `discovered-prefill` manifest record, the six Join rows are exactly the backing, three outlines, and two guides above. They have `kind=code-native-geometry`, `isBitmap=false`, `raycastTarget=false`, no `spriteName`, explicit `screen-bottom-left`/`px` geometry, and remain separate from bitmap provenance.
+
+### Final regression and Create invariance
+
+- Focused XML and matching summaries: Layout `6/6`, View `16/16`, Capture `3/3`, Controller `3/3`; aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`.
+- `scripts/TestLanLobbyVisualDiffSmoke.ps1`, `scripts/TestExportLanLobbyEvidenceSmoke.ps1`, and `scripts/TestLanLobbyEvidenceCommonSmoke.ps1` each printed `PASS` and exited `0`.
+- Final report audit printed `FINAL MANIFEST/REPORT AUDIT: PASS`, with `captures=5`, `joinVisualRows=7/7`, `bitmapRows=36`, `joinGeometryRowsPerHome=6`, `homeGeometryRows=8`, and `discoveredGeometryRows=8`.
+- The final and Cycle 3 `home-create-frame-actual.png` files are both `155035` bytes and share SHA-256 `AB0565B99828ED3BDB8E210445BFB1C9458727A03049D303D9EF46DCA8E38FD1`.
+- A full-screen Cycle 3/final comparison found `4020` changed pixels, all within input rectangle `(1269,800,482,60)`; `OutsideInputExclusion=0`. Thus the placeholder correction did not change Create or either accepted action bar.
+- This pixel identity is an invariance check only. The historical Create report still has `createFrame.passed=false` because its top continuity/contrast and right contrast failed; this Join task does not claim those Create gates were fixed.
+
+The same-Wi-Fi Windows/Android two-device flow remains manually unverified as recorded above. The final Player evidence proves the production UI/capture/build path and preserved LAN-facing events, but it does not substitute for the physical-device discovery/join/readiness/start/disconnect procedure.

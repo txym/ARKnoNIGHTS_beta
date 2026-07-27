@@ -513,22 +513,22 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 6. Open and inspect `CapturesFinal/home.png`, `CapturesFinal/discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `VisualDiff/home-join-action-overlay.png`. The retained run has no Status/discovered-room overlay on Join. Local Create/Join difference ratios `0.536508741529662` and `0.45764478818872123` remain non-blocking, and other decoration placement remains outside this iteration's acceptance.
 7. Run `scripts/TestLanLobbyVisualDiffSmoke.ps1`, `scripts/TestExportLanLobbyEvidenceSmoke.ps1`, `git diff --check`, `git status --short`, and `git ls-files 'Artifacts/*' 'Temp/*'`. The smoke scripts must exit `0`; generated evidence must stay ignored and untracked.
 
-## Home room-select evidence-derived manifest verification (current authoritative, 2026-07-26)
+## Home room-select evidence-derived manifest verification (historical; superseded for Join, 2026-07-26)
 
-1. Current proof is limited to the persistent test root `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and the retained build/capture/report root `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/`. Run the four suites sequentially with the same Unity/project/filter contract as above. Retained results are Layout `6/6/0/0` (`forced-stop-after-results`, valid XML, grace `20s`), View `14/14/0/0`, Capture `3/3/0/0`, and Controller `3/3/0/0` (the latter three normal exits), for `26/26` total.
-2. `LanLobbyCaptureSuitePlayModeTests` must require each active rendered Sprite instance to have a stable node/source row, both Home captures to contain two `join_icon` instances, each capture to contain dynamic active Unity Text rows with runtime font name and explicit no-bitmap-source fields, and both action Rects to declare `screen-bottom-left`/`px`.
+1. This historical proof is limited to the persistent test root `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and the retained build/capture/report root `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/`. Its Layout `6/6/0/0`, View `14/14/0/0`, Capture `3/3/0/0`, Controller `3/3/0/0`, aggregate `26/26` results describe the pre-reconstruction Join hierarchy; they are not the current Join acceptance record.
+2. In this historical run, `LanLobbyCaptureSuitePlayModeTests` required each active rendered Sprite instance to have a stable node/source row and each Home capture to contain two `join_icon` instances because `SimulationInvite` still existed. That inventory is superseded; the current Join contract requires one `join_icon` per Home state. The historical run also required dynamic active Unity Text rows with runtime font name/explicit no-bitmap-source fields and both action Rects to declare `screen-bottom-left`/`px`.
 3. Build to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/WindowsStandalone/ARKnoNIGHTS.exe` with `Task006StandaloneBuild.BuildWindowsX64`. Retain `WindowsStandaloneBuild.log`; the current BuildReport is `Succeeded`, `errors=0`, `warnings=1`, with only the existing `TagRegistry.freezeAppend` CS0414 warning.
 4. Start that Player visibly with D3D11 at `1920x1080`, output to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/CapturesFinal/`, and retain `PlayerCapture.log`. Require exit `0`, completion count `5`, five decodeable non-empty PNGs, and BOM-less UTF-8 manifest parsing without fallback or transcoding.
 5. Before creating output, the visual exporter must reject each table-driven Home Create action Rect case independently: missing, duplicated, non-numeric `x`, wrong `coordinateOrigin`, wrong `unit`, zero width, zero height, and out-of-bounds. Every case copies the valid fixture into its own capture directory, rewrites every capture path, and proves the requested output directory remains absent after failure. Convert the captured bottom-left Rect to `1920x1080` top-left coordinates. The report must distinguish the approved/local-reference target size (`717x99`) from `comparisonReferenceSizePx`; compute position as actual top-left minus target and size as actual minus the `717x99` local-reference target.
 6. The smoke fixture must use a non-zero Create actual delta and assert both JSON and Markdown values exactly; the fixture expects actual `(1161,449,711,95)`, position `(+7,-4)`, local target `717x99`, comparison `711x95`, and size `(-6,-4)`. Join remains zero. `TestLanLobbyVisualDiffSmoke.ps1` must preserve its existing staging/reference-file/decoded-size/non-zero-delta checks and prove a BOM-less UTF-8 manifest with Chinese text parses correctly.
 7. Export the real capture to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/VisualDiff/` using the explicit read-only Figure 9/10 directory. Require real Create/Join actual/target Rects `(1154,453,717,99)` and `(1154,876,717,99)`, zero position/size deltas, explicit local/comparison sizes `717x99`, and local ratios `0.53635377484749869` / `0.45760252454813122`.
-8. Require material categories from capture/asset audit data: 128 Sprite instances aggregated to 34 `bitmapSprites` rows, 59 active Text instances aggregated to 37 `unityText` rows, and six `codeGeneratedGeometry` rows. `join_icon` must total four occurrences across Home states; no forbidden Unpacked `$0`/`#0` source is allowed.
+8. Historical capture/asset totals were 128 Sprite instances aggregated to 34 `bitmapSprites` rows, 59 active Text instances aggregated to 37 `unityText` rows, and six `codeGeneratedGeometry` rows. Historical `join_icon` totalled four only because `SimulationInvite` still rendered; the current total is two. No forbidden Unpacked `$0`/`#0` source was allowed.
 9. Open `CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`; confirm the bars are unobstructed and both captured/reference contours are visible. Other decoration placement and non-blocking difference metrics remain outside visual acceptance.
 10. Run `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, `TestLanLobbyEvidenceCommonSmoke.ps1`, `git diff --check`, `git status --short`, and `git ls-files 'Artifacts/*' 'Temp/*'`. Generated evidence must remain ignored and untracked.
 
-## Home action-content visual-center verification (current authoritative, 2026-07-26)
+## Home action-content visual-center verification (historical action baseline; superseded for Join, 2026-07-26)
 
-1. Current focused test proof is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Verification-Final-20260726-183809/`. Run sequentially with Unity `D:\2022.3.62f1c1\Editor\Unity.exe` and project `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`:
+1. Historical focused test proof is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Verification-Final-20260726-183809/`. It was run sequentially with Unity `D:\2022.3.62f1c1\Editor\Unity.exe` and project `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`:
    - EditMode `ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests`: `6/6/0/0`, `result=Passed`; valid XML was retained before forced shutdown after the 20-second grace period.
    - PlayMode `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests`: `14/14/0/0`, `result=Passed`, normal exit.
    - PlayMode `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests`: `3/3/0/0`, `result=Passed`, normal exit.
@@ -581,3 +581,91 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 3. The only Create code-native backing is `LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking`: `code-native-geometry`, `isBitmap=false`, no Sprite/custom material/raycast, color `#000000C7`, and `(1179,620,666,224)` in both Home manifest records.
 4. The open-frame report must expose `createFrame.actualRect`, `referenceRect`, `edges`, `bottomBoundary`, and overall `passed`. Cycle 2 rows are: top `2973/0.9625/gap 16/contrast 15.31 of 18` failed; left `2772/1/gap 0/20.24 of 18` passed; right `2207/1/gap 0/12.30 of 18` failed; top-left joint `496/1/gap 0/22.77 of 18` passed; top-right joint `228/0.7857/gap 3/20.51 of 18` passed. Therefore `createFrame.passed=false` and the final visual acceptance is **FAILED**.
 5. Read final retained evidence directly: `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/Layout/EditModeResults.xml` `6/6/0/0`, `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/View/PlayModeResults.xml` `14/14/0/0`, `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/Capture/PlayModeResults.xml` `3/3/0/0`, and `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/Controller/PlayModeResults.xml` `3/3/0/0`, aggregate `26/26/0/0`; each matching `summary.txt` must agree. `WindowsStandaloneBuild-2.log` must record `Succeeded`, `errors=0`, `warnings=0`; Task 3 execution/runner evidence records Player exit `0`, while `PlayerCapture-2.log` itself must contain `[LanLobby][capture.completed] count=5`; `Captures-2` must have five non-empty decodable `1920x1080` PNGs and its manifest. `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, and `TestLanLobbyEvidenceCommonSmoke.ps1` must print `PASS` and exit `0`. These passing gates do not override the visual-acceptance failure.
+
+## Home Join decoration final verification (current authoritative, 2026-07-27)
+
+This section is the current acceptance procedure and retained evidence for the Figure 9 `加入同盟` upper decoration at commit `24806571adddee9dc48855967fd7b0a3e44ecbb6`. It supersedes earlier Join inventory/count/layout claims, including the historical `join_icon=4`, `SimulationInvite` presence, View `14/14`, and aggregate `26/26` records. It does not supersede or repair the separate Create open-frame result above: that historical Create visual gate remains failed and out of scope for this Join task.
+
+### Focused Unity regression
+
+Run the four suites serially; each output directory must be absent before the run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\Layout' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\View' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\Capture' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\Controller' -TimeoutSeconds 900
+```
+
+Final XML and matching `summary.txt` counts are Layout `6/6/0/0`, View `16/16/0/0`, Capture `3/3/0/0`, and Controller `3/3/0/0`: aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`. Every suite must discover at least one test. Layout, View, and Capture may use the runner's bounded `forced-stop-after-results` only after complete passing XML is written; Controller must retain its actual normal-exit result. Logs must contain no `error CS*`, `Compilation failed`, `Scripts have compiler errors`, `Aborting batchmode due to failure`, `Unhandled Exception`, or `Fatal Error`.
+
+### Evidence smokes
+
+Run exactly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyVisualDiffSmoke.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestExportLanLobbyEvidenceSmoke.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyEvidenceCommonSmoke.ps1
+```
+
+All three must exit `0` and print, respectively, `LAN lobby visual-diff smoke: PASS`, `Export LAN lobby evidence smoke: PASS`, and `LAN lobby evidence common smoke: PASS`.
+
+### Join crop, targets, and blocking gates
+
+- Native Figure 9 crop: `(1257,635,763,297)` on the decoded `2102×1149` reference.
+- Normalized Player crop and backing target: `(1154,596,717,280)` in `1920×1080` top-left screen pixels.
+- Accepted Join action target: `(1154,876,717,99)`; the crop/backing bottom and action top are both `y=876`.
+- Component coordinates below are local to the `717×280` Join crop. The tolerance applies independently to center X/Y and width/height deltas after the report's recorded symmetric decoded-pixel adjustment. Measurement must be available; an unavailable row fails.
+
+| Row | Expected crop-local visible bounds | Tolerance |
+| --- | --- | ---: |
+| `logo` | `(91,64,118,20)` | `2 px` |
+| `text-01` | `(391,56,65,8)` | `2 px` |
+| `text-02` | `(526,62,89,11)` | `2 px` |
+| `triangle` | `(338,47,30,17)` | `2 px` |
+| `central-blank` | `(323,68,60,61)` | `2 px` |
+| `block-bank` | `(45,107,639,89)` | `4 px` |
+| `input` | `(115,204,482,60)` | `2 px` |
+
+`joinDecoration.passed` is blocking and requires all seven rows plus all structural gates: backing position/size within `1 px`; no Join geometry below its backing; no Join decoration Graphic or geometry crossing `y=876`; boundary data available; `SimulationInvite` absent; `OutlineBottom` absent; accepted `home-join-action` content/action pass; exact repeated Sprite inventory and approved provenance pass. Full-image difference metrics remain informational and do not replace these named gates.
+
+The placeholder is additionally measured inside crop search `x=200..550,y=205..263` using neutral pixels with channel spread `<=12` and mean luminance `>=120`. The final Player must produce actual `(272,220,166,27)` against normalized Figure 9 `(271,221,168,25)`, center delta `(0,0)`, size delta `(-2,+2)`, and no overlap with the baked input icon.
+
+### Bounded calibration history and stopping rule
+
+At most three calibration cycles are allowed; no fourth calibration cycle may be used to hide a failure.
+
+1. `Cycle-1` retained five valid Player captures, but its legacy manifest lacked the explicit Sprite/geometry coordinate schema. Export failed before output with the real/synthetic schema mismatch; `Cycle-1\VisualDiff` is absent and Cycle 1 is not acceptance evidence.
+2. `Cycle-2` retained a successful build and Player capture. Its first report exposed decoded-pixel detector defects and failed; after the detector fix, `Cycle-2\VisualDiff-DetectorFix-R2` made all seven rows measurable but `triangle` and `block-bank` still failed unchanged tolerances.
+3. `Cycle-3` applied only the measured triangle/end-block geometry correction. `Cycle-3\VisualDiff` passed all seven rows and structural gates, but manual inspection retained a placeholder position/font-size caveat. The later placeholder-only correction was verified by a fresh final regression/build/visible Player at `24806571`; `Verification-Final` is post-correction verification, not a fourth calibration cycle.
+
+### Final retained build, Player, and visual evidence
+
+Build with `Task006StandaloneBuild.BuildWindowsX64` to:
+
+`Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/WindowsStandalone/ARKnoNIGHTS.exe`
+
+Require numeric Unity exit `0`, `BuildReport result=Succeeded`, `errors=0`, and `warnings=0`. Launch that Player visibly (no `-batchmode`, hidden window, or service) with D3D11 at `1920×1080` and output to:
+
+`Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures`
+
+Require Player exit `0`, a nonzero visible window handle in the interactive session, `[LanLobby][capture.completed] count=5`, five non-empty decodable `1920×1080` PNGs, and a BOM-less five-record `manifest.json`.
+
+Export once to the initially absent:
+
+`Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff`
+
+Retain and inspect:
+
+- `Player/WindowsStandaloneBuild.log`;
+- `Player/PlayerCapture.log`;
+- `Player/Captures/{home,discovered-prefill,room-host,room-ready,room-full}.png`;
+- `Player/Captures/manifest.json`;
+- `VisualDiff/visual-diff-report.json`;
+- `VisualDiff/visual-diff-report.md`;
+- `VisualDiff/home-join-decoration-{actual,reference,overlay,heatmap}.png`.
+
+The final manifest/report audit must require five captures; one `join_icon` per Home state and `2` aggregate; two left/four middle/two right block instances per Home state; one mask, one blank, four bans, one triangle, one logo, two header texts, and one input background per Home state; six Join code-native, sprite-null, non-raycast geometry rows per Home state; no `SimulationInvite`, `OutlineBottom`, `$0`, `#0`, atlas, or derived source; and a Resources path, approved source, uppercase SHA-256, capture list, and positive occurrence count for every bitmap row.
+
+Final manual verification must open the two Home screenshots and all four Join crop images. It must confirm the accepted Join action remains visible/unobstructed, discovered room `654321` is prefilled without joining, the centered placeholder clears the baked icon, and the intended visual delta is confined to the input rectangle. The final Create crop may be compared to Cycle 3 to prove this Join correction did not alter Create; that invariance does **not** convert the separate historical `createFrame.passed=false` into a pass.
