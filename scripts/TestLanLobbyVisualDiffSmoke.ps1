@@ -217,6 +217,9 @@ function Fill-RoomEvidenceFixture(
     $cyan = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 0, 220, 220))
     $gray = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 105, 105, 105))
     $light = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 235))
+    $dark = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 24, 24, 24))
+    $mutedLight = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 155, 155, 155))
+    $creatorCyan = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 9, 187, 151))
     function Fill-Normalized($Brush, [double] $X, [double] $Y, [double] $Width, [double] $Height)
     {
         $Graphics.FillRectangle(
@@ -248,8 +251,9 @@ function Fill-RoomEvidenceFixture(
             Fill-Contour $stateBrush $bodyX $bodyY 320.25 545.25
             if ($isReady)
             {
-                Fill-Normalized $light ($bodyX + 138) ($bodyY + 235) 32 26
-                Fill-Normalized $light ($bodyX + 110) ($bodyY + 280) 88 18
+                Fill-Normalized $cyan $bodyX 630 320.25 85
+                Fill-Contour $dark ($bodyX + 88) 660 38 37
+                Fill-Contour $dark ($bodyX + 144) 664 92 29
             }
             elseif ($isWaiting)
             {
@@ -262,18 +266,29 @@ function Fill-RoomEvidenceFixture(
                 Fill-Normalized $light ($bodyX + 117) ($bodyY + 295) 86 20
             }
         }
-        Fill-Normalized $light 245 745 84 24
+        Fill-Normalized $creatorCyan 318 231 124 35
         $primaryBrush = if ($State -eq 'room-full') { $gray } else { $cyan }
         Fill-Normalized $primaryBrush 1487.25 942.75 432 94.5
-        Fill-Normalized $light 1525 970 38 38
-        Fill-Normalized $light 1600 978 116 22
-        Fill-Normalized $light 43.5 30 118 52.5
+        if ($State -eq 'room-full')
+        {
+            Fill-Normalized $mutedLight 1571 964 63 52
+            Fill-Normalized $mutedLight 1650 970 153 36
+        }
+        else
+        {
+            Fill-Contour $dark 1573 964 62 52
+            Fill-Contour $dark 1652 971 140 35
+        }
+        Fill-Normalized $light 65 39 35 24
     }
     finally
     {
         $cyan.Dispose()
         $gray.Dispose()
         $light.Dispose()
+        $dark.Dispose()
+        $mutedLight.Dispose()
+        $creatorCyan.Dispose()
     }
 }
 
@@ -558,8 +573,8 @@ function Scramble-JoinBlockInternalTopologyFixture([string] $Path)
 function Mutate-RoomVisibleThresholdFixture([string] $CaptureDirectory)
 {
     $black = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
-    $light = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 235))
     $cyan = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 0, 220, 220))
+    $dark = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 24, 24, 24))
     $gray = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 105, 105, 105))
     try
     {
@@ -572,10 +587,16 @@ function Mutate-RoomVisibleThresholdFixture([string] $CaptureDirectory)
         {
             # Keep diagnostic RectTransform data untouched while moving the rendered
             # check pixels +3 px and widening the rendered ready label by +4 px.
-            $graphics.FillRectangle($black, 363, 412, 34, 28)
-            $graphics.FillRectangle($light, 367, 413, 32, 26)
-            $graphics.FillRectangle($black, 335, 457, 94, 20)
-            $graphics.FillRectangle($light, 336, 458, 92, 18)
+            $graphics.FillRectangle($cyan, 314, 660, 41, 37)
+            $graphics.FillRectangle($dark, 317, 660, 38, 5)
+            $graphics.FillRectangle($dark, 317, 692, 38, 5)
+            $graphics.FillRectangle($dark, 317, 665, 5, 27)
+            $graphics.FillRectangle($dark, 350, 665, 5, 27)
+            $graphics.FillRectangle($cyan, 370, 664, 96, 29)
+            $graphics.FillRectangle($dark, 370, 664, 96, 5)
+            $graphics.FillRectangle($dark, 370, 688, 96, 5)
+            $graphics.FillRectangle($dark, 370, 669, 5, 19)
+            $graphics.FillRectangle($dark, 461, 669, 5, 19)
             $hostBitmap.Save($hostPath, [Drawing.Imaging.ImageFormat]::Png)
         }
         finally { $graphics.Dispose(); $hostBitmap.Dispose() }
@@ -615,8 +636,8 @@ function Mutate-RoomVisibleThresholdFixture([string] $CaptureDirectory)
     finally
     {
         $black.Dispose()
-        $light.Dispose()
         $cyan.Dispose()
+        $dark.Dispose()
         $gray.Dispose()
     }
 }
@@ -739,7 +760,7 @@ try
 
     $names = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full')
     $roomSpriteSha = @{}
-    foreach ($spriteName in @('bg_terrain','player_card_ready','btn_match_normal','btn_match_grey','btn_topmenu_back','icon_amiy'))
+    foreach ($spriteName in @('bg_terrain','player_card_ready','host_top_tag','btn_match_normal','btn_match_grey','btn_topmenu_back','icon_amiy'))
     {
         $relative = if ($spriteName -eq 'icon_amiy') { "Assets/Resources/UI/Lobby/Home/$spriteName.png" } else { "Assets/Resources/UI/Lobby/$spriteName.png" }
         $roomSpriteSha[$spriteName] = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $projectRoot $relative)).Hash
@@ -813,7 +834,8 @@ try
             $primarySprite = if ($name -eq 'room-full') { 'btn_match_grey' } else { 'btn_match_normal' }
             @(
                 [ordered]@{ node='LanLobbyRoot/Terrain';spriteName='bg_terrain';sourcePath='[uc]autochessouter/bg_terrain.png';coordinateOrigin='screen-bottom-left';unit='px';x=0;y=0;width=1920;height=1080;raycastTarget=$false },
-                [ordered]@{ node='LanLobbyRoot/Room/RoomCard_0/OccupiedContent/ReadyIcon';spriteName='player_card_ready';sourcePath='[uc]autochessouter/player_card_ready.png';coordinateOrigin='screen-bottom-left';unit='px';x=354;y=629;width=54;height=48;raycastTarget=$false },
+                [ordered]@{ node='LanLobbyRoot/Room/RoomCard_0/OccupiedContent/ReadyIcon';spriteName='player_card_ready';sourcePath='[uc]autochessouter/player_card_ready.png';coordinateOrigin='screen-bottom-left';unit='px';x=314;y=383;width=38;height=37;raycastTarget=$false },
+                [ordered]@{ node='LanLobbyRoot/Room/RoomCard_0/CreatorTag';spriteName='host_top_tag';sourcePath='[uc]autochessouter/host_top_tag.png';coordinateOrigin='screen-bottom-left';unit='px';x=318;y=814;width=124;height=35;raycastTarget=$false },
                 [ordered]@{ node='LanLobbyRoot/Room/PrimaryAction';spriteName=$primarySprite;sourcePath="[uc]autochessouter/$primarySprite.png";coordinateOrigin='screen-bottom-left';unit='px';x=1479;y=41;width=441;height=104;raycastTarget=$true },
                 [ordered]@{ node='LanLobbyRoot/Room/LeaveAction';spriteName='btn_topmenu_back';sourcePath='[uc]autochessouter/btn_topmenu_back.png';coordinateOrigin='screen-bottom-left';unit='px';x=36;y=989;width=134;height=69;raycastTarget=$true }
             )
@@ -1268,6 +1290,20 @@ try
         Assert-True (($profileGate.status -ceq 'Passed') -and $profileGate.structuredAbsencePassed) "$($profileGate.name) must pass from the exact host-slot whitelist"
         Assert-True ((@($profileGate.thresholds.allowedHostSprites).Count -eq 6) -and (@($profileGate.thresholds.allowedHostText).Count -eq 1)) "$($profileGate.name) must publish the exact allowed host Sprite/text whitelist"
     }
+    foreach ($gate in @($report.roomGates | Where-Object { $_.name -like '*.ReadyCheck' -or $_.name -like '*.ReadyLabel' }))
+    {
+        Assert-True ($gate.maskKind -ceq 'DarkOnCyan') "$($gate.name) must measure dark foreground only when locally supported by the ready-cyan lower panel"
+        Assert-True (([int]$gate.roi.y -ge 645) -and ([int]$gate.roi.y -lt 665)) "$($gate.name) ROI must cover the authoritative y=660..700 visible target"
+    }
+    foreach ($gate in @($report.roomGates | Where-Object name -like '*.CreatorTag'))
+    {
+        Assert-True ($gate.maskKind -ceq 'CreatorTagCyan') "$($gate.name) must measure the solid creator-tag cyan rather than unrelated light pixels"
+        Assert-True (([int]$gate.roi.y -eq 225) -and ([int]$gate.roi.height -eq 50)) "$($gate.name) ROI must isolate the top creator tag"
+    }
+    Assert-True ((@($report.roomGates | Where-Object { $_.name -like 'RoomFull.PrimaryAction.*Center' -and $_.maskKind -ceq 'MutedLight' })).Count -eq 2) 'RoomFull primary icon and label must use the muted-light foreground detector'
+    Assert-True ((@($report.roomGates | Where-Object { $_.name -like 'RoomReady.PrimaryAction.*Center' -and $_.maskKind -ceq 'DarkOnCyan' })).Count -eq 2) 'RoomReady primary icon and label must use the dark-on-cyan foreground detector'
+    $baselineLeaveGate = @($report.roomGates | Where-Object name -ceq 'RoomReady.Leave')[0]
+    Assert-True (($baselineLeaveGate.maskKind -ceq 'Light') -and ([int]$baselineLeaveGate.roi.width -eq 75)) 'RoomReady Leave must retain the light mask in an arrow-only ROI'
     Assert-True (@($report.roomGates | Where-Object { $_.status -eq 'Passed' -and -not $_.materialEvidence.passed }).Count -eq 0) 'a room gate may not pass material evidence with SHA/occurrence mismatch'
     foreach ($wrongFigure in @($figure12,$figure13))
     {
@@ -1280,7 +1316,7 @@ try
         $wrongRouteReport = Get-Content -Raw -LiteralPath (Join-Path $wrongRouteOutput 'visual-diff-report.json') | ConvertFrom-Json
         Assert-True (@($wrongRouteReport.roomGates | Where-Object { $_.name -like 'RoomHost.*' -and $_.status -eq 'Failed' }).Count -gt 0) "room-host must not pass when the exact Figure 11 filename contains $wrongFigure pixels"
     }
-    foreach ($visibleGate in @($report.roomGates | Where-Object { $_.maskKind -in @('Cyan','Gray','Dark','Light','Contrast') -and $null -ne $_.actualVisibleBounds }))
+    foreach ($visibleGate in @($report.roomGates | Where-Object { $_.maskKind -in @('Cyan','Gray','Dark','DarkOnCyan','Light','Contrast','CreatorTagCyan','MutedLight') -and $null -ne $_.actualVisibleBounds }))
     {
         Assert-True ($null -ne $visibleGate.actualVisibleBounds) "$($visibleGate.name) actual visible bounds"
         Assert-True ($null -ne $visibleGate.referenceVisibleBounds) "$($visibleGate.name) reference visible bounds"
@@ -1629,6 +1665,46 @@ try
     $unchangedRectGate = @($thresholdReport.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyTopBar')[0]
     Assert-True ($unchangedRectGate.status -eq 'Passed') 'diagnostic RectTransform data must not fail unchanged rendered visible pixels'
     Assert-True (($shiftedCheck.diagnosticRectTransform.x -eq $unchangedRectGate.diagnosticRectTransform.x) -and ($shiftedCheck.status -eq 'Failed')) 'visible-pixel movement with unchanged diagnostic RectTransform must fail'
+
+    $detectorColorResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'room-detector-color-contracts' {
+        param($caseManifest,$caseCaptureDirectory)
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-host.png') ([Drawing.Color]::FromArgb(255,0,220,220)) 300 645 65 70
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-host.png') ([Drawing.Color]::FromArgb(255,0,220,220)) 355 645 125 70
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-host.png') ([Drawing.Color]::FromArgb(255,105,105,105)) 315 225 145 50
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-full.png') ([Drawing.Color]::FromArgb(255,105,105,105)) 1555 955 85 70
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-full.png') ([Drawing.Color]::FromArgb(255,105,105,105)) 1640 955 175 75
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-ready.png') ([Drawing.Color]::FromArgb(255,0,220,220)) 1560 955 85 75
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-ready.png') ([Drawing.Color]::FromArgb(255,0,220,220)) 1645 955 150 75
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-ready.png') ([Drawing.Color]::Black) 45 25 75 65
+    }
+    foreach ($gateName in @(
+        'RoomHost.Slot1.ReadyCheck',
+        'RoomHost.Slot1.ReadyLabel',
+        'RoomHost.Slot1.CreatorTag',
+        'RoomFull.PrimaryAction.IconCenter',
+        'RoomFull.PrimaryAction.LabelCenter',
+        'RoomReady.PrimaryAction.IconCenter',
+        'RoomReady.PrimaryAction.LabelCenter',
+        'RoomReady.Leave'))
+    {
+        $detectorGate = @($detectorColorResult.report.roomGates | Where-Object name -ceq $gateName)[0]
+        Assert-True (($detectorGate.status -ceq 'Failed') -and -not $detectorGate.passed) "$gateName must reject a same-geometry wrong-foreground-color mutation"
+    }
+
+    $unsupportedDarkResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'room-dark-without-cyan-support' {
+        param($caseManifest,$caseCaptureDirectory)
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-host.png') ([Drawing.Color]::Black) 294 639 192 82
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-ready.png') ([Drawing.Color]::Black) 1554 949 247 87
+    }
+    foreach ($gateName in @(
+        'RoomHost.Slot1.ReadyCheck',
+        'RoomHost.Slot1.ReadyLabel',
+        'RoomReady.PrimaryAction.IconCenter',
+        'RoomReady.PrimaryAction.LabelCenter'))
+    {
+        $unsupportedGate = @($unsupportedDarkResult.report.roomGates | Where-Object name -ceq $gateName)[0]
+        Assert-True (($unsupportedGate.status -ceq 'Failed') -and -not $unsupportedGate.passed) "$gateName must reject dark pixels without local cyan support"
+    }
 
     $materialCaptureDirectory = Join-Path $scratch 'room-material-mismatch-captures'
     Copy-Item -LiteralPath $captureDirectory -Destination $materialCaptureDirectory -Recurse

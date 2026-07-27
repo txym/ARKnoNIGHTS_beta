@@ -96,6 +96,24 @@ public static class LanLobbyVisualDiff {
         foreach (Rectangle exclusion in exclusions) if (Inside(exclusion,x,y)) return true;
         return false;
     }
+    static bool IsCyanColor(Color pixel) {
+        return pixel.A>0 && pixel.G>=80 && pixel.G>=pixel.R+20 && pixel.B>=pixel.R+10;
+    }
+    static bool HasCyanSupport(Bitmap bitmap, int x, int y, int radius) {
+        int[] dx={-1,1,0,0,-1,-1,1,1};
+        int[] dy={0,0,-1,1,-1,1,-1,1};
+        int supportedDirections=0;
+        for(int direction=0;direction<dx.Length;direction++) {
+            for(int distance=1;distance<=radius;distance++) {
+                int nx=x+dx[direction]*distance,ny=y+dy[direction]*distance;
+                if(nx<0||ny<0||nx>=bitmap.Width||ny>=bitmap.Height) continue;
+                if(!IsCyanColor(bitmap.GetPixel(nx,ny))) continue;
+                supportedDirections++;
+                break;
+            }
+        }
+        return supportedDirections>=4;
+    }
     static bool IsVisibleMask(Bitmap bitmap, int x, int y, string maskKind) {
         Color pixel=bitmap.GetPixel(x,y);
         if(pixel.A==0) return false;
@@ -104,10 +122,14 @@ public static class LanLobbyVisualDiff {
         int spread=maximum-minimum;
         int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
         switch(maskKind) {
-            case "Cyan": return pixel.G>=80 && pixel.G>=pixel.R+20 && pixel.B>=pixel.R+10;
+            case "Cyan": return IsCyanColor(pixel);
             case "Gray": return spread<=18 && luminance>=45 && luminance<=210;
             case "Dark": return luminance<70;
+            case "DarkOnCyan": return luminance<70 && HasCyanSupport(bitmap,x,y,6);
             case "Light": return luminance>=170 && spread<=24;
+            case "CreatorTagCyan":
+                return pixel.R<=40 && pixel.G>=160 && pixel.G<=215 && pixel.B>=120 && pixel.B<=180;
+            case "MutedLight": return spread<=35 && luminance>=115 && luminance<=240;
             case "Contrast": {
                 int maximumDifference=0;
                 int[] dx={-1,1,0,0}; int[] dy={0,0,-1,1};
@@ -919,7 +941,7 @@ function New-LanLobbyRoomGateSpec(
     [string] $Name,
     [string] $Capture,
     $Roi,
-    [ValidateSet('Cyan','Gray','Dark','Light','Contrast')] [string] $MaskKind,
+    [ValidateSet('Cyan','Gray','Dark','DarkOnCyan','Light','Contrast','CreatorTagCyan','MutedLight')] [string] $MaskKind,
     [bool] $IsContour,
     $DiagnosticRectTransform)
 {
@@ -950,9 +972,9 @@ function Get-LanLobbyRoomGateSpecs($Capture)
     {
         $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyTopBar' $captureName @{x=218;y=170;width=337;height=46} 'Cyan' $false $diagnostic
         $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyContour' $captureName @{x=218;y=208;width=337;height=523} 'Cyan' $true $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyCheck' $captureName @{x=354;y=403;width=54;height=48} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyLabel' $captureName @{x=326;y=448;width=110;height=38} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.CreatorTag' $captureName @{x=237;y=737;width=100;height=40} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyCheck' $captureName @{x=305;y=655;width=55;height=45} 'DarkOnCyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyLabel' $captureName @{x=360;y=655;width=110;height=45} 'DarkOnCyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.CreatorTag' $captureName @{x=315;y=225;width=145;height=50} 'CreatorTagCyan' $false $diagnostic
         for ($slot=1;$slot -lt 4;$slot++)
         {
             $root=$roomSlotRoots[$slot]
@@ -963,9 +985,9 @@ function Get-LanLobbyRoomGateSpecs($Capture)
     {
         $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyTopBar' $captureName @{x=218;y=170;width=337;height=46} 'Cyan' $false $diagnostic
         $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyContour' $captureName @{x=218;y=208;width=337;height=523} 'Cyan' $true $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyCheck' $captureName @{x=354;y=403;width=54;height=48} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyLabel' $captureName @{x=326;y=448;width=110;height=38} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.CreatorTag' $captureName @{x=237;y=737;width=100;height=40} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyCheck' $captureName @{x=305;y=655;width=55;height=45} 'DarkOnCyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyLabel' $captureName @{x=360;y=655;width=110;height=45} 'DarkOnCyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.CreatorTag' $captureName @{x=315;y=225;width=145;height=50} 'CreatorTagCyan' $false $diagnostic
         foreach ($slot in @(1,2))
         {
             $root=$roomSlotRoots[$slot]
@@ -977,29 +999,37 @@ function Get-LanLobbyRoomGateSpecs($Capture)
     {
         $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyTopBar' $captureName @{x=218;y=170;width=337;height=46} 'Cyan' $false $diagnostic
         $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyContour' $captureName @{x=218;y=208;width=337;height=523} 'Cyan' $true $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyCheck' $captureName @{x=354;y=403;width=54;height=48} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyLabel' $captureName @{x=326;y=448;width=110;height=38} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.CreatorTag' $captureName @{x=237;y=737;width=100;height=40} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyCheck' $captureName @{x=305;y=655;width=55;height=45} 'DarkOnCyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyLabel' $captureName @{x=360;y=655;width=110;height=45} 'DarkOnCyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.CreatorTag' $captureName @{x=315;y=225;width=145;height=50} 'CreatorTagCyan' $false $diagnostic
         foreach ($slot in @(1,2))
         {
             $root=$roomSlotRoots[$slot]
             $slotNumber=$slot+1
             $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyTopBar" $captureName @{x=($root.bodyX-8);y=170;width=337;height=46} 'Cyan' $false $diagnostic
             $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyContour" $captureName @{x=($root.bodyX-8);y=208;width=337;height=523} 'Cyan' $true $diagnostic
-            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyCheck" $captureName @{x=($root.bodyX+128);y=403;width=54;height=48} 'Light' $false $diagnostic
-            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyLabel" $captureName @{x=($root.bodyX+100);y=448;width=110;height=38} 'Light' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyCheck" $captureName @{x=($root.bodyX+79);y=655;width=55;height=45} 'DarkOnCyan' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyLabel" $captureName @{x=($root.bodyX+134);y=655;width=110;height=45} 'DarkOnCyan' $false $diagnostic
         }
     }
     if ($captureName -in @('room-full','room-ready'))
     {
         $color = if ($captureName -eq 'room-full') { 'Gray' } else { 'Cyan' }
         $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.$color" $captureName @{x=1479;y=935;width=441;height=104} $color $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.IconCenter" $captureName @{x=1517;y=962;width=55;height=55} 'Light' $false $diagnostic
-        $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.LabelCenter" $captureName @{x=1592;y=970;width=132;height=38} 'Light' $false $diagnostic
+        if ($captureName -eq 'room-full')
+        {
+            $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.IconCenter" $captureName @{x=1555;y=955;width=85;height=70} 'MutedLight' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.LabelCenter" $captureName @{x=1640;y=955;width=155;height=75} 'MutedLight' $false $diagnostic
+        }
+        else
+        {
+            $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.IconCenter" $captureName @{x=1560;y=955;width=85;height=75} 'DarkOnCyan' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.LabelCenter" $captureName @{x=1645;y=955;width=150;height=75} 'DarkOnCyan' $false $diagnostic
+        }
     }
     if ($captureName -eq 'room-ready')
     {
-        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Leave' $captureName @{x=36;y=22;width=134;height=69} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Leave' $captureName @{x=45;y=25;width=75;height=65} 'Light' $false $diagnostic
     }
     return @($gates)
 }
@@ -1072,7 +1102,7 @@ function Get-LanLobbyVisibleBounds
     param(
         [Parameter(Mandatory)] [Drawing.Bitmap] $Image,
         [Parameter(Mandatory)] $Roi,
-        [Parameter(Mandatory)] [ValidateSet('Cyan','Gray','Dark','Light','Contrast')] [string] $MaskKind,
+        [Parameter(Mandatory)] [ValidateSet('Cyan','Gray','Dark','DarkOnCyan','Light','Contrast','CreatorTagCyan','MutedLight')] [string] $MaskKind,
         $Exclusions = @()
     )
 
