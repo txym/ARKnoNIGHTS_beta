@@ -54,6 +54,22 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
+        public void RoomLayout_PreservesTopBarSourceAspect()
+        {
+            var slot = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
+
+            Assert.That(slot.TopBar.Width / slot.TopBar.Height, Is.EqualTo(234f / 31f).Within(0.0001f));
+        }
+
+        [Test]
+        public void RoomLayout_PreservesEmptyInviteSourceAspect()
+        {
+            var slot = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
+
+            Assert.That(slot.EmptyInvite.Width / slot.EmptyInvite.Height, Is.EqualTo(275f / 104f).Within(0.0001f));
+        }
+
+        [Test]
         public void RoomLayout_UsesOnlyNativeOrDeferredGeometryForUnmeasuredReadyChildren()
         {
             var slot = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
