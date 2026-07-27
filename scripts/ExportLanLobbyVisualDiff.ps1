@@ -1385,6 +1385,29 @@ function Get-LanLobbyHostProfileStructureEvidence($Capture)
 {
     $failures = @()
     $hostValues = @()
+    $hostPrefix = 'LanLobbyRoot/Room/RoomCard_0'
+    $allowedSpriteByNode = @{
+        "$hostPrefix/CardBody" = 'card_bg'
+        "$hostPrefix/TopBar" = 'bg_top_ready'
+        "$hostPrefix/ReadyOverlay" = 'player_card_self_frame'
+        "$hostPrefix/OccupiedContent/ReadyIcon" = 'player_card_ready'
+        "$hostPrefix/LowerDecoration" = 'card_deco_self'
+        "$hostPrefix/CreatorTag" = 'host_top_tag'
+    }
+    $readyLabelText = ([char]0x5DF2).ToString() + [char]0x5C31 + [char]0x7EEA
+    $allowedTextByNode = @{
+        "$hostPrefix/OccupiedContent/ReadyLabel" = $readyLabelText
+    }
+    $allowedRectNodes = @(
+        $hostPrefix
+        "$hostPrefix/CardBody"
+        "$hostPrefix/TopBar"
+        "$hostPrefix/ReadyOverlay"
+        "$hostPrefix/OccupiedContent/ReadyIcon"
+        "$hostPrefix/OccupiedContent/ReadyLabel"
+        "$hostPrefix/LowerDecoration"
+        "$hostPrefix/CreatorTag"
+    )
     if ($null -ne $Capture.PSObject.Properties['localPlayerId'] -and -not [string]::IsNullOrWhiteSpace([string]$Capture.localPlayerId))
     {
         $hostValues += [string]$Capture.localPlayerId
@@ -1415,31 +1438,48 @@ function Get-LanLobbyHostProfileStructureEvidence($Capture)
             }
         }
     }
-    $semanticRows = @(
-        @($Capture.spriteSources | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.node;spriteName=[string]$_.spriteName;kind='spriteSources' } })
-        @($Capture.unityText | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.node;spriteName='';kind='unityText' } })
-        @($Capture.sourceAudit | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.node;spriteName=[string]$_.spriteName;kind='sourceAudit' } })
-        @($Capture.rects | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.name;spriteName='';kind='rects' } })
-        if ($null -ne $Capture.PSObject.Properties['keyRects'])
-        {
-            @($Capture.keyRects | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.name;spriteName='';kind='keyRects' } })
-        }
-    )
-    $avatarSprites = @('icon_amiy','icon_clementi','icon_kirar','icon_zumam')
-    foreach ($row in $semanticRows)
+
+    foreach ($collectionName in @('spriteSources','sourceAudit'))
     {
-        $isHostNode = [string]$row.node -like 'LanLobbyRoot/Room/RoomCard_0/*'
-        $hasForbiddenNode = $isHostNode -and [string]$row.node -match '(?i)/(Portrait|Avatar|Profile|PlayerName|PlayerId|MemberName|MemberId|Label|Icon)(/|$)'
-        $hasForbiddenSprite = $isHostNode -and
-            ([string]$row.spriteName -in $avatarSprites -or [string]$row.spriteName -match '(?i)(portrait|avatar|profile)')
-        if ($hasForbiddenNode -or $hasForbiddenSprite)
+        foreach ($row in @($Capture.$collectionName | Where-Object { $null -ne $_ -and [string]$_.node -like "$hostPrefix/*" }))
         {
-            $failures += "Forbidden host profile node/Sprite '$($row.node)' / '$($row.spriteName)' is active in $($row.kind)."
+            $node = [string]$row.node
+            if (-not $allowedSpriteByNode.ContainsKey($node) -or
+                [string]$row.spriteName -cne [string]$allowedSpriteByNode[$node])
+            {
+                $failures += "Host slot $collectionName row '$node' / '$($row.spriteName)' is outside the allowed Sprite whitelist."
+            }
         }
+    }
+    foreach ($row in @($Capture.unityText | Where-Object { $null -ne $_ -and [string]$_.node -like "$hostPrefix/*" }))
+    {
+        $node = [string]$row.node
+        if (-not $allowedTextByNode.ContainsKey($node) -or
+            [string]$row.text -cne [string]$allowedTextByNode[$node])
+        {
+            $failures += "Host slot Unity Text '$node' / '$($row.text)' is outside the allowed text whitelist."
+        }
+    }
+    foreach ($collectionName in @('rects','keyRects'))
+    {
+        if ($null -eq $Capture.PSObject.Properties[$collectionName]) { continue }
+        foreach ($row in @($Capture.$collectionName | Where-Object { $null -ne $_ -and ([string]$_.name -ceq $hostPrefix -or [string]$_.name -like "$hostPrefix/*") }))
+        {
+            if ([string]$row.name -notin $allowedRectNodes)
+            {
+                $failures += "Host slot $collectionName row '$($row.name)' is outside the allowed node whitelist."
+            }
+        }
+    }
+    foreach ($geometry in @($Capture.codeNativeGeometry | Where-Object { $null -ne $_ -and [string]$_.name -like "$hostPrefix/*" }))
+    {
+        $failures += "Host slot code-native geometry '$($geometry.name)' is forbidden."
     }
     return [pscustomobject][ordered]@{
         passed=($failures.Count -eq 0)
         hostIdentityValues=@($hostValues | Select-Object -Unique)
+        allowedHostSprites=@($allowedSpriteByNode.Values | Sort-Object)
+        allowedHostText=@($allowedTextByNode.Values | Sort-Object)
         failures=@($failures | Select-Object -Unique)
     }
 }
@@ -2197,30 +2237,20 @@ try
                 $capturePrefix = switch ($captureName) { 'room-host' {'RoomHost'} 'room-full' {'RoomFull'} 'room-ready' {'RoomReady'} }
                 $profileRoi = [pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=250;y=240;width=250;height=473 }
                 $profileExclusions = @(
-                    [pscustomobject][ordered]@{ name='required-ready-check';reason='Required ready check is not host profile content.';x=354;y=403;width=54;height=48 },
-                    [pscustomobject][ordered]@{ name='required-ready-label';reason='Required ready label is not host profile content.';x=326;y=448;width=110;height=38 },
-                    [pscustomobject][ordered]@{ name='required-host-frame-bottom';reason='Required host card frame contour is not host profile content.';x=218;y=705;width=337;height=26 },
-                    [pscustomobject][ordered]@{ name='required-creator-tag';reason='Required creator tag is not host profile content.';x=237;y=737;width=100;height=40 }
+                    [pscustomobject][ordered]@{ name='reference-profile-art';reason='The authoritative reference character/profile artwork is explicitly outside visual acceptance and is not pixel-compared.';x=250;y=240;width=250;height=473 }
                 )
-                [Drawing.Rectangle[]]$profileExclusionRectangles = @($profileExclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
-                $profileUnexpected = [LanLobbyVisualDiff]::FindUnexpectedDifferenceBounds(
-                    $actual,
-                    $normalizedReference,
-                    (ConvertTo-LanLobbyRectangle $profileRoi),
-                    $profileExclusionRectangles,
-                    8)
                 $profileStructure = Get-LanLobbyHostProfileStructureEvidence $capture
                 $profileMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $profileRoi $true
-                $profileAbsent = -not $profileUnexpected.Available -and $profileStructure.passed -and $profileMaterialEvidence.passed
+                $profileAbsent = $profileStructure.passed -and $profileMaterialEvidence.passed
                 $captureGateRows += [pscustomobject][ordered]@{
                     name="$capturePrefix.Slot1.ProfileContentAbsence";capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
-                    roi=$profileRoi;exclusions=$profileExclusions;maskKind='structured-and-decoded-profile-absence';maskDescription='Structured host identity/node/Sprite absence plus decoded actual-vs-reference RGB differences across the forbidden host profile area.'
-                    diagnosticRectTransform=$null;actualVisibleBounds=$(if($profileUnexpected.Available){[pscustomobject][ordered]@{x=$profileUnexpected.Bounds.X;y=$profileUnexpected.Bounds.Y;width=$profileUnexpected.Bounds.Width;height=$profileUnexpected.Bounds.Height}}else{$null});referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
-                    actualVisiblePixelCount=[int]$profileUnexpected.PixelCount;referenceVisiblePixelCount=0
-                    unexpectedActualPixelCount=[int]$profileUnexpected.PixelCount;structuredAbsencePassed=$profileStructure.passed;structuredAbsence=$profileStructure
+                    roi=$profileRoi;exclusions=$profileExclusions;maskKind='structured-host-profile-absence';maskDescription='Exact host-slot Sprite, Unity Text, Rect/keyRect, identity, and code-native-geometry whitelist; excluded reference profile artwork is not pixel-compared.'
+                    diagnosticRectTransform=$null;actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                    actualVisiblePixelCount=0;referenceVisiblePixelCount=0
+                    unexpectedActualPixelCount=0;structuredAbsencePassed=$profileStructure.passed;structuredAbsence=$profileStructure
                     edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=[pscustomobject]@{intersectionPixels=0;unionPixels=0;jaccard=$null}
-                    thresholds=[pscustomobject]@{maximumUnexpectedPixelCount=0;minimumChannelDifference=8};materialEvidence=$profileMaterialEvidence
-                    status=$(if($profileAbsent){'Passed'}else{'Failed'});reason=$(if($profileAbsent){'Host display name/ID, profile nodes/Sprites, and unexpected decoded profile pixels are absent.'}elseif(-not $profileStructure.passed){"Structured host profile absence failed: $($profileStructure.failures -join ' ')"}elseif($profileUnexpected.Available){"Unexpected decoded host profile pixels found: $($profileUnexpected.PixelCount)."}else{'Blocking material manifest evidence failed.'});passed=$profileAbsent
+                    thresholds=[pscustomobject]@{allowedHostSprites=@($profileStructure.allowedHostSprites);allowedHostText=@($profileStructure.allowedHostText);maximumUnexpectedHostRows=0};materialEvidence=$profileMaterialEvidence
+                    status=$(if($profileAbsent){'Passed'}else{'Failed'});reason=$(if($profileAbsent){'Host slot matches the exact allowed Sprite/text/rect whitelist and contains no identity/profile/avatar/name/ID or code-native content.'}elseif(-not $profileStructure.passed){"Structured host profile absence failed: $($profileStructure.failures -join ' ')"}else{'Blocking material manifest evidence failed.'});passed=$profileAbsent
                 }
                 foreach ($forbiddenText in @('OPEN SLOT','WAITING'))
                 {

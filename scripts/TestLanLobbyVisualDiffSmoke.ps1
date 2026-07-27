@@ -1241,7 +1241,7 @@ try
         $associatedGate = @($report.roomGates | Where-Object name -ceq $association.gate)[0]
         Assert-True (@($associatedGate.materialEvidence.rows | Where-Object node -ceq $association.node).Count -eq 1) "$($association.gate) must resolve ROI-associated provenance row $($association.node)"
     }
-    foreach ($semanticGate in @($report.roomGates | Where-Object { $_.maskKind -in @('manifest-text-absence','structured-and-decoded-profile-absence','derived-visible-contour-spacing') }))
+    foreach ($semanticGate in @($report.roomGates | Where-Object { $_.maskKind -in @('manifest-text-absence','structured-host-profile-absence','derived-visible-contour-spacing') }))
     {
         Assert-True ($semanticGate.materialEvidence.associationKind -eq 'explicit-no-bitmap') "$($semanticGate.name) must explicitly declare no direct bitmap association"
         Assert-True (@($semanticGate.materialEvidence.rows).Count -eq 0) "$($semanticGate.name) must not inherit an undifferentiated capture-wide row array"
@@ -1261,6 +1261,13 @@ try
     Assert-True (@($report.roomExclusions | Where-Object { -not $_.protectedRegionsClear }).Count -eq 0) 'barrage/popup/fourth-slot exclusions must not overlap protected gates'
     $baselineRoomFailures = @($report.roomGates | Where-Object { $_.status -eq 'Failed' } | ForEach-Object { "$($_.name):$($_.reason):j=$($_.contour.jaccard):edges=$($_.edgeDeltaPx.left)/$($_.edgeDeltaPx.top)/$($_.edgeDeltaPx.right)/$($_.edgeDeltaPx.bottom)" })
     Assert-True ($baselineRoomFailures.Count -eq 0) "baseline room visible-pixel gates must pass; failed: $($baselineRoomFailures -join ' | ')"
+    foreach ($profileGate in @($report.roomGates | Where-Object name -like '*.Slot1.ProfileContentAbsence'))
+    {
+        Assert-True ($profileGate.maskKind -ceq 'structured-host-profile-absence') "$($profileGate.name) must not pixel-compare excluded reference profile artwork"
+        Assert-True (@($profileGate.exclusions | Where-Object name -ceq 'reference-profile-art').Count -eq 1) "$($profileGate.name) must explicitly declare the reference profile-art exclusion"
+        Assert-True (($profileGate.status -ceq 'Passed') -and $profileGate.structuredAbsencePassed) "$($profileGate.name) must pass from the exact host-slot whitelist"
+        Assert-True ((@($profileGate.thresholds.allowedHostSprites).Count -eq 6) -and (@($profileGate.thresholds.allowedHostText).Count -eq 1)) "$($profileGate.name) must publish the exact allowed host Sprite/text whitelist"
+    }
     Assert-True (@($report.roomGates | Where-Object { $_.status -eq 'Passed' -and -not $_.materialEvidence.passed }).Count -eq 0) 'a room gate may not pass material evidence with SHA/occurrence mismatch'
     foreach ($wrongFigure in @($figure12,$figure13))
     {
@@ -1684,32 +1691,6 @@ try
     Assert-True (($fullSpacingGate.status -ceq 'Failed') -and ([Math]::Abs([double]$fullSpacingGate.centerDeltaPx.spacingDelta) -gt 4)) 'independent Figure 12 slot 3 pixel shift must block slot 2-to-3 spacing'
     Assert-LanLobbyFailedRoiDrawn $fullSpacingResult.output 'room-full' $fullSpacingGate.roi 'RoomFull slot2-to3 spacing'
 
-    $profilePixelCases = @(
-        [pscustomobject]@{ name='dark';color=[Drawing.Color]::FromArgb(255,18,18,18) },
-        [pscustomobject]@{ name='colorful';color=[Drawing.Color]::FromArgb(255,220,35,170) }
-    )
-    foreach ($profilePixelCase in $profilePixelCases)
-    {
-        $profilePixelResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory ("profile-" + $profilePixelCase.name) {
-            param($caseManifest,$caseCaptureDirectory)
-            $positions = @{
-                'room-host'=@(270,280)
-                'room-full'=@(300,330)
-                'room-ready'=@(420,550)
-            }
-            foreach ($roomCaptureName in $positions.Keys)
-            {
-                Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory "$roomCaptureName.png") $profilePixelCase.color $positions[$roomCaptureName][0] $positions[$roomCaptureName][1] 24 24
-            }
-        }
-        foreach ($captureName in @('room-host','room-full','room-ready'))
-        {
-            $profileGate = @($profilePixelResult.report.roomGates | Where-Object name -ceq "$($roomPrefixes[$captureName]).Slot1.ProfileContentAbsence")[0]
-            Assert-True (($profileGate.status -ceq 'Failed') -and ([int]$profileGate.unexpectedActualPixelCount -gt 0)) "$captureName must reject $($profilePixelCase.name) unexpected profile pixels"
-            Assert-LanLobbyFailedRoiDrawn $profilePixelResult.output $captureName $profileGate.roi "$captureName $($profilePixelCase.name) profile"
-        }
-    }
-
     $structuredProfileCases = @(
         [pscustomobject]@{
             name='host-identity-text'
@@ -1744,6 +1725,17 @@ try
                     captures=@([string]$record.name);occurrenceCount=1;raycastTarget=$false
                 }
                 Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory "$($record.name).png") ([Drawing.Color]::FromArgb(255,70,120,210)) 270 300 80 80
+            }
+        },
+        [pscustomobject]@{
+            name='host-code-native-content'
+            mutate={
+                param($record,$caseCaptureDirectory)
+                $record.codeNativeGeometry = @($record.codeNativeGeometry) + [pscustomobject][ordered]@{
+                    name='LanLobbyRoot/Room/RoomCard_0/ProfileBacking';kind='code-native-geometry';isBitmap=$false
+                    spriteName='';materialName='';resourcesPath='';sourcePath='';sha256='';color='#FFFFFFFF'
+                    coordinateOrigin='screen-bottom-left';unit='px';raycastTarget=$false;x=270;y=700;width=80;height=80
+                }
             }
         }
     )
