@@ -50,9 +50,8 @@ public sealed class LanLobbyRoomLayout
     private const float EmptyInviteSourceWidth = 275f;
     private const float EmptyInviteSourceHeight = 104f;
     private const float ReadyCheckSourceSize = 34f;
-    private const float ReadyCheckScale = 2f;
-    private const float ReadyLabelWidth = 120f;
-    private const float ReadyLabelHeight = 36f;
+    private const float ReadyContourSourceWidth = 256f;
+    private const float ReadyContourSourceHeight = 103f;
     private const float HostTagSourceWidth = 72f;
     private const float HostTagSourceHeight = 26f;
 
@@ -66,26 +65,30 @@ public sealed class LanLobbyRoomLayout
 
     private static readonly LanLobbyRect CanonicalCardBody = FromTopLeft(CardBodyLeft, 0f, CardBodyWidth, CardBodyHeight, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalTopBar = FromTopLeft(CardBodyLeft, 0f, CardBodyWidth, CardBodyWidth * TopBarSourceHeight / TopBarSourceWidth, SlotRootHeight);
-    private static readonly LanLobbyRect CanonicalStateOverlay = CanonicalCardBody;
+    private static readonly LanLobbyRect CanonicalStateOverlay = new LanLobbyRect(
+        CanonicalCardBody.Left,
+        CanonicalCardBody.Bottom,
+        CanonicalCardBody.Width,
+        CanonicalCardBody.Width * ReadyContourSourceHeight / ReadyContourSourceWidth);
     private static readonly LanLobbyRect CanonicalEmptyInvite = CenteredIn(
         CanonicalCardBody,
         CardBodyWidth,
         CardBodyWidth * EmptyInviteSourceHeight / EmptyInviteSourceWidth);
     private static readonly LanLobbyRect CanonicalReadyIcon = CenteredIn(
         CanonicalCardBody,
-        ReadyCheckSourceSize * ReadyCheckScale,
-        ReadyCheckSourceSize * ReadyCheckScale);
+        ReadyCheckSourceSize,
+        ReadyCheckSourceSize);
     private static readonly LanLobbyRect CanonicalReadyLabel = new LanLobbyRect(
-        CanonicalCardBody.Left + (CanonicalCardBody.Width - ReadyLabelWidth) * .5f,
-        CanonicalReadyIcon.Bottom - ReadyLabelHeight,
-        ReadyLabelWidth,
-        ReadyLabelHeight);
+        CanonicalReadyIcon.Left,
+        CanonicalReadyIcon.Bottom,
+        0f,
+        0f);
     private static readonly LanLobbyRect CanonicalLowerDecoration = FromTopLeft(0f, 544.5f, 363.75f, 120f, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalCreatorTag = FromTopLeft(
         CardBodyLeft,
-        3f,
-        HostTagSourceWidth * CardBodyWidth / TopBarSourceWidth,
-        HostTagSourceHeight * CardBodyWidth / TopBarSourceWidth,
+        0f,
+        HostTagSourceWidth,
+        HostTagSourceHeight,
         SlotRootHeight);
 
     private static readonly LanLobbyRect CanonicalLeaveAction = FromTopLeft(43.5f, 30f, 118f, 52.5f, ReferenceHeight);
