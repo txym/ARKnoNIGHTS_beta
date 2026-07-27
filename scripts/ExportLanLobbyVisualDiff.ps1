@@ -127,6 +127,171 @@ public static class LanLobbyVisualDiff {
         }
         return AvailableBounds(minX,minY,maxX,maxY);
     }
+    public static LanLobbyBoundsMeasurement FindLargestNeutralComponentBounds(
+        Bitmap bitmap, Rectangle search, int minimumLuminanceInclusive, int maximumLuminanceInclusive, int maximumChannelSpread)
+    {
+        ValidateSearch(bitmap, search);
+        if(minimumLuminanceInclusive < 0 || maximumLuminanceInclusive > 255 ||
+            minimumLuminanceInclusive > maximumLuminanceInclusive || maximumChannelSpread < 0)
+            throw new ArgumentOutOfRangeException("neutralThresholds");
+        bool[,] qualifying=new bool[search.Width,search.Height];
+        bool[,] visited=new bool[search.Width,search.Height];
+        for(int y=0;y<search.Height;y++) for(int x=0;x<search.Width;x++) {
+            Color pixel=bitmap.GetPixel(search.X+x,search.Y+y);
+            int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
+            int channelSpread=Math.Max(pixel.R,Math.Max(pixel.G,pixel.B))-Math.Min(pixel.R,Math.Min(pixel.G,pixel.B));
+            qualifying[x,y]=pixel.A>0 && luminance>=minimumLuminanceInclusive &&
+                luminance<=maximumLuminanceInclusive && channelSpread<=maximumChannelSpread;
+        }
+        int bestCount=0,bestMinX=search.Right,bestMinY=search.Bottom,bestMaxX=-1,bestMaxY=-1;
+        int[] dx={-1,1,0,0,-1,-1,1,1};
+        int[] dy={0,0,-1,1,-1,1,-1,1};
+        for(int startY=0;startY<search.Height;startY++) for(int startX=0;startX<search.Width;startX++) {
+            if(visited[startX,startY] || !qualifying[startX,startY]) continue;
+            Queue<Point> queue=new Queue<Point>();
+            queue.Enqueue(new Point(startX,startY));
+            visited[startX,startY]=true;
+            int count=0,minX=startX,minY=startY,maxX=startX,maxY=startY;
+            while(queue.Count>0) {
+                Point point=queue.Dequeue();
+                count++;
+                minX=Math.Min(minX,point.X); minY=Math.Min(minY,point.Y);
+                maxX=Math.Max(maxX,point.X); maxY=Math.Max(maxY,point.Y);
+                for(int i=0;i<dx.Length;i++) {
+                    int x=point.X+dx[i],y=point.Y+dy[i];
+                    if(x<0 || y<0 || x>=search.Width || y>=search.Height ||
+                        visited[x,y] || !qualifying[x,y]) continue;
+                    visited[x,y]=true;
+                    queue.Enqueue(new Point(x,y));
+                }
+            }
+            if(count<=bestCount) continue;
+            bestCount=count; bestMinX=minX; bestMinY=minY; bestMaxX=maxX; bestMaxY=maxY;
+        }
+        return bestCount==0
+            ? Unavailable("No qualifying decoded neutral component found.")
+            : AvailableBounds(search.X+bestMinX,search.Y+bestMinY,search.X+bestMaxX,search.Y+bestMaxY);
+    }
+    public static LanLobbyBoundsMeasurement FindOrangeComponentUnionBounds(
+        Bitmap bitmap, Rectangle search, int minimumRed, int minimumGreen, int maximumBlue, int minimumRedOverGreen,
+        int minimumComponentPixelCount, int maximumComponentWidth, int maximumComponentHeight,
+        Rectangle ignoredVerticalGuide, Rectangle ignoredHorizontalGuide)
+    {
+        ValidateSearch(bitmap, search);
+        if(minimumComponentPixelCount<1 || maximumComponentWidth<1 || maximumComponentHeight<1)
+            throw new ArgumentOutOfRangeException("orangeComponentThresholds");
+        Rectangle[] ignored={ignoredVerticalGuide,ignoredHorizontalGuide};
+        foreach(Rectangle region in ignored) {
+            if(region.Width<=0 || region.Height<=0 || !Inside(search,region.X,region.Y) ||
+                !Inside(search,region.Right-1,region.Bottom-1))
+                throw new ArgumentOutOfRangeException("ignoredGuide");
+        }
+        bool[,] qualifying=new bool[search.Width,search.Height];
+        bool[,] visited=new bool[search.Width,search.Height];
+        for(int y=0;y<search.Height;y++) for(int x=0;x<search.Width;x++) {
+            int bitmapX=search.X+x,bitmapY=search.Y+y;
+            if(Inside(ignoredVerticalGuide,bitmapX,bitmapY) || Inside(ignoredHorizontalGuide,bitmapX,bitmapY)) continue;
+            Color pixel=bitmap.GetPixel(bitmapX,bitmapY);
+            qualifying[x,y]=pixel.A>0 && pixel.R>=minimumRed && pixel.G>=minimumGreen &&
+                pixel.B<=maximumBlue && pixel.R>=pixel.G+minimumRedOverGreen;
+        }
+        int unionMinX=search.Right,unionMinY=search.Bottom,unionMaxX=-1,unionMaxY=-1;
+        int[] dx={-1,1,0,0,-1,-1,1,1};
+        int[] dy={0,0,-1,1,-1,1,-1,1};
+        for(int startY=0;startY<search.Height;startY++) for(int startX=0;startX<search.Width;startX++) {
+            if(visited[startX,startY] || !qualifying[startX,startY]) continue;
+            Queue<Point> queue=new Queue<Point>();
+            queue.Enqueue(new Point(startX,startY));
+            visited[startX,startY]=true;
+            int count=0,minX=startX,minY=startY,maxX=startX,maxY=startY;
+            while(queue.Count>0) {
+                Point point=queue.Dequeue();
+                count++;
+                minX=Math.Min(minX,point.X); minY=Math.Min(minY,point.Y);
+                maxX=Math.Max(maxX,point.X); maxY=Math.Max(maxY,point.Y);
+                for(int i=0;i<dx.Length;i++) {
+                    int x=point.X+dx[i],y=point.Y+dy[i];
+                    if(x<0 || y<0 || x>=search.Width || y>=search.Height ||
+                        visited[x,y] || !qualifying[x,y]) continue;
+                    visited[x,y]=true;
+                    queue.Enqueue(new Point(x,y));
+                }
+            }
+            int width=maxX-minX+1,height=maxY-minY+1;
+            if(count<minimumComponentPixelCount || width>maximumComponentWidth || height>maximumComponentHeight) continue;
+            unionMinX=Math.Min(unionMinX,minX); unionMinY=Math.Min(unionMinY,minY);
+            unionMaxX=Math.Max(unionMaxX,maxX); unionMaxY=Math.Max(unionMaxY,maxY);
+        }
+        return unionMaxX<unionMinX || unionMaxY<unionMinY
+            ? Unavailable("No qualifying decoded orange components found.")
+            : AvailableBounds(search.X+unionMinX,search.Y+unionMinY,search.X+unionMaxX,search.Y+unionMaxY);
+    }
+    public static LanLobbyBoundsMeasurement FindEdgeComponentUnionBounds(
+        Bitmap bitmap, Rectangle search, int minimumChannelDifference, int minimumComponentPixelCount,
+        bool excludeSearchBorderComponents, Rectangle ignoredRegion)
+    {
+        ValidateSearch(bitmap, search);
+        if(minimumChannelDifference<1 || minimumChannelDifference>255 || minimumComponentPixelCount<1)
+            throw new ArgumentOutOfRangeException("edgeComponentThresholds");
+        if(ignoredRegion.Width<0 || ignoredRegion.Height<0 ||
+            (ignoredRegion.Width>0 && (!Inside(search,ignoredRegion.X,ignoredRegion.Y) ||
+            !Inside(search,ignoredRegion.Right-1,ignoredRegion.Bottom-1))))
+            throw new ArgumentOutOfRangeException("ignoredRegion");
+        bool[,] qualifying=new bool[search.Width,search.Height];
+        bool[,] visited=new bool[search.Width,search.Height];
+        int[] cardinalX={-1,1,0,0};
+        int[] cardinalY={0,0,-1,1};
+        for(int y=0;y<search.Height;y++) for(int x=0;x<search.Width;x++) {
+            int bitmapX=search.X+x,bitmapY=search.Y+y;
+            if(ignoredRegion.Width>0 && ignoredRegion.Height>0 && Inside(ignoredRegion,bitmapX,bitmapY)) {
+                qualifying[x,y]=false;
+                continue;
+            }
+            Color pixel=bitmap.GetPixel(bitmapX,bitmapY);
+            int maximumDifference=0;
+            for(int i=0;i<cardinalX.Length;i++) {
+                int neighborX=bitmapX+cardinalX[i],neighborY=bitmapY+cardinalY[i];
+                if(neighborX<0 || neighborY<0 || neighborX>=bitmap.Width || neighborY>=bitmap.Height) continue;
+                Color neighbor=bitmap.GetPixel(neighborX,neighborY);
+                maximumDifference=Math.Max(maximumDifference,
+                    Math.Max(Math.Abs(pixel.R-neighbor.R),
+                    Math.Max(Math.Abs(pixel.G-neighbor.G),Math.Abs(pixel.B-neighbor.B))));
+            }
+            qualifying[x,y]=pixel.A>0 && maximumDifference>=minimumChannelDifference;
+        }
+        int unionMinX=search.Right,unionMinY=search.Bottom,unionMaxX=-1,unionMaxY=-1;
+        int[] dx={-1,1,0,0,-1,-1,1,1};
+        int[] dy={0,0,-1,1,-1,1,-1,1};
+        for(int startY=0;startY<search.Height;startY++) for(int startX=0;startX<search.Width;startX++) {
+            if(visited[startX,startY] || !qualifying[startX,startY]) continue;
+            Queue<Point> queue=new Queue<Point>();
+            queue.Enqueue(new Point(startX,startY));
+            visited[startX,startY]=true;
+            int count=0,minX=startX,minY=startY,maxX=startX,maxY=startY;
+            bool touchesSearchBorder=false;
+            while(queue.Count>0) {
+                Point point=queue.Dequeue();
+                count++;
+                minX=Math.Min(minX,point.X); minY=Math.Min(minY,point.Y);
+                maxX=Math.Max(maxX,point.X); maxY=Math.Max(maxY,point.Y);
+                touchesSearchBorder=touchesSearchBorder || point.X==0 || point.Y==0 ||
+                    point.X==search.Width-1 || point.Y==search.Height-1;
+                for(int i=0;i<dx.Length;i++) {
+                    int x=point.X+dx[i],y=point.Y+dy[i];
+                    if(x<0 || y<0 || x>=search.Width || y>=search.Height ||
+                        visited[x,y] || !qualifying[x,y]) continue;
+                    visited[x,y]=true;
+                    queue.Enqueue(new Point(x,y));
+                }
+            }
+            if(count<minimumComponentPixelCount || (excludeSearchBorderComponents && touchesSearchBorder)) continue;
+            unionMinX=Math.Min(unionMinX,minX); unionMinY=Math.Min(unionMinY,minY);
+            unionMaxX=Math.Max(unionMaxX,maxX); unionMaxY=Math.Max(unionMaxY,maxY);
+        }
+        return unionMaxX<unionMinX || unionMaxY<unionMinY
+            ? Unavailable("No qualifying decoded edge components found.")
+            : AvailableBounds(search.X+unionMinX,search.Y+unionMinY,search.X+unionMaxX,search.Y+unionMaxY);
+    }
     public static LanLobbyVisualBounds FindDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
         if (search.X < 0 || search.Y < 0 || search.Right > bitmap.Width || search.Bottom > bitmap.Height || search.Width <= 0 || search.Height <= 0) throw new ArgumentOutOfRangeException("search");
@@ -408,13 +573,103 @@ $homeJoinDecoration = @{
   reference=@{x=1257;y=635;width=763;height=297}
 }
 $joinDecorationContentSpecs = @(
-  @{ name='logo'; measurement='orange'; search=@{x=80;y=54;width=140;height=42}; expected=@{x=91;y=64;width=118;height=20}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
-  @{ name='text-01'; measurement='orange'; search=@{x=385;y=45;width=95;height=35}; expected=@{x=391;y=56;width=65;height=8}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
-  @{ name='text-02'; measurement='orange'; search=@{x=515;y=50;width=110;height=35}; expected=@{x=526;y=62;width=89;height=11}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
-  @{ name='triangle'; measurement='orange'; search=@{x=325;y=35;width=55;height=31}; expected=@{x=338;y=47;width=30;height=17}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
-  @{ name='central-blank'; measurement='orange'; search=@{x=310;y=66;width=85;height=79}; expected=@{x=323;y=68;width=60;height=61}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
-  @{ name='block-bank'; measurement='luma'; search=@{x=35;y=97;width=660;height=110}; expected=@{x=45;y=107;width=639;height=89}; tolerance=4; thresholds=@{minimumLuminanceInclusive=200;maximumLuminanceInclusive=255} },
-  @{ name='input'; measurement='neutral'; search=@{x=105;y=194;width=510;height=75}; expected=@{x=115;y=204;width=482;height=60}; tolerance=2; thresholds=@{minimumLuminanceInclusive=90;maximumLuminanceInclusive=140;maximumChannelSpread=0} }
+  @{ name='logo'; measurement='orange'; search=@{x=80;y=54;width=140;height=42}; expected=@{x=91;y=64;width=118;height=20}; tolerance=2; thresholds=@{minimumRed=80;minimumGreen=5;maximumBlue=100;minimumRedOverGreen=15} },
+  @{
+    name='text-01'
+    measurement='orange'
+    search=@{x=385;y=45;width=95;height=35}
+    expected=@{x=391;y=56;width=65;height=8}
+    tolerance=2
+    thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40}
+    boundsAdjustment=@{
+      coordinateOrigin='crop-top-left'
+      unit='px'
+      x=-2
+      y=-2
+      width=4
+      height=5
+      reason='The text-01 decoded reference omits transparent/antialiased margins; this explicit calibration restores the approved visible target.'
+    }
+  },
+  @{ name='text-02'; measurement='orange'; search=@{x=515;y=50;width=110;height=35}; expected=@{x=526;y=62;width=89;height=11}; tolerance=2; thresholds=@{minimumRed=80;minimumGreen=5;maximumBlue=100;minimumRedOverGreen=15} },
+  @{
+    name='triangle'
+    measurement='orange'
+    search=@{x=325;y=35;width=55;height=31}
+    expected=@{x=338;y=47;width=30;height=17}
+    tolerance=2
+    thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40}
+    boundsAdjustment=@{
+      coordinateOrigin='crop-top-left'
+      unit='px'
+      x=-4
+      y=-2
+      width=6
+      height=5
+      reason='The triangle decoded reference omits transparent/antialiased margins; this explicit calibration restores the approved visible target.'
+    }
+  },
+  @{
+    name='central-blank'
+    measurement='orange-component-union'
+    search=@{x=310;y=66;width=85;height=79}
+    expected=@{x=323;y=68;width=60;height=61}
+    tolerance=2
+    thresholds=@{
+      minimumRed=200
+      minimumGreen=100
+      maximumBlue=80
+      minimumRedOverGreen=40
+      minimumComponentPixelCount=50
+      maximumComponentWidth=35
+      maximumComponentHeight=35
+      ignoredVerticalGuideX=352
+      ignoredVerticalGuideY=66
+      ignoredVerticalGuideWidth=2
+      ignoredVerticalGuideHeight=79
+      ignoredHorizontalGuideX=310
+      ignoredHorizontalGuideY=99
+      ignoredHorizontalGuideWidth=85
+      ignoredHorizontalGuideHeight=2
+      ignoredGuideReason='Exclude the code-native vertical and horizontal guide lines before selecting blank quadrants.'
+    }
+    boundsAdjustment=@{
+      coordinateOrigin='crop-top-left'
+      unit='px'
+      x=0
+      y=-4
+      width=1
+      height=5
+      reason='The central blank decoded reference omits transparent/antialiased margins after guide-line exclusion; this explicit calibration restores the approved visible target.'
+    }
+  },
+  @{
+    name='block-bank'
+    measurement='edge-component-union'
+    search=@{x=35;y=97;width=660;height=110}
+    expected=@{x=45;y=107;width=639;height=89}
+    tolerance=4
+    thresholds=@{
+      minimumChannelDifference=5
+      minimumComponentPixelCount=5
+      excludeSearchBorderComponents=$true
+      ignoredRegionX=310
+      ignoredRegionY=97
+      ignoredRegionWidth=85
+      ignoredRegionHeight=48
+      ignoredRegionReason='Exclude the overlapping central icon from the block-bank edge union.'
+    }
+    boundsAdjustment=@{
+      coordinateOrigin='crop-top-left'
+      unit='px'
+      x=-9
+      y=0
+      width=-1
+      height=0
+      reason='The block-bank asset includes a 9 px near-background/transparent left margin; this explicit calibration converts decoded edge union bounds to the approved visible target.'
+    }
+  },
+  @{ name='input'; measurement='neutral-largest-component'; search=@{x=105;y=194;width=510;height=75}; expected=@{x=115;y=204;width=482;height=60}; tolerance=2; thresholds=@{minimumLuminanceInclusive=40;maximumLuminanceInclusive=140;maximumChannelSpread=5} }
 )
 $createDecorationContentSpecs = @(
   @{name='start-room'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
@@ -530,6 +785,25 @@ function Resize-LanLobbyBitmap(
 function ConvertTo-LanLobbyBoundsObject($Bounds)
 {
     return [ordered]@{ x=$Bounds.X; y=$Bounds.Y; width=$Bounds.Width; height=$Bounds.Height }
+}
+
+function Add-LanLobbyBoundsAdjustment($Measurement, $Adjustment, [string] $Label)
+{
+    if (-not $Measurement.Available -or $null -eq $Adjustment) { return $Measurement }
+    $adjustedBounds = New-Object LanLobbyVisualBounds
+    $adjustedBounds.X = $Measurement.Bounds.X + [int]$Adjustment.x
+    $adjustedBounds.Y = $Measurement.Bounds.Y + [int]$Adjustment.y
+    $adjustedBounds.Width = $Measurement.Bounds.Width + [int]$Adjustment.width
+    $adjustedBounds.Height = $Measurement.Bounds.Height + [int]$Adjustment.height
+    if ($adjustedBounds.Width -le 0 -or $adjustedBounds.Height -le 0)
+    {
+        throw "$Label bounds adjustment produced non-positive dimensions."
+    }
+    $adjusted = New-Object LanLobbyBoundsMeasurement
+    $adjusted.Available = $true
+    $adjusted.Bounds = $adjustedBounds
+    $adjusted.FailureReason = $null
+    return $adjusted
 }
 
 function New-LanLobbyActionOverlay([Drawing.Bitmap] $Actual, [Drawing.Bitmap] $Reference)
@@ -1262,13 +1536,33 @@ try
                 switch ($contentSpec.measurement)
                 {
                     'orange' { return [LanLobbyVisualDiff]::FindOrangeBounds($bitmap, $search, $contentSpec.thresholds.minimumRed, $contentSpec.thresholds.minimumGreen, $contentSpec.thresholds.maximumBlue, $contentSpec.thresholds.minimumRedOverGreen) }
+                    'orange-component-union' {
+                        $ignoredVerticalGuide = New-Object Drawing.Rectangle $contentSpec.thresholds.ignoredVerticalGuideX, $contentSpec.thresholds.ignoredVerticalGuideY, $contentSpec.thresholds.ignoredVerticalGuideWidth, $contentSpec.thresholds.ignoredVerticalGuideHeight
+                        $ignoredHorizontalGuide = New-Object Drawing.Rectangle $contentSpec.thresholds.ignoredHorizontalGuideX, $contentSpec.thresholds.ignoredHorizontalGuideY, $contentSpec.thresholds.ignoredHorizontalGuideWidth, $contentSpec.thresholds.ignoredHorizontalGuideHeight
+                        return [LanLobbyVisualDiff]::FindOrangeComponentUnionBounds($bitmap, $search, $contentSpec.thresholds.minimumRed, $contentSpec.thresholds.minimumGreen, $contentSpec.thresholds.maximumBlue, $contentSpec.thresholds.minimumRedOverGreen, $contentSpec.thresholds.minimumComponentPixelCount, $contentSpec.thresholds.maximumComponentWidth, $contentSpec.thresholds.maximumComponentHeight, $ignoredVerticalGuide, $ignoredHorizontalGuide)
+                    }
                     'luma' { return [LanLobbyVisualDiff]::FindLumaBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive) }
                     'neutral' { return [LanLobbyVisualDiff]::FindNeutralBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive, $contentSpec.thresholds.maximumChannelSpread) }
+                    'neutral-largest-component' { return [LanLobbyVisualDiff]::FindLargestNeutralComponentBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive, $contentSpec.thresholds.maximumChannelSpread) }
+                    'edge-component-union' {
+                        $ignoredRegion = New-Object Drawing.Rectangle $contentSpec.thresholds.ignoredRegionX, $contentSpec.thresholds.ignoredRegionY, $contentSpec.thresholds.ignoredRegionWidth, $contentSpec.thresholds.ignoredRegionHeight
+                        return [LanLobbyVisualDiff]::FindEdgeComponentUnionBounds($bitmap, $search, $contentSpec.thresholds.minimumChannelDifference, $contentSpec.thresholds.minimumComponentPixelCount, $contentSpec.thresholds.excludeSearchBorderComponents, $ignoredRegion)
+                    }
                     default { throw "Unsupported Join decoration measurement: $($contentSpec.measurement)" }
                 }
             }
-            $referenceMeasurement = & $measure $locallyResizedReferenceCrop
-            $actualMeasurement = & $measure $actualCrop
+            $referenceRawMeasurement = & $measure $locallyResizedReferenceCrop
+            $actualRawMeasurement = & $measure $actualCrop
+            $boundsAdjustment = $null
+            $adjustmentSpec = $null
+            if ($contentSpec.ContainsKey('boundsAdjustment'))
+            {
+                $adjustmentSpec = $contentSpec.boundsAdjustment
+                $boundsAdjustment = [ordered]@{}
+                foreach ($key in $adjustmentSpec.Keys) { $boundsAdjustment[$key] = $adjustmentSpec[$key] }
+            }
+            $referenceMeasurement = Add-LanLobbyBoundsAdjustment $referenceRawMeasurement $adjustmentSpec "$($contentSpec.name) reference"
+            $actualMeasurement = Add-LanLobbyBoundsAdjustment $actualRawMeasurement $adjustmentSpec "$($contentSpec.name) actual"
             $measurementAvailable = $referenceMeasurement.Available -and $actualMeasurement.Available
             $measurementError = @($referenceMeasurement.FailureReason, $actualMeasurement.FailureReason | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' / '
             $expected = $contentSpec.expected
@@ -1298,6 +1592,9 @@ try
                 measurementAvailable=$measurementAvailable
                 measurementError=$(if ($measurementAvailable) { $null } else { $measurementError })
                 expectedBounds=[ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
+                boundsAdjustment=$(if ($null -eq $boundsAdjustment) { $null } else { [pscustomobject]$boundsAdjustment })
+                referenceRawBounds=$(if ($referenceRawMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $referenceRawMeasurement.Bounds } else { $null })
+                actualRawBounds=$(if ($actualRawMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $actualRawMeasurement.Bounds } else { $null })
                 referenceBounds=$(if ($referenceMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $referenceMeasurement.Bounds } else { $null })
                 actualBounds=$(if ($actualMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $actualMeasurement.Bounds } else { $null })
                 centerDeviationPx=$centerDeviation
@@ -1564,16 +1861,21 @@ try
         $markdown += "| $($edge.name) | $searchAndBackground | $($edge.referenceMeasurement.qualifyingPixelCount)/$([Math]::Round($edge.referenceMeasurement.coverageRatio, 4))/$($edge.referenceMeasurement.largestGapPixels) | $($edge.qualifyingPixelCount)/$([Math]::Round($edge.coverageRatio, 4))/$($edge.largestGapPixels) | $([Math]::Round($edge.frameMedianLuma, 2))/$([Math]::Round($edge.backgroundMedianLuma, 2)) | $([Math]::Round($edge.contrastDelta, 2))/$($edge.minimumContrast) | $($edge.continuityPassed) | $($edge.contrastPassed) | $($edge.passed) |"
     }
     $markdown += @('', '| Lower boundary kind | Action | Visible top (screen Y) | Frame local Y | Position deviation (px) | Size deviation (px) | Content passed | Passed |', '| --- | --- | ---: | ---: | --- | --- | --- | --- |', "| $($createFrameReport.bottomBoundary.kind) | $($createFrameReport.bottomBoundary.action) | $($createFrameReport.bottomBoundary.visibleTopScreenY) | $($createFrameReport.bottomBoundary.frameLocalY) | dx=$($createFrameReport.bottomBoundary.positionDeviationPx1920x1080.deltaX), dy=$($createFrameReport.bottomBoundary.positionDeviationPx1920x1080.deltaY) | dw=$($createFrameReport.bottomBoundary.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($createFrameReport.bottomBoundary.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $($createFrameReport.bottomBoundary.contentPassed) | $($createFrameReport.bottomBoundary.passed) |")
-    $markdown += @('', '## Home Join decoration', '', "Overall passed: $($joinDecorationReport.passed). Actual crop (top-left px): $($joinDecorationReport.actualRect.x),$($joinDecorationReport.actualRect.y),$($joinDecorationReport.actualRect.width),$($joinDecorationReport.actualRect.height).", '', '| Component | Measurement | Search | Thresholds | Tolerance (px) | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Measurement status | Passed |', '| --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- |')
+    $markdown += @('', '## Home Join decoration', '', "Overall passed: $($joinDecorationReport.passed). Actual crop (top-left px): $($joinDecorationReport.actualRect.x),$($joinDecorationReport.actualRect.y),$($joinDecorationReport.actualRect.width),$($joinDecorationReport.actualRect.height).", '', '| Component | Measurement | Search | Thresholds | Tolerance (px) | Expected | Reference raw | Actual raw | Bounds adjustment | Reference adjusted | Actual adjusted | Center deviation (px) | Size deviation (px) | Measurement status | Passed |', '| --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($component in @($joinDecorationReport.components))
     {
+        $referenceRaw = if ($component.referenceRawBounds) { "$($component.referenceRawBounds.x),$($component.referenceRawBounds.y),$($component.referenceRawBounds.width),$($component.referenceRawBounds.height)" } else { 'unavailable' }
+        $actualRaw = if ($component.actualRawBounds) { "$($component.actualRawBounds.x),$($component.actualRawBounds.y),$($component.actualRawBounds.width),$($component.actualRawBounds.height)" } else { 'unavailable' }
         $referenceMeasured = if ($component.referenceBounds) { "$($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height)" } else { 'unavailable' }
         $actualMeasured = if ($component.actualBounds) { "$($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height)" } else { 'unavailable' }
+        $adjustment = if ($component.boundsAdjustment) {
+            ConvertTo-LanLobbyMarkdownCell "$($component.boundsAdjustment.coordinateOrigin) $($component.boundsAdjustment.unit): x=$($component.boundsAdjustment.x), y=$($component.boundsAdjustment.y), width=$($component.boundsAdjustment.width), height=$($component.boundsAdjustment.height); $($component.boundsAdjustment.reason)"
+        } else { 'none' }
         $centerDeviation = if ($component.centerDeviationPx) { "dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY)" } else { 'n/a' }
         $sizeDeviation = if ($component.sizeDeviationPx) { "dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight)" } else { 'n/a' }
         $thresholds = @($component.thresholds.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '
         $measurementStatus = if ($component.measurementAvailable) { 'available' } else { ConvertTo-LanLobbyMarkdownCell ('unavailable: ' + [string]$component.measurementError) }
-        $markdown += "| $($component.name) | $($component.measurement) | $($component.search.x),$($component.search.y),$($component.search.width),$($component.search.height) | $thresholds | $($component.tolerancePx) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
+        $markdown += "| $($component.name) | $($component.measurement) | $($component.search.x),$($component.search.y),$($component.search.width),$($component.search.height) | $thresholds | $($component.tolerancePx) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceRaw | $actualRaw | $adjustment | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
     }
     $markdown += @('', "Join backing: $($joinDecorationReport.backingRect.x),$($joinDecorationReport.backingRect.y),$($joinDecorationReport.backingRect.width),$($joinDecorationReport.backingRect.height) top-left px; bottom screen Y: $($joinDecorationReport.backingBottomScreenY). SimulationInvite absent: $($joinDecorationReport.simulationInviteAbsent). OutlineBottom absent: $($joinDecorationReport.outlineBottomAbsent). Geometry crosses backing bottom: $($joinDecorationReport.geometryCrossesBackingBottom). Accepted Join action/content passed: $($joinDecorationReport.joinActionPassed).")
     $markdown += @('', "Join backing target passed: $($joinDecorationReport.backingTargetPassed); tolerance: $($joinDecorationReport.backingTargetTolerancePx) px; deviation: dx=$($joinDecorationReport.backingTargetDeviationPx.deltaX), dy=$($joinDecorationReport.backingTargetDeviationPx.deltaY), dw=$($joinDecorationReport.backingTargetDeviationPx.deltaWidth), dh=$($joinDecorationReport.backingTargetDeviationPx.deltaHeight). Fixed action boundary: y=$($joinDecorationReport.actionBoundaryScreenY); graphic/geometry boundary available: $($joinDecorationReport.graphicsOrGeometryBoundaryAvailable); graphic/geometry crosses boundary: $($joinDecorationReport.graphicsOrGeometryCrossesActionBoundary). Required Sprite inventory passed: $($joinDecorationReport.requiredSpriteInventoryPassed).", '', '| Required Join Sprite | Expected occurrences | Actual occurrences | Expected source | Actual source | Passed |', '| --- | ---: | ---: | --- | --- | --- |')

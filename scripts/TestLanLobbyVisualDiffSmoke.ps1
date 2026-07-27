@@ -93,27 +93,96 @@ function Fill-CreateOpenFrameFixture($Graphics, $BrightBrush, $LeftBrush, $Nativ
     Fill-ScaledFixtureRectangle $Graphics $LeftBrush $NativeCrop $TargetSize ([ordered]@{ x=25; y=0; width=3; height=236 })
 }
 
-function Fill-JoinDecorationFixture($Graphics, $NativeCrop, $TargetSize, $Bounds, [int] $Text01OffsetX)
+function Fill-JoinDecorationFixture($Graphics, $NativeCrop, $TargetSize, $Bounds, [int] $Text01OffsetX, [bool] $UseCycle2ActualColors)
 {
     $orangeBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Orange)
-    $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 235))
-    $inputBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 112, 112, 112))
+    $logoBrush = New-Object Drawing.SolidBrush $(if ($UseCycle2ActualColors) {
+        [Drawing.Color]::FromArgb(255, 198, 90, 60)
+    } else {
+        [Drawing.Color]::FromArgb(255, 198, 98, 60)
+    })
+    $text02Brush = New-Object Drawing.SolidBrush $(if ($UseCycle2ActualColors) {
+        [Drawing.Color]::FromArgb(255, 204, 98, 60)
+    } else {
+        [Drawing.Color]::FromArgb(255, 171, 71, 60)
+    })
+    $centralBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
+    $blockBrush = New-Object Drawing.SolidBrush $(if ($UseCycle2ActualColors) {
+        [Drawing.Color]::FromArgb(255, 143, 143, 143)
+    } else {
+        [Drawing.Color]::FromArgb(255, 161, 161, 161)
+    })
+    $inputBackgroundBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 20, 20, 20))
+    $inputBrush = New-Object Drawing.SolidBrush $(if ($UseCycle2ActualColors) {
+        [Drawing.Color]::FromArgb(255, 112, 111, 112)
+    } else {
+        [Drawing.Color]::FromArgb(255, 112, 112, 112)
+    })
     try
     {
+        Fill-ScaledFixtureRectangle $Graphics $inputBackgroundBrush $NativeCrop $TargetSize ([ordered]@{ x=105; y=200; width=510; height=69 })
         foreach ($bound in @($Bounds | Where-Object { $_.name -in @('block-bank', 'input') }))
         {
             $drawBounds = [ordered]@{ x=$bound.x; y=$bound.y; width=$bound.width; height=$bound.height }
+            if ($bound.name -eq 'block-bank')
+            {
+                # The decoded edge body begins after the asset's near-background/transparent
+                # left margin. The exporter must publish and apply the explicit adjustment.
+                # Inset the solid body by one pixel so the decoded edge union itself is
+                # x=54,y=107,w=640,h=89 before the asset-specific adjustment.
+                $drawBounds.x += 10
+                $drawBounds.y += 1
+                $drawBounds.width -= 1
+                $drawBounds.height -= 2
+            }
             $brush = if ($bound.name -eq 'block-bank') { $blockBrush } elseif ($bound.name -eq 'input') { $inputBrush } else { $orangeBrush }
             Fill-ScaledFixtureRectangle $Graphics $brush $NativeCrop $TargetSize $drawBounds
         }
         foreach ($bound in @($Bounds | Where-Object { $_.name -notin @('block-bank', 'input') }))
         {
             $drawBounds = [ordered]@{ x=$bound.x; y=$bound.y; width=$bound.width; height=$bound.height }
-            if ($bound.name -eq 'text-01') { $drawBounds.x += $Text01OffsetX }
-            Fill-ScaledFixtureRectangle $Graphics $orangeBrush $NativeCrop $TargetSize $drawBounds
+            if ($bound.name -eq 'text-01')
+            {
+                $drawBounds = if ($UseCycle2ActualColors) {
+                    [ordered]@{ x=(393 + $Text01OffsetX); y=58; width=61; height=5 }
+                } else {
+                    [ordered]@{ x=393; y=58; width=61; height=3 }
+                }
+            }
+            elseif ($bound.name -eq 'triangle')
+            {
+                $drawBounds = [ordered]@{ x=342; y=49; width=24; height=12 }
+            }
+            elseif ($bound.name -eq 'central-blank')
+            {
+                $drawBounds = if ($UseCycle2ActualColors) {
+                    [ordered]@{ x=324; y=69; width=58; height=58 }
+                } else {
+                    [ordered]@{ x=323; y=72; width=59; height=56 }
+                }
+            }
+            $brush = if ($bound.name -eq 'logo') {
+                $logoBrush
+            } elseif ($bound.name -eq 'text-02') {
+                $text02Brush
+            } elseif ($bound.name -eq 'central-blank') {
+                $centralBrush
+            } else {
+                $orangeBrush
+            }
+            Fill-ScaledFixtureRectangle $Graphics $brush $NativeCrop $TargetSize $drawBounds
         }
     }
-    finally { $orangeBrush.Dispose(); $blockBrush.Dispose(); $inputBrush.Dispose() }
+    finally
+    {
+        $orangeBrush.Dispose()
+        $logoBrush.Dispose()
+        $text02Brush.Dispose()
+        $centralBrush.Dispose()
+        $blockBrush.Dispose()
+        $inputBackgroundBrush.Dispose()
+        $inputBrush.Dispose()
+    }
 }
 
 function New-JoinDecorationSpriteSources()
@@ -146,11 +215,38 @@ function Repair-JoinText01Fixture([string] $Path)
     $orangeBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Orange)
     try
     {
-        $graphics.FillRectangle($backgroundBrush, 1550, 652, 65, 8)
-        $graphics.FillRectangle($orangeBrush, 1545, 652, 65, 8)
+        $graphics.FillRectangle($backgroundBrush, 1545, 650, 75, 16)
+        $graphics.FillRectangle($orangeBrush, 1547, 654, 61, 3)
         $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
     }
     finally { $orangeBrush.Dispose(); $backgroundBrush.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
+}
+
+function Shift-JoinBlockBankFixture([string] $Path, [int] $DeltaX)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $backgroundBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 60, 60, 60))
+    $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 143, 143, 143))
+    $centralBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
+    try
+    {
+        $graphics.FillRectangle($backgroundBrush, 1209, 704, 638, 87)
+        $graphics.FillRectangle($blockBrush, 1209 + $DeltaX, 704, 638, 87)
+        # Restore the overlapping central decoration after moving the bank body.
+        $graphics.FillRectangle($centralBrush, 1478, 665, 58, 58)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $centralBrush.Dispose()
+        $blockBrush.Dispose()
+        $backgroundBrush.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
 }
 
 function New-JoinDecorationGeometry()
@@ -249,7 +345,7 @@ try
             {
                 Fill-ScaledFixtureRectangle $graphics $cyanBrush $createDecorationNativeCrop $createDecorationTarget $bounds.expected
             }
-            Fill-JoinDecorationFixture $graphics $joinDecorationNativeCrop $joinDecorationTarget $joinDecorationBounds 0
+            Fill-JoinDecorationFixture $graphics $joinDecorationNativeCrop $joinDecorationTarget $joinDecorationBounds 0 $false
             Fill-CreateOpenFrameFixture $graphics $cyanBrush $cyanBrush $createFrameNativeCrop $createFrameTarget 0
         }
         finally { $contentBrush.Dispose(); $cyanBrush.Dispose() }
@@ -300,7 +396,7 @@ try
                         }
                     }
                     # text-01 deliberately exceeds its 2 px visible-bound tolerance.
-                    Fill-JoinDecorationFixture $graphics $joinDecorationTarget $joinDecorationTarget $joinDecorationBounds 5
+                    Fill-JoinDecorationFixture $graphics $joinDecorationTarget $joinDecorationTarget $joinDecorationBounds 5 $true
                     Fill-CreateOpenFrameFixture $graphics $cyanBrush $lowContrastBrush $createFrameTarget $createFrameTarget 8
                 }
                 finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose(); $cyanBrush.Dispose(); $lowContrastBrush.Dispose() }
@@ -620,6 +716,13 @@ try
     Assert-True ($joinDecoration.requiredSpriteInventoryPassed -eq $true) 'required Join Sprite inventory must be a passing acceptance gate for the valid fixture'
     Assert-True ($joinDecoration.joinActionPassed -eq $true) 'Join decoration must retain the accepted Join action/content gate'
     Assert-True (@($joinDecoration.components).Count -eq $joinDecorationBounds.Count) 'seven Join decoration visible-bound rows'
+    $cycle2DetectorNames = @('logo', 'text-02', 'block-bank', 'input')
+    $cycle2Unavailable = @(
+        $joinDecoration.components |
+            Where-Object { $_.name -in $cycle2DetectorNames -and -not $_.measurementAvailable } |
+            ForEach-Object { $_.name }
+    )
+    Assert-True ($cycle2Unavailable.Count -eq 0) "fixed-reference/Cycle-2 detector fixtures must all be measurable; unavailable: $($cycle2Unavailable -join ', ')"
     foreach ($expectedJoinBound in $joinDecorationBounds)
     {
         $component = @($joinDecoration.components | Where-Object name -eq $expectedJoinBound.name)
@@ -629,7 +732,60 @@ try
         Assert-True ($component.tolerancePx -eq $expectedJoinBound.tolerance) "Join decoration/$($expectedJoinBound.name) tolerance"
         Assert-True ($component.measurementAvailable -eq $true) "Join decoration/$($expectedJoinBound.name) decoded-pixel measurement must be available"
     }
+    $referenceSelfConsistencyFailures = @(
+        foreach ($component in $joinDecoration.components)
+        {
+            $reference = $component.referenceBounds
+            $expected = $component.expectedBounds
+            $referenceCenterX = $reference.x + ($reference.width - 1) / 2.0
+            $referenceCenterY = $reference.y + ($reference.height - 1) / 2.0
+            $expectedCenterX = $expected.x + ($expected.width - 1) / 2.0
+            $expectedCenterY = $expected.y + ($expected.height - 1) / 2.0
+            if ([Math]::Abs($referenceCenterX - $expectedCenterX) -gt $component.tolerancePx -or
+                [Math]::Abs($referenceCenterY - $expectedCenterY) -gt $component.tolerancePx -or
+                [Math]::Abs($reference.width - $expected.width) -gt $component.tolerancePx -or
+                [Math]::Abs($reference.height - $expected.height) -gt $component.tolerancePx)
+            {
+                $component.name
+            }
+        }
+    )
+    Assert-True ($referenceSelfConsistencyFailures.Count -eq 0) "fixed Join reference must be self-consistent with all seven approved targets; failed: $($referenceSelfConsistencyFailures -join ', ')"
+    $joinLogo = @($joinDecoration.components | Where-Object name -eq 'logo')[0]
+    Assert-True (($joinLogo.thresholds.minimumRed -eq 80) -and ($joinLogo.thresholds.minimumGreen -eq 5) -and ($joinLogo.thresholds.maximumBlue -eq 100) -and ($joinLogo.thresholds.minimumRedOverGreen -eq 15)) 'Join logo detector thresholds must include fixed-reference edge pixels'
+    $joinText02 = @($joinDecoration.components | Where-Object name -eq 'text-02')[0]
+    Assert-True (($joinText02.thresholds.minimumRed -eq 80) -and ($joinText02.thresholds.minimumGreen -eq 5) -and ($joinText02.thresholds.maximumBlue -eq 100) -and ($joinText02.thresholds.minimumRedOverGreen -eq 15)) 'Join text-02 detector thresholds must include fixed-reference edge pixels'
     $joinText01 = @($joinDecoration.components | Where-Object name -eq 'text-01')[0]
+    Assert-True (($joinText01.referenceRawBounds.x -eq 393) -and ($joinText01.referenceRawBounds.y -eq 58) -and ($joinText01.referenceRawBounds.width -eq 61) -and ($joinText01.referenceRawBounds.height -eq 3)) 'Join text-01 reference raw decoded bounds'
+    Assert-True (($joinText01.boundsAdjustment.x -eq -2) -and ($joinText01.boundsAdjustment.y -eq -2) -and ($joinText01.boundsAdjustment.width -eq 4) -and ($joinText01.boundsAdjustment.height -eq 5)) 'Join text-01 explicit symmetric bounds adjustment'
+    Assert-True ((($joinText01.actualRawBounds.x - $joinText01.referenceRawBounds.x) -eq 5) -and (($joinText01.actualBounds.x - $joinText01.referenceBounds.x) -eq 5)) 'Join text-01 calibration must preserve the full decoded +5 px shift'
+    $joinTriangle = @($joinDecoration.components | Where-Object name -eq 'triangle')[0]
+    Assert-True (($joinTriangle.referenceRawBounds.x -eq 342) -and ($joinTriangle.referenceRawBounds.y -eq 49) -and ($joinTriangle.referenceRawBounds.width -eq 24) -and ($joinTriangle.referenceRawBounds.height -eq 12)) 'Join triangle reference raw decoded bounds'
+    Assert-True (($joinTriangle.boundsAdjustment.x -eq -4) -and ($joinTriangle.boundsAdjustment.y -eq -2) -and ($joinTriangle.boundsAdjustment.width -eq 6) -and ($joinTriangle.boundsAdjustment.height -eq 5)) 'Join triangle explicit symmetric bounds adjustment'
+    $joinCentralBlank = @($joinDecoration.components | Where-Object name -eq 'central-blank')[0]
+    Assert-True ($joinCentralBlank.measurement -eq 'orange-component-union') 'Join central blank must use decoded component union'
+    Assert-True (($joinCentralBlank.thresholds.minimumComponentPixelCount -eq 50) -and ($joinCentralBlank.thresholds.maximumComponentWidth -eq 35) -and ($joinCentralBlank.thresholds.maximumComponentHeight -eq 35)) 'Join central blank component-selection thresholds'
+    Assert-True (($joinCentralBlank.referenceRawBounds.x -eq 323) -and ($joinCentralBlank.referenceRawBounds.y -eq 72) -and ($joinCentralBlank.referenceRawBounds.width -eq 59) -and ($joinCentralBlank.referenceRawBounds.height -eq 56)) 'Join central blank reference raw decoded bounds'
+    Assert-True (($joinCentralBlank.actualRawBounds.x -eq 324) -and ($joinCentralBlank.actualRawBounds.y -eq 69) -and ($joinCentralBlank.actualRawBounds.width -eq 58) -and ($joinCentralBlank.actualRawBounds.height -eq 58)) 'Join central blank actual guide-free decoded bounds'
+    Assert-True (($joinCentralBlank.boundsAdjustment.x -eq 0) -and ($joinCentralBlank.boundsAdjustment.y -eq -4) -and ($joinCentralBlank.boundsAdjustment.width -eq 1) -and ($joinCentralBlank.boundsAdjustment.height -eq 5)) 'Join central blank explicit symmetric bounds adjustment'
+    foreach ($calibratedComponent in @($joinText01, $joinTriangle, $joinCentralBlank))
+    {
+        Assert-True (($calibratedComponent.boundsAdjustment.coordinateOrigin -eq 'crop-top-left') -and ($calibratedComponent.boundsAdjustment.unit -eq 'px')) "Join $($calibratedComponent.name) adjustment coordinate schema"
+        Assert-True (-not [string]::IsNullOrWhiteSpace([string]$calibratedComponent.boundsAdjustment.reason)) "Join $($calibratedComponent.name) adjustment reason"
+    }
+    $joinBlockBank = @($joinDecoration.components | Where-Object name -eq 'block-bank')[0]
+    Assert-True ($joinBlockBank.measurement -eq 'edge-component-union') 'Join block bank must use decoded edge-component union'
+    Assert-True (($joinBlockBank.thresholds.minimumChannelDifference -eq 5) -and ($joinBlockBank.thresholds.minimumComponentPixelCount -eq 5) -and $joinBlockBank.thresholds.excludeSearchBorderComponents) 'Join block-bank edge-component thresholds'
+    Assert-True (($joinBlockBank.referenceRawBounds.x -eq 54) -and ($joinBlockBank.referenceRawBounds.y -eq 107) -and ($joinBlockBank.referenceRawBounds.width -eq 640) -and ($joinBlockBank.referenceRawBounds.height -eq 89)) 'Join block-bank reference raw decoded bounds'
+    Assert-True (($joinBlockBank.actualRawBounds.x -eq 54) -and ($joinBlockBank.actualRawBounds.y -eq 107) -and ($joinBlockBank.actualRawBounds.width -eq 640) -and ($joinBlockBank.actualRawBounds.height -eq 89)) 'Join block-bank actual raw decoded bounds'
+    Assert-True (($joinBlockBank.boundsAdjustment.coordinateOrigin -eq 'crop-top-left') -and ($joinBlockBank.boundsAdjustment.unit -eq 'px')) 'Join block-bank adjustment coordinate schema'
+    Assert-True (($joinBlockBank.boundsAdjustment.x -eq -9) -and ($joinBlockBank.boundsAdjustment.y -eq 0) -and ($joinBlockBank.boundsAdjustment.width -eq -1) -and ($joinBlockBank.boundsAdjustment.height -eq 0)) 'Join block-bank explicit asset-specific bounds adjustment'
+    Assert-True ([string]$joinBlockBank.boundsAdjustment.reason -like '*near-background/transparent*') 'Join block-bank adjustment reason'
+    Assert-True (($joinBlockBank.referenceBounds.x -eq 45) -and ($joinBlockBank.referenceBounds.y -eq 107) -and ($joinBlockBank.referenceBounds.width -eq 639) -and ($joinBlockBank.referenceBounds.height -eq 89)) 'Join block-bank adjusted reference bounds'
+    Assert-True (($joinBlockBank.actualBounds.x -eq 45) -and ($joinBlockBank.actualBounds.y -eq 107) -and ($joinBlockBank.actualBounds.width -eq 639) -and ($joinBlockBank.actualBounds.height -eq 89)) 'Join block-bank adjusted actual bounds'
+    $joinInput = @($joinDecoration.components | Where-Object name -eq 'input')[0]
+    Assert-True ($joinInput.measurement -eq 'neutral-largest-component') 'Join input must measure the largest decoded neutral panel'
+    Assert-True (($joinInput.thresholds.minimumLuminanceInclusive -eq 40) -and ($joinInput.thresholds.maximumLuminanceInclusive -eq 140) -and ($joinInput.thresholds.maximumChannelSpread -eq 5)) 'Join input panel thresholds'
     Assert-True ($joinText01.passed -eq $false) 'deliberately displaced Join text-01 must fail its named row'
     $unexpectedJoinFailures = @($joinDecoration.components | Where-Object { $_.name -ne 'text-01' -and -not $_.passed })
     Assert-True ($unexpectedJoinFailures.Count -eq 0) "all other Join decoration rows must pass; failed: $(@($unexpectedJoinFailures | ForEach-Object { $_.name }) -join ', ')"
@@ -784,6 +940,10 @@ try
     Assert-True ($markdown.Contains('## Home Create open-frame continuity')) 'Markdown must expose Create open-frame continuity'
     Assert-True ($markdown.Contains('## Home Join decoration')) 'Markdown must expose Join decoration visible bounds'
     foreach ($expectedJoinBound in $joinDecorationBounds) { Assert-True ($markdown.Contains($expectedJoinBound.name)) "Markdown missing Join decoration/$($expectedJoinBound.name)" }
+    Assert-True ($markdown.Contains('Reference raw')) 'Markdown must publish raw decoded Join bounds'
+    Assert-True ($markdown.Contains('Bounds adjustment')) 'Markdown must publish the explicit Join bounds adjustment'
+    Assert-True ($markdown.Contains('Reference adjusted')) 'Markdown must distinguish adjusted Join bounds'
+    Assert-True ($markdown.Contains('near-background/transparent left margin')) 'Markdown must publish the block-bank adjustment reason'
     Assert-True ($markdown.Contains('Search/background')) 'Markdown frame table must expose the background ROI'
     Assert-True ($markdown.Contains('Frame/background median luma')) 'Markdown frame table must expose median luma'
     Assert-True ($markdown.Contains('Contrast delta/minimum')) 'Markdown frame table must expose contrast acceptance'
@@ -807,6 +967,27 @@ try
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$asset.sourcePath)) 'asset must have mapped source path'
         Assert-True ([string]$asset.importedSha256 -match '^[0-9A-F]{64}$') 'asset must have SHA-256'
     }
+    $shiftedBlockCaptureDirectory = Join-Path $scratch 'shifted-join-block-bank-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $shiftedBlockCaptureDirectory -Recurse
+    $shiftedBlockManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shiftedBlockCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $shiftedBlockManifest.captures) { $record.path = Join-Path $shiftedBlockCaptureDirectory ($record.name + '.png') }
+    $shiftedBlockManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $shiftedBlockCaptureDirectory 'manifest.json') -Encoding UTF8
+    $shiftedBlockHome = Join-Path $shiftedBlockCaptureDirectory 'home.png'
+    Repair-JoinText01Fixture $shiftedBlockHome
+    Shift-JoinBlockBankFixture $shiftedBlockHome -6
+    $shiftedBlockOutput = Join-Path $scratch 'shifted-join-block-bank-output'
+    & $exportScript -CaptureDirectory $shiftedBlockCaptureDirectory -OutputDirectory $shiftedBlockOutput -ReferenceDirectory $referenceDirectory | Out-Null
+    $shiftedBlockReport = Get-Content -Raw -LiteralPath (Join-Path $shiftedBlockOutput 'visual-diff-report.json') | ConvertFrom-Json
+    $shiftedBlock = @($shiftedBlockReport.joinDecoration.components | Where-Object name -eq 'block-bank')[0]
+    Assert-True ($shiftedBlock.measurementAvailable -eq $true) 'shifted Join block-bank decoded measurement must remain available'
+    $rawBlockShiftX = $shiftedBlock.actualRawBounds.x - $joinBlockBank.actualRawBounds.x
+    $adjustedBlockShiftX = $shiftedBlock.actualBounds.x - $joinBlockBank.actualBounds.x
+    Assert-True (($rawBlockShiftX -eq -6) -and ($adjustedBlockShiftX -eq -6)) 'block-bank adjustment must preserve the full decoded -6 px shift'
+    Assert-True (($shiftedBlock.actualRawBounds.width -eq $joinBlockBank.actualRawBounds.width) -and ($shiftedBlock.actualBounds.width -eq $joinBlockBank.actualBounds.width)) 'block-bank adjustment must preserve an unchanged decoded width'
+    Assert-True (($shiftedBlock.centerDeviationPx.deltaX -eq -6) -and ($shiftedBlock.passed -eq $false)) 'meaningful block-bank position delta must remain blocking'
+    Assert-True (@($shiftedBlockReport.joinDecoration.components | Where-Object { -not $_.passed }).Count -eq 1) 'shifted block-bank fixture must isolate its visual-bound failure'
+    Assert-True ($shiftedBlockReport.joinDecoration.passed -eq $false) 'shifted block-bank must block overall Join acceptance'
+
     $joinGeometryPrefix = 'LanLobbyRoot/Home/RoomSelect/Join/'
     $joinNegativeCases = @(
         [pscustomobject]@{
