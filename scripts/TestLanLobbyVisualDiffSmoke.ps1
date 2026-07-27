@@ -12,7 +12,7 @@ $script:fixtureCount = 0
 function Assert-True([bool] $Condition, [string] $Message)
 {
     $script:assertionCount++
-    if (-not $Condition) { throw "Assertion failed: $Message" }
+    if (-not $Condition) { throw "Assertion failed: $Message (fixtures=$script:fixtureCount; assertions=$script:assertionCount)" }
 }
 
 function Assert-FailsWithoutOutput([scriptblock] $Action, [string] $OutputPath, [string] $ExpectedMessage)
@@ -83,6 +83,126 @@ function New-NormalizedRoomCapture([string] $ReferencePath, [string] $Path)
         $graphics.Dispose()
         $bitmap.Dispose()
         $reference.Dispose()
+    }
+}
+
+function Write-LanLobbySmokeManifest([string] $Path, $Manifest)
+{
+    [IO.File]::WriteAllText(
+        $Path,
+        ($Manifest | ConvertTo-Json -Depth 20),
+        (New-Object Text.UTF8Encoding($false)))
+}
+
+function Invoke-LanLobbyVisualMutation(
+    [string] $SourceCaptureDirectory,
+    [string] $ReferenceDirectory,
+    [string] $CaseName,
+    [scriptblock] $Mutate)
+{
+    $script:fixtureCount++
+    $caseCaptureDirectory = Join-Path $scratch ($CaseName + '-captures')
+    Copy-Item -LiteralPath $SourceCaptureDirectory -Destination $caseCaptureDirectory -Recurse
+    $caseManifestPath = Join-Path $caseCaptureDirectory 'manifest.json'
+    $caseManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $caseManifestPath | ConvertFrom-Json
+    foreach ($record in $caseManifest.captures)
+    {
+        $record.path = Join-Path $caseCaptureDirectory ($record.name + '.png')
+    }
+    & $Mutate $caseManifest $caseCaptureDirectory
+    Write-LanLobbySmokeManifest $caseManifestPath $caseManifest
+    $caseOutput = Join-Path $scratch ($CaseName + '-output')
+    & $exportScript -CaptureDirectory $caseCaptureDirectory -OutputDirectory $caseOutput -ReferenceDirectory $ReferenceDirectory | Out-Null
+    return [pscustomobject]@{
+        report = Get-Content -Raw -LiteralPath (Join-Path $caseOutput 'visual-diff-report.json') | ConvertFrom-Json
+        output = $caseOutput
+        captures = $caseCaptureDirectory
+    }
+}
+
+function Add-LanLobbyFixturePixels(
+    [string] $Path,
+    [Drawing.Color] $Color,
+    [int] $X,
+    [int] $Y,
+    [int] $Width,
+    [int] $Height)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $brush = New-Object Drawing.SolidBrush $Color
+    try
+    {
+        $graphics.FillRectangle($brush, $X, $Y, $Width, $Height)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $brush.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
+function Shift-LanLobbyFixtureRegion(
+    [string] $Path,
+    [Drawing.Rectangle] $Region,
+    [int] $DeltaX,
+    [int] $DeltaY)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $crop = $bitmap.Clone($Region, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try
+    {
+        $graphics.FillRectangle([Drawing.Brushes]::Black, $Region)
+        $graphics.DrawImageUnscaled($crop, $Region.X + $DeltaX, $Region.Y + $DeltaY)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $graphics.Dispose()
+        $crop.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
+function Assert-LanLobbyFailedRoiDrawn(
+    [string] $OutputDirectory,
+    [string] $CaptureName,
+    $Roi,
+    [string] $Label)
+{
+    foreach ($kind in @('overlay','heatmap'))
+    {
+        $path = Join-Path $OutputDirectory "$CaptureName-$kind.png"
+        $bitmap = [Drawing.Bitmap]::FromFile($path)
+        try
+        {
+            $redBorderPixels = 0
+            for ($x = [int]$Roi.x; $x -lt ([int]$Roi.x + [int]$Roi.width); $x++)
+            {
+                foreach ($y in @([int]$Roi.y, ([int]$Roi.y + [int]$Roi.height - 1)))
+                {
+                    $pixel = $bitmap.GetPixel($x, $y)
+                    if ($pixel.R -ge 240 -and $pixel.G -le 24 -and $pixel.B -le 24) { $redBorderPixels++ }
+                }
+            }
+            for ($y = [int]$Roi.y; $y -lt ([int]$Roi.y + [int]$Roi.height); $y++)
+            {
+                foreach ($x in @([int]$Roi.x, ([int]$Roi.x + [int]$Roi.width - 1)))
+                {
+                    $pixel = $bitmap.GetPixel($x, $y)
+                    if ($pixel.R -ge 240 -and $pixel.G -le 24 -and $pixel.B -le 24) { $redBorderPixels++ }
+                }
+            }
+            Assert-True ($redBorderPixels -gt 20) "$Label failed ROI must be red on $kind"
+        }
+        finally { $bitmap.Dispose() }
     }
 }
 
@@ -618,7 +738,12 @@ try
     }
 
     $names = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full')
-    $bgTerrainSha = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $projectRoot 'Assets/Resources/UI/Lobby/bg_terrain.png')).Hash
+    $roomSpriteSha = @{}
+    foreach ($spriteName in @('bg_terrain','player_card_ready','btn_match_normal','btn_match_grey','btn_topmenu_back','icon_amiy'))
+    {
+        $relative = if ($spriteName -eq 'icon_amiy') { "Assets/Resources/UI/Lobby/Home/$spriteName.png" } else { "Assets/Resources/UI/Lobby/$spriteName.png" }
+        $roomSpriteSha[$spriteName] = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $projectRoot $relative)).Hash
+    }
     $records = @()
     foreach ($name in $names)
     {
@@ -684,14 +809,27 @@ try
                 [ordered]@{ name = 'LanLobbyRoot/Home/RoomSelect/Join/JoinAction'; coordinateOrigin = 'screen-bottom-left'; unit = 'px'; x = 1154; y = 105; width = 717; height = 99 }
             )
         } else { @() }
+        $roomSpriteSources = if ($name -like 'room-*') {
+            $primarySprite = if ($name -eq 'room-full') { 'btn_match_grey' } else { 'btn_match_normal' }
+            @(
+                [ordered]@{ node='LanLobbyRoot/Terrain';spriteName='bg_terrain';sourcePath='[uc]autochessouter/bg_terrain.png';coordinateOrigin='screen-bottom-left';unit='px';x=0;y=0;width=1920;height=1080;raycastTarget=$false },
+                [ordered]@{ node='LanLobbyRoot/Room/RoomCard_0/OccupiedContent/ReadyIcon';spriteName='player_card_ready';sourcePath='[uc]autochessouter/player_card_ready.png';coordinateOrigin='screen-bottom-left';unit='px';x=354;y=629;width=54;height=48;raycastTarget=$false },
+                [ordered]@{ node='LanLobbyRoot/Room/PrimaryAction';spriteName=$primarySprite;sourcePath="[uc]autochessouter/$primarySprite.png";coordinateOrigin='screen-bottom-left';unit='px';x=1479;y=41;width=441;height=104;raycastTarget=$true },
+                [ordered]@{ node='LanLobbyRoot/Room/LeaveAction';spriteName='btn_topmenu_back';sourcePath='[uc]autochessouter/btn_topmenu_back.png';coordinateOrigin='screen-bottom-left';unit='px';x=36;y=989;width=134;height=69;raycastTarget=$true }
+            )
+        } else { @() }
         $records += [ordered]@{
             name = $name
             path = $actualPath
             width = 1920
             height = 1080
-            spriteSources = @(
-                [ordered]@{ node = 'LanLobbyRoot/Terrain'; spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' }
-            ) + $(if ($name -in @('home', 'discovered-prefill')) {
+            localPlayerId = $(if ($name -like 'room-*') { 'capture-host' } else { '' })
+            members = $(if ($name -like 'room-*') { @([ordered]@{ playerId='capture-host';displayName='Doctor';isReady=$true }) } else { @() })
+            spriteSources = @($(if ($name -like 'room-*') {
+                @($roomSpriteSources)
+            } else {
+                @([ordered]@{ node = 'LanLobbyRoot/Terrain'; spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' })
+            })) + @($(if ($name -in @('home', 'discovered-prefill')) {
                 @(
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/TitleDot'; spriteName = 'room_select_dot'; sourcePath = '[uc]autochessouter/room_select_dot.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/Wings/WingLeftUpper'; spriteName = 'img_pointer'; sourcePath = '[uc]autochessouter/img_pointer.png' },
@@ -716,7 +854,7 @@ try
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/Text02'; spriteName = 'room_select_create_text_02'; sourcePath = '[uc]autochessouter/room_select_create_text_02.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/StartRoomDecoration'; spriteName = 'room_select_img_startroom'; sourcePath = '[uc]autochessouter/room_select_img_startroom.png' }
                 )
-            } else { @() }) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationSpriteSources } else { @() })
+            } else { @() })) + @($(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationSpriteSources } else { @() }))
             rects = @(
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_0'; x = 100; y = 100; width = 200; height = 300 },
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_1'; x = 320; y = 100; width = 200; height = 300 },
@@ -736,19 +874,24 @@ try
                 [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 0; y = 0; width = 1920; height = 1080 }
             ) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationGeometry } else { @() })
             sourceAudit = $(if ($name -like 'room-*') {
-                @([ordered]@{
-                    node='LanLobbyRoot/Terrain'
-                    kind='bitmap-sprite'
-                    isBitmap=$true
-                    spriteName='bg_terrain'
-                    materialName=''
-                    resourcesPath='UI/Lobby/bg_terrain'
-                    sourcePath='[uc]autochessouter/bg_terrain.png'
-                    sha256=$bgTerrainSha
-                    captures=@($name)
-                    occurrenceCount=1
-                    raycastTarget=$false
-                })
+                @(
+                    foreach ($sprite in $roomSpriteSources)
+                    {
+                        [ordered]@{
+                            node=$sprite.node
+                            kind='bitmap-sprite'
+                            isBitmap=$true
+                            spriteName=$sprite.spriteName
+                            materialName=''
+                            resourcesPath=$(if ($sprite.spriteName -eq 'icon_amiy') { 'UI/Lobby/Home/icon_amiy' } else { "UI/Lobby/$($sprite.spriteName)" })
+                            sourcePath=$sprite.sourcePath
+                            sha256=$roomSpriteSha[[string]$sprite.spriteName]
+                            captures=@($name)
+                            occurrenceCount=1
+                            raycastTarget=$sprite.raycastTarget
+                        }
+                    }
+                )
             } else { @() })
         }
     }
@@ -1039,8 +1182,14 @@ try
         'RoomFull.Slot1.ProfileContentAbsence',
         'RoomReady.Slot1.ProfileContentAbsence',
         'RoomHost.LegacyOpenSlotTextAbsence',
+        'RoomHost.LegacyWaitingTextAbsence',
+        'RoomFull.LegacyOpenSlotTextAbsence',
         'RoomFull.LegacyWaitingTextAbsence',
+        'RoomReady.LegacyOpenSlotTextAbsence',
+        'RoomReady.LegacyWaitingTextAbsence',
         'RoomHost.Slot2To3.VisibleContourSpacing',
+        'RoomHost.Slot3To4.VisibleContourSpacing',
+        'RoomFull.Slot2To3.VisibleContourSpacing',
         'RoomReady.Slot2To3.VisibleContourSpacing'
     )
     foreach ($gateName in $requiredRoomGates)
@@ -1055,6 +1204,27 @@ try
         Assert-True ($null -ne $gate.thresholds) "$gateName thresholds"
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$gate.status)) "$gateName status"
         Assert-True ($null -ne $gate.materialEvidence) "$gateName material provenance"
+        Assert-True ($gate.materialEvidence.bijectionPassed) "$gateName bitmap manifest bijection"
+        Assert-True ($gate.materialEvidence.pathPassed) "$gateName approved Resources/source path"
+        Assert-True ($gate.materialEvidence.captureListPassed) "$gateName exact capture list"
+        Assert-True ($gate.materialEvidence.aggregatePassed) "$gateName aggregate occurrence inventory"
+        Assert-True ($gate.materialEvidence.associationKind -in @('roi-overlap','explicit-no-bitmap')) "$gateName per-gate material association"
+    }
+    $roomGateMaterialAssociations = @(
+        [pscustomobject]@{ gate='RoomHost.Slot1.ReadyCheck';node='LanLobbyRoot/Room/RoomCard_0/OccupiedContent/ReadyIcon' },
+        [pscustomobject]@{ gate='RoomFull.PrimaryAction.Gray';node='LanLobbyRoot/Room/PrimaryAction' },
+        [pscustomobject]@{ gate='RoomReady.PrimaryAction.Cyan';node='LanLobbyRoot/Room/PrimaryAction' },
+        [pscustomobject]@{ gate='RoomReady.Leave';node='LanLobbyRoot/Room/LeaveAction' }
+    )
+    foreach ($association in $roomGateMaterialAssociations)
+    {
+        $associatedGate = @($report.roomGates | Where-Object name -ceq $association.gate)[0]
+        Assert-True (@($associatedGate.materialEvidence.rows | Where-Object node -ceq $association.node).Count -eq 1) "$($association.gate) must resolve ROI-associated provenance row $($association.node)"
+    }
+    foreach ($semanticGate in @($report.roomGates | Where-Object { $_.maskKind -in @('manifest-text-absence','structured-and-decoded-profile-absence','derived-visible-contour-spacing') }))
+    {
+        Assert-True ($semanticGate.materialEvidence.associationKind -eq 'explicit-no-bitmap') "$($semanticGate.name) must explicitly declare no direct bitmap association"
+        Assert-True (@($semanticGate.materialEvidence.rows).Count -eq 0) "$($semanticGate.name) must not inherit an undifferentiated capture-wide row array"
     }
     foreach ($excludedName in @('RoomFull.Slot4.ReferencePopupExclusion','RoomReady.Slot4.ReferencePopupExclusion'))
     {
@@ -1348,8 +1518,26 @@ try
         Assert-True ($markdown.Contains("${figure}: 2560×1440")) "Markdown must derive $figure native dimensions from decoded reference pixels"
     }
     Assert-True ($markdown.Contains('## LAN room named visible-pixel gates')) 'Markdown must expose named LAN room visible-pixel gates'
+    Assert-True ($markdown.Contains('Full-screen capture metrics are informational')) 'Markdown must identify full-screen metrics as informational'
+    Assert-True ($markdown.Contains('named room gates and material provenance are blocking')) 'Markdown must identify room/material gates as blocking'
+    foreach ($column in @('Exclusions','Actual/reference centers','Actual/reference pixels','Associated provenance'))
+    {
+        Assert-True ($markdown.Contains($column)) "Markdown human gate table missing $column"
+    }
     foreach ($gateName in $requiredRoomGates) { Assert-True ($markdown.Contains($gateName)) "Markdown missing named room gate $gateName" }
     Assert-True ($markdown.Contains('ExcludedByReferencePopup')) 'Markdown must preserve excluded fourth-slot status'
+    $markdownLines = @($markdown -split "`r?`n")
+    $jsonlBegin = [Array]::IndexOf($markdownLines, '<!-- ROOM_GATE_JSONL_BEGIN -->')
+    $jsonlEnd = [Array]::IndexOf($markdownLines, '<!-- ROOM_GATE_JSONL_END -->')
+    Assert-True ($jsonlBegin -ge 0 -and $jsonlEnd -gt $jsonlBegin) 'Markdown must contain a bounded lossless room-gate JSONL appendix'
+    $jsonlGateLines = @($markdownLines[($jsonlBegin + 2)..($jsonlEnd - 2)] | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    Assert-True ($jsonlGateLines.Count -eq @($report.roomGates).Count) 'Markdown JSONL must contain exactly one row per JSON room gate'
+    for ($gateIndex = 0; $gateIndex -lt @($report.roomGates).Count; $gateIndex++)
+    {
+        $jsonGate = $report.roomGates[$gateIndex] | ConvertTo-Json -Depth 20 -Compress
+        $markdownGate = ($jsonlGateLines[$gateIndex] | ConvertFrom-Json) | ConvertTo-Json -Depth 20 -Compress
+        Assert-True ($markdownGate -ceq $jsonGate) "Markdown JSONL parity for every field/provenance row: $($report.roomGates[$gateIndex].name)"
+    }
     Assert-True ($markdown.Contains('Position deviation (px)')) 'Markdown action table must expose position deviation in px'
     Assert-True ($markdown.Contains('1161,449,711,95')) 'Markdown must contain the manifest-derived Create actual Rect'
     Assert-True ($markdown.Contains('dx=7, dy=-4')) 'Markdown must contain the exact manifest-derived Create position delta'
@@ -1429,6 +1617,176 @@ try
     $materialGate = @($materialReport.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyTopBar')[0]
     Assert-True (($materialGate.materialEvidence.shaPassed -eq $false) -and ($materialGate.materialEvidence.occurrencePassed -eq $false)) 'source SHA and rendered occurrence mismatches must both fail material evidence'
     Assert-True (($materialGate.status -eq 'Failed') -and ($materialGate.passed -eq $false)) 'material mismatch must block a visually matching named gate'
+
+    $roomPrefixes = @{
+        'room-host'='RoomHost'
+        'room-full'='RoomFull'
+        'room-ready'='RoomReady'
+    }
+    foreach ($forbiddenText in @('OPEN SLOT','WAITING'))
+    {
+        foreach ($captureName in @('room-host','room-full','room-ready'))
+        {
+            $caseName = 'legacy-' + $captureName + '-' + $forbiddenText.Replace(' ','-').ToLowerInvariant()
+            $legacyResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory $caseName {
+                param($caseManifest,$caseCaptureDirectory)
+                $record = @($caseManifest.captures | Where-Object name -ceq $captureName)[0]
+                $record.unityText = @($record.unityText) + [pscustomobject][ordered]@{
+                    node="LanLobbyRoot/Room/RoomCard_2/Legacy$($forbiddenText.Replace(' ',''))"
+                    text=$forbiddenText
+                    fontName='Novecento wide Normal Regular'
+                    fontResourcePath=''
+                    hasBitmapSource=$false
+                    bitmapSourcePath=''
+                }
+            }
+            $literalSuffix = if ($forbiddenText -ceq 'OPEN SLOT') { 'LegacyOpenSlotTextAbsence' } else { 'LegacyWaitingTextAbsence' }
+            $legacyGate = @($legacyResult.report.roomGates | Where-Object name -ceq "$($roomPrefixes[$captureName]).$literalSuffix")[0]
+            Assert-True (($legacyGate.status -ceq 'Failed') -and ($legacyGate.passed -eq $false)) "$captureName must reject exact forbidden text $forbiddenText"
+            Assert-True ([string]$legacyGate.reason -like "*$forbiddenText*") "$captureName forbidden-text failure must name $forbiddenText"
+            Assert-LanLobbyFailedRoiDrawn $legacyResult.output $captureName $legacyGate.roi "$captureName $forbiddenText"
+        }
+    }
+
+    $hostSpacingResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'host-slot3-to4-spacing' {
+        param($caseManifest,$caseCaptureDirectory)
+        Shift-LanLobbyFixtureRegion (Join-Path $caseCaptureDirectory 'room-host.png') (New-Object Drawing.Rectangle 1365,178,364,665) 5 0
+    }
+    $hostSpacingGate = @($hostSpacingResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot3To4.VisibleContourSpacing')[0]
+    Assert-True (($hostSpacingGate.status -ceq 'Failed') -and ([Math]::Abs([double]$hostSpacingGate.centerDeltaPx.spacingDelta) -gt 4)) 'independent Figure 11 slot 4 pixel shift must block slot 3-to-4 spacing'
+    Assert-LanLobbyFailedRoiDrawn $hostSpacingResult.output 'room-host' $hostSpacingGate.roi 'RoomHost slot3-to4 spacing'
+
+    $fullSpacingResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'full-slot2-to3-spacing' {
+        param($caseManifest,$caseCaptureDirectory)
+        Shift-LanLobbyFixtureRegion (Join-Path $caseCaptureDirectory 'room-full.png') (New-Object Drawing.Rectangle 977,178,364,665) 5 0
+    }
+    $fullSpacingGate = @($fullSpacingResult.report.roomGates | Where-Object name -ceq 'RoomFull.Slot2To3.VisibleContourSpacing')[0]
+    Assert-True (($fullSpacingGate.status -ceq 'Failed') -and ([Math]::Abs([double]$fullSpacingGate.centerDeltaPx.spacingDelta) -gt 4)) 'independent Figure 12 slot 3 pixel shift must block slot 2-to-3 spacing'
+    Assert-LanLobbyFailedRoiDrawn $fullSpacingResult.output 'room-full' $fullSpacingGate.roi 'RoomFull slot2-to3 spacing'
+
+    $profilePixelCases = @(
+        [pscustomobject]@{ name='dark';color=[Drawing.Color]::FromArgb(255,18,18,18) },
+        [pscustomobject]@{ name='colorful';color=[Drawing.Color]::FromArgb(255,220,35,170) }
+    )
+    foreach ($profilePixelCase in $profilePixelCases)
+    {
+        $profilePixelResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory ("profile-" + $profilePixelCase.name) {
+            param($caseManifest,$caseCaptureDirectory)
+            $positions = @{
+                'room-host'=@(270,280)
+                'room-full'=@(300,330)
+                'room-ready'=@(420,550)
+            }
+            foreach ($roomCaptureName in $positions.Keys)
+            {
+                Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory "$roomCaptureName.png") $profilePixelCase.color $positions[$roomCaptureName][0] $positions[$roomCaptureName][1] 24 24
+            }
+        }
+        foreach ($captureName in @('room-host','room-full','room-ready'))
+        {
+            $profileGate = @($profilePixelResult.report.roomGates | Where-Object name -ceq "$($roomPrefixes[$captureName]).Slot1.ProfileContentAbsence")[0]
+            Assert-True (($profileGate.status -ceq 'Failed') -and ([int]$profileGate.unexpectedActualPixelCount -gt 0)) "$captureName must reject $($profilePixelCase.name) unexpected profile pixels"
+            Assert-LanLobbyFailedRoiDrawn $profilePixelResult.output $captureName $profileGate.roi "$captureName $($profilePixelCase.name) profile"
+        }
+    }
+
+    $structuredProfileCases = @(
+        [pscustomobject]@{
+            name='host-identity-text'
+            mutate={
+                param($record,$caseCaptureDirectory)
+                $record.unityText = @($record.unityText) + [pscustomobject][ordered]@{
+                    node='LanLobbyRoot/Room/RoomCard_0/Label';text='Doctor / capture-host';fontName='Novecento wide Normal Regular';fontResourcePath='';hasBitmapSource=$false;bitmapSourcePath=''
+                }
+            }
+        },
+        [pscustomobject]@{
+            name='generic-profile-label'
+            mutate={
+                param($record,$caseCaptureDirectory)
+                $record.unityText = @($record.unityText) + [pscustomobject][ordered]@{
+                    node='LanLobbyRoot/Room/RoomCard_0/Label';text='PROFILE';fontName='Novecento wide Normal Regular';fontResourcePath='';hasBitmapSource=$false;bitmapSourcePath=''
+                }
+            }
+        },
+        [pscustomobject]@{
+            name='approved-avatar-generic-icon'
+            mutate={
+                param($record,$caseCaptureDirectory)
+                $sprite = [pscustomobject][ordered]@{
+                    node='LanLobbyRoot/Room/RoomCard_0/Icon';spriteName='icon_amiy';sourcePath='Combined/[uc]autochesscommon/icon_amiy.png'
+                    coordinateOrigin='screen-bottom-left';unit='px';x=270;y=700;width=80;height=80;raycastTarget=$false
+                }
+                $record.spriteSources = @($record.spriteSources) + $sprite
+                $record.sourceAudit = @($record.sourceAudit) + [pscustomobject][ordered]@{
+                    node=$sprite.node;kind='bitmap-sprite';isBitmap=$true;spriteName=$sprite.spriteName;materialName=''
+                    resourcesPath='UI/Lobby/Home/icon_amiy';sourcePath=$sprite.sourcePath;sha256=$roomSpriteSha['icon_amiy']
+                    captures=@([string]$record.name);occurrenceCount=1;raycastTarget=$false
+                }
+                Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory "$($record.name).png") ([Drawing.Color]::FromArgb(255,70,120,210)) 270 300 80 80
+            }
+        }
+    )
+    foreach ($structuredProfileCase in $structuredProfileCases)
+    {
+        $profileStructureResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory $structuredProfileCase.name {
+            param($caseManifest,$caseCaptureDirectory)
+            foreach ($record in @($caseManifest.captures | Where-Object { $_.name -like 'room-*' }))
+            {
+                & $structuredProfileCase.mutate $record $caseCaptureDirectory
+            }
+        }
+        foreach ($captureName in @('room-host','room-full','room-ready'))
+        {
+            $profileGate = @($profileStructureResult.report.roomGates | Where-Object name -ceq "$($roomPrefixes[$captureName]).Slot1.ProfileContentAbsence")[0]
+            Assert-True (($profileGate.status -ceq 'Failed') -and (-not $profileGate.structuredAbsencePassed)) "$captureName must reject $($structuredProfileCase.name)"
+        }
+        if ($structuredProfileCase.name -ceq 'approved-avatar-generic-icon')
+        {
+            $avatarGate = @($profileStructureResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.ProfileContentAbsence')[0]
+            Assert-True $avatarGate.materialEvidence.passed 'approved extra avatar provenance must remain valid so structured/profile absence is independently blocking'
+        }
+    }
+
+    $extraAuditResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'material-extra-unmatched-row' {
+        param($caseManifest,$caseCaptureDirectory)
+        $record = @($caseManifest.captures | Where-Object name -ceq 'room-host')[0]
+        $record.sourceAudit = @($record.sourceAudit) + [pscustomobject][ordered]@{
+            node='LanLobbyRoot/Room/UnknownExtra';kind='bitmap-sprite';isBitmap=$true;spriteName='unknown-extra';materialName=''
+            resourcesPath='UI/Lobby/unknown-extra';sourcePath='[uc]autochessouter/unknown-extra.png';sha256=('A' * 64)
+            captures=@('room-host');occurrenceCount=1;raycastTarget=$false
+        }
+    }
+    $extraAuditGate = @($extraAuditResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.ReadyCheck')[0]
+    Assert-True ((-not $extraAuditGate.materialEvidence.bijectionPassed) -and $extraAuditGate.status -ceq 'Failed') 'an extra unmatched bitmap audit row must block every room-host gate'
+
+    $wrongPathResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'material-wrong-paths-capture' {
+        param($caseManifest,$caseCaptureDirectory)
+        $record = @($caseManifest.captures | Where-Object name -ceq 'room-ready')[0]
+        $row = @($record.sourceAudit | Where-Object node -ceq 'LanLobbyRoot/Room/PrimaryAction')[0]
+        $row.resourcesPath = 'UI/Lobby/wrong'
+        $row.sourcePath = '[uc]autochessouter/wrong.png'
+        $row.captures = @('room-full')
+    }
+    $wrongPathGate = @($wrongPathResult.report.roomGates | Where-Object name -ceq 'RoomReady.PrimaryAction.Cyan')[0]
+    Assert-True ((-not $wrongPathGate.materialEvidence.pathPassed) -and (-not $wrongPathGate.materialEvidence.captureListPassed) -and $wrongPathGate.status -ceq 'Failed') 'wrong Resources/source paths and capture list must block ROI-associated material evidence'
+
+    $missingAuditResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'material-missing-row' {
+        param($caseManifest,$caseCaptureDirectory)
+        $record = @($caseManifest.captures | Where-Object name -ceq 'room-ready')[0]
+        $record.sourceAudit = @($record.sourceAudit | Where-Object node -cne 'LanLobbyRoot/Room/LeaveAction')
+    }
+    $missingAuditGate = @($missingAuditResult.report.roomGates | Where-Object name -ceq 'RoomReady.Leave')[0]
+    Assert-True ((-not $missingAuditGate.materialEvidence.bijectionPassed) -and $missingAuditGate.status -ceq 'Failed') 'missing bitmap audit row must block the rendered occurrence bijection'
+
+    $duplicateAuditResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'material-duplicate-row' {
+        param($caseManifest,$caseCaptureDirectory)
+        $record = @($caseManifest.captures | Where-Object name -ceq 'room-full')[0]
+        $duplicate = @($record.sourceAudit | Where-Object node -ceq 'LanLobbyRoot/Room/PrimaryAction')[0] | Select-Object *
+        $record.sourceAudit = @($record.sourceAudit) + $duplicate
+    }
+    $duplicateAuditGate = @($duplicateAuditResult.report.roomGates | Where-Object name -ceq 'RoomFull.PrimaryAction.Gray')[0]
+    Assert-True ((-not $duplicateAuditGate.materialEvidence.bijectionPassed) -and (-not $duplicateAuditGate.materialEvidence.aggregatePassed) -and $duplicateAuditGate.status -ceq 'Failed') 'duplicate bitmap audit rows must block bijection and aggregate inventory'
 
     $intrudedCentralCaptureDirectory = Join-Path $scratch 'intruded-central-blank-captures'
     Copy-Item -LiteralPath $captureDirectory -Destination $intrudedCentralCaptureDirectory -Recurse

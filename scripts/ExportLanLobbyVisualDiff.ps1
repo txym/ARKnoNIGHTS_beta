@@ -154,6 +154,26 @@ public static class LanLobbyVisualDiff {
             Jaccard=union==0 ? 0.0 : (double)intersection/union
         };
     }
+    public static LanLobbyBoundsMeasurement FindUnexpectedDifferenceBounds(
+        Bitmap actual, Bitmap reference, Rectangle search, Rectangle[] exclusions, int minimumChannelDifference)
+    {
+        ValidateSearch(actual,search); ValidateSearch(reference,search);
+        if(minimumChannelDifference<1 || minimumChannelDifference>255)
+            throw new ArgumentOutOfRangeException("minimumChannelDifference");
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1,pixelCount=0;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            if(IsExcluded(exclusions,x,y)) continue;
+            Color a=actual.GetPixel(x,y),r=reference.GetPixel(x,y);
+            int difference=Math.Max(Math.Abs(a.R-r.R),
+                Math.Max(Math.Abs(a.G-r.G),Math.Abs(a.B-r.B)));
+            if(difference<minimumChannelDifference) continue;
+            pixelCount++;
+            minX=Math.Min(minX,x);minY=Math.Min(minY,y);maxX=Math.Max(maxX,x);maxY=Math.Max(maxY,y);
+        }
+        return pixelCount==0
+            ? Unavailable("No unexpected decoded actual-vs-reference RGB differences found.")
+            : AvailableBounds(minX,minY,maxX,maxY,pixelCount);
+    }
     public static LanLobbyBoundsMeasurement FindOrangeBounds(
         Bitmap bitmap, Rectangle search, int minimumRed, int minimumGreen, int maximumBlue, int minimumRedOverGreen)
     {
@@ -1183,54 +1203,243 @@ function Test-LanLobbyRectanglesOverlap($Left, $Right)
 function Get-LanLobbyRoomMaterialEvidence($Capture, $SpriteUsage)
 {
     $failures = @()
+    $bijectionPassed = $true
+    $identityPassed = $true
+    $pathPassed = $true
     $shaPassed = $true
+    $captureListPassed = $true
     $occurrencePassed = $true
+    $aggregatePassed = $true
     $auditProperty = $Capture.PSObject.Properties['sourceAudit']
     [array]$auditRows = if ($null -eq $auditProperty) { @() } else { @($auditProperty.Value | Where-Object { $_ -and [bool]$_.isBitmap }) }
+    [array]$renderedRows = @($Capture.spriteSources | Where-Object { $null -ne $_ })
     if ($auditRows.Count -eq 0)
     {
         $failures += "Capture '$($Capture.name)' has no bitmap sourceAudit rows."
+        $bijectionPassed = $false
+        $identityPassed = $false
+        $pathPassed = $false
         $shaPassed = $false
+        $captureListPassed = $false
         $occurrencePassed = $false
+        $aggregatePassed = $false
     }
-    foreach ($sprite in @($Capture.spriteSources))
+    if ($auditRows.Count -ne $renderedRows.Count)
+    {
+        $failures += "Capture '$($Capture.name)' bitmap sourceAudit count $($auditRows.Count) does not equal rendered spriteSources count $($renderedRows.Count)."
+        $bijectionPassed = $false
+    }
+    foreach ($sprite in $renderedRows)
     {
         [array]$audit = @($auditRows | Where-Object { [string]$_.node -ceq [string]$sprite.node -and [string]$_.spriteName -ceq [string]$sprite.spriteName })
         [array]$approved = @($SpriteUsage | Where-Object { $_.CaptureName -ceq [string]$Capture.name -and $_.SpriteName -ceq [string]$sprite.spriteName })
-        if ($audit.Count -ne 1 -or $approved.Count -ne 1)
+        if ($audit.Count -ne 1)
         {
-            $failures += "Rendered Sprite '$($sprite.node)' does not have one matching approved material row."
-            $shaPassed = $false
-            $occurrencePassed = $false
+            $failures += "Rendered Sprite '$($sprite.node)' does not have exactly one matching bitmap sourceAudit row."
+            $bijectionPassed = $false
+            $identityPassed = $false
             continue
         }
-        if ([string]$audit[0].sha256 -cne [string]$approved[0].ImportedSha256 -or [string]$audit[0].sha256 -cnotmatch '^[0-9A-F]{64}$')
+        if ($approved.Count -ne 1)
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' does not resolve to exactly one approved material inventory row."
+            $identityPassed = $false
+            $pathPassed = $false
+            $shaPassed = $false
+            $aggregatePassed = $false
+            continue
+        }
+        $approvedRow = $approved[0]
+        $auditRow = $audit[0]
+        if ([string]$auditRow.kind -cne 'bitmap-sprite' -or -not [bool]$auditRow.isBitmap -or
+            [string]$auditRow.node -cne [string]$sprite.node -or [string]$auditRow.spriteName -cne [string]$sprite.spriteName)
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' bitmap identity fields do not match the same rendered occurrence."
+            $identityPassed = $false
+        }
+        if ([string]$sprite.sourcePath -cne [string]$approvedRow.SourcePath -or
+            [string]$auditRow.resourcesPath -cne [string]$approvedRow.ResourcesPath -or
+            [string]$auditRow.sourcePath -cne [string]$approvedRow.SourcePath)
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' Resources/source paths do not match the approved imported source."
+            $pathPassed = $false
+        }
+        if ([string]$auditRow.sha256 -cne [string]$approvedRow.ImportedSha256 -or [string]$auditRow.sha256 -cnotmatch '^[0-9A-F]{64}$')
         {
             $failures += "Rendered Sprite '$($sprite.node)' SHA-256 does not match the imported approved source."
             $shaPassed = $false
         }
-        if ([int]$audit[0].occurrenceCount -ne 1 -or @($audit[0].captures).Count -ne 1 -or [string]$audit[0].captures[0] -cne [string]$Capture.name)
+        if (@($auditRow.captures).Count -ne 1 -or [string]$auditRow.captures[0] -cne [string]$Capture.name)
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' capture list does not identify exactly this capture."
+            $captureListPassed = $false
+        }
+        if ([int]$auditRow.occurrenceCount -ne 1)
         {
             $failures += "Rendered Sprite '$($sprite.node)' occurrence evidence does not identify exactly one occurrence in this capture."
             $occurrencePassed = $false
         }
     }
-    foreach ($group in @($Capture.spriteSources | Group-Object spriteName))
+    foreach ($auditRow in $auditRows)
     {
-        $auditedCount = [int](($auditRows | Where-Object spriteName -ceq $group.Name | Measure-Object occurrenceCount -Sum).Sum)
-        if ($auditedCount -ne $group.Count)
+        [array]$rendered = @($renderedRows | Where-Object { [string]$_.node -ceq [string]$auditRow.node -and [string]$_.spriteName -ceq [string]$auditRow.spriteName })
+        if ($rendered.Count -ne 1)
         {
-            $failures += "Sprite '$($group.Name)' audited occurrence total $auditedCount does not match rendered total $($group.Count)."
-            $occurrencePassed = $false
+            $failures += "Bitmap sourceAudit row '$($auditRow.node)' does not map back to exactly one rendered Sprite occurrence."
+            $bijectionPassed = $false
+            $identityPassed = $false
         }
+    }
+    foreach ($group in @($renderedRows | Group-Object spriteName))
+    {
+        [array]$matchingAuditRows = @($auditRows | Where-Object spriteName -ceq $group.Name)
+        $auditedCount = if ($matchingAuditRows.Count -eq 0) { 0 } else { [int](($matchingAuditRows | Measure-Object occurrenceCount -Sum).Sum) }
+        [array]$approved = @($SpriteUsage | Where-Object { $_.CaptureName -ceq [string]$Capture.name -and $_.SpriteName -ceq [string]$group.Name })
+        $approvedCount = if ($approved.Count -eq 1) { [int]$approved[0].OccurrenceCount } else { -1 }
+        if ($auditedCount -ne $group.Count -or $approvedCount -ne $group.Count)
+        {
+            $failures += "Sprite '$($group.Name)' aggregate audit/approved occurrence inventory does not match rendered total $($group.Count)."
+            $aggregatePassed = $false
+        }
+    }
+    foreach ($auditGroup in @($auditRows | Group-Object spriteName))
+    {
+        $renderedCount = @($renderedRows | Where-Object spriteName -ceq $auditGroup.Name).Count
+        $auditedCount = [int](($auditGroup.Group | Measure-Object occurrenceCount -Sum).Sum)
+        if ($renderedCount -ne $auditGroup.Count -or $auditedCount -ne $renderedCount)
+        {
+            $failures += "Bitmap sourceAudit aggregate '$($auditGroup.Name)' contains extra, duplicate, or mismatched occurrences."
+            $aggregatePassed = $false
+        }
+    }
+    $normalizedRows = @(
+        foreach ($auditRow in $auditRows)
+        {
+            [array]$rendered = @($renderedRows | Where-Object { [string]$_.node -ceq [string]$auditRow.node -and [string]$_.spriteName -ceq [string]$auditRow.spriteName })
+            $visibleRoi = $null
+            if ($rendered.Count -eq 1)
+            {
+                $sprite = $rendered[0]
+                $visibleRoi = [pscustomobject][ordered]@{
+                    coordinateOrigin='screen-top-left'
+                    unit='px'
+                    x=[int][Math]::Round([double]$sprite.x * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
+                    y=[int][Math]::Round(([double]$Capture.height - ([double]$sprite.y + [double]$sprite.height)) * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+                    width=[int][Math]::Round([double]$sprite.width * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
+                    height=[int][Math]::Round([double]$sprite.height * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+                }
+            }
+            [pscustomobject][ordered]@{
+                node=[string]$auditRow.node
+                spriteName=[string]$auditRow.spriteName
+                resourcesPath=[string]$auditRow.resourcesPath
+                sourcePath=[string]$auditRow.sourcePath
+                sha256=[string]$auditRow.sha256
+                captures=@($auditRow.captures)
+                occurrenceCount=[int]$auditRow.occurrenceCount
+                visibleRoi=$visibleRoi
+            }
+        }
+    )
+    return [pscustomobject][ordered]@{
+        acceptanceRole='blocking'
+        bijectionPassed=$bijectionPassed
+        identityPassed=$identityPassed
+        pathPassed=$pathPassed
+        shaPassed=$shaPassed
+        captureListPassed=$captureListPassed
+        occurrencePassed=$occurrencePassed
+        aggregatePassed=$aggregatePassed
+        passed=($bijectionPassed -and $identityPassed -and $pathPassed -and $shaPassed -and $captureListPassed -and $occurrencePassed -and $aggregatePassed)
+        failures=@($failures)
+        rows=$normalizedRows
+    }
+}
+
+function Get-LanLobbyGateMaterialEvidence($CaptureEvidence, $Roi, [bool] $ExplicitNoBitmapAssociation)
+{
+    $associatedRows = @()
+    if (-not $ExplicitNoBitmapAssociation)
+    {
+        $associatedRows = @($CaptureEvidence.rows | Where-Object {
+            $null -ne $_.visibleRoi -and (Test-LanLobbyRectanglesOverlap $_.visibleRoi $Roi)
+        })
     }
     return [pscustomobject][ordered]@{
         acceptanceRole='blocking'
-        shaPassed=$shaPassed
-        occurrencePassed=$occurrencePassed
-        passed=($shaPassed -and $occurrencePassed)
-        failures=@($failures)
-        rows=@($auditRows)
+        associationKind=$(if ($ExplicitNoBitmapAssociation) { 'explicit-no-bitmap' } else { 'roi-overlap' })
+        bijectionPassed=$CaptureEvidence.bijectionPassed
+        identityPassed=$CaptureEvidence.identityPassed
+        pathPassed=$CaptureEvidence.pathPassed
+        shaPassed=$CaptureEvidence.shaPassed
+        captureListPassed=$CaptureEvidence.captureListPassed
+        occurrencePassed=$CaptureEvidence.occurrencePassed
+        aggregatePassed=$CaptureEvidence.aggregatePassed
+        passed=$CaptureEvidence.passed
+        failures=@($CaptureEvidence.failures)
+        rows=@($associatedRows | Where-Object { $null -ne $_ })
+    }
+}
+
+function Get-LanLobbyHostProfileStructureEvidence($Capture)
+{
+    $failures = @()
+    $hostValues = @()
+    if ($null -ne $Capture.PSObject.Properties['localPlayerId'] -and -not [string]::IsNullOrWhiteSpace([string]$Capture.localPlayerId))
+    {
+        $hostValues += [string]$Capture.localPlayerId
+    }
+    if ($null -ne $Capture.PSObject.Properties['members'])
+    {
+        $hostMember = @($Capture.members | Where-Object { $null -ne $_ } | Select-Object -First 1)
+        if ($hostMember.Count -eq 1)
+        {
+            foreach ($propertyName in @('playerId','displayName'))
+            {
+                if ($null -ne $hostMember[0].PSObject.Properties[$propertyName] -and
+                    -not [string]::IsNullOrWhiteSpace([string]$hostMember[0].$propertyName))
+                {
+                    $hostValues += [string]$hostMember[0].$propertyName
+                }
+            }
+        }
+    }
+    foreach ($textRow in @($Capture.unityText | Where-Object { $null -ne $_ }))
+    {
+        foreach ($hostValue in @($hostValues | Select-Object -Unique))
+        {
+            if (-not [string]::IsNullOrEmpty([string]$textRow.text) -and
+                ([string]$textRow.text).IndexOf($hostValue, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+            {
+                $failures += "Host identity text '$hostValue' is rendered by '$($textRow.node)'."
+            }
+        }
+    }
+    $semanticRows = @(
+        @($Capture.spriteSources | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.node;spriteName=[string]$_.spriteName;kind='spriteSources' } })
+        @($Capture.unityText | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.node;spriteName='';kind='unityText' } })
+        @($Capture.sourceAudit | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.node;spriteName=[string]$_.spriteName;kind='sourceAudit' } })
+        @($Capture.rects | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.name;spriteName='';kind='rects' } })
+        if ($null -ne $Capture.PSObject.Properties['keyRects'])
+        {
+            @($Capture.keyRects | Where-Object { $null -ne $_ } | ForEach-Object { [pscustomobject]@{ node=[string]$_.name;spriteName='';kind='keyRects' } })
+        }
+    )
+    $avatarSprites = @('icon_amiy','icon_clementi','icon_kirar','icon_zumam')
+    foreach ($row in $semanticRows)
+    {
+        $isHostNode = [string]$row.node -like 'LanLobbyRoot/Room/RoomCard_0/*'
+        $hasForbiddenNode = $isHostNode -and [string]$row.node -match '(?i)/(Portrait|Avatar|Profile|PlayerName|PlayerId|MemberName|MemberId|Label|Icon)(/|$)'
+        $hasForbiddenSprite = [string]$row.spriteName -in $avatarSprites -or [string]$row.spriteName -match '(?i)(portrait|avatar|profile)'
+        if ($hasForbiddenNode -or $hasForbiddenSprite)
+        {
+            $failures += "Forbidden host profile node/Sprite '$($row.node)' / '$($row.spriteName)' is active in $($row.kind)."
+        }
+    }
+    return [pscustomobject][ordered]@{
+        passed=($failures.Count -eq 0)
+        hostIdentityValues=@($hostValues | Select-Object -Unique)
+        failures=@($failures | Select-Object -Unique)
     }
 }
 
@@ -1935,15 +2144,16 @@ try
                     throw "Room reference exclusions overlap protected named gates for capture '$captureName'."
                 }
                 $roomExclusionReports += $exclusionRows
-                $materialEvidence = Get-LanLobbyRoomMaterialEvidence $capture $spriteUsage
+                $captureMaterialEvidence = Get-LanLobbyRoomMaterialEvidence $capture $spriteUsage
                 $captureGateRows = @()
                 foreach ($gateSpec in @(Get-LanLobbyRoomGateSpecs $capture))
                 {
                     $measurement = Measure-LanLobbyVisiblePlacement $actual $normalizedReference $gateSpec
-                    $gatePassed = $measurement.passed -and $materialEvidence.passed
+                    $gateMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $gateSpec.roi $false
+                    $gatePassed = $measurement.passed -and $gateMaterialEvidence.passed
                     $gateStatus = if ($gatePassed) { 'Passed' } else { 'Failed' }
-                    $gateReason = if (-not $materialEvidence.passed) {
-                        'Blocking material SHA-256 or rendered occurrence evidence failed.'
+                    $gateReason = if (-not $gateMaterialEvidence.passed) {
+                        'Blocking bitmap manifest bijection, identity, approved path, SHA-256, capture list, or occurrence evidence failed.'
                     } else { $measurement.reason }
                     $gateRow = [pscustomobject][ordered]@{
                         name=$gateSpec.name
@@ -1967,60 +2177,73 @@ try
                         sizeDeltaPx=$measurement.sizeDeltaPx
                         contour=$measurement.contour
                         thresholds=$measurement.thresholds
-                        materialEvidence=$materialEvidence
+                        materialEvidence=$gateMaterialEvidence
                         status=$gateStatus
                         reason=$gateReason
                         passed=$gatePassed
                     }
                     $captureGateRows += $gateRow
-                    if (-not $gatePassed)
-                    {
-                        foreach ($diagnosticBitmap in @($overlay,$heatmap))
-                        {
-                            $diagnosticGraphics = [Drawing.Graphics]::FromImage($diagnosticBitmap)
-                            $diagnosticPen = New-Object Drawing.Pen ([Drawing.Color]::Red), 3
-                            try { $diagnosticGraphics.DrawRectangle($diagnosticPen, (ConvertTo-LanLobbyRectangle $gateSpec.roi)) }
-                            finally { $diagnosticPen.Dispose(); $diagnosticGraphics.Dispose() }
-                        }
-                    }
                 }
 
-                $profileRoi = [pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=250;y=525;width=250;height=160 }
-                $profileActual = Get-LanLobbyVisibleBounds $actual $profileRoi 'Light' @($captureExclusions)
-                $profileReference = Get-LanLobbyVisibleBounds $normalizedReference $profileRoi 'Light' @($captureExclusions)
-                $profileAbsent = -not $profileActual.available -and -not $profileReference.available -and $materialEvidence.passed
                 $capturePrefix = switch ($captureName) { 'room-host' {'RoomHost'} 'room-full' {'RoomFull'} 'room-ready' {'RoomReady'} }
+                $profileRoi = [pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=250;y=240;width=250;height=473 }
+                $profileExclusions = @(
+                    [pscustomobject][ordered]@{ name='required-ready-check';reason='Required ready check is not host profile content.';x=354;y=403;width=54;height=48 },
+                    [pscustomobject][ordered]@{ name='required-ready-label';reason='Required ready label is not host profile content.';x=326;y=448;width=110;height=38 },
+                    [pscustomobject][ordered]@{ name='required-host-frame-bottom';reason='Required host card frame contour is not host profile content.';x=218;y=705;width=337;height=26 },
+                    [pscustomobject][ordered]@{ name='required-creator-tag';reason='Required creator tag is not host profile content.';x=237;y=737;width=100;height=40 }
+                )
+                [Drawing.Rectangle[]]$profileExclusionRectangles = @($profileExclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
+                $profileUnexpected = [LanLobbyVisualDiff]::FindUnexpectedDifferenceBounds(
+                    $actual,
+                    $normalizedReference,
+                    (ConvertTo-LanLobbyRectangle $profileRoi),
+                    $profileExclusionRectangles,
+                    8)
+                $profileStructure = Get-LanLobbyHostProfileStructureEvidence $capture
+                $profileMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $profileRoi $true
+                $profileAbsent = -not $profileUnexpected.Available -and $profileStructure.passed -and $profileMaterialEvidence.passed
                 $captureGateRows += [pscustomobject][ordered]@{
                     name="$capturePrefix.Slot1.ProfileContentAbsence";capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
-                    roi=$profileRoi;exclusions=@($captureExclusions);maskKind='Light';maskDescription='Decoded opaque screenshot light-color mask; absence requires zero qualifying pixels.'
-                    diagnosticRectTransform=$null;actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                    roi=$profileRoi;exclusions=$profileExclusions;maskKind='structured-and-decoded-profile-absence';maskDescription='Structured host identity/node/Sprite absence plus decoded actual-vs-reference RGB differences across the forbidden host profile area.'
+                    diagnosticRectTransform=$null;actualVisibleBounds=$(if($profileUnexpected.Available){[pscustomobject][ordered]@{x=$profileUnexpected.Bounds.X;y=$profileUnexpected.Bounds.Y;width=$profileUnexpected.Bounds.Width;height=$profileUnexpected.Bounds.Height}}else{$null});referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                    actualVisiblePixelCount=[int]$profileUnexpected.PixelCount;referenceVisiblePixelCount=0
+                    unexpectedActualPixelCount=[int]$profileUnexpected.PixelCount;structuredAbsencePassed=$profileStructure.passed;structuredAbsence=$profileStructure
                     edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=[pscustomobject]@{intersectionPixels=0;unionPixels=0;jaccard=$null}
-                    thresholds=[pscustomobject]@{maximumVisiblePixelCount=0};materialEvidence=$materialEvidence
-                    status=$(if($profileAbsent){'Passed'}else{'Failed'});reason=$(if($profileAbsent){'Host profile-content ROI contains no qualifying visible pixels.'}else{'Host profile-content absence or material evidence failed.'});passed=$profileAbsent
+                    thresholds=[pscustomobject]@{maximumUnexpectedPixelCount=0;minimumChannelDifference=8};materialEvidence=$profileMaterialEvidence
+                    status=$(if($profileAbsent){'Passed'}else{'Failed'});reason=$(if($profileAbsent){'Host display name/ID, profile nodes/Sprites, and unexpected decoded profile pixels are absent.'}elseif(-not $profileStructure.passed){"Structured host profile absence failed: $($profileStructure.failures -join ' ')"}elseif($profileUnexpected.Available){"Unexpected decoded host profile pixels found: $($profileUnexpected.PixelCount)."}else{'Blocking material manifest evidence failed.'});passed=$profileAbsent
                 }
-                $forbiddenText = if ($captureName -eq 'room-host') { 'OPEN SLOT' } elseif ($captureName -eq 'room-full') { 'WAITING' } else { $null }
-                if ($forbiddenText)
+                foreach ($forbiddenText in @('OPEN SLOT','WAITING'))
                 {
-                    $textAbsent = @($capture.unityText | Where-Object { [string]$_.text -ceq $forbiddenText }).Count -eq 0 -and $materialEvidence.passed
+                    $textOccurrenceCount = @($capture.unityText | Where-Object { [string]$_.text -ceq $forbiddenText }).Count
+                    $textMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $roomProtectedRegions.hostSlot $true
+                    $textAbsent = $textOccurrenceCount -eq 0 -and $textMaterialEvidence.passed
+                    $literalSuffix = if ($forbiddenText -ceq 'OPEN SLOT') { 'LegacyOpenSlotTextAbsence' } else { 'LegacyWaitingTextAbsence' }
                     $captureGateRows += [pscustomobject][ordered]@{
-                        name=$(if($captureName -eq 'room-host'){'RoomHost.LegacyOpenSlotTextAbsence'}else{'RoomFull.LegacyWaitingTextAbsence'})
+                        name="$capturePrefix.$literalSuffix"
                         capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
                         roi=[pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=200;y=178;width=1529;height=665};exclusions=@($captureExclusions)
                         maskKind='manifest-text-absence';maskDescription='Structured active Unity Text evidence from the capture manifest.';diagnosticRectTransform=$null
                         actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                        actualVisiblePixelCount=$textOccurrenceCount;referenceVisiblePixelCount=0
                         edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=$null;thresholds=[pscustomobject]@{maximumOccurrenceCount=0}
-                        materialEvidence=$materialEvidence;status=$(if($textAbsent){'Passed'}else{'Failed'});reason=$(if($textAbsent){"Active Unity Text contains no '$forbiddenText'."}else{"Forbidden active Unity Text '$forbiddenText' or material evidence failed."});passed=$textAbsent
+                        materialEvidence=$textMaterialEvidence;status=$(if($textAbsent){'Passed'}else{'Failed'});reason=$(if($textAbsent){"Active Unity Text contains no '$forbiddenText'."}else{"Forbidden active Unity Text '$forbiddenText' or blocking material evidence failed."});passed=$textAbsent
                     }
                 }
-                [array]$spacingNames = if ($captureName -eq 'room-host') {
-                    @('RoomHost.Slot2.EmptyComposition','RoomHost.Slot3.EmptyComposition')
+                [array]$spacingSpecs = if ($captureName -eq 'room-host') {
+                    @(
+                        [pscustomobject]@{name='RoomHost.Slot2To3.VisibleContourSpacing';left='RoomHost.Slot2.EmptyComposition';right='RoomHost.Slot3.EmptyComposition';roi=@{x=589;y=178;width=752;height=665}},
+                        [pscustomobject]@{name='RoomHost.Slot3To4.VisibleContourSpacing';left='RoomHost.Slot3.EmptyComposition';right='RoomHost.Slot4.EmptyComposition';roi=@{x=977;y=178;width=752;height=665}}
+                    )
+                } elseif ($captureName -eq 'room-full') {
+                    @([pscustomobject]@{name='RoomFull.Slot2To3.VisibleContourSpacing';left='RoomFull.Slot2.WaitingContour';right='RoomFull.Slot3.WaitingContour';roi=@{x=589;y=178;width=752;height=665}})
                 } elseif ($captureName -eq 'room-ready') {
-                    @('RoomReady.Slot2.ReadyContour','RoomReady.Slot3.ReadyContour')
+                    @([pscustomobject]@{name='RoomReady.Slot2To3.VisibleContourSpacing';left='RoomReady.Slot2.ReadyContour';right='RoomReady.Slot3.ReadyContour';roi=@{x=589;y=178;width=752;height=665}})
                 } else { @() }
-                if (@($spacingNames).Count -eq 2)
+                foreach ($spacingSpec in $spacingSpecs)
                 {
-                    $leftGate=@($captureGateRows | Where-Object name -eq $spacingNames[0])[0]
-                    $rightGate=@($captureGateRows | Where-Object name -eq $spacingNames[1])[0]
+                    $leftGate=@($captureGateRows | Where-Object name -eq $spacingSpec.left)[0]
+                    $rightGate=@($captureGateRows | Where-Object name -eq $spacingSpec.right)[0]
                     $spacingAvailable = $null -ne $leftGate.actualVisibleCenter -and
                         $null -ne $rightGate.actualVisibleCenter -and
                         $null -ne $leftGate.referenceVisibleCenter -and
@@ -2028,16 +2251,19 @@ try
                     $actualSpacing = if ($spacingAvailable) { $rightGate.actualVisibleCenter.x-$leftGate.actualVisibleCenter.x } else { $null }
                     $referenceSpacing = if ($spacingAvailable) { $rightGate.referenceVisibleCenter.x-$leftGate.referenceVisibleCenter.x } else { $null }
                     $spacingDelta = if ($spacingAvailable) { $actualSpacing-$referenceSpacing } else { $null }
-                    $spacingPassed=$spacingAvailable -and [Math]::Abs($spacingDelta)-le 4 -and $materialEvidence.passed
+                    $spacingRoi = [pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=$spacingSpec.roi.x;y=$spacingSpec.roi.y;width=$spacingSpec.roi.width;height=$spacingSpec.roi.height}
+                    $spacingMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $spacingRoi $true
+                    $spacingPassed=$spacingAvailable -and [Math]::Abs($spacingDelta)-le 4 -and $spacingMaterialEvidence.passed
                     $captureGateRows += [pscustomobject][ordered]@{
-                        name=$(if($captureName -eq 'room-host'){'RoomHost.Slot2To3.VisibleContourSpacing'}else{'RoomReady.Slot2To3.VisibleContourSpacing'})
+                        name=$spacingSpec.name
                         capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
-                        roi=[pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=589;y=178;width=752;height=665};exclusions=@($captureExclusions)
+                        roi=$spacingRoi;exclusions=@($captureExclusions)
                         maskKind='derived-visible-contour-spacing';maskDescription='Derived from the two authoritative visible contour centers.';diagnosticRectTransform=$null
                         actualVisibleBounds=@($leftGate.actualVisibleBounds,$rightGate.actualVisibleBounds);referenceVisibleBounds=@($leftGate.referenceVisibleBounds,$rightGate.referenceVisibleBounds)
                         actualVisibleCenter=@($leftGate.actualVisibleCenter,$rightGate.actualVisibleCenter);referenceVisibleCenter=@($leftGate.referenceVisibleCenter,$rightGate.referenceVisibleCenter)
+                        actualVisiblePixelCount=@($leftGate.actualVisiblePixelCount,$rightGate.actualVisiblePixelCount);referenceVisiblePixelCount=@($leftGate.referenceVisiblePixelCount,$rightGate.referenceVisiblePixelCount)
                         edgeDeltaPx=$null;centerDeltaPx=[pscustomobject][ordered]@{unit='px';actualSpacing=$actualSpacing;referenceSpacing=$referenceSpacing;spacingDelta=$spacingDelta};sizeDeltaPx=$null;contour=$null
-                        thresholds=[pscustomobject]@{maximumSpacingErrorPx=4};materialEvidence=$materialEvidence;status=$(if($spacingPassed){'Passed'}else{'Failed'})
+                        thresholds=[pscustomobject]@{maximumSpacingErrorPx=4};materialEvidence=$spacingMaterialEvidence;status=$(if($spacingPassed){'Passed'}else{'Failed'})
                         reason=$(if($spacingPassed){'Repeated visible contour spacing satisfies the 4 px gate.'}elseif(-not $spacingAvailable){'Repeated visible contour spacing is unavailable because a required visible contour is empty.'}else{'Repeated visible contour spacing or material evidence failed.'});passed=$spacingPassed
                     }
                 }
@@ -2049,9 +2275,20 @@ try
                         roi=[pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=1365;y=178;width=364;height=665}
                         exclusions=@($captureExclusions);maskKind=$null;maskDescription='No visible measurement is accepted from the popup-obscured fourth-slot reference.'
                         diagnosticRectTransform=$null;actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                        actualVisiblePixelCount=$null;referenceVisiblePixelCount=$null
                         edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=$null
-                        thresholds=[pscustomobject]@{acceptance='excluded-never-passed'};materialEvidence=$materialEvidence
+                        thresholds=[pscustomobject]@{acceptance='excluded-never-passed'};materialEvidence=$(Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence ([pscustomobject]@{x=1365;y=178;width=364;height=665}) $true)
                         status='ExcludedByReferencePopup';reason="The complete fourth slot is obscured by the Figure $($(if($captureName -eq 'room-full'){12}else{13})) right-side popup; Figure 11 is the only blocking fourth-slot reference.";passed=$false
+                    }
+                }
+                foreach ($failedGate in @($captureGateRows | Where-Object status -ceq 'Failed'))
+                {
+                    foreach ($diagnosticBitmap in @($overlay,$heatmap))
+                    {
+                        $diagnosticGraphics = [Drawing.Graphics]::FromImage($diagnosticBitmap)
+                        $diagnosticPen = New-Object Drawing.Pen ([Drawing.Color]::Red), 3
+                        try { $diagnosticGraphics.DrawRectangle($diagnosticPen, (ConvertTo-LanLobbyRectangle $failedGate.roi)) }
+                        finally { $diagnosticPen.Dispose(); $diagnosticGraphics.Dispose() }
                     }
                 }
                 $roomGates += $captureGateRows
@@ -2661,7 +2898,7 @@ try
         $first = $_.Group[0]
         "$($_.Name): $($first.referenceWidth)×$($first.referenceHeight)"
     })
-    $markdown = @('# LAN Lobby Visual Difference Report', '', "Reference figure native dimensions (decoded from this export): $($referenceDimensionLines -join '; '). Each reference is independently normalized on X and Y to 1920×1080. This is non-blocking layout/color reporting, not a pixel-equality claim.", '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
+    $markdown = @('# LAN Lobby Visual Difference Report', '', "Reference figure native dimensions (decoded from this export): $($referenceDimensionLines -join '; '). Each reference is independently normalized on X and Y to 1920×1080. Full-screen capture metrics are informational and are not pixel-equality acceptance; named room gates and material provenance are blocking.", '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
     $markdown += @(
         '',
@@ -2669,21 +2906,32 @@ try
         '',
         'Blocking placement uses decoded opaque screenshot color/contrast masks measured directly from rendered RGB values. Diagnostic RectTransform rectangles do not override visible-pixel results.',
         '',
-        '| Gate | Capture / reference | ROI | Mask | Actual / reference visible bounds | Center delta | Size delta | Edge delta | Jaccard | Thresholds | Material | Status / reason |',
-        '| --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- |'
+        '| Gate | Capture / reference | ROI | Exclusions | Mask | Actual / reference visible bounds | Actual/reference centers | Actual/reference pixels | Deltas / contour | Thresholds | Associated provenance | Status / reason |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'
     )
     foreach ($gate in @($roomGates))
     {
         $actualBounds = if ($gate.actualVisibleBounds -is [array]) { @($gate.actualVisibleBounds | Where-Object { $null -ne $_ } | ForEach-Object { "$($_.x),$($_.y),$($_.width),$($_.height)" }) -join '; ' } elseif ($gate.actualVisibleBounds) { "$($gate.actualVisibleBounds.x),$($gate.actualVisibleBounds.y),$($gate.actualVisibleBounds.width),$($gate.actualVisibleBounds.height)" } else { 'n/a' }
         $referenceBounds = if ($gate.referenceVisibleBounds -is [array]) { @($gate.referenceVisibleBounds | Where-Object { $null -ne $_ } | ForEach-Object { "$($_.x),$($_.y),$($_.width),$($_.height)" }) -join '; ' } elseif ($gate.referenceVisibleBounds) { "$($gate.referenceVisibleBounds.x),$($gate.referenceVisibleBounds.y),$($gate.referenceVisibleBounds.width),$($gate.referenceVisibleBounds.height)" } else { 'n/a' }
-        $centerDelta = if ($gate.centerDeltaPx) { @($gate.centerDeltaPx.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', ' } else { 'n/a' }
-        $sizeDelta = if ($gate.sizeDeltaPx) { "dw=$($gate.sizeDeltaPx.deltaWidth), dh=$($gate.sizeDeltaPx.deltaHeight)" } else { 'n/a' }
-        $edgeDelta = if ($gate.edgeDeltaPx) { "l/t/r/b=$($gate.edgeDeltaPx.left)/$($gate.edgeDeltaPx.top)/$($gate.edgeDeltaPx.right)/$($gate.edgeDeltaPx.bottom)" } else { 'n/a' }
-        $jaccard = if ($gate.contour -and $null -ne $gate.contour.jaccard) { $gate.contour.jaccard } else { 'n/a' }
-        $thresholdText = @($gate.thresholds.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '
-        $materialText = "sha=$($gate.materialEvidence.shaPassed), occurrences=$($gate.materialEvidence.occurrencePassed), passed=$($gate.materialEvidence.passed)"
-        $markdown += "| $($gate.name) | $($gate.capture) / $($gate.referenceFigure) | $($gate.roi.x),$($gate.roi.y),$($gate.roi.width),$($gate.roi.height) | $($gate.maskKind) | $actualBounds / $referenceBounds | $centerDelta | $sizeDelta | $edgeDelta | $jaccard | $thresholdText | $materialText | $($gate.status): $(ConvertTo-LanLobbyMarkdownCell ([string]$gate.reason)) |"
+        $exclusionText = if (@($gate.exclusions).Count -eq 0) { 'none' } else { @($gate.exclusions | ForEach-Object { "$($_.name)[$($_.x),$($_.y),$($_.width),$($_.height)]:$($_.reason)" }) -join '; ' }
+        $centerText = "actual=$($gate.actualVisibleCenter | ConvertTo-Json -Depth 8 -Compress); reference=$($gate.referenceVisibleCenter | ConvertTo-Json -Depth 8 -Compress)"
+        $pixelText = "actual=$($gate.actualVisiblePixelCount | ConvertTo-Json -Depth 8 -Compress); reference=$($gate.referenceVisiblePixelCount | ConvertTo-Json -Depth 8 -Compress)"
+        $deltaText = "center=$($gate.centerDeltaPx | ConvertTo-Json -Depth 8 -Compress); size=$($gate.sizeDeltaPx | ConvertTo-Json -Depth 8 -Compress); edge=$($gate.edgeDeltaPx | ConvertTo-Json -Depth 8 -Compress); contour=$($gate.contour | ConvertTo-Json -Depth 8 -Compress)"
+        $thresholdText = $gate.thresholds | ConvertTo-Json -Depth 8 -Compress
+        $provenanceRows = @($gate.materialEvidence.rows | Where-Object { $null -ne $_ })
+        if (@($provenanceRows | Where-Object { $null -eq $_.PSObject.Properties['node'] }).Count -gt 0)
+        {
+            throw "Room gate '$($gate.name)' contains a material provenance row without a node identity."
+        }
+        $materialRows = if ($provenanceRows.Count -eq 0) { $gate.materialEvidence.associationKind } else {
+            @($provenanceRows | ForEach-Object { "$($_.node):$($_.spriteName), Resources=$($_.resourcesPath), source=$($_.sourcePath), SHA=$($_.sha256), occurrence=$($_.occurrenceCount), captures=$($_.captures -join ',')" }) -join '; '
+        }
+        $materialText = "association=$($gate.materialEvidence.associationKind); bijection=$($gate.materialEvidence.bijectionPassed); identity=$($gate.materialEvidence.identityPassed); paths=$($gate.materialEvidence.pathPassed); SHA=$($gate.materialEvidence.shaPassed); captureList=$($gate.materialEvidence.captureListPassed); occurrence=$($gate.materialEvidence.occurrencePassed); aggregate=$($gate.materialEvidence.aggregatePassed); rows=$materialRows"
+        $markdown += "| $($gate.name) | $($gate.capture) / $($gate.referenceFigure) | $($gate.roi.x),$($gate.roi.y),$($gate.roi.width),$($gate.roi.height) | $(ConvertTo-LanLobbyMarkdownCell $exclusionText) | $($gate.maskKind) | $actualBounds / $referenceBounds | $(ConvertTo-LanLobbyMarkdownCell $centerText) | $(ConvertTo-LanLobbyMarkdownCell $pixelText) | $(ConvertTo-LanLobbyMarkdownCell $deltaText) | $(ConvertTo-LanLobbyMarkdownCell $thresholdText) | $(ConvertTo-LanLobbyMarkdownCell $materialText) | $($gate.status): $(ConvertTo-LanLobbyMarkdownCell ([string]$gate.reason)) |"
     }
+    $markdown += @('', '### Lossless room gate JSONL appendix', '', '<!-- ROOM_GATE_JSONL_BEGIN -->', '```jsonl')
+    foreach ($gate in @($roomGates)) { $markdown += ($gate | ConvertTo-Json -Depth 20 -Compress) }
+    $markdown += @('```', '<!-- ROOM_GATE_JSONL_END -->')
     $markdown += @('', '### Room reference exclusions', '', '| Capture | Exclusion | ROI | Protected regions clear | Reason |', '| --- | --- | --- | --- | --- |')
     foreach ($exclusion in @($roomExclusionReports))
     {
