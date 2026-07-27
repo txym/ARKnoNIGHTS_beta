@@ -256,10 +256,10 @@ foreach ($property in $expectedFirstPassQuantiles.Keys) {
     }
 }
 
-$attackingRows = @($shopRows | Where-Object { $_.DamageType -ne 'None' })
-foreach ($row in $shopRows) {
+foreach ($row in $rows) {
     Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$row.DamageType)) "Type ID $($row.TypeId) is missing a damage type."
 }
+$attackingRows = @($shopRows | Where-Object { $_.DamageType -ne 'None' })
 foreach ($row in $attackingRows) {
     Assert-Condition ($row.EffectiveAttackIntervalSeconds -gt 0) "Type ID $($row.TypeId) has a nonpositive effective attack interval."
 }
