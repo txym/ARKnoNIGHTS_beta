@@ -28,6 +28,7 @@ level 0，才回退到同目录 `unit-source-v1.json` 的标准值。
 4. 能力列表随变体覆盖；未声明时继承，显式空数组时清空。
 5. 保持没有精英变体文件的现有单位行为不变。
 6. 当前生成结果仍为 `unit-catalog-v1`，但 `1000_gopro` 应生成精零数据。
+7. 所有单位头像以原始 `Texture2D` 导入，正式 UI 统一缓存转换为 Sprite。
 
 ## 非目标
 
@@ -36,6 +37,8 @@ level 0，才回退到同目录 `unit-source-v1.json` 的标准值。
 - 不让战斗、UI 或播放层按实例 `eliteLevel` 动态选择变体。
 - 不修改当前 Player 侧 `unit-catalog-v1` 的结构。
 - 不从项目外的工具目录读取运行时数据。
+- 不把现有 UGUI `Image` 批量替换为 `RawImage`。
+- 不改变 Spine 贴图、普通 UI 贴图或图集的导入和加载方式。
 
 ## 文件布局
 
@@ -185,6 +188,27 @@ Assets/GameData/Units/EliteVariants/Json/1000_gopro.json
 
 模型块采用原子覆盖，避免新骨骼与旧头像、旧动画名或旧攻击动画时长混用。
 
+## 头像资源类型与 UI 适配
+
+`Assets/Resources/ProfilePicture` 下的单位头像统一作为原始 `Texture2D`
+导入，不再要求 Sprite Import Mode。JSON 与目录继续只保存不带扩展名的
+Resources 路径，不增加资源类型字段。
+
+Editor 生成器和 Player 侧目录加载器均使用 `Resources.Load<Texture2D>` 验证
+头像存在，不先尝试 `Resources.Load<Sprite>`。
+
+正式头像 UI 继续使用 UGUI `Image`。新增共享的 `UnitPortraitLoader`：
+
+1. 按目录路径加载 `Texture2D`；
+2. 用整张纹理、中心 pivot 和 `100 pixels per unit` 创建 Sprite；
+3. 按资源路径缓存 Sprite；
+4. 同一路径重复请求返回同一 Sprite；
+5. 缺失或空路径返回 `null`。
+
+备战槽位、商店单位头像、单位详情头像和当前正式战斗 HUD 都通过该加载器赋值
+`Image.sprite`。通用 UI 美术仍可保留现有混合 Sprite/Texture 加载器；本规则
+只约束单位头像。
+
 ## 当前读取链路
 
 `UnitCatalogGenerator` 在读取每个 `unit-source-v1` 后：
@@ -196,9 +220,11 @@ Assets/GameData/Units/EliteVariants/Json/1000_gopro.json
 5. 把精零变体的名称、数值、模型字段和能力列表覆盖到内存中的源文档。
 6. 继续走原有合法性校验、Spine 动画校验、攻击间隔换算和
    `unit-catalog-v1` 生成流程。
+7. 头像路径通过 `Resources.Load<Texture2D>` 校验。
 
 运行时 `RealBattleDataLoader` 仍读取原有扁平目录，不需要理解精英变体 schema。
-因此本阶段改变的是 Editor 侧源数据读取，不改变当前 Player 数据契约。
+它同样按 `Texture2D` 校验头像，UI 再通过 `UnitPortraitLoader` 适配为 Sprite。
+因此本阶段不改变当前 Player JSON 数据契约。
 
 ## 兼容性与错误处理
 
@@ -208,6 +234,7 @@ Assets/GameData/Units/EliteVariants/Json/1000_gopro.json
 - 高阶 `stats` 可以完全省略，也可以只提供完整的 `combat` 或 `shared` 数据块。
 - 高阶 `model` 可以完全省略；一旦出现则必须完整。
 - 外部工具目录只作为人工导入来源，项目生成过程不访问绝对路径。
+- 单位头像必须能以 `Texture2D` 从目录路径加载；Sprite 子资源不是前置条件。
 
 ## 1000_gopro 的当前验收结果
 
@@ -233,8 +260,10 @@ Assets/GameData/Units/EliteVariants/Json/1000_gopro.json
 1. JSON 解析测试覆盖精零解析、部分 `stats` 继承、模型原子覆盖和能力数组语义。
 2. 生成器测试确认没有旁路文件的单位结果不变。
 3. 生成器测试确认 `1000_gopro` 生成上述精零数据。
-4. 运行相关 EditMode 测试和 Unity 编译检查。
-5. 检查生成目录差异，确认没有意外修改其他单位。
+4. 头像加载测试确认原始 Texture2D 能转换为缓存 Sprite。
+5. 运行时目录测试确认 Texture2D 头像合法。
+6. 运行相关 EditMode、PlayMode 测试和 Unity 编译检查。
+7. 检查生成目录差异，确认没有意外修改其他单位。
 
 ## 后续阶段
 

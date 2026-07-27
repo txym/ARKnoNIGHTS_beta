@@ -4,7 +4,7 @@
 
 **Goal:** Store sparse elite variants for unit `1000_gopro` and make the existing catalog generator resolve elite level 0 without changing the Player-side catalog schema.
 
-**Architecture:** Keep `unit-source-v1` as the legacy/common source and add an optional `unit-elite-variants-v1` sidecar keyed by `typeId`. An Editor-only resolver applies sparse patches with atomic `combat`, `shared`, and `model` blocks; `UnitCatalogGenerator` currently requests only elite level 0 and then continues through its existing validation, attack-interval conversion, Spine verification, and flat `unit-catalog-v1` output.
+**Architecture:** Keep `unit-source-v1` as the legacy/common source and add an optional `unit-elite-variants-v1` sidecar keyed by `typeId`. An Editor-only resolver applies sparse patches with atomic `combat`, `shared`, and `model` blocks; `UnitCatalogGenerator` currently requests only elite level 0 and then continues through its existing validation, attack-interval conversion, Spine verification, and flat `unit-catalog-v1` output. Unit portraits remain raw `Texture2D` resources; a shared cached `UnitPortraitLoader` adapts them to Sprite only at UGUI `Image` consumers.
 
 **Tech Stack:** Unity 2022.3.62f1, C#, Unity `JsonUtility`, Unity Editor APIs, Spine-Unity, NUnit EditMode/PlayMode tests, PowerShell test runner.
 
@@ -19,6 +19,9 @@
 - An omitted `innateAbilityIds` inherits; an explicit empty array clears the list.
 - Missing elite 2 or elite 3 entries inherit the nearest lower entry and never borrow a higher entry.
 - Current generation resolves elite level 0 only. Do not connect elite 2/3 selection to battle, UI, presentation, or Player runtime data in this task.
+- All unit portraits under `Assets/Resources/ProfilePicture` are raw `Texture2D`; portrait code must not try `Resources.Load<Sprite>` first.
+- Keep UGUI `Image` consumers and convert each portrait Texture2D to one cached runtime Sprite through `UnitPortraitLoader`.
+- Do not modify portrait `.meta` files, Spine textures, general UI textures, atlases, or mixed-format non-portrait artwork.
 - Preserve the existing base attack interval rule: `ceil(attackIntervalSeconds × 0.5 × 20)`.
 - Do not add or upgrade Unity packages, Editor versions, render pipelines, input systems, or external dependencies.
 - If Unity is already using this project, stop the batch invocation rather than opening the same project in a second Editor process.
@@ -27,9 +30,16 @@
 
 - Create `Assets/GameData/Units/EliteVariants/Json/1000_gopro.json`: authoritative sparse variant sidecar for type 1000.
 - Create `Assets/Game/Editor/Battle/UnitEliteVariantResolver.cs`: Editor-only DTO parsing, validation, inheritance, and patch application.
+- Create `Assets/Game/UI/FormalHud/UnitPortraitLoader.cs`: Texture2D-only unit portrait loading and Sprite caching for UGUI.
 - Create `Assets/Game/Tests/EditMode/Battle/UnitEliteVariantSourceEditModeTests.cs`: reflection-based resolver tests that do not require an assembly-definition migration.
 - Modify `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs`: discover sidecars by `typeId`, resolve elite 0, and feed the resolved `UnitJson` into the existing conversion.
+- Modify `Assets/Game/Battle/Infrastructure/RealBattleDataLoader.cs`: validate portrait paths as Texture2D resources.
+- Modify `Assets/Game/UI/FormalHud/StagingHudController.cs`: load portraits through `UnitPortraitLoader`.
+- Modify `Assets/Game/UI/FormalHud/ShopReady/ShopReadyHudController.cs`: use the portrait-only loader for shop unit portraits while retaining `FormalHudSpriteLoader` for mixed UI art.
+- Modify `Assets/Game/Runtime/Initial/FormalBattleHudController.cs`: load all unit portraits through `UnitPortraitLoader`.
+- Modify `Assets/Game/Debug/ButtonDebug.cs`: keep the legacy portrait debug entry compatible with Texture2D portraits.
 - Modify `Assets/Game/Tests/EditMode/Battle/BattleCoreEditModeTests.cs`: assert the generated type 1000 entry uses elite-zero data.
+- Modify `Assets/Game/Tests/EditMode/Battle/StagingHudLayoutEditModeTests.cs`: assert Texture2D conversion and cache identity through the real portrait loader.
 - Regenerate `Assets/Resources/BattleData/unit-catalog-v1.json`: keep the schema flat while changing type 1000 to the resolved elite-zero values and resources.
 - Modify `docs/SPEC.md`: record the confirmed source, inheritance, level-zero, and current-runtime rules.
 - Modify `docs/ARCHITECTURE.md`: document the Editor-side resolver between source JSON and catalog generation.
@@ -653,19 +663,174 @@ Before committing, `git diff --cached --name-only` must not list any existing
 
 ---
 
-### Task 2: Resolve elite zero during catalog generation
+### Task 2: Resolve elite zero and load raw Texture2D portraits
 
 **Files:**
 - Modify: `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs:15-67`
+- Create: `Assets/Game/UI/FormalHud/UnitPortraitLoader.cs`
+- Modify: `Assets/Game/Battle/Infrastructure/RealBattleDataLoader.cs:159-168`
+- Modify: `Assets/Game/UI/FormalHud/StagingHudController.cs:235-245`
+- Modify: `Assets/Game/UI/FormalHud/ShopReady/ShopReadyHudController.cs:387-391`
+- Modify: `Assets/Game/Runtime/Initial/FormalBattleHudController.cs:369-420`
+- Modify: `Assets/Game/Debug/ButtonDebug.cs:47`
 - Modify: `Assets/Game/Tests/EditMode/Battle/BattleCoreEditModeTests.cs:540-605`
+- Modify: `Assets/Game/Tests/EditMode/Battle/StagingHudLayoutEditModeTests.cs`
 - Modify: `Assets/Resources/BattleData/unit-catalog-v1.json:5-36`
 
 **Interfaces:**
 - Consumes: `UnitEliteVariantResolver.LoadDirectory(...)`
 - Consumes: `UnitEliteVariantResolver.Resolve(..., eliteLevel: 0, ...)`
+- Produces: `ArknoNights.UI.UnitPortraitLoader.Load(string resourcePath) : Sprite`
 - Produces: the unchanged `unit-catalog-v1` shape with type 1000 resolved from elite zero
 
-- [ ] **Step 1: Change the catalog regression test to require elite-zero output**
+- [ ] **Step 1: Write a failing Texture2D portrait adapter test**
+
+Add these imports to `StagingHudLayoutEditModeTests.cs`:
+
+```csharp
+using System;
+using System.Reflection;
+using UnityEngine;
+```
+
+Add the test:
+
+```csharp
+[Test]
+public void UnitPortraitLoader_LoadsTexture2DAsOneCachedSprite()
+{
+    const string path = "ProfilePicture/UIImage_1000_gopro";
+    var texture = Resources.Load<Texture2D>(path);
+    Assert.That(texture, Is.Not.Null, "Portrait must remain a raw Texture2D.");
+
+    var loader = Type.GetType("ArknoNights.UI.UnitPortraitLoader, ARKnoNIGHTS.UI");
+    Assert.That(loader, Is.Not.Null, "Texture2D-only portrait loader must exist.");
+    var load = loader.GetMethod("Load", BindingFlags.Public | BindingFlags.Static);
+    Assert.That(load, Is.Not.Null);
+
+    var first = (Sprite)load.Invoke(null, new object[] { path });
+    var second = (Sprite)load.Invoke(null, new object[] { path });
+    Assert.That(first, Is.Not.Null);
+    Assert.That(first.texture, Is.SameAs(texture));
+    Assert.That(second, Is.SameAs(first));
+}
+```
+
+This test catches a missing adapter, loading the wrong Resources type, copying the
+portrait into a different texture, or recreating a Sprite on every UI refresh.
+
+- [ ] **Step 2: Run the portrait test and verify the intended failure**
+
+Run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 `
+  -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -TestPlatform EditMode `
+  -TestFilter 'ArknoNights.Battle.Tests.StagingHudLayoutEditModeTests.UnitPortraitLoader_LoadsTexture2DAsOneCachedSprite' `
+  -OutputDirectory 'Temp/UnitEliteVariants/TDD-Portrait-Red' `
+  -NoGraphics
+```
+
+Expected: one failed test with `Texture2D-only portrait loader must exist`; the raw
+Texture2D assertion must already pass.
+
+- [ ] **Step 3: Implement the portrait-only loader and route all unit portrait consumers**
+
+Create `Assets/Game/UI/FormalHud/UnitPortraitLoader.cs`:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace ArknoNights.UI
+{
+    public static class UnitPortraitLoader
+    {
+        private static readonly Dictionary<string, Sprite> Cache =
+            new Dictionary<string, Sprite>(StringComparer.Ordinal);
+
+        public static Sprite Load(string resourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(resourcePath)) return null;
+            if (Cache.TryGetValue(resourcePath, out var cached)) return cached;
+
+            var texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null)
+            {
+                Cache[resourcePath] = null;
+                return null;
+            }
+
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(.5f, .5f),
+                100f);
+            sprite.name = texture.name;
+            Cache[resourcePath] = sprite;
+            return sprite;
+        }
+    }
+}
+```
+
+Replace only unit portrait loads:
+
+```csharp
+// StagingHudController.LoadPortrait
+var portrait = UnitPortraitLoader.Load(stack.PortraitResourcePath);
+
+// ShopReadyHudController.RefreshShop
+widget.Portrait.sprite =
+    slot.IsEmpty ? null : UnitPortraitLoader.Load(slot.PortraitResourcePath);
+
+// FormalBattleHudController: selected entry, detail, and visual fixture
+portrait.sprite = UnitPortraitLoader.Load(entry.PortraitResourcePath);
+portrait.sprite = UnitPortraitLoader.Load(detail.PortraitResourcePath);
+
+// ButtonDebug legacy portrait assignment
+image.sprite = ArknoNights.UI.UnitPortraitLoader.Load(
+    loadpath + UnitFactory.GetUnitBasicValueSO(
+        units[i].GetComponent<UnitIdentity>().UnitTypeID).ProfilePicture);
+```
+
+Do not alter `FormalHudSpriteLoader`; it continues serving mixed-format non-portrait
+HUD artwork.
+
+Change portrait existence validation at both data boundaries:
+
+```csharp
+// UnitCatalogGenerator
+if (Resources.Load<Texture2D>(portraitResourcePath) == null)
+    throw new InvalidOperationException(
+        "TASK004A_CATALOG_PORTRAIT_MISSING path=" + sourcePath
+        + " resource=" + portraitResourcePath);
+
+// RealBattleDataLoader
+else if (Resources.Load<Texture2D>(dto.portraitResourcePath) == null)
+{
+    errors.Add(Error(
+        "catalog.portrait.resource.missing",
+        schemaVersion,
+        catalogId,
+        null,
+        dto.typeId));
+    valid = false;
+}
+```
+
+Neither boundary may call `Resources.Load<Sprite>` for portraits.
+
+- [ ] **Step 4: Run the portrait test and verify it passes**
+
+Run the Step 2 command with output directory
+`Temp/UnitEliteVariants/TDD-Portrait-Green`.
+
+Expected: result `Passed`, total `1`, failed `0`, skipped `0`.
+
+- [ ] **Step 5: Change the catalog regression test to require elite-zero output**
 
 In `RealCatalog_ParsesSourceValuesAndLoadsDeterministicallyFromResources`, add
 or update the type 1000 assertions:
@@ -702,7 +867,7 @@ StringAssert.Contains("\"resourceFolderName\": \"1000_gopro_3\"", eliteGopro);
 
 Keep the existing assertions for type 5503 and type 5504 unchanged.
 
-- [ ] **Step 2: Run the catalog regression and verify it is red**
+- [ ] **Step 6: Run the catalog regression and verify it is red**
 
 Run:
 
@@ -715,10 +880,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTe
   -NoGraphics
 ```
 
-Expected: one failed test because the checked-in generated catalog still contains
-type 1000 HP 3000, attack 370, and the previous name/resource mapping.
+Expected: one failed test because the checked-in catalog still points at the previous
+`enemy_1000_gopro_3_SkeletonData` location. With the imported resource rearrangement,
+the runtime catalog validator may fail on that stale skeleton path before reaching
+the HP 3000/attack 370 assertions; both failures are corrected only by regenerating
+the elite-zero entry.
 
-- [ ] **Step 3: Integrate the resolver into `UnitCatalogGenerator`**
+- [ ] **Step 7: Integrate the resolver into `UnitCatalogGenerator`**
 
 Add the sidecar directory constant:
 
@@ -808,7 +976,7 @@ Keep the existing value validation and the method body beginning with
 the high-tier data into `UnitCatalogEntry`; only the resolved elite-zero snapshot
 reaches the existing flat output.
 
-- [ ] **Step 4: Regenerate the catalog through Unity**
+- [ ] **Step 8: Regenerate the catalog through Unity**
 
 Run:
 
@@ -841,7 +1009,7 @@ exception. The type 1000 output must contain:
 }
 ```
 
-- [ ] **Step 5: Run focused source and catalog tests**
+- [ ] **Step 9: Run focused source and catalog tests**
 
 Run:
 
@@ -869,7 +1037,7 @@ Expected: both summaries report `result=Passed`, positive test totals, failed `0
 Do not change battle assertions solely to suppress a failure; investigate whether
 the failure is a legitimate consequence of the confirmed elite-zero data.
 
-- [ ] **Step 6: Verify deterministic generation**
+- [ ] **Step 10: Verify deterministic generation**
 
 Record the catalog hash:
 
@@ -878,7 +1046,7 @@ $firstHash = (Get-FileHash -LiteralPath `
   'Assets/Resources/BattleData/unit-catalog-v1.json' -Algorithm SHA256).Hash
 ```
 
-Run the Step 4 generation command again, then compare:
+Run the Step 8 generation command again, then compare:
 
 ```powershell
 $secondHash = (Get-FileHash -LiteralPath `
@@ -888,15 +1056,23 @@ if ($firstHash -ne $secondHash) { throw "Catalog generation is not deterministic
 
 Expected: hashes are identical.
 
-- [ ] **Step 7: Commit only generator integration, catalog regression, and output**
+- [ ] **Step 11: Commit generator, Texture2D portrait routing, regressions, and output**
 
 ```powershell
 git add -- `
   Assets/Game/Editor/Battle/UnitCatalogGenerator.cs `
+  Assets/Game/Battle/Infrastructure/RealBattleDataLoader.cs `
+  Assets/Game/UI/FormalHud/UnitPortraitLoader.cs `
+  Assets/Game/UI/FormalHud/UnitPortraitLoader.cs.meta `
+  Assets/Game/UI/FormalHud/StagingHudController.cs `
+  Assets/Game/UI/FormalHud/ShopReady/ShopReadyHudController.cs `
+  Assets/Game/Runtime/Initial/FormalBattleHudController.cs `
+  Assets/Game/Debug/ButtonDebug.cs `
   Assets/Game/Tests/EditMode/Battle/BattleCoreEditModeTests.cs `
+  Assets/Game/Tests/EditMode/Battle/StagingHudLayoutEditModeTests.cs `
   Assets/Resources/BattleData/unit-catalog-v1.json
 git diff --cached --check
-git commit -m "feat: resolve elite zero unit catalog data"
+git commit -m "feat: resolve elite zero with Texture2D portraits"
 ```
 
 Confirm with `git diff --cached --name-only` before commit that no user-owned model,
@@ -990,6 +1166,9 @@ In `docs/SPEC.md`, extend the confirmed elite-data rules with these statements:
   complete and atomic.
 - Model changes bind the display name, resource key/folder, skeleton, portrait,
   skeleton type, animation names, attack animation duration, and variant abilities.
+- All unit portraits are raw Texture2D Resources. Catalog validation loads
+  `Texture2D`, and UGUI `Image` consumers use cached `UnitPortraitLoader` Sprites
+  without trying Sprite resources first.
 - In the current milestone the Editor generator resolves only elite 0 into the flat
   catalog. Instance `eliteLevel` still does not change runtime battle results until
   a later integration task.
@@ -1012,12 +1191,20 @@ unit-source-v1 + optional unit-elite-variants-v1
 
 State that `UnitEliteVariantResolver` is Editor-only, that higher variants remain
 outside the Player catalog for now, and that no runtime reads the project-external
-staging directory.
+staging directory. Also record the portrait path:
+
+```text
+portraitResourcePath
+    -> Resources.Load<Texture2D>
+    -> UnitPortraitLoader cached Sprite
+    -> existing UGUI Image
+```
 
 In `docs/TEST_PLAN.md`, append a dated verification section containing:
 
 - the exact catalog generation command and deterministic SHA-256;
 - focused resolver and BattleCore NUnit totals;
+- focused Texture2D portrait-loader NUnit total;
 - full EditMode total;
 - both PlayMode totals;
 - Windows build result, error count, warning count, and log path;
@@ -1071,6 +1258,8 @@ Confirm all of the following before reporting completion:
 - the checked-in sidecar has elite 0, 2, and 3 entries with level-zero stats;
 - elite 1 resolves to base, and absent `shared` fields inherit;
 - model blocks are validated atomically;
+- every formal unit portrait consumer loads through `UnitPortraitLoader`, and
+  directory validation accepts raw Texture2D portraits;
 - type 1000 in `unit-catalog-v1` is elite-zero `猎狗`, HP 820, attack 190, and
   uses `enemy_1000_gopro_SkeletonData`;
 - type 5503 and 5504 catalog entries remain unchanged;
