@@ -409,7 +409,7 @@ $homeJoinDecoration = @{
 }
 $joinDecorationContentSpecs = @(
   @{ name='logo'; measurement='orange'; search=@{x=80;y=54;width=140;height=42}; expected=@{x=91;y=64;width=118;height=20}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
-  @{ name='text-01'; measurement='orange'; search=@{x=380;y=45;width=100;height=35}; expected=@{x=391;y=56;width=65;height=8}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
+  @{ name='text-01'; measurement='orange'; search=@{x=385;y=45;width=95;height=35}; expected=@{x=391;y=56;width=65;height=8}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
   @{ name='text-02'; measurement='orange'; search=@{x=515;y=50;width=110;height=35}; expected=@{x=526;y=62;width=89;height=11}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
   @{ name='triangle'; measurement='orange'; search=@{x=325;y=35;width=55;height=31}; expected=@{x=338;y=47;width=30;height=17}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
   @{ name='central-blank'; measurement='orange'; search=@{x=310;y=66;width=85;height=79}; expected=@{x=323;y=68;width=60;height=61}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
@@ -622,6 +622,29 @@ function Convert-CapturedJoinGeometryRectangle($Capture, $Geometry)
     }
 }
 
+function Convert-CapturedJoinGraphicRectangle($Capture, $Sprite)
+{
+    $result = [ordered]@{ name=[string]$Sprite.node; spriteName=[string]$Sprite.spriteName; available=$false; failureReason=$null; x=$null; y=$null; width=$null; height=$null }
+    try
+    {
+        if ([string]$Sprite.coordinateOrigin -cne 'screen-top-left' -or [string]$Sprite.unit -cne 'px') { throw 'must declare coordinateOrigin=screen-top-left and unit=px' }
+        $numbers = @([double]$Sprite.x, [double]$Sprite.y, [double]$Sprite.width, [double]$Sprite.height)
+        if (@($numbers | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) }).Count -gt 0 -or
+            $numbers[0] -lt 0 -or $numbers[1] -lt 0 -or $numbers[2] -le 0 -or $numbers[3] -le 0 -or
+            ($numbers[0] + $numbers[2]) -gt [double]$Capture.width -or ($numbers[1] + $numbers[3]) -gt [double]$Capture.height)
+        {
+            throw 'has an invalid or out-of-bounds visible rectangle'
+        }
+        $result.available=$true
+        $result.x=[int][Math]::Round($numbers[0] * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
+        $result.y=[int][Math]::Round($numbers[1] * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+        $result.width=[int][Math]::Round($numbers[2] * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
+        $result.height=[int][Math]::Round($numbers[3] * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+    }
+    catch { $result.failureReason=$_.Exception.Message }
+    return [pscustomobject]$result
+}
+
 function ConvertTo-LanLobbyMarkdownCell([string] $Value)
 {
     if ($null -eq $Value) { return '' }
@@ -715,6 +738,37 @@ $assets = @($spriteUsage | Group-Object SpriteName | Sort-Object Name | ForEach-
     $first = $_.Group[0]
     [pscustomobject][ordered]@{ spriteName=$first.SpriteName; captures=@($_.Group.CaptureName | Sort-Object -Unique); resourcesPath=$first.ResourcesPath; sourcePath=$first.SourcePath; importedSha256=$first.ImportedSha256; occurrenceCount=[int](($_.Group | Measure-Object OccurrenceCount -Sum).Sum) }
 })
+$requiredJoinSpriteCounts = [ordered]@{
+    join_icon = 2
+    room_select_join_left_block = 4
+    room_select_join_middle_block = 8
+    room_select_join_right_block = 4
+    room_select_join_middle_block_mask = 2
+    room_select_join_blank = 2
+    room_select_join_ban = 8
+    room_select_join_triangle = 2
+    room_select_join_logo = 2
+    room_select_join_text_01 = 2
+    room_select_join_text_02 = 2
+    room_select_join_text_bg = 2
+}
+$joinSpriteInventory = @(
+    foreach ($spriteName in $requiredJoinSpriteCounts.Keys)
+    {
+        $matches = @($assets | Where-Object spriteName -eq $spriteName)
+        $expectedSource = '[uc]autochessouter/' + $spriteName + '.png'
+        $actualOccurrences = if ($matches.Count -eq 1) { [int]$matches[0].occurrenceCount } else { 0 }
+        $sourcePath = if ($matches.Count -eq 1) { [string]$matches[0].sourcePath } else { $null }
+        [pscustomobject][ordered]@{
+            spriteName=$spriteName
+            expectedOccurrenceCount=[int]$requiredJoinSpriteCounts[$spriteName]
+            actualOccurrenceCount=$actualOccurrences
+            expectedSourcePath=$expectedSource
+            sourcePath=$sourcePath
+            passed=($matches.Count -eq 1 -and $actualOccurrences -eq $requiredJoinSpriteCounts[$spriteName] -and $sourcePath -ceq $expectedSource)
+        }
+    }
+)
 $unityTextUsage = @($textOccurrences | Group-Object Node, Text, FontName, FontResourcePath, HasBitmapSource, BitmapSourcePath | Sort-Object Name | ForEach-Object {
     $first = $_.Group[0]
     [pscustomobject][ordered]@{
@@ -1124,10 +1178,39 @@ try
         $backingRows = @($joinGeometryRects | Where-Object name -eq $backingName)
         if ($backingRows.Count -ne 1) { throw "Expected exactly one Join InteriorBacking geometry row; found $($backingRows.Count)." }
         $backingRect = $backingRows[0]
+        $backingTargetTolerancePx = 1
+        $backingTargetDeviationPx = [ordered]@{
+            unit='px'
+            deltaX=($backingRect.x - $homeJoinDecoration.approvedTarget.x)
+            deltaY=($backingRect.y - $homeJoinDecoration.approvedTarget.y)
+            deltaWidth=($backingRect.width - $homeJoinDecoration.approvedTarget.width)
+            deltaHeight=($backingRect.height - $homeJoinDecoration.approvedTarget.height)
+        }
+        $backingTargetPassed = [Math]::Abs($backingTargetDeviationPx.deltaX) -le $backingTargetTolerancePx -and
+            [Math]::Abs($backingTargetDeviationPx.deltaY) -le $backingTargetTolerancePx -and
+            [Math]::Abs($backingTargetDeviationPx.deltaWidth) -le $backingTargetTolerancePx -and
+            [Math]::Abs($backingTargetDeviationPx.deltaHeight) -le $backingTargetTolerancePx
         $backingBottomScreenY = $backingRect.y + $backingRect.height
         $geometryCrossesBackingBottom = @($joinGeometryRects | Where-Object { ($_.y + $_.height) -gt $backingBottomScreenY }).Count -gt 0
+        $actionBoundaryScreenY = 876
+        $joinGraphicRows = @(
+            foreach ($sprite in @($homeCapture.spriteSources | Where-Object {
+                $_ -and [string]$_.node -like ($joinGeometryPrefix + '*') -and
+                [string]$_.node -notlike ($joinGeometryPrefix + 'JoinAction/*')
+            }))
+            {
+                Convert-CapturedJoinGraphicRectangle $homeCapture $sprite
+            }
+        )
+        $graphicsOrGeometryBoundaryAvailable = @($joinGraphicRows | Where-Object { -not $_.available }).Count -eq 0
+        $joinBoundaryRows = @(
+            @($joinGeometryRects | ForEach-Object { [pscustomobject]@{ name=$_.name; y=$_.y; height=$_.height } }) +
+            @($joinGraphicRows | Where-Object available)
+        )
+        $graphicsOrGeometryCrossesActionBoundary = @($joinBoundaryRows | Where-Object { ($_.y + $_.height) -gt $actionBoundaryScreenY }).Count -gt 0
         $simulationInviteAbsent = -not ((ConvertTo-Json $manifest -Depth 12) -match 'SimulationInvite')
         $outlineBottomAbsent = @($joinGeometryRects | Where-Object { $_.name -like '*OutlineBottom*' }).Count -eq 0
+        $requiredSpriteInventoryPassed = @($joinSpriteInventory | Where-Object { -not $_.passed }).Count -eq 0
         $joinActionReport = @($actionBarReports | Where-Object name -eq 'home-join-action')
         if ($joinActionReport.Count -ne 1) { throw 'Expected exactly one home-join-action report for Join decoration acceptance.' }
         $joinActionPassed = [bool]$joinActionReport[0].passed
@@ -1143,12 +1226,22 @@ try
             averageAbsoluteRgbError=[double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
             components=$components
             backingRect=[ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$backingRect.x; y=$backingRect.y; width=$backingRect.width; height=$backingRect.height }
+            backingTargetRect=[ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$homeJoinDecoration.approvedTarget.x; y=$homeJoinDecoration.approvedTarget.y; width=$homeJoinDecoration.approvedTarget.width; height=$homeJoinDecoration.approvedTarget.height }
+            backingTargetTolerancePx=$backingTargetTolerancePx
+            backingTargetDeviationPx=$backingTargetDeviationPx
+            backingTargetPassed=$backingTargetPassed
             backingBottomScreenY=$backingBottomScreenY
             geometryCrossesBackingBottom=$geometryCrossesBackingBottom
+            actionBoundaryScreenY=$actionBoundaryScreenY
+            graphicBounds=$joinGraphicRows
+            graphicsOrGeometryBoundaryAvailable=$graphicsOrGeometryBoundaryAvailable
+            graphicsOrGeometryCrossesActionBoundary=$graphicsOrGeometryCrossesActionBoundary
             simulationInviteAbsent=$simulationInviteAbsent
             outlineBottomAbsent=$outlineBottomAbsent
+            requiredSpriteInventory=$joinSpriteInventory
+            requiredSpriteInventoryPassed=$requiredSpriteInventoryPassed
             joinActionPassed=$joinActionPassed
-            passed=( @($components | Where-Object { -not $_.passed }).Count -eq 0 -and $simulationInviteAbsent -and $outlineBottomAbsent -and -not $geometryCrossesBackingBottom -and $joinActionPassed )
+            passed=( @($components | Where-Object { -not $_.passed }).Count -eq 0 -and $simulationInviteAbsent -and $outlineBottomAbsent -and $backingTargetPassed -and -not $geometryCrossesBackingBottom -and $graphicsOrGeometryBoundaryAvailable -and -not $graphicsOrGeometryCrossesActionBoundary -and $requiredSpriteInventoryPassed -and $joinActionPassed )
         }
         $actualCrop.Save((Join-Path $stagingDirectory ($homeJoinDecoration.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
         $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($homeJoinDecoration.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
@@ -1342,6 +1435,8 @@ try
         $markdown += "| $($component.name) | $($component.measurement) | $($component.search.x),$($component.search.y),$($component.search.width),$($component.search.height) | $thresholds | $($component.tolerancePx) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
     }
     $markdown += @('', "Join backing: $($joinDecorationReport.backingRect.x),$($joinDecorationReport.backingRect.y),$($joinDecorationReport.backingRect.width),$($joinDecorationReport.backingRect.height) top-left px; bottom screen Y: $($joinDecorationReport.backingBottomScreenY). SimulationInvite absent: $($joinDecorationReport.simulationInviteAbsent). OutlineBottom absent: $($joinDecorationReport.outlineBottomAbsent). Geometry crosses backing bottom: $($joinDecorationReport.geometryCrossesBackingBottom). Accepted Join action/content passed: $($joinDecorationReport.joinActionPassed).")
+    $markdown += @('', "Join backing target passed: $($joinDecorationReport.backingTargetPassed); tolerance: $($joinDecorationReport.backingTargetTolerancePx) px; deviation: dx=$($joinDecorationReport.backingTargetDeviationPx.deltaX), dy=$($joinDecorationReport.backingTargetDeviationPx.deltaY), dw=$($joinDecorationReport.backingTargetDeviationPx.deltaWidth), dh=$($joinDecorationReport.backingTargetDeviationPx.deltaHeight). Fixed action boundary: y=$($joinDecorationReport.actionBoundaryScreenY); graphic/geometry boundary available: $($joinDecorationReport.graphicsOrGeometryBoundaryAvailable); graphic/geometry crosses boundary: $($joinDecorationReport.graphicsOrGeometryCrossesActionBoundary). Required Sprite inventory passed: $($joinDecorationReport.requiredSpriteInventoryPassed).", '', '| Required Join Sprite | Expected occurrences | Actual occurrences | Expected source | Actual source | Passed |', '| --- | ---: | ---: | --- | --- | --- |')
+    foreach ($item in @($joinDecorationReport.requiredSpriteInventory)) { $markdown += "| $($item.spriteName) | $($item.expectedOccurrenceCount) | $($item.actualOccurrenceCount) | $($item.expectedSourcePath) | $($item.sourcePath) | $($item.passed) |" }
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Bitmap Sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')

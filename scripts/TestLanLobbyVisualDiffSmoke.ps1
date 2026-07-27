@@ -120,19 +120,36 @@ function New-JoinDecorationSpriteSources()
 {
     $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
     return @(
-        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/LeftBlock_$_"; spriteName = 'room_select_join_left_block'; sourcePath = '[uc]autochessouter/room_select_join_left_block.png' } }
-        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/MiddleBlock_$_"; spriteName = 'room_select_join_middle_block'; sourcePath = '[uc]autochessouter/room_select_join_middle_block.png' } }
-        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/RightBlock_$_"; spriteName = 'room_select_join_right_block'; sourcePath = '[uc]autochessouter/room_select_join_right_block.png' } }
-        [ordered]@{ node = "$prefix/MiddleMask"; spriteName = 'room_select_join_middle_block_mask'; sourcePath = '[uc]autochessouter/room_select_join_middle_block_mask.png' }
-        [ordered]@{ node = "$prefix/Blank"; spriteName = 'room_select_join_blank'; sourcePath = '[uc]autochessouter/room_select_join_blank.png' }
-        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/Ban_$_"; spriteName = 'room_select_join_ban'; sourcePath = '[uc]autochessouter/room_select_join_ban.png' } }
-        [ordered]@{ node = "$prefix/Triangle"; spriteName = 'room_select_join_triangle'; sourcePath = '[uc]autochessouter/room_select_join_triangle.png' }
-        [ordered]@{ node = "$prefix/Logo"; spriteName = 'room_select_join_logo'; sourcePath = '[uc]autochessouter/room_select_join_logo.png' }
-        [ordered]@{ node = "$prefix/Text01"; spriteName = 'room_select_join_text_01'; sourcePath = '[uc]autochessouter/room_select_join_text_01.png' }
-        [ordered]@{ node = "$prefix/Text02"; spriteName = 'room_select_join_text_02'; sourcePath = '[uc]autochessouter/room_select_join_text_02.png' }
-        [ordered]@{ node = "$prefix/RoomCodeInput"; spriteName = 'room_select_join_text_bg'; sourcePath = '[uc]autochessouter/room_select_join_text_bg.png' }
+        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/LeftBlock_$_"; spriteName = 'room_select_join_left_block'; sourcePath = '[uc]autochessouter/room_select_join_left_block.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1199 + 84 * $_); y=703; width=125; height=89 } }
+        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/MiddleBlock_$_"; spriteName = 'room_select_join_middle_block'; sourcePath = '[uc]autochessouter/room_select_join_middle_block.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1367 + 67 * $_); y=703; width=108; height=89 } }
+        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/RightBlock_$_"; spriteName = 'room_select_join_right_block'; sourcePath = '[uc]autochessouter/room_select_join_right_block.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1635 + 80 * $_); y=703; width=121; height=89 } }
+        [ordered]@{ node = "$prefix/MiddleMask"; spriteName = 'room_select_join_middle_block_mask'; sourcePath = '[uc]autochessouter/room_select_join_middle_block_mask.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1477; y=658; width=60; height=60 }
+        [ordered]@{ node = "$prefix/Blank"; spriteName = 'room_select_join_blank'; sourcePath = '[uc]autochessouter/room_select_join_blank.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1477; y=664; width=60; height=61 }
+        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/Ban_$_"; spriteName = 'room_select_join_ban'; sourcePath = '[uc]autochessouter/room_select_join_ban.png'; coordinateOrigin='screen-top-left'; unit='px'; x=(1488 + 22 * ($_ % 2)); y=(679 + 19 * [int]($_ / 2)); width=13; height=13 } }
+        [ordered]@{ node = "$prefix/Triangle"; spriteName = 'room_select_join_triangle'; sourcePath = '[uc]autochessouter/room_select_join_triangle.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1492; y=643; width=30; height=17 }
+        [ordered]@{ node = "$prefix/Logo"; spriteName = 'room_select_join_logo'; sourcePath = '[uc]autochessouter/room_select_join_logo.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1245; y=660; width=118; height=20 }
+        [ordered]@{ node = "$prefix/Text01"; spriteName = 'room_select_join_text_01'; sourcePath = '[uc]autochessouter/room_select_join_text_01.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1545; y=652; width=65; height=8 }
+        [ordered]@{ node = "$prefix/Text02"; spriteName = 'room_select_join_text_02'; sourcePath = '[uc]autochessouter/room_select_join_text_02.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1680; y=658; width=89; height=11 }
+        [ordered]@{ node = "$prefix/RoomCodeInput"; spriteName = 'room_select_join_text_bg'; sourcePath = '[uc]autochessouter/room_select_join_text_bg.png'; coordinateOrigin='screen-top-left'; unit='px'; x=1269; y=800; width=482; height=60 }
         [ordered]@{ node = "$prefix/JoinAction/ActionIcon"; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' }
     )
+}
+
+function Repair-JoinText01Fixture([string] $Path)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $backgroundBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 60, 60, 60))
+    $orangeBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Orange)
+    try
+    {
+        $graphics.FillRectangle($backgroundBrush, 1550, 652, 65, 8)
+        $graphics.FillRectangle($orangeBrush, 1545, 652, 65, 8)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { $orangeBrush.Dispose(); $backgroundBrush.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
 }
 
 function New-JoinDecorationGeometry()
@@ -517,8 +534,11 @@ try
     Assert-True (($joinDecoration.actualRect.x -eq 1154) -and ($joinDecoration.actualRect.y -eq 596) -and ($joinDecoration.actualRect.width -eq 717) -and ($joinDecoration.actualRect.height -eq 280)) 'Join decoration crop'
     Assert-True ($joinDecoration.simulationInviteAbsent -eq $true) 'SimulationInvite must be absent from Join evidence'
     Assert-True (($joinDecoration.backingRect.x -eq 1154) -and ($joinDecoration.backingRect.y -eq 596) -and ($joinDecoration.backingRect.width -eq 717) -and ($joinDecoration.backingRect.height -eq 280)) 'Join backing must use its exact screen-top-left geometry'
+    Assert-True (($joinDecoration.backingTargetTolerancePx -eq 1) -and $joinDecoration.backingTargetPassed) 'Join backing target must be a blocking <=1 px acceptance gate'
     Assert-True ($joinDecoration.backingBottomScreenY -eq 876) 'Join backing bottom must meet the accepted Join action'
     Assert-True ($joinDecoration.geometryCrossesBackingBottom -eq $false) 'Join decoration geometry must not cross the backing bottom'
+    Assert-True ($joinDecoration.graphicsOrGeometryBoundaryAvailable -and ($joinDecoration.graphicsOrGeometryCrossesActionBoundary -eq $false)) 'every Join bitmap Graphic and geometry must remain above fixed screen y=876'
+    Assert-True ($joinDecoration.requiredSpriteInventoryPassed -eq $true) 'required Join Sprite inventory must be a passing acceptance gate for the valid fixture'
     Assert-True ($joinDecoration.joinActionPassed -eq $true) 'Join decoration must retain the accepted Join action/content gate'
     Assert-True (@($joinDecoration.components).Count -eq $joinDecorationBounds.Count) 'seven Join decoration visible-bound rows'
     foreach ($expectedJoinBound in $joinDecorationBounds)
@@ -707,6 +727,57 @@ try
     {
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$asset.sourcePath)) 'asset must have mapped source path'
         Assert-True ([string]$asset.importedSha256 -match '^[0-9A-F]{64}$') 'asset must have SHA-256'
+    }
+    $joinGeometryPrefix = 'LanLobbyRoot/Home/RoomSelect/Join/'
+    $joinNegativeCases = @(
+        [pscustomobject]@{
+            name = 'displaced-join-backing'
+            gate = 'backingTargetPassed'
+            expected = $false
+            mutate = {
+                param($homeCaptureRecord)
+                foreach ($geometry in @($homeCaptureRecord.codeNativeGeometry | Where-Object { $_.name -like ($joinGeometryPrefix + '*') })) { $geometry.x += 10 }
+            }
+        },
+        [pscustomobject]@{
+            name = 'join-graphic-crosses-action-boundary'
+            gate = 'graphicsOrGeometryCrossesActionBoundary'
+            expected = $true
+            mutate = {
+                param($homeCaptureRecord)
+                $logo = @($homeCaptureRecord.spriteSources | Where-Object node -eq ($joinGeometryPrefix + 'Logo'))[0]
+                $logo.y = 870
+                $logo.height = 20
+            }
+        },
+        [pscustomobject]@{
+            name = 'missing-join-middle-block'
+            gate = 'requiredSpriteInventoryPassed'
+            expected = $false
+            mutate = {
+                param($homeCaptureRecord)
+                $homeCaptureRecord.spriteSources = @($homeCaptureRecord.spriteSources | Where-Object node -ne ($joinGeometryPrefix + 'MiddleBlock_3'))
+            }
+        }
+    )
+    foreach ($negativeCase in $joinNegativeCases)
+    {
+        $caseCaptureDirectory = Join-Path $scratch ($negativeCase.name + '-captures')
+        Copy-Item -LiteralPath $captureDirectory -Destination $caseCaptureDirectory -Recurse
+        $caseManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $caseCaptureDirectory 'manifest.json') | ConvertFrom-Json
+        foreach ($record in $caseManifest.captures) { $record.path = Join-Path $caseCaptureDirectory ($record.name + '.png') }
+        $caseHome = @($caseManifest.captures | Where-Object name -eq 'home')[0]
+        $mutate = $negativeCase.mutate
+        & $mutate $caseHome
+        $caseManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $caseCaptureDirectory 'manifest.json') -Encoding UTF8
+        Repair-JoinText01Fixture (Join-Path $caseCaptureDirectory 'home.png')
+        $caseOutput = Join-Path $scratch ($negativeCase.name + '-output')
+        & $exportScript -CaptureDirectory $caseCaptureDirectory -OutputDirectory $caseOutput -ReferenceDirectory $referenceDirectory | Out-Null
+        $caseReport = Get-Content -Raw -LiteralPath (Join-Path $caseOutput 'visual-diff-report.json') | ConvertFrom-Json
+        Assert-True (@($caseReport.joinDecoration.components | Where-Object { -not $_.passed }).Count -eq 0) "$($negativeCase.name) must isolate the structural Join gate from visual-bound failures"
+        Assert-True ($caseReport.joinDecoration.$($negativeCase.gate) -eq $negativeCase.expected) "$($negativeCase.name) must flip its Join acceptance gate"
+        Assert-True ($caseReport.joinDecoration.passed -eq $false) "$($negativeCase.name) must block overall Join acceptance"
+        foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $caseOutput ('home-join-decoration-' + $kind + '.png'))) "$($negativeCase.name) must still publish home-join-decoration $kind" }
     }
     Write-Output 'LAN lobby visual-diff smoke: PASS'
 }
