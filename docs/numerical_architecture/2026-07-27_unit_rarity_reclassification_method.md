@@ -2,7 +2,7 @@
 
 - 日期：2026-07-27
 - 状态：待项目负责人复核
-- 适用名单：`docs/bonds/BONDS_SPEC.md` 当前列出的 83 个商店候选与 4 个非商店召唤/衍生单位
+- 适用名单：保留 `docs/bonds/BONDS_SPEC.md` 原始 83 个商店候选作为审计输入；最终为 81 个保留候选、2 个当前范围待移除候选，另有 4 个非商店召唤/衍生单位
 - 输出位置：稀有度与待移除结论写回 `docs/bonds/BONDS_SPEC.md`；完整评分与地区缺口保存在 `docs/numerical_architecture`
 
 ## 1. 目标
