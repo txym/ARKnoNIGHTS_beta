@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -16,6 +17,7 @@ public static class UnitCatalogGenerator
 {
     private const int TicksPerSecond = 20;
     private const string SourceDirectory = "Assets/GameData/Units/Json";
+    private const string EliteVariantSourceDirectory = "Assets/GameData/Units/EliteVariants/Json";
     private const string OutputPath = "Assets/Resources/BattleData/unit-catalog-v1.json";
     private const string CatalogId = "task004a-real-units";
 
@@ -25,12 +27,27 @@ public static class UnitCatalogGenerator
         if (!Directory.Exists(SourceDirectory)) throw new InvalidOperationException("TASK004A_CATALOG_SOURCE_MISSING path=" + SourceDirectory);
         var sourceFiles = Directory.GetFiles(SourceDirectory, "*.json", SearchOption.TopDirectoryOnly).OrderBy(path => Path.GetFileName(path), StringComparer.Ordinal).ToArray();
         if (sourceFiles.Length == 0) throw new InvalidOperationException("TASK004A_CATALOG_SOURCE_EMPTY path=" + SourceDirectory);
+        var eliteVariantsByTypeId = UnitEliteVariantResolver.LoadDirectory(EliteVariantSourceDirectory);
+        var consumedEliteVariantTypeIds = new HashSet<int>();
+        var units = sourceFiles
+            .Select(path => Convert(path, eliteVariantsByTypeId, consumedEliteVariantTypeIds))
+            .OrderBy(entry => entry.typeId, StringComparer.Ordinal)
+            .ToArray();
+        var orphanTypeIds = eliteVariantsByTypeId.Keys
+            .Where(typeId => !consumedEliteVariantTypeIds.Contains(typeId))
+            .OrderBy(typeId => typeId)
+            .ToArray();
+        if (orphanTypeIds.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "UNIT_ELITE_VARIANT_BASE_SOURCE_MISSING typeIds=" + string.Join(",", orphanTypeIds));
+        }
 
         var document = new UnitCatalogDocument
         {
             schemaVersion = "unit-catalog-v1",
             catalogId = CatalogId,
-            units = sourceFiles.Select(Convert).OrderBy(entry => entry.typeId, StringComparer.Ordinal).ToArray()
+            units = units
         };
         if (document.units.Select(entry => entry.typeId).Distinct(StringComparer.Ordinal).Count() != document.units.Length)
             throw new InvalidOperationException("TASK004A_CATALOG_TYPEID_DUPLICATE");
@@ -41,10 +58,28 @@ public static class UnitCatalogGenerator
         Debug.Log("TASK004A_CATALOG_GENERATED path=" + OutputPath + " units=" + document.units.Length + " summary=" + string.Join("|", document.units.Select(entry => entry.typeId + ":" + entry.attackAnimationDurationTicks)));
     }
 
-    private static UnitCatalogEntry Convert(string sourcePath)
+    private static UnitCatalogEntry Convert(
+        string sourcePath,
+        IReadOnlyDictionary<int, UnitEliteVariantSource> eliteVariantsByTypeId,
+        ISet<int> consumedEliteVariantTypeIds)
     {
+        string sourceJson;
         UnitJson source;
-        try { source = JsonUtility.FromJson<UnitJson>(File.ReadAllText(sourcePath)); }
+        try
+        {
+            sourceJson = File.ReadAllText(sourcePath);
+            source = JsonUtility.FromJson<UnitJson>(sourceJson);
+            if (source != null
+                && eliteVariantsByTypeId.TryGetValue(source.typeId, out var eliteVariants))
+            {
+                source = UnitEliteVariantResolver.Resolve(
+                    sourceJson,
+                    eliteVariants.Json,
+                    0,
+                    eliteVariants.Path);
+                consumedEliteVariantTypeIds.Add(source.typeId);
+            }
+        }
         catch (Exception exception) { throw new InvalidOperationException("TASK004A_CATALOG_SOURCE_INVALID path=" + sourcePath, exception); }
         if (source == null) throw new InvalidOperationException("TASK004A_CATALOG_SOURCE_EMPTY path=" + sourcePath);
         if (!string.Equals(source.schemaVersion, "unit-source-v1", StringComparison.Ordinal) || source.typeId <= 0 || string.IsNullOrWhiteSpace(source.resourceKey) || string.IsNullOrWhiteSpace(source.skeletonDataResourceName)) throw new InvalidOperationException("UNIT_DATA_001_SOURCE_REQUIRED_MISSING path=" + sourcePath + " typeId=" + source.typeId);
@@ -64,7 +99,7 @@ public static class UnitCatalogGenerator
 
         if (string.IsNullOrEmpty(source.displayNameZhHans)) Debug.LogWarning("UNIT_DATA_001_DISPLAY_NAME_UNCONFIGURED path=" + sourcePath + " typeId=" + source.typeId);
 
-        if (Resources.Load<Sprite>(portraitResourcePath) == null) throw new InvalidOperationException("TASK004A_CATALOG_PORTRAIT_MISSING path=" + sourcePath + " resource=" + portraitResourcePath);
+        if (Resources.Load<Texture2D>(portraitResourcePath) == null) throw new InvalidOperationException("TASK004A_CATALOG_PORTRAIT_MISSING path=" + sourcePath + " resource=" + portraitResourcePath);
 
         VerifyAnimation(sourcePath, skeletonResourcePath, source.attackAnimation, attackAnimationTicks, required: true);
         VerifyAnimation(sourcePath, skeletonResourcePath, source.moveAnimation, 0, required: true);

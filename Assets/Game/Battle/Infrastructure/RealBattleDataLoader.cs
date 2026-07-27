@@ -161,7 +161,7 @@ namespace ArknoNights.Battle.Infrastructure
                 errors.Add(Error("catalog.portrait.resource.missing", schemaVersion, catalogId, null, dto.typeId));
                 valid = false;
             }
-            else if (Resources.Load<Sprite>(dto.portraitResourcePath) == null)
+            else if (Resources.Load<Texture2D>(dto.portraitResourcePath) == null)
             {
                 errors.Add(Error("catalog.portrait.resource.missing", schemaVersion, catalogId, null, dto.typeId));
                 valid = false;

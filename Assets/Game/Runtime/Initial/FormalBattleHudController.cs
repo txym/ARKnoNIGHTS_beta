@@ -369,7 +369,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
         if (!catalog.TryGet(typeId, out var entry)) { ClearSelection(); return; }
         maxHp = entry.Definition.MaxHitPoints; if (currentHp == 0 && loop.Phase != LocalBattlePhase.Battle) currentHp = maxHp;
         infoPanel.gameObject.SetActive(true);
-        portrait.sprite = Resources.Load<Sprite>(entry.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
+        portrait.sprite = UnitPortraitLoader.Load(entry.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
         unitName.text = (string.IsNullOrEmpty(entry.DisplayNameZhHans) ? "未配置" : entry.DisplayNameZhHans) + " (" + typeId + ")";
         elite.text = eliteLevel.HasValue ? "精英化 " + eliteLevel.Value : "精英化: 未知";
         var ratio = maxHp <= 0 ? 0f : Mathf.Clamp01((float)currentHp / maxHp);
@@ -388,7 +388,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
         infoPanel.gameObject.SetActive(true);
         foreach (var diagnostic in detail.Diagnostics)
             if (reportedDetailDiagnostics.Add(diagnostic)) Debug.LogWarning("[UI-INFO-001][" + diagnostic + "]", this);
-        portrait.sprite = Resources.Load<Sprite>(detail.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
+        portrait.sprite = UnitPortraitLoader.Load(detail.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
         rarityIcon.sprite = LoadRaritySprite(detail.Rarity); rarityIcon.enabled = rarityIcon.sprite != null;
         eliteIcon.sprite = Sprite("StagingSlotElite" + detail.EliteLevel + "Icon"); eliteIcon.enabled = eliteIcon.sprite != null;
         unitName.text = string.IsNullOrWhiteSpace(detail.DisplayNameZhHans) ? "--" : detail.DisplayNameZhHans;
@@ -416,7 +416,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
         infoPanel.gameObject.SetActive(true);
         if (catalog.TryGet("1000", out var entry))
         {
-            portrait.sprite = Resources.Load<Sprite>(entry.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
+            portrait.sprite = UnitPortraitLoader.Load(entry.PortraitResourcePath); portrait.enabled = portrait.sprite != null;
             rarityIcon.sprite = LoadRaritySprite(entry.Rarity); rarityIcon.enabled = rarityIcon.sprite != null;
             eliteIcon.sprite = Sprite("StagingSlotElite0Icon"); eliteIcon.enabled = eliteIcon.sprite != null;
         }

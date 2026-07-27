@@ -1,8 +1,11 @@
+using System;
 using System.Linq;
+using System.Reflection;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Player;
 using ArknoNights.UI;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace ArknoNights.Battle.Tests
 {
@@ -71,6 +74,25 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(ids.Length, ids.Distinct().Count());
             Assert.That(ids[0], Does.Contain("local-1000-alpha"));
             Assert.That(ids[1], Does.Contain("local-5503-alpha"));
+        }
+
+        [Test]
+        public void UnitPortraitLoader_LoadsTexture2DAsOneCachedSprite()
+        {
+            const string path = "ProfilePicture/UIImage_1000_gopro";
+            var texture = Resources.Load<Texture2D>(path);
+            Assert.That(texture, Is.Not.Null, "Portrait must remain a raw Texture2D.");
+
+            var loader = Type.GetType("ArknoNights.UI.UnitPortraitLoader, ARKnoNIGHTS.UI");
+            Assert.That(loader, Is.Not.Null, "Texture2D-only portrait loader must exist.");
+            var load = loader.GetMethod("Load", BindingFlags.Public | BindingFlags.Static);
+            Assert.That(load, Is.Not.Null);
+
+            var first = (Sprite)load.Invoke(null, new object[] { path });
+            var second = (Sprite)load.Invoke(null, new object[] { path });
+            Assert.That(first, Is.Not.Null);
+            Assert.That(first.texture, Is.SameAs(texture));
+            Assert.That(second, Is.SameAs(first));
         }
     }
 }

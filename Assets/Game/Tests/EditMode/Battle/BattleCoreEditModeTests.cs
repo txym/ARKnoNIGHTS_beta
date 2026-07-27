@@ -546,6 +546,11 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(second.Success, Errors(second.Errors));
             Assert.AreEqual(first.Catalog.CanonicalSummary, second.Catalog.CanonicalSummary);
             Assert.IsTrue(first.Catalog.TryGet("1000", out var gopro));
+            Assert.That(gopro.DisplayNameZhHans, Is.EqualTo("猎狗"));
+            Assert.That(gopro.Definition.MaxHitPoints, Is.EqualTo(820));
+            Assert.That(gopro.Definition.Attack, Is.EqualTo(190));
+            Assert.That(gopro.Definition.Defense, Is.EqualTo(0));
+            Assert.That(gopro.Definition.MagicResistance, Is.EqualTo(20));
             Assert.AreEqual(190, gopro.Definition.MoveSpeedCentimetresPerSecond);
             Assert.AreEqual(14, gopro.Definition.AttackIntervalTicks);
             Assert.AreEqual(20, gopro.Definition.AttackAnimationDurationTicks);
@@ -554,8 +559,9 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(1, gopro.Definition.BlockCapacity);
             Assert.AreEqual(0, gopro.Definition.TauntLevel);
             Assert.AreEqual("1000_gopro.json", gopro.SourceFile);
-            Assert.AreEqual("Characters/1000_gopro/enemy_1000_gopro_3_SkeletonData", gopro.SkeletonDataResourcePath);
+            Assert.AreEqual("Characters/1000_gopro/enemy_1000_gopro_SkeletonData", gopro.SkeletonDataResourcePath);
             Assert.AreEqual("ProfilePicture/UIImage_1000_gopro", gopro.PortraitResourcePath);
+            Assert.That(gopro.Definition.InnateAbilityIds, Is.Empty);
 
             Assert.IsTrue(first.Catalog.TryGet("5503", out var arcslma));
             Assert.AreEqual(20, arcslma.Definition.MoveSpeedCentimetresPerSecond);
@@ -587,9 +593,15 @@ namespace ArknoNights.Battle.Tests
             var sourceGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/1000_gopro.json"));
             var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/5503_arcslma.json"));
             var sourceArcslmi = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/5504_arcslmi.json"));
+            var eliteGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/EliteVariants/Json/1000_gopro.json"));
             StringAssert.Contains("\"schemaVersion\": \"unit-source-v1\"", sourceGopro);
             StringAssert.Contains("\"resourceKey\": \"gopro\"", sourceGopro);
-            StringAssert.Contains("\"displayNameZhHans\": \"狂暴的猎狗pro\"", sourceGopro);
+            StringAssert.Contains("\"schemaVersion\": \"unit-elite-variants-v1\"", eliteGopro);
+            StringAssert.Contains("\"minEliteLevel\": 0", eliteGopro);
+            StringAssert.Contains("\"statsLevel\": 0", eliteGopro);
+            StringAssert.Contains("\"displayNameZhHans\": \"猎狗\"", eliteGopro);
+            StringAssert.Contains("\"resourceFolderName\": \"1000_gopro_2\"", eliteGopro);
+            StringAssert.Contains("\"resourceFolderName\": \"1000_gopro_3\"", eliteGopro);
             StringAssert.Contains("\"skillDescriptionZhHans\": \"\"", sourceArcslma);
             StringAssert.Contains("\"attackAnimationDurationSeconds\": 1.0", sourceGopro);
             StringAssert.Contains("\"attackAnimationDurationSeconds\": 2.666667", sourceArcslma);
@@ -737,7 +749,7 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void RealCatalog_MissingPresentationResourceReturnsStructuredError()
         {
-            var json = UnityEngine.Resources.Load<UnityEngine.TextAsset>(CatalogPath).text.Replace("Characters/1000_gopro/enemy_1000_gopro_3_SkeletonData", "Characters/missing/not-present");
+            var json = UnityEngine.Resources.Load<UnityEngine.TextAsset>(CatalogPath).text.Replace("Characters/1000_gopro/enemy_1000_gopro_SkeletonData", "Characters/missing/not-present");
             var loaded = UnitCatalogLoader.LoadFromJson(json);
             Assert.IsFalse(loaded.Success);
             Assert.That(loaded.Errors.Select(error => error.Code), Does.Contain("catalog.skeleton.resource.missing"));

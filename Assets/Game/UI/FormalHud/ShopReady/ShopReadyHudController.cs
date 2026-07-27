@@ -386,7 +386,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             widget.Purchase.interactable = !slot.IsEmpty;
             widget.Background.sprite = FormalHudSpriteLoader.Load(
                 slot.IsEmpty ? "UI/Texture/shop/bg_empty" : "UI/Texture/shop/bg_black");
-            widget.Portrait.sprite = slot.IsEmpty ? null : FormalHudSpriteLoader.Load(slot.PortraitResourcePath);
+            widget.Portrait.sprite = slot.IsEmpty ? null : UnitPortraitLoader.Load(slot.PortraitResourcePath);
             widget.Portrait.gameObject.SetActive(widget.Portrait.sprite != null);
             widget.Portrait.preserveAspect = true;
             widget.Unaffordable.gameObject.SetActive(!slot.IsEmpty && !slot.CanPurchase);

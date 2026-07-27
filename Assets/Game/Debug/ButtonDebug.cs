@@ -44,7 +44,9 @@ public class ButtonDebug : MonoBehaviour
             var obj = virtualSlotPanel.PlaceObjectInSlot(i);
             var image=obj.GetComponent<Image>();
             var eventText=obj.GetComponent<EventTest>();
-            image.sprite= Resources.Load<Sprite>(loadpath+UnitFactory.GetUnitBasicValueSO(units[i].GetComponent<UnitIdentity>().UnitTypeID).ProfilePicture);
+            image.sprite = ArknoNights.UI.UnitPortraitLoader.Load(
+                loadpath + UnitFactory.GetUnitBasicValueSO(
+                    units[i].GetComponent<UnitIdentity>().UnitTypeID).ProfilePicture);
             eventText.ChangeUnitId(units[i].GetComponent<UnitIdentity>().UnitTypeID);
         }
         DataUISwitchInitializerFromPath.InitUI();

@@ -239,7 +239,7 @@ namespace ArknoNights.UI
                 Debug.LogError("[StagingHud][portrait.path.missing] type=" + stack.TypeId, this);
                 return null;
             }
-            var portrait = Resources.Load<Sprite>(stack.PortraitResourcePath);
+            var portrait = UnitPortraitLoader.Load(stack.PortraitResourcePath);
             if (portrait == null) Debug.LogError("[StagingHud][portrait.missing] type=" + stack.TypeId + "; resource=" + stack.PortraitResourcePath, this);
             return portrait;
         }
