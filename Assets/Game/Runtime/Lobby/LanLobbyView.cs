@@ -380,7 +380,9 @@ public sealed class LanLobbyView : MonoBehaviour
         for (var index = 0; index < 4; index++)
         {
             var middleBlock = Image("MiddleBlock_" + index, parent, "Home/room_select_join_middle_block");
-            PositionSpriteTopLeft(middleBlock, 335f + index * 67f, 118f, 108f);
+            var middleBlockLeft = index == 0 ? 271f : index == 1 ? 343f : index == 2 ? 504f : 606f;
+            var middleBlockWidth = index == 0 ? 74f : index == 1 ? 106f : 108f;
+            PositionSpriteTopLeft(middleBlock, middleBlockLeft, 118f, middleBlockWidth);
         }
         for (var index = 0; index < 2; index++)
         {

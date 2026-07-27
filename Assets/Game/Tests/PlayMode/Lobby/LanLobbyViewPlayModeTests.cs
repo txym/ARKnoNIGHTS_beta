@@ -379,17 +379,51 @@ namespace ArknoNights.Lobby.Tests
                 AssertJoinCodeNativeGeometry(join, geometry, materialField);
             Assert.That(join.Find("OutlineBottom"), Is.Null);
 
-            var blockRects = expectedBitmaps
-                .Where(item => item.Key.StartsWith("LeftBlock_") || item.Key.StartsWith("MiddleBlock_") || item.Key.StartsWith("RightBlock_"))
-                .Select(item => VisibleSpriteScreenTopLeftRect(join.Find(item.Key).GetComponent<Image>(), roomSelect))
-                .OrderBy(rect => rect.x)
-                .ToArray();
-            for (var index = 1; index < blockRects.Length; index++)
-                Assert.That(blockRects[index - 1].xMax, Is.GreaterThan(blockRects[index].x), "Block pair " + (index - 1) + "/" + index + " must overlap.");
+            var blockNamesInSiblingOrder = new[]
+            {
+                "LeftBlock_0", "LeftBlock_1",
+                "MiddleBlock_0", "MiddleBlock_1", "MiddleBlock_2", "MiddleBlock_3",
+                "RightBlock_0", "RightBlock_1"
+            };
+            for (var index = 1; index < blockNamesInSiblingOrder.Length; index++)
+            {
+                Assert.That(join.Find(blockNamesInSiblingOrder[index - 1]).GetSiblingIndex(),
+                    Is.LessThan(join.Find(blockNamesInSiblingOrder[index]).GetSiblingIndex()),
+                    "Block sibling order must remain left, middle, then right.");
+            }
+
             // The end sprites intentionally extend past the approved visible-pixel union to compensate for
             // transparent/near-background source pixels measured by the real-Player detector.
             AssertTopLeftRect(join.Find("LeftBlock_0").GetComponent<RectTransform>(), 163f, 118f, 125f, 125f * 71f / 100f, .1f);
+            AssertTopLeftRect(join.Find("LeftBlock_1").GetComponent<RectTransform>(), 251f, 118f, 125f, 125f * 71f / 100f, .1f);
+            AssertTopLeftRect(join.Find("MiddleBlock_0").GetComponent<RectTransform>(), 271f, 118f, 74f, 74f * 71f / 86f, .1f);
+            AssertTopLeftRect(join.Find("MiddleBlock_1").GetComponent<RectTransform>(), 343f, 118f, 106f, 106f * 71f / 86f, .1f);
+            AssertTopLeftRect(join.Find("MiddleBlock_2").GetComponent<RectTransform>(), 504f, 118f, 108f, 108f * 71f / 86f, .1f);
+            AssertTopLeftRect(join.Find("MiddleBlock_3").GetComponent<RectTransform>(), 606f, 118f, 108f, 108f * 71f / 86f, .1f);
+            AssertTopLeftRect(join.Find("RightBlock_0").GetComponent<RectTransform>(), 603f, 118f, 121f, 121f * 71f / 97f, .1f);
             AssertTopLeftRect(join.Find("RightBlock_1").GetComponent<RectTransform>(), 701f, 118f, 121f, 121f * 71f / 97f, .1f);
+
+            var blockRectsByName = blockNamesInSiblingOrder.ToDictionary(
+                name => name,
+                name => VisibleSpriteScreenTopLeftRect(join.Find(name).GetComponent<Image>(), roomSelect));
+            var spatialOverlapOrder = new[]
+            {
+                "LeftBlock_0", "LeftBlock_1", "MiddleBlock_0", "MiddleBlock_1",
+                "MiddleBlock_2", "RightBlock_0", "MiddleBlock_3", "RightBlock_1"
+            };
+            for (var index = 1; index < spatialOverlapOrder.Length; index++)
+            {
+                if (spatialOverlapOrder[index - 1] == "MiddleBlock_1") continue;
+                Assert.That(blockRectsByName[spatialOverlapOrder[index - 1]].xMax,
+                    Is.GreaterThan(blockRectsByName[spatialOverlapOrder[index]].x),
+                    "Spatial block pair " + spatialOverlapOrder[index - 1] + "/" + spatialOverlapOrder[index] + " must overlap.");
+            }
+            var measuredBlankRect = VisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect);
+            Assert.That(blockRectsByName["MiddleBlock_1"].xMax, Is.GreaterThan(measuredBlankRect.x),
+                "The central Blank must overlap the left side of the intentional middle-bank gap.");
+            Assert.That(measuredBlankRect.xMax, Is.GreaterThan(blockRectsByName["MiddleBlock_2"].x),
+                "The central Blank must overlap the right side of the intentional middle-bank gap.");
+            var blockRects = blockRectsByName.Values.ToArray();
             Assert.That(Union(blockRects), Is.EqualTo(new Rect(1195f, 703f, 659f, 108f * 71f / 86f)).Using(RectComparer.Within(.1f)));
 
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Logo").GetComponent<Image>(), roomSelect, 1245f, 660f, 118f, 20f, 2f);
