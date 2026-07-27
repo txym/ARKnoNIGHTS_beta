@@ -660,7 +660,12 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(emptyContent.gameObject.activeSelf, Is.True);
                 AssertResourceSprite(emptyContent.GetComponent<Image>(), "card_empty");
                 AssertDirectChildren(emptyContent, "EmptyInviteIcon", "EmptyInviteLabel", "EmptyInviteHint");
-                AssertResourceSprite(RequireChild(emptyContent, "EmptyInviteIcon").GetComponent<Image>(), "bg_plus");
+                var emptyInviteIcon = RequireChild(emptyContent, "EmptyInviteIcon").GetComponent<Image>();
+                AssertResourceSprite(emptyInviteIcon, "bg_plus");
+                Assert.That(emptyInviteIcon.preserveAspect, Is.True);
+                Assert.That(Aspect(emptyInviteIcon.rectTransform),
+                    Is.EqualTo(Aspect(emptyInviteIcon.sprite)).Within(.0001f));
+                AssertBottomLeftAnchoring(emptyInviteIcon.rectTransform);
                 Assert.That(RequireChild(emptyContent, "EmptyInviteLabel").GetComponent<Text>().text, Is.EqualTo("邀请"));
                 Assert.That(RequireChild(emptyContent, "EmptyInviteHint").GetComponent<Text>().text, Is.Not.Empty);
                 Assert.That(RequireChild(slot, "ReadyOverlay").gameObject.activeSelf, Is.False);
@@ -704,10 +709,9 @@ namespace ArknoNights.Lobby.Tests
             view.BindRoom(ready, "guest-1");
             AssertReadyGuestSlot(RequireChild(room, "RoomCard_1"));
             view.BindRoom(waiting, "guest-1");
-            Assert.That(RequireChild(RequireChild(room, "RoomCard_1"), "ReadyOverlay").gameObject.activeSelf, Is.False);
-            Assert.That(RequireChild(RequireChild(room, "RoomCard_1"), "OccupiedContent").gameObject.activeSelf, Is.False);
+            AssertWaitingGuestSlot(RequireChild(room, "RoomCard_1"));
             view.BindRoom(empty, "host");
-            Assert.That(RequireChild(RequireChild(room, "RoomCard_1"), "EmptyContent").gameObject.activeSelf, Is.True);
+            AssertEmptyGuestSlot(RequireChild(room, "RoomCard_1"));
             view.BindRoom(ready, "guest-1");
 
             var reboundSlot = RequireChild(room, "RoomCard_1");
@@ -722,6 +726,9 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(readyLabel.text, Is.EqualTo("已就绪"));
             Assert.That(readyLabel.rectTransform.sizeDelta.x, Is.EqualTo(readyLabel.preferredWidth).Within(.05f));
             Assert.That(readyLabel.rectTransform.sizeDelta.y, Is.EqualTo(readyLabel.preferredHeight).Within(.05f));
+            AssertBottomLeftAnchor(
+                readyLabel.rectTransform,
+                global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[1].ReadyLabel);
             yield return null;
         }
 
@@ -1160,13 +1167,96 @@ namespace ArknoNights.Lobby.Tests
 
         private static void AssertBottomLeftRect(RectTransform actual, global::LanLobbyRect expected, float tolerance = .05f)
         {
-            Assert.That(actual.anchorMin, Is.EqualTo(Vector2.zero));
-            Assert.That(actual.anchorMax, Is.EqualTo(Vector2.zero));
-            Assert.That(actual.pivot, Is.EqualTo(Vector2.zero));
+            AssertBottomLeftAnchoring(actual);
             Assert.That(actual.anchoredPosition.x, Is.EqualTo(expected.Left).Within(tolerance));
             Assert.That(actual.anchoredPosition.y, Is.EqualTo(expected.Bottom).Within(tolerance));
             Assert.That(actual.sizeDelta.x, Is.EqualTo(expected.Width).Within(tolerance));
             Assert.That(actual.sizeDelta.y, Is.EqualTo(expected.Height).Within(tolerance));
+        }
+
+        private static void AssertBottomLeftAnchor(
+            RectTransform actual,
+            global::LanLobbyRect expected,
+            float tolerance = .05f)
+        {
+            AssertBottomLeftAnchoring(actual);
+            Assert.That(actual.anchoredPosition.x, Is.EqualTo(expected.Left).Within(tolerance));
+            Assert.That(actual.anchoredPosition.y, Is.EqualTo(expected.Bottom).Within(tolerance));
+        }
+
+        private static void AssertBottomLeftAnchoring(RectTransform actual)
+        {
+            Assert.That(actual.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(actual.anchorMax, Is.EqualTo(Vector2.zero));
+            Assert.That(actual.pivot, Is.EqualTo(Vector2.zero));
+        }
+
+        private static void AssertWaitingGuestSlot(Transform slot)
+        {
+            AssertDirectChildren(slot,
+                "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
+                "OccupiedContent", "LowerDecoration", "CreatorTag");
+            AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
+            AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
+            AssertActiveResourceSprite(RequireChild(slot, "ReadyOverlay"), "player_card_self_frame", false);
+
+            var emptyContent = RequireChild(slot, "EmptyContent");
+            Assert.That(emptyContent.gameObject.activeSelf, Is.False);
+            AssertResourceSprite(emptyContent.GetComponent<Image>(), "card_empty");
+            AssertDirectChildren(emptyContent, "EmptyInviteIcon", "EmptyInviteLabel", "EmptyInviteHint");
+            AssertResourceSprite(RequireChild(emptyContent, "EmptyInviteIcon").GetComponent<Image>(), "bg_plus");
+            Assert.That(RequireChild(emptyContent, "EmptyInviteLabel").GetComponent<Text>().text, Is.EqualTo("邀请"));
+            Assert.That(RequireChild(emptyContent, "EmptyInviteHint").GetComponent<Text>().text,
+                Is.EqualTo("复制同盟密钥以邀请队友"));
+
+            var occupiedContent = RequireChild(slot, "OccupiedContent");
+            Assert.That(occupiedContent.gameObject.activeSelf, Is.False);
+            AssertDirectChildren(occupiedContent, "ReadyIcon", "ReadyLabel");
+            AssertActiveResourceSprite(RequireChild(occupiedContent, "ReadyIcon"), "player_card_ready", false);
+            Assert.That(RequireChild(occupiedContent, "ReadyLabel").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
+            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", false);
+            AssertActiveResourceSprite(RequireChild(slot, "CreatorTag"), "host_top_tag", false);
+            Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
+                Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
+        }
+
+        private static void AssertEmptyGuestSlot(Transform slot)
+        {
+            AssertDirectChildren(slot,
+                "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
+                "OccupiedContent", "LowerDecoration", "CreatorTag");
+            AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
+            AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
+            AssertActiveResourceSprite(RequireChild(slot, "ReadyOverlay"), "player_card_self_frame", false);
+
+            var emptyContent = RequireChild(slot, "EmptyContent");
+            Assert.That(emptyContent.gameObject.activeSelf, Is.True);
+            AssertResourceSprite(emptyContent.GetComponent<Image>(), "card_empty");
+            AssertDirectChildren(emptyContent, "EmptyInviteIcon", "EmptyInviteLabel", "EmptyInviteHint");
+            AssertActiveResourceSprite(RequireChild(emptyContent, "EmptyInviteIcon"), "bg_plus", true);
+            Assert.That(RequireChild(emptyContent, "EmptyInviteLabel").gameObject.activeSelf, Is.True);
+            Assert.That(RequireChild(emptyContent, "EmptyInviteLabel").GetComponent<Text>().text, Is.EqualTo("邀请"));
+            Assert.That(RequireChild(emptyContent, "EmptyInviteHint").gameObject.activeSelf, Is.True);
+            Assert.That(RequireChild(emptyContent, "EmptyInviteHint").GetComponent<Text>().text,
+                Is.EqualTo("复制同盟密钥以邀请队友"));
+
+            var occupiedContent = RequireChild(slot, "OccupiedContent");
+            Assert.That(occupiedContent.gameObject.activeSelf, Is.False);
+            AssertDirectChildren(occupiedContent, "ReadyIcon", "ReadyLabel");
+            AssertActiveResourceSprite(RequireChild(occupiedContent, "ReadyIcon"), "player_card_ready", false);
+            Assert.That(RequireChild(occupiedContent, "ReadyLabel").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
+            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", false);
+            AssertActiveResourceSprite(RequireChild(slot, "CreatorTag"), "host_top_tag", false);
+            Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
+                Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
+        }
+
+        private static void AssertActiveResourceSprite(Transform node, string resourceName, bool expectedActive)
+        {
+            Assert.That(node.gameObject.activeSelf, Is.EqualTo(expectedActive), node.name);
+            AssertResourceSprite(node.GetComponent<Image>(), resourceName);
         }
 
         private static void AssertReadyGuestSlot(Transform slot)
