@@ -375,7 +375,7 @@ public sealed class LanLobbyView : MonoBehaviour
         for (var index = 0; index < 2; index++)
         {
             var leftBlock = Image("LeftBlock_" + index, parent, "Home/room_select_join_left_block");
-            PositionSpriteTopLeft(leftBlock, 167f + index * 84f, 118f, 125f);
+            PositionSpriteTopLeft(leftBlock, index == 0 ? 163f : 251f, 118f, 125f);
         }
         for (var index = 0; index < 4; index++)
         {
@@ -385,7 +385,7 @@ public sealed class LanLobbyView : MonoBehaviour
         for (var index = 0; index < 2; index++)
         {
             var rightBlock = Image("RightBlock_" + index, parent, "Home/room_select_join_right_block");
-            PositionSpriteTopLeft(rightBlock, 603f + index * 80f, 118f, 121f);
+            PositionSpriteTopLeft(rightBlock, index == 0 ? 603f : 701f, 118f, 121f);
         }
 
         var middleMask = Image("MiddleMask", parent, "Home/room_select_join_middle_block_mask");
@@ -398,7 +398,7 @@ public sealed class LanLobbyView : MonoBehaviour
             PositionSpriteTopLeft(ban, 456f + index % 2 * 22f, 94f + index / 2 * 19f, 13f);
         }
         var triangle = Image("Triangle", parent, "Home/room_select_join_triangle");
-        PositionSpriteTopLeftExact(triangle, 460f, 58f, 30f, 17f);
+        PositionSpriteTopLeftExact(triangle, 462f, 60f, 28f, 13f);
 
         var logo = Image("Logo", parent, "Home/room_select_join_logo");
         PositionSpriteTopLeft(logo, 213f, 75f, 118f);

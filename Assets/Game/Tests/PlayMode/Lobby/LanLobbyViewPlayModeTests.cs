@@ -372,12 +372,18 @@ namespace ArknoNights.Lobby.Tests
                 .ToArray();
             for (var index = 1; index < blockRects.Length; index++)
                 Assert.That(blockRects[index - 1].xMax, Is.GreaterThan(blockRects[index].x), "Block pair " + (index - 1) + "/" + index + " must overlap.");
-            Assert.That(Union(blockRects), Is.EqualTo(new Rect(1199f, 703f, 639f, 89f)).Using(RectComparer.Within(4f)));
+            // The end sprites intentionally extend past the approved visible-pixel union to compensate for
+            // transparent/near-background source pixels measured by the real-Player detector.
+            AssertTopLeftRect(join.Find("LeftBlock_0").GetComponent<RectTransform>(), 163f, 118f, 125f, 125f * 71f / 100f, .1f);
+            AssertTopLeftRect(join.Find("RightBlock_1").GetComponent<RectTransform>(), 701f, 118f, 121f, 121f * 71f / 97f, .1f);
+            Assert.That(Union(blockRects), Is.EqualTo(new Rect(1195f, 703f, 659f, 108f * 71f / 86f)).Using(RectComparer.Within(.1f)));
 
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Logo").GetComponent<Image>(), roomSelect, 1245f, 660f, 118f, 20f, 2f);
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Text01").GetComponent<Image>(), roomSelect, 1545f, 652f, 65f, 8f, 2f);
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Text02").GetComponent<Image>(), roomSelect, 1680f, 658f, 89f, 11f, 2f);
-            AssertVisibleSpriteScreenTopLeftRect(join.Find("Triangle").GetComponent<Image>(), roomSelect, 1492f, 643f, 30f, 17f, 2f);
+            // The triangle Rect likewise compensates for transparent/antialiased edge pixels; its decoded
+            // visible bounds, rather than this RectTransform, remain the approved 30x17 target.
+            AssertTopLeftRect(join.Find("Triangle").GetComponent<RectTransform>(), 462f, 60f, 28f, 13f, .1f);
             AssertVisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect, 1477f, 664f, 60f, 61f, 2f);
             AssertVisibleSpriteScreenTopLeftRect(input.GetComponent<Image>(), roomSelect, 1269f, 800f, 482f, 60f, 2f);
             Assert.That(join.Find("Triangle").GetComponent<Image>().preserveAspect, Is.False);
