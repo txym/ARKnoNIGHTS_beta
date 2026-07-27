@@ -25,7 +25,7 @@
   "lifeDeduct": 1,
   "damageType": "Physical",
   "innateAbilityIds": [],
-  "skeletonDataResourceName": "enemy_1000_gopro_3_SkeletonData",
+  "skeletonDataResourceName": "enemy_1000_gopro_SkeletonData",
   "profilePictureResourceName": "UIImage_1000_gopro",
   "moveAnimation": "Run_Loop",
   "attackAnimation": "Attack",
