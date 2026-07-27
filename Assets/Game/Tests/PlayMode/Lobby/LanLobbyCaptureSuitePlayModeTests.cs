@@ -190,33 +190,6 @@ namespace ArknoNights.Lobby.Tests
                 "Rendered join_icon occurrences must sum to two across the two Home states.");
             Assert.That(home.spriteSources.Select(sprite => sprite.node), Is.Unique,
                 "Each Sprite usage row must identify one stable rendered node.");
-            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(8),
-                "The Home manifest must report OpaqueBlocker, Create backing, and six Join geometry rows.");
-            foreach (var geometry in home.codeNativeGeometry)
-            {
-                Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
-                Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
-                Assert.That(geometry.isBitmap, Is.False);
-                Assert.That(geometry.color, Is.Not.Null.And.Not.Empty);
-                Assert.That(geometry.width, Is.GreaterThan(0f));
-                Assert.That(geometry.height, Is.GreaterThan(0f));
-            }
-            Assert.That(home.codeNativeGeometry.Any(item =>
-                item.name.StartsWith("LanLobbyRoot/Home/RoomSelect/PanelFrame", StringComparison.Ordinal)), Is.False);
-            CollectionAssert.AreEquivalent(
-                new[]
-                {
-                    "LanLobbyRoot/OpaqueBlocker",
-                    "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking",
-                    "LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking",
-                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineTop",
-                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft",
-                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineRight",
-                    "LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal",
-                    "LanLobbyRoot/Home/RoomSelect/Join/GuideVertical"
-                },
-                home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
-            Assert.That(home.codeNativeGeometry.Any(geometry => geometry.name.EndsWith("/OutlineBottom", StringComparison.Ordinal)), Is.False);
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");
             Assert.That(roomHost.codeNativeGeometry.Select(geometry => geometry.name), Is.EquivalentTo(new[] { "LanLobbyRoot/OpaqueBlocker" }),
@@ -228,32 +201,41 @@ namespace ArknoNights.Lobby.Tests
 
         private static void AssertJoinBitmapInventory(CaptureRecordProbe capture)
         {
-            var expectedCounts = new Dictionary<string, int>
-            {
-                { "room_select_join_left_block", 2 },
-                { "room_select_join_middle_block", 4 },
-                { "room_select_join_right_block", 2 },
-                { "room_select_join_middle_block_mask", 1 },
-                { "room_select_join_blank", 1 },
-                { "room_select_join_ban", 4 },
-                { "room_select_join_triangle", 1 },
-                { "room_select_join_logo", 1 },
-                { "room_select_join_text_01", 1 },
-                { "room_select_join_text_02", 1 },
-                { "room_select_join_text_bg", 1 },
-                { "room_select_join_btn_bg_down", 1 }
-            };
             const string joinRoot = "LanLobbyRoot/Home/RoomSelect/Join/";
-            foreach (var expected in expectedCounts)
+            var expected = new Dictionary<string, string>
             {
-                var occurrences = capture.spriteSources.Where(sprite => sprite.spriteName == expected.Key).ToArray();
-                Assert.That(occurrences, Has.Length.EqualTo(expected.Value), capture.name + ": " + expected.Key);
-                Assert.That(occurrences.All(sprite => sprite.node.StartsWith(joinRoot, StringComparison.Ordinal)), Is.True,
-                    capture.name + ": " + expected.Key + " must be owned by the Join hierarchy.");
-                Assert.That(occurrences.All(sprite => sprite.sourcePath == "[uc]autochessouter/" + expected.Key + ".png"
-                    && !sprite.sourcePath.Contains("$0")
-                    && !sprite.sourcePath.Contains("#0")), Is.True,
-                    capture.name + ": " + expected.Key + " must use its exact approved source.");
+                { joinRoot + "LeftBlock_0", "room_select_join_left_block" },
+                { joinRoot + "LeftBlock_1", "room_select_join_left_block" },
+                { joinRoot + "MiddleBlock_0", "room_select_join_middle_block" },
+                { joinRoot + "MiddleBlock_1", "room_select_join_middle_block" },
+                { joinRoot + "MiddleBlock_2", "room_select_join_middle_block" },
+                { joinRoot + "MiddleBlock_3", "room_select_join_middle_block" },
+                { joinRoot + "RightBlock_0", "room_select_join_right_block" },
+                { joinRoot + "RightBlock_1", "room_select_join_right_block" },
+                { joinRoot + "MiddleMask", "room_select_join_middle_block_mask" },
+                { joinRoot + "Blank", "room_select_join_blank" },
+                { joinRoot + "Ban_0", "room_select_join_ban" },
+                { joinRoot + "Ban_1", "room_select_join_ban" },
+                { joinRoot + "Ban_2", "room_select_join_ban" },
+                { joinRoot + "Ban_3", "room_select_join_ban" },
+                { joinRoot + "Triangle", "room_select_join_triangle" },
+                { joinRoot + "Logo", "room_select_join_logo" },
+                { joinRoot + "Text01", "room_select_join_text_01" },
+                { joinRoot + "Text02", "room_select_join_text_02" },
+                { joinRoot + "RoomCodeInput", "room_select_join_text_bg" },
+                { joinRoot + "JoinAction", "room_select_join_btn_bg_down" },
+                { joinRoot + "JoinAction/ActionIcon", "join_icon" }
+            };
+            var actual = capture.spriteSources.Where(sprite => sprite.node.StartsWith(joinRoot, StringComparison.Ordinal)).ToArray();
+            CollectionAssert.AreEquivalent(expected.Select(item => item.Key + "|" + item.Value),
+                actual.Select(item => item.node + "|" + item.spriteName),
+                capture.name + " must have no unexpected or missing Join bitmap nodes.");
+            foreach (var item in expected)
+            {
+                var occurrence = actual.Single(sprite => sprite.node == item.Key && sprite.spriteName == item.Value);
+                Assert.That(occurrence.sourcePath, Is.EqualTo("[uc]autochessouter/" + item.Value + ".png"));
+                Assert.That(occurrence.sourcePath.Contains("$0") || occurrence.sourcePath.Contains("#0"), Is.False,
+                    capture.name + ": " + item.Key + " must not use a forbidden source variant.");
             }
         }
 
@@ -279,6 +261,33 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry.width, Is.EqualTo(item.Width).Within(.05f));
                 Assert.That(geometry.height, Is.EqualTo(item.Height).Within(.05f));
             }
+            Assert.That(capture.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(8),
+                capture.name + " must report OpaqueBlocker, Create backing, and exactly six Join geometry rows.");
+            foreach (var geometry in capture.codeNativeGeometry)
+            {
+                Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
+                Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
+                Assert.That(geometry.isBitmap, Is.False);
+                Assert.That(geometry.color, Is.Not.Null.And.Not.Empty);
+                Assert.That(geometry.width, Is.GreaterThan(0f));
+                Assert.That(geometry.height, Is.GreaterThan(0f));
+            }
+            CollectionAssert.AreEquivalent(
+                new[]
+                {
+                    "LanLobbyRoot/OpaqueBlocker",
+                    "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking",
+                    "LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking",
+                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineTop",
+                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft",
+                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineRight",
+                    "LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal",
+                    "LanLobbyRoot/Home/RoomSelect/Join/GuideVertical"
+                },
+                capture.codeNativeGeometry.Select(geometry => geometry.name).ToArray(),
+                capture.name + " must have exactly the approved Home geometry inventory.");
+            Assert.That(capture.codeNativeGeometry.Any(item =>
+                item.name.StartsWith("LanLobbyRoot/Home/RoomSelect/PanelFrame", StringComparison.Ordinal)), Is.False);
             Assert.That(capture.codeNativeGeometry.Any(geometry => geometry.name.EndsWith("/OutlineBottom", StringComparison.Ordinal)), Is.False,
                 capture.name + " must not report a bottom outline.");
         }

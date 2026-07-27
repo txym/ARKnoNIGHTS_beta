@@ -369,8 +369,12 @@ namespace ArknoNights.Lobby.Tests
 
             var blankRect = VisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect);
             var bans = ChildrenWithPrefix(join, "Ban_").Select(item => VisibleSpriteScreenTopLeftRect(item.GetComponent<Image>(), roomSelect)).ToArray();
-            Assert.That(bans.Select(rect => rect.x).Distinct().Count(), Is.EqualTo(2));
-            Assert.That(bans.Select(rect => rect.y).Distinct().Count(), Is.EqualTo(2));
+            var banCoordinates = bans.Select(rect => new Vector2(rect.x, rect.y)).ToArray();
+            Assert.That(banCoordinates.Distinct().Count(), Is.EqualTo(4), "Each ban must occupy one distinct grid cell.");
+            Assert.That(bans.GroupBy(rect => rect.x).Select(group => group.Count()), Is.EquivalentTo(new[] { 2, 2 }),
+                "The ban grid must have exactly two bans in each column.");
+            Assert.That(bans.GroupBy(rect => rect.y).Select(group => group.Count()), Is.EquivalentTo(new[] { 2, 2 }),
+                "The ban grid must have exactly two bans in each row.");
             Assert.That(bans.All(rect => blankRect.Contains(rect.min) && blankRect.Contains(rect.max)), Is.True,
                 "Every ban must remain inside the central blank.");
 
@@ -407,14 +411,19 @@ namespace ArknoNights.Lobby.Tests
             var inputPointer = PointerAt(inputTransform);
             var inputHits = new List<RaycastResult>();
             EventSystem.current.RaycastAll(inputPointer, inputHits);
-            Assert.That(FirstInputField(inputHits), Is.EqualTo(input), "The real EventSystem raycast must resolve the room-code input.");
+            Assert.That(inputHits, Is.Not.Empty, "The input center must have a raycast hit.");
+            var inputClickTarget = ExecuteEvents.GetEventHandler<IPointerClickHandler>(inputHits[0].gameObject);
+            Assert.That(inputClickTarget, Is.EqualTo(input.gameObject),
+                "The first raycast hit at the input center must resolve the real InputField click handler.");
 
             var actionPointer = PointerAt(joinAction);
             var actionHits = new List<RaycastResult>();
             EventSystem.current.RaycastAll(actionPointer, actionHits);
-            var resolvedJoin = FirstInteractableButton(actionHits);
-            Assert.That(resolvedJoin, Is.EqualTo(joinButton), "The real EventSystem raycast must resolve the accepted Join Button.");
-            ExecuteEvents.Execute(resolvedJoin.gameObject, actionPointer, ExecuteEvents.pointerClickHandler);
+            Assert.That(actionHits, Is.Not.Empty, "The Join action center must have a raycast hit.");
+            var joinClickTarget = ExecuteEvents.GetEventHandler<IPointerClickHandler>(actionHits[0].gameObject);
+            Assert.That(joinClickTarget, Is.EqualTo(joinButton.gameObject),
+                "The first raycast hit at the Join action center must resolve the accepted Join Button.");
+            ExecuteEvents.Execute(joinClickTarget, actionPointer, ExecuteEvents.pointerClickHandler);
             Assert.That(joinRequests, Is.EqualTo(1));
             yield return null;
         }
@@ -880,16 +889,6 @@ namespace ArknoNights.Lobby.Tests
             {
                 var button = hit.gameObject.GetComponentInParent<Button>();
                 if (button != null && button.isActiveAndEnabled && button.interactable) return button;
-            }
-            return null;
-        }
-
-        private static InputField FirstInputField(IEnumerable<RaycastResult> hits)
-        {
-            foreach (var hit in hits)
-            {
-                var input = hit.gameObject.GetComponentInParent<InputField>();
-                if (input != null && input.isActiveAndEnabled && input.interactable) return input;
             }
             return null;
         }
