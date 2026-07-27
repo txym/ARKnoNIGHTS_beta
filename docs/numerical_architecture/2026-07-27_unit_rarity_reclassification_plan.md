@@ -161,7 +161,7 @@
 
   At minimum include:
 
-  - `1169`: DEF 300 at one E0 entity, DEF 700 per entity for one E2, and DEF 1300 per entity for two adjacent E2 units.
+  - `1169`: E0 has DEF 300. E2 uses its `_2 level: 0` base DEF 400, so one E2 has DEF 800 per entity and two adjacent E2 units have DEF 1400 per entity.
   - Unstackable drone auras: no linear entity multiplier.
   - Death summons and periodic summons: independent elite-entity triggers unless an explicit shared cap applies.
   - `1121`: repeated entity unlock triggers provide no extra benefit after allies are already released.
