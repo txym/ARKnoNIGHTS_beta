@@ -1690,9 +1690,13 @@ function Assert-LanLobbyCaptureEvidenceSchema($Manifest)
                     throw "Capture '$($capture.name)' CodeNativeGeometry is missing required capture field '$propertyName'."
                 }
             }
-            if ($null -ne $geometry.PSObject.Properties['spriteName'])
+            foreach ($propertyName in @('spriteName','materialName','resourcesPath','sourcePath','sha256'))
             {
-                throw "CodeNativeGeometry '$($geometry.name)' must not declare spriteName."
+                if ($null -ne $geometry.PSObject.Properties[$propertyName] -and
+                    -not [string]::IsNullOrWhiteSpace([string]$geometry.$propertyName))
+                {
+                    throw "CodeNativeGeometry '$($geometry.name)' must not declare nonempty $propertyName."
+                }
             }
             if ([string]::IsNullOrWhiteSpace([string]$geometry.name) -or
                 [string]$geometry.kind -cne 'code-native-geometry' -or
@@ -1769,9 +1773,13 @@ function Convert-CapturedJoinGeometryRectangle($Capture, $Geometry)
             throw "Join geometry is missing required capture field '$propertyName'."
         }
     }
-    if ($null -ne $Geometry.PSObject.Properties['spriteName'])
+    foreach ($propertyName in @('spriteName','materialName','resourcesPath','sourcePath','sha256'))
     {
-        throw "Join geometry '$($Geometry.name)' must not declare spriteName."
+        if ($null -ne $Geometry.PSObject.Properties[$propertyName] -and
+            -not [string]::IsNullOrWhiteSpace([string]$Geometry.$propertyName))
+        {
+            throw "Join geometry '$($Geometry.name)' must not declare nonempty $propertyName."
+        }
     }
     if ([string]::IsNullOrWhiteSpace([string]$Geometry.name) -or
         [string]$Geometry.kind -cne 'code-native-geometry' -or

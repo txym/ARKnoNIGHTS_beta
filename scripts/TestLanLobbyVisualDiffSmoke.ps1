@@ -625,12 +625,12 @@ function New-JoinDecorationGeometry()
 {
     $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
     return @(
-        [ordered]@{ name = "$prefix/InteriorBacking"; kind = 'code-native-geometry'; isBitmap = $false; color = '#000000D1'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 204; width = 717; height = 280 }
-        [ordered]@{ name = "$prefix/OutlineTop"; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 482; width = 717; height = 2 }
-        [ordered]@{ name = "$prefix/OutlineLeft"; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 204; width = 2; height = 280 }
-        [ordered]@{ name = "$prefix/OutlineRight"; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1869; y = 204; width = 2; height = 280 }
-        [ordered]@{ name = "$prefix/GuideHorizontal"; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 383; width = 717; height = 2 }
-        [ordered]@{ name = "$prefix/GuideVertical"; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1506; y = 288; width = 2; height = 196 }
+        [ordered]@{ name = "$prefix/InteriorBacking"; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#000000D1'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 204; width = 717; height = 280 }
+        [ordered]@{ name = "$prefix/OutlineTop"; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 482; width = 717; height = 2 }
+        [ordered]@{ name = "$prefix/OutlineLeft"; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 204; width = 2; height = 280 }
+        [ordered]@{ name = "$prefix/OutlineRight"; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#3030308C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1869; y = 204; width = 2; height = 280 }
+        [ordered]@{ name = "$prefix/GuideHorizontal"; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#FFA5008C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1154; y = 383; width = 717; height = 2 }
+        [ordered]@{ name = "$prefix/GuideVertical"; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#FFA5008C'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 1506; y = 288; width = 2; height = 196 }
     )
 }
 
@@ -871,7 +871,7 @@ try
                 @([ordered]@{ node = 'LanLobbyRoot/Room/Latency'; text = '18 ms'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' })
             })
             codeNativeGeometry = @(
-                [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 0; y = 0; width = 1920; height = 1080 }
+                [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; spriteName=''; materialName=''; resourcesPath=''; sourcePath=''; sha256=''; color = '#060F14FF'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 0; y = 0; width = 1920; height = 1080 }
             ) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationGeometry } else { @() })
             sourceAudit = $(if ($name -like 'room-*') {
                 @(
@@ -1020,8 +1020,28 @@ try
         },
         [pscustomobject]@{
             name = 'invalid-join-geometry-sprite-name'
-            expectedMessage = 'must not declare spriteName'
-            mutate = { param($geometry) $geometry | Add-Member -NotePropertyName spriteName -NotePropertyValue 'forbidden' }
+            expectedMessage = 'must not declare nonempty spriteName'
+            mutate = { param($geometry) $geometry.spriteName = 'forbidden' }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-material-name'
+            expectedMessage = 'must not declare nonempty materialName'
+            mutate = { param($geometry) $geometry.materialName = 'forbidden' }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-resources-path'
+            expectedMessage = 'must not declare nonempty resourcesPath'
+            mutate = { param($geometry) $geometry.resourcesPath = 'UI/forbidden' }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-source-path'
+            expectedMessage = 'must not declare nonempty sourcePath'
+            mutate = { param($geometry) $geometry.sourcePath = 'forbidden.png' }
+        },
+        [pscustomobject]@{
+            name = 'invalid-join-geometry-sha256'
+            expectedMessage = 'must not declare nonempty sha256'
+            mutate = { param($geometry) $geometry.sha256 = ('A' * 64) }
         }
     )
     foreach ($invalidJoinGeometryCase in $invalidJoinGeometryCases)
