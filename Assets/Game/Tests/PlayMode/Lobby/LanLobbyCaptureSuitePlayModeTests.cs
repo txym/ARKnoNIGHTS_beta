@@ -265,6 +265,8 @@ namespace ArknoNights.Lobby.Tests
                 string.Equals(text.text, "OPEN SLOT", StringComparison.Ordinal) ||
                 string.Equals(text.text, "WAITING", StringComparison.Ordinal)), Is.False,
                 capture.name + " must not render legacy placeholder literals.");
+            Assert.That(HasRenderedHostProfile(capture, "Doctor", "capture-host"), Is.False,
+                capture.name + " must not render the host display name, player ID, or avatar bitmap.");
             var semanticNodes = capture.keyRects.Select(rect => rect.name)
                 .Concat(capture.spriteSources.Select(sprite => sprite.node))
                 .Concat(capture.unityText.Select(text => text.node))
@@ -343,6 +345,13 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(item.sourcePath.Contains("$0") || item.sourcePath.Contains("#0"), Is.False);
                 Assert.That(item.captures, Is.EqualTo(new[] { capture.name }));
                 Assert.That(item.occurrenceCount, Is.EqualTo(1));
+                var renderedOccurrence = capture.spriteSources.SingleOrDefault(sprite =>
+                    sprite.node == item.node && sprite.spriteName == item.spriteName);
+                Assert.That(renderedOccurrence, Is.Not.Null,
+                    capture.name + " audit row must retain its rendered Image occurrence identity: " + item.node);
+                Assert.That(renderedOccurrence.isBitmap, Is.True);
+                Assert.That(item.raycastTarget, Is.EqualTo(renderedOccurrence.raycastTarget),
+                    capture.name + " audit raycast must come from the same rendered Image occurrence: " + item.node);
             }
 
             foreach (var item in codeNativeRows)
@@ -364,6 +373,29 @@ namespace ArknoNights.Lobby.Tests
                     .Select(group => group.Key + "|" + group.Sum(item => item.occurrenceCount)),
                 capture.name + " must report the exact rendered bitmap occurrence inventory.");
             Assert.That(expectedOccurrences["card_bg"], Is.EqualTo(4));
+
+            AssertBitmapOccurrenceRaycast(capture, "LanLobbyRoot/Room/LeaveAction", true);
+            AssertBitmapOccurrenceRaycast(capture, "LanLobbyRoot/Room/PrimaryAction", true);
+            AssertBitmapOccurrenceRaycast(capture, "LanLobbyRoot/Room/RoomCard_0/CardBody", false);
+            AssertBitmapOccurrenceRaycast(capture, "LanLobbyRoot/Room/RoomCard_0/TopBar", false);
+            var blocker = capture.sourceAudit.Single(item => item.node == "LanLobbyRoot/OpaqueBlocker");
+            Assert.That(blocker.isBitmap, Is.False);
+            Assert.That(blocker.raycastTarget, Is.False);
+        }
+
+        private static void AssertBitmapOccurrenceRaycast(
+            CaptureRecordProbe capture,
+            string node,
+            bool expectedRaycastTarget)
+        {
+            var rendered = capture.spriteSources.Where(item => item.node == node).ToArray();
+            var audited = capture.sourceAudit.Where(item => item.node == node).ToArray();
+            Assert.That(rendered, Has.Length.EqualTo(1), capture.name + " rendered occurrence: " + node);
+            Assert.That(audited, Has.Length.EqualTo(1), capture.name + " audit occurrence: " + node);
+            Assert.That(rendered[0].spriteName, Is.EqualTo(audited[0].spriteName));
+            Assert.That(rendered[0].raycastTarget, Is.EqualTo(expectedRaycastTarget), node);
+            Assert.That(audited[0].raycastTarget, Is.EqualTo(expectedRaycastTarget), node);
+            Assert.That(audited[0].occurrenceCount, Is.EqualTo(1), node);
         }
 
         private static Dictionary<string, int> ExpectedRoomBitmapOccurrences(string captureName)
@@ -417,6 +449,67 @@ namespace ArknoNights.Lobby.Tests
             };
             return forbiddenSegments.Any(segment =>
                 node.IndexOf(segment, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static bool HasRenderedHostProfile(
+            CaptureRecordProbe capture,
+            string hostDisplayName,
+            string hostPlayerId)
+        {
+            var forbiddenTexts = new[] { hostDisplayName, hostPlayerId };
+            if (capture.unityText.Any(text => forbiddenTexts.Any(forbidden =>
+                !string.IsNullOrEmpty(forbidden) &&
+                !string.IsNullOrEmpty(text.text) &&
+                text.text.IndexOf(forbidden, StringComparison.OrdinalIgnoreCase) >= 0)))
+            {
+                return true;
+            }
+
+            var approvedAvatarSprites = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "icon_amiy", "icon_clementi", "icon_kirar", "icon_zumam"
+            };
+            return capture.spriteSources.Any(sprite => approvedAvatarSprites.Contains(sprite.spriteName));
+        }
+
+        [Test]
+        public void HostProfileAbsenceGuard_RejectsGenericLabelAndIconMutations()
+        {
+            var probe = new CaptureRecordProbe
+            {
+                unityText = new[]
+                {
+                    new UnityTextProbe { node = "LanLobbyRoot/Room/PrimaryAction/Label", text = "协议启动" }
+                },
+                spriteSources = new[]
+                {
+                    new SpriteSourceProbe
+                    {
+                        node = "LanLobbyRoot/Room/RoomCard_0/CardBody",
+                        spriteName = "card_bg"
+                    }
+                }
+            };
+            Assert.That(HasRenderedHostProfile(probe, "Doctor", "capture-host"), Is.False);
+
+            probe.unityText = new[]
+            {
+                new UnityTextProbe { node = "LanLobbyRoot/Room/RoomCard_0/Label", text = "Doctor" }
+            };
+            Assert.That(HasRenderedHostProfile(probe, "Doctor", "capture-host"), Is.True,
+                "A generic Label containing the host display name must trip the guard.");
+
+            probe.unityText = Array.Empty<UnityTextProbe>();
+            probe.spriteSources = new[]
+            {
+                new SpriteSourceProbe
+                {
+                    node = "LanLobbyRoot/Room/RoomCard_0/Icon",
+                    spriteName = "icon_amiy"
+                }
+            };
+            Assert.That(HasRenderedHostProfile(probe, "Doctor", "capture-host"), Is.True,
+                "A generic Icon rendering the host avatar must trip the guard.");
         }
 
         private static void AssertJoinBitmapInventory(CaptureRecordProbe capture)
@@ -641,7 +734,7 @@ namespace ArknoNights.Lobby.Tests
         [Serializable] private sealed class CaptureRecordProbe { public string name; public int width; public int height; public float canvasScale; public string roomCode; public string localPlayerId; public bool primaryActionInteractable; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public CaptureRectProbe[] keyRects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; public SourceAuditProbe[] sourceAudit; }
         [Serializable] private sealed class CaptureMemberProbe { public string playerId; public string displayName; public bool isReady; }
         [Serializable] private sealed class CaptureRectProbe { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
-        [Serializable] private sealed class SpriteSourceProbe { public string node; public string spriteName; public string sourcePath; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
+        [Serializable] private sealed class SpriteSourceProbe { public string node; public bool isBitmap; public string spriteName; public string sourcePath; public bool raycastTarget; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class UnityTextProbe { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
         [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public string coordinateOrigin; public string unit; public bool raycastTarget; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class SourceAuditProbe { public string node; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public bool raycastTarget; }

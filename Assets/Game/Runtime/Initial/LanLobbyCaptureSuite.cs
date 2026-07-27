@@ -260,6 +260,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
                     sha256 = source.Sha256,
                     captures = new[] { captureName },
                     occurrenceCount = 1,
+                    raycastTarget = image.raycastTarget,
                     coordinateOrigin = "screen-bottom-left",
                     unit = "px",
                     x = minX,
@@ -363,7 +364,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
                 sha256 = sprite.sha256,
                 captures = new[] { captureName },
                 occurrenceCount = 1,
-                raycastTarget = false
+                raycastTarget = sprite.raycastTarget
             });
         }
 
@@ -621,7 +622,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     [Serializable] private sealed class CaptureRecord { public string name; public string path; public int width; public int height; public float canvasScale; public string roomCode; public string localPlayerId; public bool primaryActionInteractable; public CaptureMember[] members; public long localLatencyMilliseconds; public CaptureRect[] rects; public CaptureRect[] keyRects; public SpriteSource[] spriteSources; public UnityText[] unityText; public CodeNativeGeometry[] codeNativeGeometry; public SourceAudit[] sourceAudit; }
     [Serializable] private sealed class CaptureMember { public string playerId; public string displayName; public int avatarIndex; public bool isReady; public long latencyMilliseconds; }
     [Serializable] private sealed class CaptureRect { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
-    [Serializable] private sealed class SpriteSource { public string node; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
+    [Serializable] private sealed class SpriteSource { public string node; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public bool raycastTarget; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
     [Serializable] private sealed class UnityText { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
     [Serializable] private sealed class CodeNativeGeometry { public string name; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string color; public string coordinateOrigin; public string unit; public bool raycastTarget; public float x; public float y; public float width; public float height; }
     [Serializable] private sealed class SourceAudit { public string node; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public bool raycastTarget; }
