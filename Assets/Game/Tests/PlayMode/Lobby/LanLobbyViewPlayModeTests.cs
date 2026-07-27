@@ -619,17 +619,173 @@ namespace ArknoNights.Lobby.Tests
         [UnityTest]
         public IEnumerator RoomPermissions_RequireLocalMemberAndNeverAllowStartedRoomActions()
         {
-            view.BindRoom(Room("654321", everyoneReady: true), "missing");
-            Assert.That(view.ReadyInteractableForTests, Is.False);
-            Assert.That(view.StartInteractableForTests, Is.False);
+            view.ShowRoom(Room("654321", everyoneReady: true), "missing");
+            var primary = RequireOnlyVisibleRoomPrimaryAction(view);
+            var leave = RequireChild(view.transform, "LanLobbyRoot/Room/LeaveAction").GetComponent<Button>();
+            Assert.That(view.RoomPrimaryActionInteractableForTests, Is.False);
+            Assert.That(view.RoomLeaveInteractableForTests, Is.False);
 
-            view.BindRoom(Room("654321", everyoneReady: true), "host");
-            Assert.That(view.ReadyInteractableForTests, Is.True);
-            Assert.That(view.StartInteractableForTests, Is.True);
+            view.ShowRoom(Room("654321", everyoneReady: true), "host");
+            Assert.That(view.RoomPrimaryActionInteractableForTests, Is.True);
+            Assert.That(view.RoomLeaveInteractableForTests, Is.True);
 
-            view.BindRoom(Room("654321", hasStarted: true, everyoneReady: true), "host");
-            Assert.That(view.ReadyInteractableForTests, Is.False);
-            Assert.That(view.StartInteractableForTests, Is.False);
+            view.ShowRoom(Room("654321", hasStarted: true, everyoneReady: true), "host");
+            Assert.That(view.RoomPrimaryActionInteractableForTests, Is.False);
+            Assert.That(view.RoomLeaveInteractableForTests, Is.False);
+            Assert.That(primary, Is.SameAs(RequireOnlyVisibleRoomPrimaryAction(view)));
+            Assert.That(leave, Is.SameAs(RequireChild(view.transform, "LanLobbyRoot/Room/LeaveAction").GetComponent<Button>()));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomPrimaryAction_HostAllPresentReady_UsesCyanStartAndEmitsOnlyStart()
+        {
+            var readyRequests = new List<bool>();
+            var startRequests = 0;
+            view.ReadyRequested += value => readyRequests.Add(value);
+            view.StartRequested += () => startRequests++;
+
+            view.ShowRoom(Room("654321", everyoneReady: true), "host");
+            var primary = RequireOnlyVisibleRoomPrimaryAction(view);
+
+            AssertResourceSprite(primary.GetComponent<Image>(), "btn_match_normal");
+            Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("协议启动"));
+            Assert.That(primary.interactable, Is.True);
+            Click(primary);
+
+            Assert.That(startRequests, Is.EqualTo(1));
+            Assert.That(readyRequests, Is.Empty);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomPrimaryAction_HostWithUnreadyGuest_UsesDisabledGrayStartAndEmitsNothing()
+        {
+            var readyRequests = new List<bool>();
+            var startRequests = 0;
+            view.ReadyRequested += value => readyRequests.Add(value);
+            view.StartRequested += () => startRequests++;
+
+            view.ShowRoom(RoomWithGuest("654321", guestReady: false), "host");
+            var primary = RequireOnlyVisibleRoomPrimaryAction(view);
+
+            AssertResourceSprite(primary.GetComponent<Image>(), "btn_match_grey");
+            Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("协议启动"));
+            Assert.That(primary.interactable, Is.False);
+            Assert.That(primary.GetComponent<CanvasRenderer>().GetColor(), Is.EqualTo(Color.white),
+                "The disabled host action must render the approved gray Sprite without an additional tint.");
+            Click(primary);
+
+            Assert.That(startRequests, Is.Zero);
+            Assert.That(readyRequests, Is.Empty);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomPrimaryAction_UnreadyGuest_UsesInteractableGrayReadyAndEmitsOnlyReadyTrue()
+        {
+            var readyRequests = new List<bool>();
+            var startRequests = 0;
+            view.ReadyRequested += value => readyRequests.Add(value);
+            view.StartRequested += () => startRequests++;
+
+            view.ShowRoom(RoomWithGuest("654321", guestReady: false), "guest-1");
+            var primary = RequireOnlyVisibleRoomPrimaryAction(view);
+            view.ShowRoom(RoomWithGuest("654321", guestReady: true), "guest-1");
+            view.BindRoom(RoomWithGuest("654321", guestReady: false), "guest-1");
+
+            Assert.That(RequireOnlyVisibleRoomPrimaryAction(view), Is.SameAs(primary));
+            AssertResourceSprite(primary.GetComponent<Image>(), "btn_match_grey");
+            Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("准备就绪"));
+            Assert.That(primary.interactable, Is.True);
+            Click(primary);
+
+            Assert.That(readyRequests, Is.EqualTo(new[] { true }));
+            Assert.That(startRequests, Is.Zero);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomPrimaryAction_ReadyGuest_UsesCyanCancelAndEmitsOnlyReadyFalse()
+        {
+            var readyRequests = new List<bool>();
+            var startRequests = 0;
+            view.ReadyRequested += value => readyRequests.Add(value);
+            view.StartRequested += () => startRequests++;
+
+            view.ShowRoom(RoomWithGuest("654321", guestReady: true), "guest-1");
+            var primary = RequireOnlyVisibleRoomPrimaryAction(view);
+
+            AssertResourceSprite(primary.GetComponent<Image>(), "btn_match_normal");
+            Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("取消准备"));
+            Assert.That(primary.interactable, Is.True);
+            Click(primary);
+
+            Assert.That(readyRequests, Is.EqualTo(new[] { false }));
+            Assert.That(startRequests, Is.Zero);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomLeave_IsTopLeft_UsesApprovedSprite_AndHasUnobstructedHitTarget()
+        {
+            var leaveRequests = 0;
+            view.LeaveRequested += () => leaveRequests++;
+            view.BindRoom(HostOnlyRoom("654321"), "host");
+            view.ShowRoom();
+
+            var room = RequireChild(view.transform, "LanLobbyRoot/Room");
+            var leaveButtons = room.GetComponentsInChildren<Button>(true)
+                .Where(button => button.name == "LeaveAction" && button.gameObject.activeInHierarchy)
+                .ToArray();
+            Assert.That(leaveButtons, Has.Length.EqualTo(1));
+            var leave = leaveButtons[0];
+            AssertResourceSprite(leave.GetComponent<Image>(), "btn_topmenu_back");
+            AssertBottomLeftRect(
+                leave.GetComponent<RectTransform>(),
+                global::LanLobbyRoomLayout.ForSize(1920, 1080).LeaveAction);
+            Assert.That(leave.interactable, Is.True);
+            AssertButtonChildrenDoNotReceiveRaycasts(leave);
+
+            yield return null;
+            var hits = RaycastAt(leave.GetComponent<RectTransform>(), new Vector2(.5f, .5f));
+            Assert.That(hits, Is.Not.Empty);
+            Assert.That(hits[0].gameObject, Is.SameAs(leave.gameObject));
+            Click(leave);
+            Assert.That(leaveRequests, Is.EqualTo(1));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomPrimaryAction_HitTargetWinsOverEveryDecoration()
+        {
+            var scaler = view.GetComponent<CanvasScaler>();
+            scaler.matchWidthOrHeight = 0f;
+            yield return null;
+            Assert.That(view.GetComponent<Canvas>().scaleFactor, Is.EqualTo(Screen.width / 1920f).Within(.001f));
+
+            view.BindRoom(HostOnlyRoom("654321"), "host");
+            view.ShowRoom();
+            var primary = RequireOnlyVisibleRoomPrimaryAction(view);
+            var primaryRect = primary.GetComponent<RectTransform>();
+            var label = primary.GetComponentInChildren<Text>();
+
+            AssertBottomLeftRect(
+                primaryRect,
+                global::LanLobbyRoomLayout.ForSize(1920, 1080).PrimaryAction);
+            AssertButtonChildrenDoNotReceiveRaycasts(primary);
+
+            yield return null;
+            var embeddedIconPoint = ScreenPointAt(primaryRect, new Vector2(.88f, .5f));
+            var labelPoint = ScreenPointAt(label.rectTransform, new Vector2(.5f, .5f));
+            AssertScreenPointIsVisible(embeddedIconPoint);
+            AssertScreenPointIsVisible(labelPoint);
+            var embeddedIconHits = RaycastAt(primaryRect, new Vector2(.88f, .5f));
+            var labelHits = RaycastAt(label.rectTransform, new Vector2(.5f, .5f));
+            Assert.That(embeddedIconHits, Is.Not.Empty);
+            Assert.That(labelHits, Is.Not.Empty);
+            Assert.That(embeddedIconHits[0].gameObject, Is.SameAs(primary.gameObject));
+            Assert.That(labelHits[0].gameObject, Is.SameAs(primary.gameObject));
             yield return null;
         }
 
@@ -1091,6 +1247,63 @@ namespace ArknoNights.Lobby.Tests
                 if (button != null && button.isActiveAndEnabled && button.interactable) return button;
             }
             return null;
+        }
+
+        private static Button RequireOnlyVisibleRoomPrimaryAction(global::LanLobbyView targetView)
+        {
+            var room = RequireChild(targetView.transform, "LanLobbyRoot/Room");
+            var actions = room.GetComponentsInChildren<Button>(true)
+                .Where(button => button.name == "PrimaryAction" && button.gameObject.activeInHierarchy)
+                .ToArray();
+            Assert.That(actions, Has.Length.EqualTo(1));
+            Assert.That(room.Find("Ready"), Is.Null);
+            Assert.That(room.Find("Start"), Is.Null);
+            return actions[0];
+        }
+
+        private static void AssertButtonChildrenDoNotReceiveRaycasts(Button button)
+        {
+            Assert.That(button.targetGraphic, Is.SameAs(button.GetComponent<Image>()));
+            Assert.That(button.targetGraphic.raycastTarget, Is.True);
+            foreach (var graphic in button.GetComponentsInChildren<Graphic>(true))
+            {
+                if (graphic.gameObject == button.gameObject) continue;
+                Assert.That(graphic.raycastTarget, Is.False, graphic.transform.name);
+            }
+        }
+
+        private static void Click(Button button)
+        {
+            ExecuteEvents.Execute(
+                button.gameObject,
+                new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left },
+                ExecuteEvents.pointerClickHandler);
+        }
+
+        private static List<RaycastResult> RaycastAt(RectTransform target, Vector2 normalizedPosition)
+        {
+            var pointer = new PointerEventData(EventSystem.current)
+            {
+                button = PointerEventData.InputButton.Left,
+                position = ScreenPointAt(target, normalizedPosition)
+            };
+            var hits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(pointer, hits);
+            return hits;
+        }
+
+        private static Vector2 ScreenPointAt(RectTransform target, Vector2 normalizedPosition)
+        {
+            var localPoint = new Vector2(
+                Mathf.Lerp(target.rect.xMin, target.rect.xMax, normalizedPosition.x),
+                Mathf.Lerp(target.rect.yMin, target.rect.yMax, normalizedPosition.y));
+            return RectTransformUtility.WorldToScreenPoint(null, target.TransformPoint(localPoint));
+        }
+
+        private static void AssertScreenPointIsVisible(Vector2 point)
+        {
+            Assert.That(point.x, Is.InRange(0f, (float)Screen.width));
+            Assert.That(point.y, Is.InRange(0f, (float)Screen.height));
         }
 
         private static PointerEventData PointerAt(RectTransform target)

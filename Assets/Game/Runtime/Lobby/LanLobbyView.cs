@@ -54,9 +54,12 @@ public sealed class LanLobbyView : MonoBehaviour
     private Text discoveryOverflowText;
     private Text latencyText;
     private Text roomCodeText;
-    private Button readyButton;
-    private Button startButton;
+    private Button roomPrimaryActionButton;
+    private Text roomPrimaryActionLabel;
+    private Button roomLeaveButton;
     private string localPlayerId;
+    private bool boundLocalIsHost;
+    private bool boundLocalMemberReady;
     private int avatarIndex;
     private int readyCardCount;
     private int discoveryOverflowCount;
@@ -75,8 +78,8 @@ public sealed class LanLobbyView : MonoBehaviour
     public int ReadyCardCountForTests => readyCardCount;
     public string LocalLatencyTextForTests => latencyText == null ? string.Empty : latencyText.text;
     public int CanvasSortOrderForTests => canvas == null ? -1 : canvas.sortingOrder;
-    public bool ReadyInteractableForTests => readyButton != null && readyButton.interactable;
-    public bool StartInteractableForTests => startButton != null && startButton.interactable;
+    public bool RoomPrimaryActionInteractableForTests => roomPrimaryActionButton != null && roomPrimaryActionButton.interactable;
+    public bool RoomLeaveInteractableForTests => roomLeaveButton != null && roomLeaveButton.interactable;
     public int DiscoveryRenderedItemCountForTests => discoveryItemsRoot == null ? 0 : discoveryItemsRoot.childCount;
     public int DiscoveryOverflowCountForTests => discoveryOverflowCount;
     private void Awake()
@@ -168,9 +171,23 @@ public sealed class LanLobbyView : MonoBehaviour
             }
         }
 
-        readyButton.interactable = room != null && !room.HasStarted && hasLocalMember;
-        startButton.interactable = room != null && !room.HasStarted && localIsHost && room.Members.Count > 0 && readyCardCount == room.Members.Count;
-        readyButton.GetComponentInChildren<Text>().text = localMemberReady ? "UNREADY" : "READY";
+        boundLocalIsHost = localIsHost;
+        boundLocalMemberReady = localMemberReady;
+        var canMutateRoom = room != null && !room.HasStarted && hasLocalMember;
+        var allPresentMembersReady = room != null
+            && room.Members.Count > 0
+            && readyCardCount == room.Members.Count;
+        var primaryUsesNormalSprite = localIsHost ? allPresentMembersReady : localMemberReady;
+
+        roomPrimaryActionButton.GetComponent<Image>().sprite = Sprite(
+            primaryUsesNormalSprite ? "btn_match_normal" : "btn_match_grey");
+        roomPrimaryActionLabel.text = localIsHost
+            ? "协议启动"
+            : localMemberReady
+                ? "取消准备"
+                : "准备就绪";
+        roomPrimaryActionButton.interactable = canMutateRoom && (!localIsHost || allPresentMembersReady);
+        roomLeaveButton.interactable = canMutateRoom;
     }
 
     public void SetStatus(string message)
@@ -448,10 +465,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         var layout = LanLobbyRoomLayout.ForSize(1920, 1080);
         latencyText = Text("LocalLatency", parent, 28, TextAnchor.UpperLeft, new Color(.3f, .95f, .95f));
-        latencyText.rectTransform.anchorMin = latencyText.rectTransform.anchorMax = new Vector2(0f, 1f);
-        latencyText.rectTransform.pivot = new Vector2(0f, 1f);
-        latencyText.rectTransform.anchoredPosition = new Vector2(40f, -34f);
-        latencyText.rectTransform.sizeDelta = new Vector2(260f, 50f);
+        PositionBottomLeft(latencyText.rectTransform, layout.Latency);
         latencyText.text = "0 ms";
         roomCodeText = Text("RoomCode", parent, 42, TextAnchor.UpperCenter, Color.white);
         Position(roomCodeText.rectTransform, new Vector2(.5f, .92f), new Vector2(500f, 70f));
@@ -464,15 +478,32 @@ public sealed class LanLobbyView : MonoBehaviour
             BindSlot(slot, RoomSlotPresentationState.Empty, null, false);
         }
 
-        readyButton = Button("Ready", parent, "btn_match_grey", "READY", 30);
-        Position(readyButton.GetComponent<RectTransform>(), new Vector2(.38f, .14f), new Vector2(300f, 92f));
-        readyButton.onClick.AddListener(() => ReadyRequested?.Invoke(readyButton.GetComponentInChildren<Text>().text == "READY"));
-        var leave = Button("Leave", parent, "btn_match_cancel", "LEAVE", 30);
-        Position(leave.GetComponent<RectTransform>(), new Vector2(.5f, .14f), new Vector2(300f, 92f));
-        leave.onClick.AddListener(() => LeaveRequested?.Invoke());
-        startButton = Button("Start", parent, "btn_match_host_grey", "START", 30);
-        Position(startButton.GetComponent<RectTransform>(), new Vector2(.62f, .14f), new Vector2(300f, 92f));
-        startButton.onClick.AddListener(() => StartRequested?.Invoke());
+        roomLeaveButton = Button("LeaveAction", parent, "btn_topmenu_back", string.Empty, 30, true);
+        PositionBottomLeft(roomLeaveButton.GetComponent<RectTransform>(), layout.LeaveAction);
+        roomLeaveButton.onClick.AddListener(RequestRoomLeave);
+
+        roomPrimaryActionButton = Button("PrimaryAction", parent, "btn_match_grey", "协议启动", 30, true);
+        PositionBottomLeft(roomPrimaryActionButton.GetComponent<RectTransform>(), layout.PrimaryAction);
+        roomPrimaryActionButton.transition = Selectable.Transition.None;
+        roomPrimaryActionLabel = roomPrimaryActionButton.GetComponentInChildren<Text>();
+        roomPrimaryActionButton.onClick.AddListener(RequestRoomPrimaryAction);
+    }
+
+    private void RequestRoomLeave()
+    {
+        if (roomLeaveButton != null && roomLeaveButton.interactable) LeaveRequested?.Invoke();
+    }
+
+    private void RequestRoomPrimaryAction()
+    {
+        if (roomPrimaryActionButton == null || !roomPrimaryActionButton.interactable) return;
+        if (boundLocalIsHost)
+        {
+            StartRequested?.Invoke();
+            return;
+        }
+
+        ReadyRequested?.Invoke(!boundLocalMemberReady);
     }
 
     private static RoomSlotView BuildRoomSlot(

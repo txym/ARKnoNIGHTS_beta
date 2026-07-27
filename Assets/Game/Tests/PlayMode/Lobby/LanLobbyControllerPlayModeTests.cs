@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Reflection;
+using System.Threading.Tasks;
 using ArknoNights.Lobby;
 using NUnit.Framework;
 using UnityEngine;
@@ -14,9 +16,24 @@ namespace ArknoNights.Lobby.Tests
 {
     public sealed class LanLobbyControllerPlayModeTests
     {
+        private readonly List<LanRoomClient> clientsToStop = new List<LanRoomClient>();
+        private readonly List<LanRoomHost> hostsToStop = new List<LanRoomHost>();
+
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            foreach (var client in clientsToStop)
+            {
+                if (client != null) yield return WaitForTask(client.StopAsync());
+            }
+            clientsToStop.Clear();
+
+            foreach (var roomHost in hostsToStop)
+            {
+                if (roomHost != null) yield return WaitForTask(roomHost.StopAsync());
+            }
+            hostsToStop.Clear();
+
             foreach (var controller in Resources.FindObjectsOfTypeAll<MonoBehaviour>()
                 .Where(item => item != null && string.Equals(item.GetType().Name, "LanLobbyController", StringComparison.Ordinal))
                 .ToArray())
@@ -91,6 +108,109 @@ namespace ArknoNights.Lobby.Tests
 
             var listenersAfter = ListenerKeys();
             Assert.That(listenersAfter.Except(listenersBefore), Is.Empty, "A superseded successful create must release its unbound TCP listener.");
+        }
+
+        [UnityTest]
+        public IEnumerator LeavingRoom_ShutsDownHostOrNotifiesGuestAndReturnsHome()
+        {
+            SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+            yield return WaitForSceneBootstrap();
+
+            var controller = FindComponent("LanLobbyController");
+            var controllerType = controller.GetType();
+            var hostField = controllerType.GetField("host", BindingFlags.Instance | BindingFlags.NonPublic);
+            var clientField = controllerType.GetField("client", BindingFlags.Instance | BindingFlags.NonPublic);
+            var profileField = controllerType.GetField("profile", BindingFlags.Instance | BindingFlags.NonPublic);
+            var profile = (LobbyProfile)profileField.GetValue(controller);
+            var view = controller.GetComponentInChildren<global::LanLobbyView>(true);
+            Assert.That(hostField, Is.Not.Null);
+            Assert.That(clientField, Is.Not.Null);
+            Assert.That(profile, Is.Not.Null);
+            Assert.That(view, Is.Not.Null);
+
+            var localHostTask = LanRoomHost.StartForTestsAsync(profile, 0);
+            yield return WaitForTask(localHostTask);
+            var localHost = localHostTask.Result;
+            hostsToStop.Add(localHost);
+            var localHostPort = localHost.TcpPort;
+            var localHostShutdownTasks = PrivateTasks(localHost, "acceptTask", "heartbeatTask");
+            hostField.SetValue(controller, localHost);
+            view.ShowRoom(localHost.Snapshot, profile.PlayerId);
+
+            view.transform.Find("LanLobbyRoot/Room/LeaveAction").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+
+            Assert.That(hostField.GetValue(controller), Is.Null);
+            AssertHome(view);
+            for (var frame = 0; frame < 120 && ListenerKeys().Any(key => key.EndsWith(":" + localHostPort)); frame++)
+                yield return null;
+            Assert.That(ListenerKeys().Any(key => key.EndsWith(":" + localHostPort)), Is.False,
+                "Host Leave must close the authoritative room listener.");
+            yield return WaitForTask(Task.WhenAll(localHostShutdownTasks));
+
+            var remoteHostProfile = new LobbyProfile("remote-host", "Remote Host", 0);
+            var remoteHostTask = LanRoomHost.StartForTestsAsync(remoteHostProfile, 0);
+            yield return WaitForTask(remoteHostTask);
+            var remoteHost = remoteHostTask.Result;
+            hostsToStop.Add(remoteHost);
+            var clientTask = LanRoomClient.JoinForTestsAsync(remoteHost.LoopbackEndpoint, profile);
+            yield return WaitForTask(clientTask);
+            var localClient = clientTask.Result;
+            clientsToStop.Add(localClient);
+            var localClientShutdownTasks = PrivateTasks(localClient, "readTask", "heartbeatTask");
+            localClient.Tick();
+            remoteHost.Tick();
+            Assert.That(localClient.Snapshot, Is.Not.Null);
+            Assert.That(remoteHost.Snapshot.Members.Select(member => member.PlayerId), Does.Contain(profile.PlayerId));
+            clientField.SetValue(controller, localClient);
+            view.ShowRoom(localClient.Snapshot, profile.PlayerId);
+
+            view.transform.Find("LanLobbyRoot/Room/LeaveAction").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+
+            Assert.That(clientField.GetValue(controller), Is.Null);
+            AssertHome(view);
+            for (var frame = 0; frame < 120; frame++)
+            {
+                remoteHost.Tick();
+                if (!localClient.IsConnected
+                    && remoteHost.Snapshot.Members.All(member => member.PlayerId != profile.PlayerId))
+                    break;
+                yield return null;
+            }
+            remoteHost.Tick();
+            Assert.That(localClient.IsConnected, Is.False);
+            Assert.That(remoteHost.Snapshot.Members.Select(member => member.PlayerId),
+                Has.None.EqualTo(profile.PlayerId), "Guest Leave must remove only the guest from the authoritative room.");
+            yield return WaitForTask(Task.WhenAll(localClientShutdownTasks));
+        }
+
+        private static void AssertHome(global::LanLobbyView view)
+        {
+            Assert.That(view.transform.Find("LanLobbyRoot/Home").gameObject.activeSelf, Is.True);
+            Assert.That(view.transform.Find("LanLobbyRoot/Room").gameObject.activeSelf, Is.False);
+            Assert.That(view.StatusTextForTests, Is.EqualTo("Left room."));
+        }
+
+        private static IEnumerator WaitForTask(Task task)
+        {
+            for (var frame = 0; frame < 300 && task != null && !task.IsCompleted; frame++)
+                yield return null;
+            Assert.That(task, Is.Not.Null);
+            Assert.That(task.IsCompleted, Is.True, "Timed out waiting for LAN lifecycle task.");
+            Assert.That(task.IsFaulted, Is.False, task.Exception == null ? string.Empty : task.Exception.ToString());
+            Assert.That(task.IsCanceled, Is.False);
+        }
+
+        private static Task[] PrivateTasks(object owner, params string[] fieldNames)
+        {
+            var tasks = new Task[fieldNames.Length];
+            for (var index = 0; index < fieldNames.Length; index++)
+            {
+                var field = owner.GetType().GetField(fieldNames[index], BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null, fieldNames[index]);
+                tasks[index] = field.GetValue(owner) as Task;
+                Assert.That(tasks[index], Is.Not.Null, fieldNames[index]);
+            }
+            return tasks;
         }
 
         private static IEnumerator WaitForSceneBootstrap()
