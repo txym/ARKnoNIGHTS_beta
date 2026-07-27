@@ -188,11 +188,18 @@ public static class LanLobbyVisualDiff {
     public static LanLobbyBoundsMeasurement FindOrangeComponentUnionBounds(
         Bitmap bitmap, Rectangle search, int minimumRed, int minimumGreen, int maximumBlue, int minimumRedOverGreen,
         int minimumComponentPixelCount, int maximumComponentWidth, int maximumComponentHeight,
-        Rectangle ignoredVerticalGuide, Rectangle ignoredHorizontalGuide)
+        Rectangle ignoredVerticalGuide, Rectangle ignoredHorizontalGuide, Rectangle[] requiredComponentAnchors)
     {
         ValidateSearch(bitmap, search);
         if(minimumComponentPixelCount<1 || maximumComponentWidth<1 || maximumComponentHeight<1)
             throw new ArgumentOutOfRangeException("orangeComponentThresholds");
+        if(requiredComponentAnchors==null || requiredComponentAnchors.Length==0)
+            throw new ArgumentOutOfRangeException("requiredComponentAnchors");
+        foreach(Rectangle anchor in requiredComponentAnchors) {
+            if(anchor.Width<=0 || anchor.Height<=0 || !Inside(search,anchor.X,anchor.Y) ||
+                !Inside(search,anchor.Right-1,anchor.Bottom-1))
+                throw new ArgumentOutOfRangeException("requiredComponentAnchor");
+        }
         Rectangle[] ignored={ignoredVerticalGuide,ignoredHorizontalGuide};
         foreach(Rectangle region in ignored) {
             if(region.Width<=0 || region.Height<=0 || !Inside(search,region.X,region.Y) ||
@@ -209,6 +216,7 @@ public static class LanLobbyVisualDiff {
                 pixel.B<=maximumBlue && pixel.R>=pixel.G+minimumRedOverGreen;
         }
         int unionMinX=search.Right,unionMinY=search.Bottom,unionMaxX=-1,unionMaxY=-1;
+        bool[] matchedAnchors=new bool[requiredComponentAnchors.Length];
         int[] dx={-1,1,0,0,-1,-1,1,1};
         int[] dy={0,0,-1,1,-1,1,-1,1};
         for(int startY=0;startY<search.Height;startY++) for(int startX=0;startX<search.Width;startX++) {
@@ -217,11 +225,16 @@ public static class LanLobbyVisualDiff {
             queue.Enqueue(new Point(startX,startY));
             visited[startX,startY]=true;
             int count=0,minX=startX,minY=startY,maxX=startX,maxY=startY;
+            bool[] componentAnchorMatches=new bool[requiredComponentAnchors.Length];
             while(queue.Count>0) {
                 Point point=queue.Dequeue();
                 count++;
                 minX=Math.Min(minX,point.X); minY=Math.Min(minY,point.Y);
                 maxX=Math.Max(maxX,point.X); maxY=Math.Max(maxY,point.Y);
+                int bitmapX=search.X+point.X,bitmapY=search.Y+point.Y;
+                for(int anchorIndex=0;anchorIndex<requiredComponentAnchors.Length;anchorIndex++)
+                    if(Inside(requiredComponentAnchors[anchorIndex],bitmapX,bitmapY))
+                        componentAnchorMatches[anchorIndex]=true;
                 for(int i=0;i<dx.Length;i++) {
                     int x=point.X+dx[i],y=point.Y+dy[i];
                     if(x<0 || y<0 || x>=search.Width || y>=search.Height ||
@@ -232,9 +245,18 @@ public static class LanLobbyVisualDiff {
             }
             int width=maxX-minX+1,height=maxY-minY+1;
             if(count<minimumComponentPixelCount || width>maximumComponentWidth || height>maximumComponentHeight) continue;
+            bool matchesRequiredAnchor=false;
+            for(int anchorIndex=0;anchorIndex<componentAnchorMatches.Length;anchorIndex++) {
+                if(!componentAnchorMatches[anchorIndex]) continue;
+                matchesRequiredAnchor=true;
+                matchedAnchors[anchorIndex]=true;
+            }
+            if(!matchesRequiredAnchor) continue;
             unionMinX=Math.Min(unionMinX,minX); unionMinY=Math.Min(unionMinY,minY);
             unionMaxX=Math.Max(unionMaxX,maxX); unionMaxY=Math.Max(unionMaxY,maxY);
         }
+        foreach(bool matchedAnchor in matchedAnchors)
+            if(!matchedAnchor) return Unavailable("A required central-blank quadrant anchor had no qualifying decoded orange component.");
         return unionMaxX<unionMinX || unionMaxY<unionMinY
             ? Unavailable("No qualifying decoded orange components found.")
             : AvailableBounds(search.X+unionMinX,search.Y+unionMinY,search.X+unionMaxX,search.Y+unionMaxY);
@@ -645,6 +667,13 @@ $joinDecorationContentSpecs = @(
       ignoredHorizontalGuideWidth=85
       ignoredHorizontalGuideHeight=2
       ignoredGuideReason='Exclude the code-native vertical and horizontal guide lines before selecting blank quadrants.'
+      requiredComponentAnchors=@(
+        @{name='top-left';x=323;y=72;width=29;height=27}
+        @{name='top-right';x=354;y=72;width=28;height=27}
+        @{name='bottom-left';x=323;y=101;width=29;height=27}
+        @{name='bottom-right';x=354;y=101;width=28;height=27}
+      )
+      componentAnchorReason='Require one size-qualified decoded orange component in each fixed-reference central Blank quadrant; exclude neighboring bank components without clipping measured bounds.'
     }
     boundsAdjustment=@{
       coordinateOrigin='crop-top-left'
@@ -1693,7 +1722,13 @@ try
                     'orange-component-union' {
                         $ignoredVerticalGuide = New-Object Drawing.Rectangle $contentSpec.thresholds.ignoredVerticalGuideX, $contentSpec.thresholds.ignoredVerticalGuideY, $contentSpec.thresholds.ignoredVerticalGuideWidth, $contentSpec.thresholds.ignoredVerticalGuideHeight
                         $ignoredHorizontalGuide = New-Object Drawing.Rectangle $contentSpec.thresholds.ignoredHorizontalGuideX, $contentSpec.thresholds.ignoredHorizontalGuideY, $contentSpec.thresholds.ignoredHorizontalGuideWidth, $contentSpec.thresholds.ignoredHorizontalGuideHeight
-                        return [LanLobbyVisualDiff]::FindOrangeComponentUnionBounds($bitmap, $search, $contentSpec.thresholds.minimumRed, $contentSpec.thresholds.minimumGreen, $contentSpec.thresholds.maximumBlue, $contentSpec.thresholds.minimumRedOverGreen, $contentSpec.thresholds.minimumComponentPixelCount, $contentSpec.thresholds.maximumComponentWidth, $contentSpec.thresholds.maximumComponentHeight, $ignoredVerticalGuide, $ignoredHorizontalGuide)
+                        [Drawing.Rectangle[]]$requiredComponentAnchors = @(
+                            foreach ($anchor in $contentSpec.thresholds.requiredComponentAnchors)
+                            {
+                                New-Object Drawing.Rectangle $anchor.x, $anchor.y, $anchor.width, $anchor.height
+                            }
+                        )
+                        return [LanLobbyVisualDiff]::FindOrangeComponentUnionBounds($bitmap, $search, $contentSpec.thresholds.minimumRed, $contentSpec.thresholds.minimumGreen, $contentSpec.thresholds.maximumBlue, $contentSpec.thresholds.minimumRedOverGreen, $contentSpec.thresholds.minimumComponentPixelCount, $contentSpec.thresholds.maximumComponentWidth, $contentSpec.thresholds.maximumComponentHeight, $ignoredVerticalGuide, $ignoredHorizontalGuide, $requiredComponentAnchors)
                     }
                     'luma' { return [LanLobbyVisualDiff]::FindLumaBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive) }
                     'neutral' { return [LanLobbyVisualDiff]::FindNeutralBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive, $contentSpec.thresholds.maximumChannelSpread) }

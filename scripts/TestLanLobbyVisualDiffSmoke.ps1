@@ -231,6 +231,58 @@ function Repair-JoinText01Fixture([string] $Path)
     finally { $orangeBrush.Dispose(); $backgroundBrush.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
 }
 
+function Add-JoinCentralBlankNeighborIntrusionFixture([string] $Path)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 143, 143, 143))
+    $orangeBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
+    try
+    {
+        # Crop-local x=384,y=116,w=11,h=29 reproduces the exact retained
+        # neighboring MiddleBlock orange component without changing the
+        # central Blank. A one-pixel decoded-gray moat keeps this component
+        # separate from the fixture's synthetic solid topology strip; the
+        # four remaining strip pixels still satisfy its >=3 px column rule.
+        $graphics.FillRectangle($blockBrush, 1537, 711, 1, 31)
+        $graphics.FillRectangle($blockBrush, 1549, 711, 1, 31)
+        $graphics.FillRectangle($blockBrush, 1537, 741, 13, 1)
+        $graphics.FillRectangle($orangeBrush, 1538, 712, 11, 29)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { $orangeBrush.Dispose(); $blockBrush.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
+}
+
+function Shift-JoinCentralBlankFixture([string] $Path, [int] $DeltaX)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $backgroundBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 60, 60, 60))
+    $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 143, 143, 143))
+    $centralBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 220, 120, 40))
+    try
+    {
+        # Restore the two surfaces behind the original central Blank before
+        # redrawing the same decoded content at a genuine displaced position.
+        $graphics.FillRectangle($backgroundBrush, 1478, 665, 58, 38)
+        $graphics.FillRectangle($blockBrush, 1478, 703, 58, 20)
+        $graphics.FillRectangle($centralBrush, 1478 + $DeltaX, 665, 58, 58)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $centralBrush.Dispose()
+        $blockBrush.Dispose()
+        $backgroundBrush.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
 function Shift-JoinBlockBankFixture([string] $Path, [int] $DeltaX)
 {
     $source = [Drawing.Bitmap]::FromFile($Path)
@@ -1021,6 +1073,46 @@ try
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$asset.sourcePath)) 'asset must have mapped source path'
         Assert-True ([string]$asset.importedSha256 -match '^[0-9A-F]{64}$') 'asset must have SHA-256'
     }
+    $intrudedCentralCaptureDirectory = Join-Path $scratch 'intruded-central-blank-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $intrudedCentralCaptureDirectory -Recurse
+    $intrudedCentralManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $intrudedCentralCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $intrudedCentralManifest.captures) { $record.path = Join-Path $intrudedCentralCaptureDirectory ($record.name + '.png') }
+    $intrudedCentralManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $intrudedCentralCaptureDirectory 'manifest.json') -Encoding UTF8
+    $intrudedCentralHome = Join-Path $intrudedCentralCaptureDirectory 'home.png'
+    Repair-JoinText01Fixture $intrudedCentralHome
+    Add-JoinCentralBlankNeighborIntrusionFixture $intrudedCentralHome
+    $intrudedCentralOutput = Join-Path $scratch 'intruded-central-blank-output'
+    & $exportScript -CaptureDirectory $intrudedCentralCaptureDirectory -OutputDirectory $intrudedCentralOutput -ReferenceDirectory $referenceDirectory | Out-Null
+    $intrudedCentralReport = Get-Content -Raw -LiteralPath (Join-Path $intrudedCentralOutput 'visual-diff-report.json') | ConvertFrom-Json
+    $intrudedCentral = @($intrudedCentralReport.joinDecoration.components | Where-Object name -eq 'central-blank')[0]
+    Assert-True ($intrudedCentral.measurementAvailable) 'unchanged central Blank must remain measurable beside neighboring orange block intrusion'
+    Assert-True (($intrudedCentral.actualRawBounds.x -eq 324) -and ($intrudedCentral.actualRawBounds.y -eq 69) -and ($intrudedCentral.actualRawBounds.width -eq 58) -and ($intrudedCentral.actualRawBounds.height -eq 58)) 'neighboring block orange must not contaminate central Blank decoded bounds'
+    Assert-True ($intrudedCentral.passed) 'unchanged central Blank must pass despite neighboring block orange in the broad search'
+    $intrudedBlock = @($intrudedCentralReport.joinDecoration.components | Where-Object name -eq 'block-bank')[0]
+    Assert-True (($intrudedBlock.actualRawBounds.x -eq $joinBlockBank.actualRawBounds.x) -and ($intrudedBlock.actualRawBounds.y -eq $joinBlockBank.actualRawBounds.y) -and ($intrudedBlock.actualRawBounds.width -eq $joinBlockBank.actualRawBounds.width) -and ($intrudedBlock.actualRawBounds.height -eq $joinBlockBank.actualRawBounds.height)) 'central intrusion fixture must preserve identical outer block-bank raw bounds'
+    Assert-True (($intrudedBlock.internalTopology.comparison.profileJaccard -eq 1) -and ($intrudedBlock.internalTopology.comparison.occupiedColumnCountDelta -eq 0) -and $intrudedBlock.internalTopology.passed) 'central intrusion fixture must preserve the block-bank internal topology profile'
+    Assert-True (@($intrudedCentralReport.joinDecoration.components | Where-Object { -not $_.passed }).Count -eq 0) 'central intrusion fixture must keep all seven corrected visual rows passing'
+    Assert-True ($intrudedCentralReport.joinDecoration.passed) 'central intrusion fixture must keep overall Join acceptance passing'
+
+    $shiftedCentralCaptureDirectory = Join-Path $scratch 'shifted-central-blank-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $shiftedCentralCaptureDirectory -Recurse
+    $shiftedCentralManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shiftedCentralCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $shiftedCentralManifest.captures) { $record.path = Join-Path $shiftedCentralCaptureDirectory ($record.name + '.png') }
+    $shiftedCentralManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $shiftedCentralCaptureDirectory 'manifest.json') -Encoding UTF8
+    $shiftedCentralHome = Join-Path $shiftedCentralCaptureDirectory 'home.png'
+    Repair-JoinText01Fixture $shiftedCentralHome
+    Shift-JoinCentralBlankFixture $shiftedCentralHome -6
+    $shiftedCentralOutput = Join-Path $scratch 'shifted-central-blank-output'
+    & $exportScript -CaptureDirectory $shiftedCentralCaptureDirectory -OutputDirectory $shiftedCentralOutput -ReferenceDirectory $referenceDirectory | Out-Null
+    $shiftedCentralReport = Get-Content -Raw -LiteralPath (Join-Path $shiftedCentralOutput 'visual-diff-report.json') | ConvertFrom-Json
+    $shiftedCentral = @($shiftedCentralReport.joinDecoration.components | Where-Object name -eq 'central-blank')[0]
+    Assert-True ($shiftedCentral.measurementAvailable) 'genuinely shifted central Blank must remain measurable'
+    Assert-True (($shiftedCentral.actualRawBounds.x -eq 318) -and ($shiftedCentral.actualRawBounds.width -eq 58)) 'genuinely shifted central Blank must preserve its decoded -6 px delta'
+    Assert-True (($shiftedCentral.centerDeviationPx.deltaX -eq -5.5) -and ($shiftedCentral.passed -eq $false)) 'genuine central Blank perturbation must remain blocking'
+    $shiftedCentralFailedComponents = @($shiftedCentralReport.joinDecoration.components | Where-Object { -not $_.passed } | ForEach-Object name)
+    Assert-True ($shiftedCentralFailedComponents.Count -eq 1) "shifted central Blank fixture must isolate its visual-bound failure; failed: $($shiftedCentralFailedComponents -join ', ')"
+    Assert-True ($shiftedCentralReport.joinDecoration.passed -eq $false) 'shifted central Blank must block overall Join acceptance'
+
     $shiftedBlockCaptureDirectory = Join-Path $scratch 'shifted-join-block-bank-captures'
     Copy-Item -LiteralPath $captureDirectory -Destination $shiftedBlockCaptureDirectory -Recurse
     $shiftedBlockManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shiftedBlockCaptureDirectory 'manifest.json') | ConvertFrom-Json
