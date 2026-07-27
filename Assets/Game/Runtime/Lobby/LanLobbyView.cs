@@ -13,10 +13,32 @@ public sealed class LanLobbyView : MonoBehaviour
     private const string FontPath = "Fonts/Novecento wide Normal Regular.woff2";
     private const string SpriteRoot = "UI/Lobby/";
 
+    private enum RoomSlotPresentationState
+    {
+        Empty,
+        Waiting,
+        Ready
+    }
+
+    private sealed class RoomSlotView
+    {
+        public RectTransform Root;
+        public Image CardBody;
+        public Image TopBar;
+        public Image ReadyOverlay;
+        public GameObject EmptyContent;
+        public Image EmptyInviteIcon;
+        public Text EmptyInviteLabel;
+        public Text EmptyInviteHint;
+        public GameObject OccupiedContent;
+        public Image ReadyIcon;
+        public Text ReadyLabel;
+        public Image LowerDecoration;
+        public Image CreatorTag;
+    }
+
     private readonly Dictionary<string, LobbyDiscoveryEntry> discoveries = new Dictionary<string, LobbyDiscoveryEntry>(StringComparer.Ordinal);
-    private readonly List<Image> roomCardImages = new List<Image>();
-    private readonly List<Text> roomCardTexts = new List<Text>();
-    private readonly List<Text> roomCardAvatarTexts = new List<Text>();
+    private readonly List<RoomSlotView> roomSlots = new List<RoomSlotView>();
     private Canvas canvas;
     private RectTransform homeRoot;
     private RectTransform roomRoot;
@@ -49,7 +71,7 @@ public sealed class LanLobbyView : MonoBehaviour
     public string RoomCodeTextForTests => roomCodeInput == null ? string.Empty : roomCodeInput.text;
     public bool JoinInteractableForTests => joinButton != null && joinButton.interactable;
     public string StatusTextForTests => statusText == null ? string.Empty : statusText.text;
-    public int RoomCardCountForTests => roomCardImages.Count;
+    public int RoomCardCountForTests => roomSlots.Count;
     public int ReadyCardCountForTests => readyCardCount;
     public string LocalLatencyTextForTests => latencyText == null ? string.Empty : latencyText.text;
     public int CanvasSortOrderForTests => canvas == null ? -1 : canvas.sortingOrder;
@@ -57,11 +79,6 @@ public sealed class LanLobbyView : MonoBehaviour
     public bool StartInteractableForTests => startButton != null && startButton.interactable;
     public int DiscoveryRenderedItemCountForTests => discoveryItemsRoot == null ? 0 : discoveryItemsRoot.childCount;
     public int DiscoveryOverflowCountForTests => discoveryOverflowCount;
-    public string RoomCardAvatarTextForTests(int index)
-    {
-        return index >= 0 && index < roomCardAvatarTexts.Count ? roomCardAvatarTexts[index].text : string.Empty;
-    }
-
     private void Awake()
     {
         Build();
@@ -124,23 +141,16 @@ public sealed class LanLobbyView : MonoBehaviour
         localPlayerId = localId;
         roomCodeText.text = room == null ? "------" : room.RoomCode;
         readyCardCount = 0;
-        for (var index = 0; index < roomCardImages.Count; index++)
+        for (var index = 0; index < roomSlots.Count; index++)
         {
-            var hasMember = room != null && index < room.Members.Count;
-            var member = hasMember ? room.Members[index] : null;
-            var ready = member != null && member.IsReady;
-            roomCardImages[index].sprite = Sprite(ready ? "player_card_ready" : "player_card_waiting");
-            roomCardImages[index].enabled = true;
-            roomCardTexts[index].text = hasMember
-                ? member.Profile.DisplayName + (member.PlayerId == room.HostPlayerId ? "  HOST" : string.Empty) + "\n" + (ready ? "READY" : "WAITING") + "  " + member.LatencyMilliseconds + " ms"
-                : "OPEN SLOT";
-            roomCardAvatarTexts[index].gameObject.SetActive(hasMember);
-            if (hasMember)
-            {
-                roomCardAvatarTexts[index].text = "A" + (member.Profile.AvatarIndex + 1);
-                roomCardAvatarTexts[index].color = AvatarColor(member.Profile.AvatarIndex);
-            }
-            if (ready) readyCardCount++;
+            var member = room != null && index < room.Members.Count ? room.Members[index] : null;
+            var state = member == null
+                ? RoomSlotPresentationState.Empty
+                : member.IsReady
+                    ? RoomSlotPresentationState.Ready
+                    : RoomSlotPresentationState.Waiting;
+            BindSlot(roomSlots[index], state, member, index == 0);
+            if (member != null && member.IsReady) readyCardCount++;
         }
 
         var localMemberReady = false;
@@ -436,6 +446,7 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void BuildRoom(Transform parent)
     {
+        var layout = LanLobbyRoomLayout.ForSize(1920, 1080);
         latencyText = Text("LocalLatency", parent, 28, TextAnchor.UpperLeft, new Color(.3f, .95f, .95f));
         latencyText.rectTransform.anchorMin = latencyText.rectTransform.anchorMax = new Vector2(0f, 1f);
         latencyText.rectTransform.pivot = new Vector2(0f, 1f);
@@ -448,22 +459,9 @@ public sealed class LanLobbyView : MonoBehaviour
 
         for (var index = 0; index < LobbyRoomSnapshot.MaximumMembers; index++)
         {
-            var card = Image("RoomCard_" + index, parent, "player_card_waiting");
-            Position(card.rectTransform, new Vector2(.16f + index * .227f, .53f), new Vector2(390f, 430f));
-            roomCardImages.Add(card);
-            var text = Text("Member", card.transform, 25, TextAnchor.MiddleCenter, Color.white);
-            Stretch(text.rectTransform);
-            text.rectTransform.offsetMin = new Vector2(28f, 36f);
-            text.rectTransform.offsetMax = new Vector2(-28f, -36f);
-            text.text = "OPEN SLOT";
-            roomCardTexts.Add(text);
-            var avatarFrame = Image("AvatarFrame", card.transform, "team_icon_frame");
-            Position(avatarFrame.rectTransform, new Vector2(.5f, .76f), new Vector2(86f, 86f));
-            avatarFrame.preserveAspect = true;
-            var avatarText = Text("Avatar", avatarFrame.transform, 20, TextAnchor.MiddleCenter, Color.white);
-            Stretch(avatarText.rectTransform);
-            avatarText.text = string.Empty;
-            roomCardAvatarTexts.Add(avatarText);
+            var slot = BuildRoomSlot(parent, index, layout.Slots[index]);
+            roomSlots.Add(slot);
+            BindSlot(slot, RoomSlotPresentationState.Empty, null, false);
         }
 
         readyButton = Button("Ready", parent, "btn_match_grey", "READY", 30);
@@ -475,6 +473,119 @@ public sealed class LanLobbyView : MonoBehaviour
         startButton = Button("Start", parent, "btn_match_host_grey", "START", 30);
         Position(startButton.GetComponent<RectTransform>(), new Vector2(.62f, .14f), new Vector2(300f, 92f));
         startButton.onClick.AddListener(() => StartRequested?.Invoke());
+    }
+
+    private static RoomSlotView BuildRoomSlot(
+        Transform parent,
+        int index,
+        LanLobbyRoomSlotLayout layout)
+    {
+        var root = Rect("RoomCard_" + index, parent);
+        PositionBottomLeft(root, layout.Root);
+
+        var cardBody = Image("CardBody", root, "card_bg");
+        PositionBottomLeft(cardBody.rectTransform, layout.CardBody);
+        cardBody.preserveAspect = false;
+
+        var topBar = Image("TopBar", root, "bg_top_normal");
+        PositionBottomLeft(topBar.rectTransform, layout.TopBar);
+        topBar.preserveAspect = true;
+
+        var readyOverlay = Image("ReadyOverlay", root, "player_card_self_frame");
+        PositionBottomLeft(readyOverlay.rectTransform, layout.StateOverlay);
+        readyOverlay.preserveAspect = true;
+
+        var emptyContentImage = Image("EmptyContent", root, "card_empty");
+        PositionBottomLeft(emptyContentImage.rectTransform, layout.EmptyInvite);
+        emptyContentImage.preserveAspect = true;
+
+        var emptyInviteIcon = Image("EmptyInviteIcon", emptyContentImage.transform, "bg_plus");
+        PositionSourceAspect(
+            emptyInviteIcon,
+            34f,
+            (layout.EmptyInvite.Height - 72f * emptyInviteIcon.sprite.rect.height / emptyInviteIcon.sprite.rect.width) * .5f,
+            72f);
+
+        var emptyInviteLabel = Text("EmptyInviteLabel", emptyContentImage.transform, 25, TextAnchor.MiddleLeft, Color.white);
+        PositionBottomLeft(emptyInviteLabel.rectTransform, new LanLobbyRect(122f, 61f, 110f, 34f));
+        emptyInviteLabel.text = "邀请";
+
+        var emptyInviteHint = Text(
+            "EmptyInviteHint",
+            emptyContentImage.transform,
+            14,
+            TextAnchor.MiddleLeft,
+            new Color(.65f, .68f, .7f));
+        PositionBottomLeft(emptyInviteHint.rectTransform, new LanLobbyRect(122f, 25f, 190f, 32f));
+        emptyInviteHint.text = "复制同盟密钥以邀请队友";
+
+        var occupiedContent = Rect("OccupiedContent", root);
+        Stretch(occupiedContent);
+
+        var readyIcon = Image("ReadyIcon", occupiedContent, "player_card_ready");
+        PositionBottomLeft(readyIcon.rectTransform, layout.ReadyIcon);
+        readyIcon.preserveAspect = true;
+
+        var readyLabel = Text("ReadyLabel", occupiedContent, 28, TextAnchor.MiddleLeft, Color.black);
+        readyLabel.text = "已就绪";
+        PositionPreferredText(readyLabel, layout.ReadyLabel);
+
+        var lowerDecoration = Image("LowerDecoration", root, "card_deco_self");
+        PositionBottomLeft(lowerDecoration.rectTransform, layout.LowerDecoration);
+        lowerDecoration.preserveAspect = true;
+
+        var creatorTag = Image("CreatorTag", root, "host_top_tag");
+        PositionBottomLeft(creatorTag.rectTransform, layout.CreatorTag);
+        creatorTag.preserveAspect = true;
+
+        return new RoomSlotView
+        {
+            Root = root,
+            CardBody = cardBody,
+            TopBar = topBar,
+            ReadyOverlay = readyOverlay,
+            EmptyContent = emptyContentImage.gameObject,
+            EmptyInviteIcon = emptyInviteIcon,
+            EmptyInviteLabel = emptyInviteLabel,
+            EmptyInviteHint = emptyInviteHint,
+            OccupiedContent = occupiedContent.gameObject,
+            ReadyIcon = readyIcon,
+            ReadyLabel = readyLabel,
+            LowerDecoration = lowerDecoration,
+            CreatorTag = creatorTag
+        };
+    }
+
+    private static void BindSlot(
+        RoomSlotView slot,
+        RoomSlotPresentationState state,
+        LobbyMemberSnapshot member,
+        bool isHostSlot)
+    {
+        var isEmpty = state == RoomSlotPresentationState.Empty;
+        var isReady = state == RoomSlotPresentationState.Ready;
+        slot.CardBody.sprite = Sprite("card_bg");
+        slot.TopBar.sprite = Sprite(isReady ? "bg_top_ready" : "bg_top_normal");
+        slot.ReadyOverlay.sprite = Sprite("player_card_self_frame");
+        slot.EmptyContent.GetComponent<Image>().sprite = Sprite("card_empty");
+        slot.EmptyInviteIcon.sprite = Sprite("bg_plus");
+        slot.ReadyIcon.sprite = Sprite("player_card_ready");
+        slot.LowerDecoration.sprite = Sprite("card_deco_self");
+        slot.CreatorTag.sprite = Sprite("host_top_tag");
+        slot.EmptyInviteLabel.text = "邀请";
+        slot.EmptyInviteHint.text = "复制同盟密钥以邀请队友";
+        slot.ReadyLabel.text = "已就绪";
+
+        slot.CardBody.gameObject.SetActive(true);
+        slot.TopBar.gameObject.SetActive(true);
+        slot.ReadyOverlay.gameObject.SetActive(isReady);
+        slot.EmptyContent.SetActive(isEmpty);
+        slot.OccupiedContent.SetActive(isReady);
+        slot.ReadyIcon.gameObject.SetActive(isReady);
+        slot.ReadyLabel.gameObject.SetActive(isReady);
+        slot.LowerDecoration.gameObject.SetActive(isReady);
+        slot.CreatorTag.gameObject.SetActive(member != null && isHostSlot);
+        ResizeToPreferredText(slot.ReadyLabel);
     }
 
     private void RebuildDiscoveryItems()
@@ -576,17 +687,6 @@ public sealed class LanLobbyView : MonoBehaviour
         }
     }
 
-    private static Color AvatarColor(int value)
-    {
-        switch (value % 4)
-        {
-            case 0: return new Color(.3f, .95f, .95f);
-            case 1: return new Color(1f, .72f, .25f);
-            case 2: return new Color(.7f, .5f, 1f);
-            default: return new Color(.45f, 1f, .55f);
-        }
-    }
-
     private static Button Button(string name, Transform parent, string spriteName, string label, int fontSize, bool preserveAspect = false)
     {
         var value = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
@@ -681,6 +781,27 @@ public sealed class LanLobbyView : MonoBehaviour
         value.pivot = Vector2.zero;
         value.anchoredPosition = new Vector2(rect.Left, rect.Bottom);
         value.sizeDelta = new Vector2(rect.Width, rect.Height);
+    }
+
+    private static void PositionSourceAspect(Image image, float left, float bottom, float width)
+    {
+        if (image == null || image.sprite == null)
+            throw new InvalidOperationException("Sprite must be assigned before source-aspect placement.");
+
+        var height = width * image.sprite.rect.height / image.sprite.rect.width;
+        PositionBottomLeft(image.rectTransform, new LanLobbyRect(left, bottom, width, height));
+        image.preserveAspect = true;
+    }
+
+    private static void PositionPreferredText(Text text, LanLobbyRect anchor)
+    {
+        PositionBottomLeft(text.rectTransform, new LanLobbyRect(anchor.Left, anchor.Bottom, 0f, 0f));
+        ResizeToPreferredText(text);
+    }
+
+    private static void ResizeToPreferredText(Text text)
+    {
+        text.rectTransform.sizeDelta = new Vector2(text.preferredWidth, text.preferredHeight);
     }
 
     private static LanLobbyRect RelativeTo(LanLobbyRect child, LanLobbyRect parent)

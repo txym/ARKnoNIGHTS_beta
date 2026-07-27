@@ -634,14 +634,134 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
-        public IEnumerator RoomSnapshot_RendersEachMemberAvatarIndexInItsCard()
+        public IEnumerator RoomSnapshot_EmptySlotUsesCompleteInviteComposition()
         {
-            view.BindRoom(Room("654321"), "host");
+            view.BindRoom(HostOnlyRoom("654321"), "host");
+            var room = view.transform.Find("LanLobbyRoot/Room");
+            var layout = global::LanLobbyRoomLayout.ForSize(1920, 1080);
 
-            Assert.That(view.RoomCardAvatarTextForTests(0), Is.EqualTo("A1"));
-            Assert.That(view.RoomCardAvatarTextForTests(1), Is.EqualTo("A2"));
-            Assert.That(view.RoomCardAvatarTextForTests(2), Is.EqualTo("A3"));
-            Assert.That(view.RoomCardAvatarTextForTests(3), Is.EqualTo("A4"));
+            Assert.That(view.RoomCardCountForTests, Is.EqualTo(4));
+            for (var index = 0; index < 4; index++)
+            {
+                var slot = RequireChild(room, "RoomCard_" + index);
+                AssertBottomLeftRect(slot.GetComponent<RectTransform>(), layout.Slots[index].Root);
+            }
+
+            for (var index = 1; index < 4; index++)
+            {
+                var slot = RequireChild(room, "RoomCard_" + index);
+                AssertDirectChildren(slot,
+                    "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
+                    "OccupiedContent", "LowerDecoration", "CreatorTag");
+                AssertResourceSprite(RequireChild(slot, "CardBody").GetComponent<Image>(), "card_bg");
+                AssertResourceSprite(RequireChild(slot, "TopBar").GetComponent<Image>(), "bg_top_normal");
+
+                var emptyContent = RequireChild(slot, "EmptyContent");
+                Assert.That(emptyContent.gameObject.activeSelf, Is.True);
+                AssertResourceSprite(emptyContent.GetComponent<Image>(), "card_empty");
+                AssertDirectChildren(emptyContent, "EmptyInviteIcon", "EmptyInviteLabel", "EmptyInviteHint");
+                AssertResourceSprite(RequireChild(emptyContent, "EmptyInviteIcon").GetComponent<Image>(), "bg_plus");
+                Assert.That(RequireChild(emptyContent, "EmptyInviteLabel").GetComponent<Text>().text, Is.EqualTo("邀请"));
+                Assert.That(RequireChild(emptyContent, "EmptyInviteHint").GetComponent<Text>().text, Is.Not.Empty);
+                Assert.That(RequireChild(slot, "ReadyOverlay").gameObject.activeSelf, Is.False);
+                Assert.That(RequireChild(slot, "OccupiedContent").gameObject.activeSelf, Is.False);
+                Assert.That(RequireChild(slot, "LowerDecoration").gameObject.activeSelf, Is.False);
+                Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
+                Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
+                    Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSnapshot_UnreadyGuestUsesNeutralFrameWithoutWaitingText()
+        {
+            view.BindRoom(RoomWithGuest("654321", guestReady: false), "guest-1");
+            var slot = RequireChild(view.transform, "LanLobbyRoot/Room/RoomCard_1");
+
+            AssertResourceSprite(RequireChild(slot, "CardBody").GetComponent<Image>(), "card_bg");
+            AssertResourceSprite(RequireChild(slot, "TopBar").GetComponent<Image>(), "bg_top_normal");
+            Assert.That(RequireChild(slot, "ReadyOverlay").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(slot, "EmptyContent").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(slot, "OccupiedContent").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(slot, "LowerDecoration").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
+            Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
+                Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSnapshot_ReadyMemberUsesCyanLayersAndRestoresEveryLayerAfterRebind()
+        {
+            var ready = RoomWithGuest("654321", guestReady: true);
+            var waiting = RoomWithGuest("654321", guestReady: false);
+            var empty = HostOnlyRoom("654321");
+            var room = RequireChild(view.transform, "LanLobbyRoot/Room");
+            var originalSlots = ChildrenWithPrefix(room, "RoomCard_").ToArray();
+
+            view.BindRoom(ready, "guest-1");
+            AssertReadyGuestSlot(RequireChild(room, "RoomCard_1"));
+            view.BindRoom(waiting, "guest-1");
+            Assert.That(RequireChild(RequireChild(room, "RoomCard_1"), "ReadyOverlay").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(RequireChild(room, "RoomCard_1"), "OccupiedContent").gameObject.activeSelf, Is.False);
+            view.BindRoom(empty, "host");
+            Assert.That(RequireChild(RequireChild(room, "RoomCard_1"), "EmptyContent").gameObject.activeSelf, Is.True);
+            view.BindRoom(ready, "guest-1");
+
+            var reboundSlot = RequireChild(room, "RoomCard_1");
+            AssertReadyGuestSlot(reboundSlot);
+            Assert.That(ChildrenWithPrefix(room, "RoomCard_"), Has.Count.EqualTo(4));
+            for (var index = 0; index < originalSlots.Length; index++)
+            {
+                Assert.That(RequireChild(room, "RoomCard_" + index), Is.SameAs(originalSlots[index]));
+            }
+
+            var readyLabel = RequireChild(RequireChild(reboundSlot, "OccupiedContent"), "ReadyLabel").GetComponent<Text>();
+            Assert.That(readyLabel.text, Is.EqualTo("已就绪"));
+            Assert.That(readyLabel.rectTransform.sizeDelta.x, Is.EqualTo(readyLabel.preferredWidth).Within(.05f));
+            Assert.That(readyLabel.rectTransform.sizeDelta.y, Is.EqualTo(readyLabel.preferredHeight).Within(.05f));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSnapshot_HostReadySlotHasNoProfileOrPortraitContent()
+        {
+            view.BindRoom(HostOnlyRoom("654321"), "host");
+            var hostSlot = RequireChild(view.transform, "LanLobbyRoot/Room/RoomCard_0");
+
+            AssertResourceSprite(RequireChild(hostSlot, "TopBar").GetComponent<Image>(), "bg_top_ready");
+            AssertResourceSprite(RequireChild(hostSlot, "ReadyOverlay").GetComponent<Image>(), "player_card_self_frame");
+            AssertResourceSprite(RequireChild(hostSlot, "CreatorTag").GetComponent<Image>(), "host_top_tag");
+            Assert.That(RequireChild(hostSlot, "CreatorTag").gameObject.activeSelf, Is.True);
+            Assert.That(RequireChild(RequireChild(hostSlot, "OccupiedContent"), "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
+            var hostNodeNames = hostSlot.GetComponentsInChildren<Transform>(true)
+                .Select(item => item.name.ToLowerInvariant())
+                .ToArray();
+            var forbiddenProfileNames = new[]
+            {
+                "portrait", "avatar", "profilename", "playername", "playerid", "profilecard"
+            };
+            Assert.That(hostNodeNames.Any(name => forbiddenProfileNames.Any(name.Contains)), Is.False);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSlot_DecorativeLayersDoNotReceiveRaycasts()
+        {
+            view.BindRoom(RoomWithGuest("654321", guestReady: true), "guest-1");
+            var room = RequireChild(view.transform, "LanLobbyRoot/Room");
+
+            foreach (var slot in ChildrenWithPrefix(room, "RoomCard_"))
+            {
+                Assert.That(slot.GetComponentsInChildren<Button>(true), Is.Empty, slot.name);
+                foreach (var graphic in slot.GetComponentsInChildren<Graphic>(true))
+                {
+                    Assert.That(graphic.raycastTarget, Is.False, graphic.transform.name);
+                }
+            }
+
             yield return null;
         }
 
@@ -1013,6 +1133,71 @@ namespace ArknoNights.Lobby.Tests
             return sprite.rect.width / sprite.rect.height;
         }
 
+        private static Transform RequireChild(Transform parent, string path)
+        {
+            var child = parent.Find(path);
+            Assert.That(child, Is.Not.Null, path);
+            return child;
+        }
+
+        private static void AssertDirectChildren(Transform parent, params string[] expectedNames)
+        {
+            Assert.That(parent.childCount, Is.EqualTo(expectedNames.Length), parent.name);
+            for (var index = 0; index < expectedNames.Length; index++)
+            {
+                Assert.That(parent.GetChild(index).name, Is.EqualTo(expectedNames[index]), parent.name + "[" + index + "]");
+            }
+        }
+
+        private static void AssertResourceSprite(Image image, string resourceName)
+        {
+            Assert.That(image, Is.Not.Null, resourceName);
+            var expected = Resources.Load<Sprite>("UI/Lobby/" + resourceName);
+            Assert.That(expected, Is.Not.Null, resourceName);
+            Assert.That(image.sprite, Is.SameAs(expected), resourceName);
+            Assert.That(image.sprite.name, Is.EqualTo(resourceName));
+        }
+
+        private static void AssertBottomLeftRect(RectTransform actual, global::LanLobbyRect expected, float tolerance = .05f)
+        {
+            Assert.That(actual.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(actual.anchorMax, Is.EqualTo(Vector2.zero));
+            Assert.That(actual.pivot, Is.EqualTo(Vector2.zero));
+            Assert.That(actual.anchoredPosition.x, Is.EqualTo(expected.Left).Within(tolerance));
+            Assert.That(actual.anchoredPosition.y, Is.EqualTo(expected.Bottom).Within(tolerance));
+            Assert.That(actual.sizeDelta.x, Is.EqualTo(expected.Width).Within(tolerance));
+            Assert.That(actual.sizeDelta.y, Is.EqualTo(expected.Height).Within(tolerance));
+        }
+
+        private static void AssertReadyGuestSlot(Transform slot)
+        {
+            AssertResourceSprite(RequireChild(slot, "CardBody").GetComponent<Image>(), "card_bg");
+            AssertResourceSprite(RequireChild(slot, "TopBar").GetComponent<Image>(), "bg_top_ready");
+
+            var readyOverlay = RequireChild(slot, "ReadyOverlay");
+            Assert.That(readyOverlay.gameObject.activeSelf, Is.True);
+            AssertResourceSprite(readyOverlay.GetComponent<Image>(), "player_card_self_frame");
+            Assert.That(readyOverlay.GetComponent<Image>().preserveAspect, Is.True);
+            Assert.That(Aspect(readyOverlay.GetComponent<RectTransform>()),
+                Is.EqualTo(Aspect(readyOverlay.GetComponent<Image>().sprite)).Within(.0001f));
+
+            Assert.That(RequireChild(slot, "EmptyContent").gameObject.activeSelf, Is.False);
+            var occupiedContent = RequireChild(slot, "OccupiedContent");
+            Assert.That(occupiedContent.gameObject.activeSelf, Is.True);
+            AssertDirectChildren(occupiedContent, "ReadyIcon", "ReadyLabel");
+            var readyIcon = RequireChild(occupiedContent, "ReadyIcon").GetComponent<Image>();
+            AssertResourceSprite(readyIcon, "player_card_ready");
+            Assert.That(readyIcon.preserveAspect, Is.True);
+            Assert.That(Aspect(readyIcon.rectTransform), Is.EqualTo(Aspect(readyIcon.sprite)).Within(.0001f));
+            Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
+
+            var lowerDecoration = RequireChild(slot, "LowerDecoration");
+            Assert.That(lowerDecoration.gameObject.activeSelf, Is.True);
+            AssertResourceSprite(lowerDecoration.GetComponent<Image>(), "card_deco_self");
+            Assert.That(lowerDecoration.GetComponent<Image>().preserveAspect, Is.True);
+            Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
+        }
+
         private static List<Transform> ChildrenWithPrefix(Transform parent, string prefix)
         {
             var result = new List<Transform>();
@@ -1027,6 +1212,23 @@ namespace ArknoNights.Lobby.Tests
         private static LobbyDiscoveryEntry Discovery(string roomCode, int memberCount = 1, int capacity = 4, bool joinable = true)
         {
             return new LobbyDiscoveryEntry(roomCode, "Host", memberCount, capacity, joinable, 12345, 1);
+        }
+
+        private static LobbyRoomSnapshot HostOnlyRoom(string roomCode)
+        {
+            return new LobbyRoomSnapshot(roomCode, "host", new[]
+            {
+                new LobbyMemberSnapshot(new LobbyProfile("host", "Host", 0), true, 42)
+            }, false, 1);
+        }
+
+        private static LobbyRoomSnapshot RoomWithGuest(string roomCode, bool guestReady)
+        {
+            return new LobbyRoomSnapshot(roomCode, "host", new[]
+            {
+                new LobbyMemberSnapshot(new LobbyProfile("host", "Host", 0), true, 42),
+                new LobbyMemberSnapshot(new LobbyProfile("guest-1", "Guest One", 1), guestReady, 60)
+            }, false, 1);
         }
 
         private static LobbyRoomSnapshot Room(string roomCode, bool hasStarted = false, bool everyoneReady = false)
