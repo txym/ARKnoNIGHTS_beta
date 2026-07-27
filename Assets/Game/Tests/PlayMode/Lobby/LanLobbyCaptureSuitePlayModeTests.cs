@@ -70,6 +70,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(parsed.captures, Has.Length.EqualTo(expectedNames.Length));
             foreach (var captureRecord in parsed.captures)
             {
+                Assert.That(captureRecord.canvasScale, Is.GreaterThan(0f), captureRecord.name + " must report a positive canvas scale.");
                 Assert.That(captureRecord.spriteSources, Is.Not.Null.And.Not.Empty, captureRecord.name + " must include sprite provenance.");
                 foreach (var spriteSource in captureRecord.spriteSources)
                 {
@@ -108,6 +109,7 @@ namespace ArknoNights.Lobby.Tests
             var homeStates = new[] { home, discovered };
             foreach (var homeState in homeStates)
             {
+                Assert.That(homeState.canvasScale, Is.GreaterThan(0f), homeState.name + " must report a positive canvas scale.");
                 Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(7));
                 Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
                 Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
@@ -256,10 +258,10 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry, Is.Not.Null, capture.name + ": missing " + item.Name);
                 Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
                 Assert.That(geometry.isBitmap, Is.False, item.Name + " must be sprite-null geometry.");
-                Assert.That(geometry.x, Is.EqualTo(item.X).Within(.05f));
-                Assert.That(geometry.y, Is.EqualTo(item.Y).Within(.05f));
-                Assert.That(geometry.width, Is.EqualTo(item.Width).Within(.05f));
-                Assert.That(geometry.height, Is.EqualTo(item.Height).Within(.05f));
+                Assert.That(geometry.x / capture.canvasScale, Is.EqualTo(item.X).Within(.05f));
+                Assert.That(geometry.y / capture.canvasScale, Is.EqualTo(item.Y).Within(.05f));
+                Assert.That(geometry.width / capture.canvasScale, Is.EqualTo(item.Width).Within(.05f));
+                Assert.That(geometry.height / capture.canvasScale, Is.EqualTo(item.Height).Within(.05f));
             }
             Assert.That(capture.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(8),
                 capture.name + " must report OpaqueBlocker, Create backing, and exactly six Join geometry rows.");
@@ -366,7 +368,7 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Serializable] private sealed class CaptureManifestProbe { public CaptureRecordProbe[] captures; }
-        [Serializable] private sealed class CaptureRecordProbe { public string name; public string roomCode; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; }
+        [Serializable] private sealed class CaptureRecordProbe { public string name; public float canvasScale; public string roomCode; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; }
         [Serializable] private sealed class CaptureMemberProbe { public string playerId; }
         [Serializable] private sealed class CaptureRectProbe { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class SpriteSourceProbe { public string node; public string spriteName; public string sourcePath; }
