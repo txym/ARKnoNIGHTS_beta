@@ -38,7 +38,8 @@
 
 **Interfaces:**
 - Consumes: `-BondSpecPath`, `-StagingRoot`, and `-OutputCsvPath` absolute or repository-relative paths.
-- Produces: UTF-8 CSV rows with `TypeId`, `DisplayName`, `Category`, `CurrentRarity`, `IsShopCandidate`, `Regions`, `ResourceDirectory`, `DamageType`, `MaxHitPoints`, `Attack`, `Defense`, `MagicResistance`, `AttackIntervalSeconds`, `EffectiveAttackIntervalSeconds`, `MoveSpeedMetresPerSecond`, `LifeDeduct`, `HasElite2`, and `HasElite3`.
+- Produces: UTF-8 CSV rows with `TypeId`, `DisplayName`, `Category`, `CurrentRarity`, `IsShopCandidate`, `RosterStatus`, `Regions`, `ResourceDirectory`, `DamageType`, base `MaxHitPoints/Attack/Defense/MagicResistance/AttackIntervalSeconds/EffectiveAttackIntervalSeconds/MoveSpeedMetresPerSecond/LifeDeduct`, and `HasElite2/HasElite3`.
+- Produces for each elite level `N∈{2,3}`: `EliteNResourceDirectory` plus its level-0 `EliteNMaxHitPoints/EliteNAttack/EliteNDefense/EliteNMagicResistance/EliteNAttackIntervalSeconds/EliteNMoveSpeedMetresPerSecond/EliteNLifeDeduct`. All eight fields are populated when that variant directory exists and blank when the entire variant directory is absent; this does not alter `CurrentRarity`, `Category`, or `RosterStatus`.
 
 - [ ] **Step 1: Implement strict unit-line and section parsing**
 
@@ -46,7 +47,7 @@
 
 - [ ] **Step 2: Implement base and variant package resolution**
 
-  Resolve a base directory as `<typeId>_*` excluding names ending `_2` or `_3`. Require exactly one base directory and a `level: 0` row. Detect `_2` and `_3` by appending the suffix to that exact base directory name.
+  Resolve a base directory as `<typeId>_*` excluding names ending `_2` or `_3`. Require exactly one base directory and a `level: 0` row. Detect `_2` and `_3` by appending the suffix to that exact base directory name. For every variant directory that exists, read its own `unit-levels.json` through the same `Get-LevelZero` rule and reject missing or duplicate level 0; never substitute the base panel. A wholly absent variant directory remains valid and exports blank variant fields.
 
 - [ ] **Step 3: Parse region membership**
 

@@ -50,6 +50,30 @@ function Get-LevelZero {
     return $matches[0]
 }
 
+function Get-EliteVariantEvidence {
+    param([Parameter(Mandatory = $true)][string]$DirectoryPath)
+
+    if (-not (Test-Path -LiteralPath $DirectoryPath -PathType Container)) {
+        return $null
+    }
+
+    $levelsPath = Join-Path $DirectoryPath 'unit-levels.json'
+    $levelZero = Get-LevelZero `
+        -LevelsDocument (Get-Content -LiteralPath $levelsPath -Raw -Encoding UTF8 | ConvertFrom-Json) `
+        -DirectoryPath $DirectoryPath
+
+    return [pscustomobject]@{
+        ResourceDirectory = Split-Path -Leaf $DirectoryPath
+        MaxHitPoints = [int]$levelZero.maxHitPoints
+        Attack = [int]$levelZero.attack
+        Defense = [int]$levelZero.defense
+        MagicResistance = [int]$levelZero.magicResistance
+        AttackIntervalSeconds = [decimal]$levelZero.attackIntervalSeconds
+        MoveSpeedMetresPerSecond = [decimal]$levelZero.moveSpeedMetresPerSecond
+        LifeDeduct = [int]$levelZero.lifeDeduct
+    }
+}
+
 function Get-PhysicalDamage {
     param(
         [Parameter(Mandatory = $true)][int]$Attack,
@@ -244,8 +268,8 @@ $rows = foreach ($entry in $roster.Values | Sort-Object { [int]$_.TypeId }) {
     $levelZero = Get-LevelZero -LevelsDocument (Get-Content -LiteralPath $levelsPath -Raw -Encoding UTF8 | ConvertFrom-Json) -DirectoryPath $baseDirectory.FullName
     $source = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8 | ConvertFrom-Json
 
-    $elite2Directory = Join-Path $StagingRoot "$($baseDirectory.Name)_2"
-    $elite3Directory = Join-Path $StagingRoot "$($baseDirectory.Name)_3"
+    $elite2 = Get-EliteVariantEvidence -DirectoryPath (Join-Path $StagingRoot "$($baseDirectory.Name)_2")
+    $elite3 = Get-EliteVariantEvidence -DirectoryPath (Join-Path $StagingRoot "$($baseDirectory.Name)_3")
     $regions = if ($regionsByTypeId.ContainsKey($entry.TypeId)) { $regionsByTypeId[$entry.TypeId] -join ';' } else { '' }
 
     [pscustomobject][ordered]@{
@@ -266,8 +290,24 @@ $rows = foreach ($entry in $roster.Values | Sort-Object { [int]$_.TypeId }) {
         EffectiveAttackIntervalSeconds = [decimal]$levelZero.attackIntervalSeconds * [decimal]0.5
         MoveSpeedMetresPerSecond = [decimal]$levelZero.moveSpeedMetresPerSecond
         LifeDeduct = [int]$levelZero.lifeDeduct
-        HasElite2 = Test-Path -LiteralPath $elite2Directory -PathType Container
-        HasElite3 = Test-Path -LiteralPath $elite3Directory -PathType Container
+        HasElite2 = $null -ne $elite2
+        Elite2ResourceDirectory = if ($null -ne $elite2) { $elite2.ResourceDirectory } else { $null }
+        Elite2MaxHitPoints = if ($null -ne $elite2) { $elite2.MaxHitPoints } else { $null }
+        Elite2Attack = if ($null -ne $elite2) { $elite2.Attack } else { $null }
+        Elite2Defense = if ($null -ne $elite2) { $elite2.Defense } else { $null }
+        Elite2MagicResistance = if ($null -ne $elite2) { $elite2.MagicResistance } else { $null }
+        Elite2AttackIntervalSeconds = if ($null -ne $elite2) { $elite2.AttackIntervalSeconds } else { $null }
+        Elite2MoveSpeedMetresPerSecond = if ($null -ne $elite2) { $elite2.MoveSpeedMetresPerSecond } else { $null }
+        Elite2LifeDeduct = if ($null -ne $elite2) { $elite2.LifeDeduct } else { $null }
+        HasElite3 = $null -ne $elite3
+        Elite3ResourceDirectory = if ($null -ne $elite3) { $elite3.ResourceDirectory } else { $null }
+        Elite3MaxHitPoints = if ($null -ne $elite3) { $elite3.MaxHitPoints } else { $null }
+        Elite3Attack = if ($null -ne $elite3) { $elite3.Attack } else { $null }
+        Elite3Defense = if ($null -ne $elite3) { $elite3.Defense } else { $null }
+        Elite3MagicResistance = if ($null -ne $elite3) { $elite3.MagicResistance } else { $null }
+        Elite3AttackIntervalSeconds = if ($null -ne $elite3) { $elite3.AttackIntervalSeconds } else { $null }
+        Elite3MoveSpeedMetresPerSecond = if ($null -ne $elite3) { $elite3.MoveSpeedMetresPerSecond } else { $null }
+        Elite3LifeDeduct = if ($null -ne $elite3) { $elite3.LifeDeduct } else { $null }
     }
 }
 
@@ -365,7 +405,23 @@ $rows = foreach ($row in $rows) {
         MoveSpeedMetresPerSecond = $row.MoveSpeedMetresPerSecond
         LifeDeduct = $row.LifeDeduct
         HasElite2 = $row.HasElite2
+        Elite2ResourceDirectory = $row.Elite2ResourceDirectory
+        Elite2MaxHitPoints = $row.Elite2MaxHitPoints
+        Elite2Attack = $row.Elite2Attack
+        Elite2Defense = $row.Elite2Defense
+        Elite2MagicResistance = $row.Elite2MagicResistance
+        Elite2AttackIntervalSeconds = $row.Elite2AttackIntervalSeconds
+        Elite2MoveSpeedMetresPerSecond = $row.Elite2MoveSpeedMetresPerSecond
+        Elite2LifeDeduct = $row.Elite2LifeDeduct
         HasElite3 = $row.HasElite3
+        Elite3ResourceDirectory = $row.Elite3ResourceDirectory
+        Elite3MaxHitPoints = $row.Elite3MaxHitPoints
+        Elite3Attack = $row.Elite3Attack
+        Elite3Defense = $row.Elite3Defense
+        Elite3MagicResistance = $row.Elite3MagicResistance
+        Elite3AttackIntervalSeconds = $row.Elite3AttackIntervalSeconds
+        Elite3MoveSpeedMetresPerSecond = $row.Elite3MoveSpeedMetresPerSecond
+        Elite3LifeDeduct = $row.Elite3LifeDeduct
         MedianDamagePerHit = if ($null -ne $metrics) { $metrics.MedianDamagePerHit } else { $null }
         MedianDps = if ($null -ne $metrics) { $metrics.MedianDps } else { $null }
         MedianTtkSeconds = if ($null -ne $metrics) { $metrics.MedianTtkSeconds } else { $null }
