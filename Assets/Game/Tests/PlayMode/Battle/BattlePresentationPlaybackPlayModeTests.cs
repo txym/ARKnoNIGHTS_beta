@@ -444,11 +444,16 @@ namespace ArknoNights.Battle.Tests
             Assert.That(catalog.Success, Is.True, string.Join(";", catalog.Errors.Select(item => item.ToString())));
             var abilities = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalog.Catalog);
             Assert.That(abilities.Success, Is.True, string.Join(";", abilities.Errors.Select(item => item.ToString())));
+            var definitions = catalog.Catalog.Entries
+                .Select(item => item.Definition.TypeId == "1000"
+                    ? WithMaxHitPoints(item.Definition, 100000)
+                    : item.Definition)
+                .ToArray();
             var specification = new BattleInputSpecification(
                 BattleInput.SupportedSchemaVersion,
                 "presentation-playmode-single-caster",
                 101,
-                catalog.Catalog.Entries.Select(item => item.Definition),
+                definitions,
                 abilities.Catalog.Abilities,
                 new[]
                 {
@@ -463,6 +468,25 @@ namespace ArknoNights.Battle.Tests
                 });
             Assert.That(BattleInputFactory.TryCreate(specification, out var input, out var errors), Is.True, string.Join(";", errors.Select(item => item.ToString())));
             return new BattleRunner(input).RunToCompletion();
+        }
+
+        private static UnitDefinition WithMaxHitPoints(UnitDefinition source, int maxHitPoints)
+        {
+            return new UnitDefinition(
+                source.TypeId,
+                maxHitPoints,
+                source.Attack,
+                source.Defense,
+                source.MagicResistance,
+                source.MoveSpeedCentimetresPerSecond,
+                source.AttackIntervalTicks,
+                source.AttackAnimationDurationTicks,
+                source.DamageType,
+                source.AttackMethod,
+                source.BlockCapacity,
+                source.TauntLevel,
+                source.IsSyntheticFixtureData,
+                source.InnateAbilityIds);
         }
 
         private static BattleRunResult WithoutDynamicEventSnapshots(BattleRunResult source)
