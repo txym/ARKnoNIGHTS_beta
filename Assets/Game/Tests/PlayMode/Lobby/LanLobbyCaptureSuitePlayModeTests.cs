@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -91,6 +92,12 @@ namespace ArknoNights.Lobby.Tests
                 }
                 Assert.That(captureRecord.codeNativeGeometry.Any(geometry => geometry.name == "LanLobbyRoot/OpaqueBlocker"), Is.True,
                     captureRecord.name + " must report the visible non-bitmap OpaqueBlocker.");
+                Assert.That(captureRecord.spriteSources.Any(sprite => sprite.node.Contains("SimulationInvite")), Is.False,
+                    captureRecord.name + " must not retain a SimulationInvite Sprite source.");
+                Assert.That(captureRecord.unityText.Any(text => text.node.Contains("SimulationInvite")), Is.False,
+                    captureRecord.name + " must not retain a SimulationInvite text row.");
+                Assert.That(captureRecord.codeNativeGeometry.Any(geometry => geometry.name.Contains("SimulationInvite")), Is.False,
+                    captureRecord.name + " must not retain SimulationInvite geometry.");
             }
 
             var discovered = parsed.captures.Single(record => record.name == "discovered-prefill");
@@ -118,6 +125,10 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(interiorBacking.color, Is.EqualTo("#000000C7"));
                 Assert.That(interiorBacking.width, Is.GreaterThan(0f));
                 Assert.That(interiorBacking.height, Is.GreaterThan(0f));
+                Assert.That(homeState.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(1),
+                    homeState.name + " must contain only the JoinAction icon after removing SimulationInvite.");
+                AssertJoinBitmapInventory(homeState);
+                AssertHomeJoinGeometry(homeState);
             }
             Assert.That(homeStates.Sum(record =>
                 record.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line")), Is.EqualTo(14));
@@ -157,8 +168,8 @@ namespace ArknoNights.Lobby.Tests
                 "The Home capture manifest must prove it rendered an approved Combined avatar source.");
             Assert.That(home.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.False,
                 "The Home provenance table must exclude inactive legacy foreground sprites.");
-            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
-                "Home must count both rendered join_icon instances.");
+            Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(1),
+                "Home must count only the accepted JoinAction icon.");
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "room_select_create_logo"), Is.Zero);
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "img_pointer"), Is.EqualTo(4));
             Assert.That(home.spriteSources.Count(sprite => sprite.spriteName == "doc_frame_line"), Is.EqualTo(7));
@@ -173,14 +184,14 @@ namespace ArknoNights.Lobby.Tests
                     .All(sprite => sprite.sourcePath.StartsWith("[uc]autochessouter/", StringComparison.Ordinal)
                         && !sprite.sourcePath.Contains("$0")
                         && !sprite.sourcePath.Contains("#0")), Is.True);
-            Assert.That(discovered.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(2),
-                "Discovered Home must count both rendered join_icon instances.");
-            Assert.That(parsed.captures.Sum(record => record.spriteSources.Count(sprite => sprite.spriteName == "join_icon")), Is.EqualTo(4),
-                "Rendered join_icon occurrences must sum to four across the two Home states.");
+            Assert.That(discovered.spriteSources.Count(sprite => sprite.spriteName == "join_icon"), Is.EqualTo(1),
+                "Discovered Home must count only the accepted JoinAction icon.");
+            Assert.That(homeStates.Sum(record => record.spriteSources.Count(sprite => sprite.spriteName == "join_icon")), Is.EqualTo(2),
+                "Rendered join_icon occurrences must sum to two across the two Home states.");
             Assert.That(home.spriteSources.Select(sprite => sprite.node), Is.Unique,
                 "Each Sprite usage row must identify one stable rendered node.");
-            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(2),
-                "The Home manifest must report OpaqueBlocker and the code-native InteriorBacking.");
+            Assert.That(home.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(8),
+                "The Home manifest must report OpaqueBlocker, Create backing, and six Join geometry rows.");
             foreach (var geometry in home.codeNativeGeometry)
             {
                 Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
@@ -196,9 +207,16 @@ namespace ArknoNights.Lobby.Tests
                 new[]
                 {
                     "LanLobbyRoot/OpaqueBlocker",
-                    "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking"
+                    "LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking",
+                    "LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking",
+                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineTop",
+                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft",
+                    "LanLobbyRoot/Home/RoomSelect/Join/OutlineRight",
+                    "LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal",
+                    "LanLobbyRoot/Home/RoomSelect/Join/GuideVertical"
                 },
                 home.codeNativeGeometry.Select(geometry => geometry.name).ToArray());
+            Assert.That(home.codeNativeGeometry.Any(geometry => geometry.name.EndsWith("/OutlineBottom", StringComparison.Ordinal)), Is.False);
             Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
                 "The Room provenance table must include the foreground once that page restores it.");
             Assert.That(roomHost.codeNativeGeometry.Select(geometry => geometry.name), Is.EquivalentTo(new[] { "LanLobbyRoot/OpaqueBlocker" }),
@@ -206,6 +224,63 @@ namespace ArknoNights.Lobby.Tests
             foreach (var room in parsed.captures.Where(record => record.name.StartsWith("room-", StringComparison.Ordinal)))
                 Assert.That(room.codeNativeGeometry.Any(geometry => geometry.name.Contains("PanelFrame")), Is.False,
                     room.name + " must not report inactive Home-only frame geometry.");
+        }
+
+        private static void AssertJoinBitmapInventory(CaptureRecordProbe capture)
+        {
+            var expectedCounts = new Dictionary<string, int>
+            {
+                { "room_select_join_left_block", 2 },
+                { "room_select_join_middle_block", 4 },
+                { "room_select_join_right_block", 2 },
+                { "room_select_join_middle_block_mask", 1 },
+                { "room_select_join_blank", 1 },
+                { "room_select_join_ban", 4 },
+                { "room_select_join_triangle", 1 },
+                { "room_select_join_logo", 1 },
+                { "room_select_join_text_01", 1 },
+                { "room_select_join_text_02", 1 },
+                { "room_select_join_text_bg", 1 },
+                { "room_select_join_btn_bg_down", 1 }
+            };
+            const string joinRoot = "LanLobbyRoot/Home/RoomSelect/Join/";
+            foreach (var expected in expectedCounts)
+            {
+                var occurrences = capture.spriteSources.Where(sprite => sprite.spriteName == expected.Key).ToArray();
+                Assert.That(occurrences, Has.Length.EqualTo(expected.Value), capture.name + ": " + expected.Key);
+                Assert.That(occurrences.All(sprite => sprite.node.StartsWith(joinRoot, StringComparison.Ordinal)), Is.True,
+                    capture.name + ": " + expected.Key + " must be owned by the Join hierarchy.");
+                Assert.That(occurrences.All(sprite => sprite.sourcePath == "[uc]autochessouter/" + expected.Key + ".png"
+                    && !sprite.sourcePath.Contains("$0")
+                    && !sprite.sourcePath.Contains("#0")), Is.True,
+                    capture.name + ": " + expected.Key + " must use its exact approved source.");
+            }
+        }
+
+        private static void AssertHomeJoinGeometry(CaptureRecordProbe capture)
+        {
+            var expected = new[]
+            {
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking", 1154f, 204f, 717f, 280f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineTop", 1154f, 482f, 717f, 2f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft", 1154f, 204f, 2f, 280f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineRight", 1869f, 204f, 2f, 280f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal", 1154f, 383f, 717f, 2f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/GuideVertical", 1506f, 288f, 2f, 196f)
+            };
+            foreach (var item in expected)
+            {
+                var geometry = capture.codeNativeGeometry.SingleOrDefault(value => value.name == item.Name);
+                Assert.That(geometry, Is.Not.Null, capture.name + ": missing " + item.Name);
+                Assert.That(geometry.kind, Is.EqualTo("code-native-geometry"));
+                Assert.That(geometry.isBitmap, Is.False, item.Name + " must be sprite-null geometry.");
+                Assert.That(geometry.x, Is.EqualTo(item.X).Within(.05f));
+                Assert.That(geometry.y, Is.EqualTo(item.Y).Within(.05f));
+                Assert.That(geometry.width, Is.EqualTo(item.Width).Within(.05f));
+                Assert.That(geometry.height, Is.EqualTo(item.Height).Within(.05f));
+            }
+            Assert.That(capture.codeNativeGeometry.Any(geometry => geometry.name.EndsWith("/OutlineBottom", StringComparison.Ordinal)), Is.False,
+                capture.name + " must not report a bottom outline.");
         }
 
         private static void AssertActionRect(CaptureRecordProbe capture, string name)
@@ -261,6 +336,24 @@ namespace ArknoNights.Lobby.Tests
             var copiedPlayerArguments = new object[] { relativeOutput, externalDirectory, externalDirectory, null, null };
             Assert.That((bool)validator.Invoke(null, copiedPlayerArguments), Is.False);
             StringAssert.Contains("project root", copiedPlayerArguments[4] as string);
+        }
+
+        private sealed class GeometryExpectation
+        {
+            public GeometryExpectation(string name, float x, float y, float width, float height)
+            {
+                Name = name;
+                X = x;
+                Y = y;
+                Width = width;
+                Height = height;
+            }
+
+            public string Name { get; }
+            public float X { get; }
+            public float Y { get; }
+            public float Width { get; }
+            public float Height { get; }
         }
 
         [Serializable] private sealed class CaptureManifestProbe { public CaptureRecordProbe[] captures; }

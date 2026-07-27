@@ -77,7 +77,11 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(ChildrenWithPrefix(join, "LeftBlock_").Count, Is.EqualTo(2));
             Assert.That(ChildrenWithPrefix(join, "MiddleBlock_").Count, Is.EqualTo(4));
             Assert.That(ChildrenWithPrefix(join, "RightBlock_").Count, Is.EqualTo(2));
-            Assert.That(ChildrenWithPrefix(join, "Blank_").Count, Is.EqualTo(LobbyRoomCode.Length));
+            Assert.That(join.Find("MiddleMask"), Is.Not.Null);
+            Assert.That(join.Find("Blank"), Is.Not.Null);
+            Assert.That(ChildrenWithPrefix(join, "Ban_").Count, Is.EqualTo(4));
+            for (var index = 0; index < LobbyRoomCode.Length; index++)
+                Assert.That(join.Find("Blank_" + index), Is.Null);
 
             view.BindDiscoveredRooms(new[] { Discovery("654321") });
             view.ClickDiscoveredRoomForTests("654321");
@@ -104,9 +108,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(home.Find("RoomSelect/Create/CreateFrame/Top_0"), Is.Not.Null);
             Assert.That(home.Find("RoomSelect/Create/CreateFrame/Bottom_2"), Is.Null);
             Assert.That(home.Find("RoomSelect/Create/CreateFrame/TopRightChamfer"), Is.Null);
-            Assert.That(home.Find("RoomSelect/Join/SimulationInvite"), Is.Not.Null);
-            Assert.That(home.Find("RoomSelect/Join/SimulationInvite/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
-                Is.EqualTo("join_icon"));
+            Assert.That(home.Find("RoomSelect/Join/SimulationInvite"), Is.Null);
             Assert.That(home.Find("RoomSelect/Create/CreateAction/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
                 Is.EqualTo("create_icon"));
             Assert.That(home.Find("RoomSelect/Join/JoinAction/ActionIcon").GetComponent<UnityEngine.UI.Image>().sprite.name,
@@ -278,6 +280,142 @@ namespace ArknoNights.Lobby.Tests
             {
                 Assert.That(frameImage.rectTransform.sizeDelta.y, Is.InRange(8f, 14f), frameImage.name);
             }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator HomeRoomSelect_JoinDecorationUsesMeasuredOverlapAndKeepsInputFunctional()
+        {
+            var roomSelect = view.transform.Find("LanLobbyRoot/Home/RoomSelect").GetComponent<RectTransform>();
+            var join = roomSelect.Find("Join").GetComponent<RectTransform>();
+            var input = join.Find("RoomCodeInput").GetComponent<InputField>();
+            var joinAction = join.Find("JoinAction").GetComponent<RectTransform>();
+            var joinButton = joinAction.GetComponent<Button>();
+            var materialField = typeof(Graphic).GetField("m_Material", BindingFlags.Instance | BindingFlags.NonPublic);
+            var expectedBitmaps = new Dictionary<string, string>
+            {
+                { "LeftBlock_0", "room_select_join_left_block" },
+                { "LeftBlock_1", "room_select_join_left_block" },
+                { "MiddleBlock_0", "room_select_join_middle_block" },
+                { "MiddleBlock_1", "room_select_join_middle_block" },
+                { "MiddleBlock_2", "room_select_join_middle_block" },
+                { "MiddleBlock_3", "room_select_join_middle_block" },
+                { "RightBlock_0", "room_select_join_right_block" },
+                { "RightBlock_1", "room_select_join_right_block" },
+                { "MiddleMask", "room_select_join_middle_block_mask" },
+                { "Blank", "room_select_join_blank" },
+                { "Ban_0", "room_select_join_ban" },
+                { "Ban_1", "room_select_join_ban" },
+                { "Ban_2", "room_select_join_ban" },
+                { "Ban_3", "room_select_join_ban" },
+                { "Triangle", "room_select_join_triangle" },
+                { "Logo", "room_select_join_logo" },
+                { "Text01", "room_select_join_text_01" },
+                { "Text02", "room_select_join_text_02" }
+            };
+            var expectedGeometry = new[]
+            {
+                new JoinGeometryExpectation("InteriorBacking", 122f, 11f, 717f, 280f),
+                new JoinGeometryExpectation("OutlineTop", 122f, 11f, 717f, 2f),
+                new JoinGeometryExpectation("OutlineLeft", 122f, 11f, 2f, 280f),
+                new JoinGeometryExpectation("OutlineRight", 837f, 11f, 2f, 280f),
+                new JoinGeometryExpectation("GuideHorizontal", 122f, 110f, 717f, 2f),
+                new JoinGeometryExpectation("GuideVertical", 474f, 11f, 2f, 196f)
+            };
+
+            Canvas.ForceUpdateCanvases();
+            Assert.That(join.Find("SimulationInvite"), Is.Null);
+            Assert.That(materialField, Is.Not.Null, "Unity Graphic must expose its serialized custom-material field.");
+            Assert.That(ChildrenWithPrefix(join, "LeftBlock_").Count, Is.EqualTo(2));
+            Assert.That(ChildrenWithPrefix(join, "MiddleBlock_").Count, Is.EqualTo(4));
+            Assert.That(ChildrenWithPrefix(join, "RightBlock_").Count, Is.EqualTo(2));
+            Assert.That(join.Find("MiddleMask"), Is.Not.Null);
+            Assert.That(join.Find("Blank"), Is.Not.Null);
+            Assert.That(ChildrenWithPrefix(join, "Ban_").Count, Is.EqualTo(4));
+            Assert.That(join.Find("Triangle"), Is.Not.Null);
+            Assert.That(join.Find("Logo"), Is.Not.Null);
+            Assert.That(join.Find("Text01"), Is.Not.Null);
+            Assert.That(join.Find("Text02"), Is.Not.Null);
+            for (var index = 0; index < LobbyRoomCode.Length; index++)
+                Assert.That(join.Find("Blank_" + index), Is.Null);
+
+            foreach (var bitmap in expectedBitmaps)
+            {
+                var image = join.Find(bitmap.Key).GetComponent<Image>();
+                Assert.That(image.sprite, Is.Not.Null, bitmap.Key);
+                Assert.That(image.sprite.name, Is.EqualTo(bitmap.Value), bitmap.Key);
+                Assert.That(image.raycastTarget, Is.False, bitmap.Key);
+            }
+
+            foreach (var geometry in expectedGeometry)
+                AssertJoinCodeNativeGeometry(join, geometry, materialField);
+            Assert.That(join.Find("OutlineBottom"), Is.Null);
+
+            var blockRects = expectedBitmaps
+                .Where(item => item.Key.StartsWith("LeftBlock_") || item.Key.StartsWith("MiddleBlock_") || item.Key.StartsWith("RightBlock_"))
+                .Select(item => VisibleSpriteScreenTopLeftRect(join.Find(item.Key).GetComponent<Image>(), roomSelect))
+                .OrderBy(rect => rect.x)
+                .ToArray();
+            for (var index = 1; index < blockRects.Length; index++)
+                Assert.That(blockRects[index - 1].xMax, Is.GreaterThan(blockRects[index].x), "Block pair " + (index - 1) + "/" + index + " must overlap.");
+            Assert.That(Union(blockRects), Is.EqualTo(new Rect(1199f, 703f, 639f, 89f)).Using(RectComparer.Within(4f)));
+
+            AssertVisibleSpriteScreenTopLeftRect(join.Find("Logo").GetComponent<Image>(), roomSelect, 1245f, 660f, 118f, 20f, 2f);
+            AssertVisibleSpriteScreenTopLeftRect(join.Find("Text01").GetComponent<Image>(), roomSelect, 1545f, 652f, 65f, 8f, 2f);
+            AssertVisibleSpriteScreenTopLeftRect(join.Find("Text02").GetComponent<Image>(), roomSelect, 1680f, 658f, 89f, 11f, 2f);
+            AssertVisibleSpriteScreenTopLeftRect(join.Find("Triangle").GetComponent<Image>(), roomSelect, 1492f, 643f, 30f, 17f, 2f);
+            AssertVisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect, 1477f, 664f, 60f, 61f, 2f);
+            AssertVisibleSpriteScreenTopLeftRect(input.GetComponent<Image>(), roomSelect, 1269f, 800f, 482f, 60f, 2f);
+
+            var blankRect = VisibleSpriteScreenTopLeftRect(join.Find("Blank").GetComponent<Image>(), roomSelect);
+            var bans = ChildrenWithPrefix(join, "Ban_").Select(item => VisibleSpriteScreenTopLeftRect(item.GetComponent<Image>(), roomSelect)).ToArray();
+            Assert.That(bans.Select(rect => rect.x).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(bans.Select(rect => rect.y).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(bans.All(rect => blankRect.Contains(rect.min) && blankRect.Contains(rect.max)), Is.True,
+                "Every ban must remain inside the central blank.");
+
+            var inputTransform = input.GetComponent<RectTransform>();
+            foreach (var graphic in join.GetComponentsInChildren<Graphic>(true))
+            {
+                if (!graphic.isActiveAndEnabled || graphic.transform.IsChildOf(input.transform) || graphic.transform.IsChildOf(joinAction)) continue;
+                var directChild = graphic.transform;
+                while (directChild.parent != join) directChild = directChild.parent;
+                Assert.That(directChild.GetSiblingIndex(), Is.LessThan(inputTransform.GetSiblingIndex()), graphic.name);
+                Assert.That(directChild.GetSiblingIndex(), Is.LessThan(joinAction.GetSiblingIndex()), graphic.name);
+                Assert.That(DesignRect(graphic.rectTransform, roomSelect).Overlaps(DesignRect(joinAction, roomSelect)), Is.False,
+                    graphic.name + " must not overlap the accepted Join action.");
+            }
+            Assert.That(DesignRect(inputTransform, roomSelect).Overlaps(DesignRect(joinAction, roomSelect)), Is.False,
+                "The room-code input must not overlap the accepted Join action.");
+
+            Assert.That(ScreenTopLeftRect(DesignRect(joinAction, roomSelect)), Is.EqualTo(new Rect(1154f, 876f, 717f, 99f)).Using(RectComparer.Within(2f)));
+            AssertTopLeftRect(joinAction.Find("ActionIcon").GetComponent<RectTransform>(), 47f, 19f, 47f, 47f * 41f / 36f, .05f);
+            var joinLabel = joinAction.Find("Label").GetComponent<Text>();
+            Assert.That(joinLabel.rectTransform.offsetMin, Is.EqualTo(new Vector2(103f, 2f)));
+            Assert.That(joinLabel.rectTransform.offsetMax, Is.EqualTo(new Vector2(-220f, 2f)));
+            Assert.That(joinLabel.fontSize, Is.EqualTo(38));
+
+            Assert.That(input.contentType, Is.EqualTo(InputField.ContentType.IntegerNumber));
+            Assert.That(input.characterLimit, Is.EqualTo(LobbyRoomCode.Length));
+            Assert.That(input.textComponent.alignment, Is.EqualTo(TextAnchor.MiddleCenter));
+            Assert.That(input.GetComponent<Image>().raycastTarget, Is.True);
+            view.BindDiscoveredRooms(new[] { Discovery("654321") });
+            view.ClickDiscoveredRoomForTests("654321");
+            Assert.That(view.RoomCodeTextForTests, Is.EqualTo("654321"));
+            Assert.That(joinRequests, Is.Zero);
+
+            var inputPointer = PointerAt(inputTransform);
+            var inputHits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(inputPointer, inputHits);
+            Assert.That(FirstInputField(inputHits), Is.EqualTo(input), "The real EventSystem raycast must resolve the room-code input.");
+
+            var actionPointer = PointerAt(joinAction);
+            var actionHits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(actionPointer, actionHits);
+            var resolvedJoin = FirstInteractableButton(actionHits);
+            Assert.That(resolvedJoin, Is.EqualTo(joinButton), "The real EventSystem raycast must resolve the accepted Join Button.");
+            ExecuteEvents.Execute(resolvedJoin.gameObject, actionPointer, ExecuteEvents.pointerClickHandler);
+            Assert.That(joinRequests, Is.EqualTo(1));
             yield return null;
         }
 
@@ -502,6 +640,24 @@ namespace ArknoNights.Lobby.Tests
             public bool PreserveAspect { get; }
         }
 
+        private sealed class JoinGeometryExpectation
+        {
+            public JoinGeometryExpectation(string name, float left, float top, float width, float height)
+            {
+                Name = name;
+                Left = left;
+                Top = top;
+                Width = width;
+                Height = height;
+            }
+
+            public string Name { get; }
+            public float Left { get; }
+            public float Top { get; }
+            public float Width { get; }
+            public float Height { get; }
+        }
+
         private static void AssertMappedRoomSelectSprites(Transform home)
         {
             var expected = new Dictionary<string, string>
@@ -539,18 +695,17 @@ namespace ArknoNights.Lobby.Tests
                 { "RoomSelect/Join/MiddleBlock_3", "room_select_join_middle_block" },
                 { "RoomSelect/Join/RightBlock_0", "room_select_join_right_block" },
                 { "RoomSelect/Join/RightBlock_1", "room_select_join_right_block" },
+                { "RoomSelect/Join/MiddleMask", "room_select_join_middle_block_mask" },
                 { "RoomSelect/Join/Logo", "room_select_join_logo" },
                 { "RoomSelect/Join/Text01", "room_select_join_text_01" },
                 { "RoomSelect/Join/Text02", "room_select_join_text_02" },
                 { "RoomSelect/Join/Triangle", "room_select_join_triangle" },
-                { "RoomSelect/Join/Blank_0", "room_select_join_blank" },
-                { "RoomSelect/Join/Blank_1", "room_select_join_blank" },
-                { "RoomSelect/Join/Blank_2", "room_select_join_blank" },
-                { "RoomSelect/Join/Blank_3", "room_select_join_blank" },
-                { "RoomSelect/Join/Blank_4", "room_select_join_blank" },
-                { "RoomSelect/Join/Blank_5", "room_select_join_blank" },
+                { "RoomSelect/Join/Blank", "room_select_join_blank" },
+                { "RoomSelect/Join/Ban_0", "room_select_join_ban" },
+                { "RoomSelect/Join/Ban_1", "room_select_join_ban" },
+                { "RoomSelect/Join/Ban_2", "room_select_join_ban" },
+                { "RoomSelect/Join/Ban_3", "room_select_join_ban" },
                 { "RoomSelect/Join/RoomCodeInput", "room_select_join_text_bg" },
-                { "RoomSelect/Join/Ban", "room_select_join_ban" },
                 { "RoomSelect/Join/JoinAction", "room_select_join_btn_bg_down" }
             };
 
@@ -600,6 +755,70 @@ namespace ArknoNights.Lobby.Tests
             var directChild = create.Find(path);
             while (directChild.parent != create) directChild = directChild.parent;
             Assert.That(directChild.GetSiblingIndex(), Is.LessThan(action.GetSiblingIndex()), path);
+        }
+
+        private static void AssertJoinCodeNativeGeometry(RectTransform join, JoinGeometryExpectation expected, FieldInfo materialField)
+        {
+            var image = join.Find(expected.Name).GetComponent<Image>();
+            Assert.That(image.sprite, Is.Null, expected.Name + " must remain code-native geometry.");
+            Assert.IsNull(materialField.GetValue(image), expected.Name + " must not use a custom serialized material.");
+            Assert.That(image.raycastTarget, Is.False, expected.Name + " must not intercept input.");
+            AssertTopLeftRect(image.rectTransform, expected.Left, expected.Top, expected.Width, expected.Height, .05f);
+        }
+
+        private static void AssertVisibleSpriteScreenTopLeftRect(
+            Image image,
+            RectTransform designRoot,
+            float left,
+            float top,
+            float width,
+            float height,
+            float tolerance)
+        {
+            Assert.That(VisibleSpriteScreenTopLeftRect(image, designRoot),
+                Is.EqualTo(new Rect(left, top, width, height)).Using(RectComparer.Within(tolerance)), image.name);
+        }
+
+        private static Rect VisibleSpriteScreenTopLeftRect(Image image, RectTransform designRoot)
+        {
+            return ScreenTopLeftRect(VisibleSpriteDesignRect(image, designRoot), designRoot);
+        }
+
+        private static Rect VisibleSpriteDesignRect(Image image, RectTransform designRoot)
+        {
+            var rect = DesignRect(image.rectTransform, designRoot);
+            if (!image.preserveAspect || image.sprite == null) return rect;
+
+            var spriteAspect = Aspect(image.sprite);
+            var rectAspect = rect.width / rect.height;
+            if (rectAspect > spriteAspect)
+            {
+                var width = rect.height * spriteAspect;
+                rect.x += (rect.width - width) / 2f;
+                rect.width = width;
+            }
+            else
+            {
+                var height = rect.width / spriteAspect;
+                rect.y += (rect.height - height) / 2f;
+                rect.height = height;
+            }
+            return rect;
+        }
+
+        private static Rect ScreenTopLeftRect(Rect designRect, RectTransform designRoot = null)
+        {
+            var height = designRoot == null ? 1080f : designRoot.rect.height;
+            return new Rect(designRect.x, height - designRect.yMax, designRect.width, designRect.height);
+        }
+
+        private static Rect Union(IEnumerable<Rect> rects)
+        {
+            var result = rects.First();
+            foreach (var rect in rects.Skip(1)) result = Rect.MinMaxRect(
+                Mathf.Min(result.xMin, rect.xMin), Mathf.Min(result.yMin, rect.yMin),
+                Mathf.Max(result.xMax, rect.xMax), Mathf.Max(result.yMax, rect.yMax));
+            return result;
         }
 
         private static void AssertActionRect(RectTransform action, RectTransform container, global::LanLobbyRect expected, float tolerance)
@@ -663,6 +882,25 @@ namespace ArknoNights.Lobby.Tests
                 if (button != null && button.isActiveAndEnabled && button.interactable) return button;
             }
             return null;
+        }
+
+        private static InputField FirstInputField(IEnumerable<RaycastResult> hits)
+        {
+            foreach (var hit in hits)
+            {
+                var input = hit.gameObject.GetComponentInParent<InputField>();
+                if (input != null && input.isActiveAndEnabled && input.interactable) return input;
+            }
+            return null;
+        }
+
+        private static PointerEventData PointerAt(RectTransform target)
+        {
+            return new PointerEventData(EventSystem.current)
+            {
+                button = PointerEventData.InputButton.Left,
+                position = RectTransformUtility.WorldToScreenPoint(null, target.TransformPoint(target.rect.center))
+            };
         }
 
         private sealed class RectComparer : IEqualityComparer<Rect>
