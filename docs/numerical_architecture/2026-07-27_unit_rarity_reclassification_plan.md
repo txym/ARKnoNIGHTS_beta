@@ -349,7 +349,13 @@
 
 - [ ] **Step 1: Run the extractor from a clean process**
 
-  Run the exact Task 1 process-scoped `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...` command with the final pending-removal ID list and require exit 0.
+  Run the final extractor from a clean Windows PowerShell process. `-ExecutionPolicy Bypass` applies only to that process; do not modify the persistent machine or user execution policy. Construct the final pending-removal ID array inside the child process so the script's `[int[]]` parameter receives two values:
+
+  ```powershell
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& 'docs/numerical_architecture/tools/Export-UnitRarityDataset.ps1' -BondSpecPath 'docs/bonds/BONDS_SPEC.md' -StagingRoot 'G:/ARKnoNIGHTS_tools/spine-fetcher-output-variants-20260725/staging' -OutputCsvPath '.superpowers/sdd/2026-07-27_unit_rarity_reclassification_plan/task-8-clean-process-output.csv' -PendingRemovalIds @(1007,1055)"
+  ```
+
+  Require exit 0, 87 data rows, and a SHA-256 hash byte-identical to the formal CSV. Do not use `-File ... -PendingRemovalIds 1007,1055` for this final array-valued invocation, because Windows PowerShell 5.1 in the `zh-CN` environment binds that token as the single integer `10071055`.
 
 - [ ] **Step 2: Run structural assertions**
 
