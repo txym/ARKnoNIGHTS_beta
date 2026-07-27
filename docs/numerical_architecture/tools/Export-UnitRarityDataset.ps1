@@ -7,7 +7,12 @@ param(
     [string]$StagingRoot,
 
     [Parameter(Mandatory = $true)]
-    [string]$OutputCsvPath
+    [string]$OutputCsvPath,
+
+    # Windows PowerShell 5.1 can culture-bind "1007,1055" passed after -File as
+    # one integer. Invoke this script from PowerShell with @(1007, 1055), such
+    # as through -Command or a wrapper, so the public interface remains int[].
+    [int[]]$PendingRemovalIds = @()
 )
 
 Set-StrictMode -Version Latest
@@ -107,7 +112,7 @@ function Get-Median {
     return Get-Percentile -Values $Values -Percentile ([decimal]0.5)
 }
 
-function Get-FirstPassQuantileSummary {
+function Get-QuantileSummary {
     param([Parameter(Mandatory = $true)]$Defenders)
 
     $percentiles = [ordered]@{ P25 = [decimal]0.25; P50 = [decimal]0.5; P75 = [decimal]0.75; P90 = [decimal]0.9 }
@@ -126,6 +131,12 @@ function Get-FirstPassQuantileSummary {
 $BondSpecPath = Resolve-ExistingPath $BondSpecPath
 $StagingRoot = Resolve-ExistingPath $StagingRoot
 $OutputCsvPath = [System.IO.Path]::GetFullPath($OutputCsvPath)
+$pendingRemovalTypeIds = [System.Collections.Generic.HashSet[int]]::new()
+foreach ($typeId in $PendingRemovalIds) {
+    if (-not $pendingRemovalTypeIds.Add($typeId)) {
+        throw "Pending-removal type ID '$typeId' was provided more than once."
+    }
+}
 
 $specLines = Get-Content -LiteralPath $BondSpecPath -Encoding UTF8
 $rarityLabel = [string]::Concat([char]0x7A00, [char]0x6709)
@@ -161,6 +172,16 @@ foreach ($line in $specLines) {
         CurrentRarity = [int]$Matches.Rarity
         IsShopCandidate = -not $nonShopTypeIds.Contains($typeId)
     })
+}
+
+foreach ($typeId in $pendingRemovalTypeIds) {
+    $typeIdKey = [string]$typeId
+    if (-not $roster.ContainsKey($typeIdKey)) {
+        throw "Pending-removal type ID '$typeId' does not exist in the roster."
+    }
+    if (-not $roster[$typeIdKey].IsShopCandidate) {
+        throw "Pending-removal type ID '$typeId' is not a shop candidate."
+    }
 }
 
 $regionsByTypeId = @{}
@@ -214,6 +235,7 @@ $rows = foreach ($entry in $roster.Values | Sort-Object { [int]$_.TypeId }) {
         Category = $entry.Category
         CurrentRarity = $entry.CurrentRarity
         IsShopCandidate = [bool]$entry.IsShopCandidate
+        RosterStatus = if (-not $entry.IsShopCandidate) { 'NonShop' } elseif ($pendingRemovalTypeIds.Contains([int]$entry.TypeId)) { 'PendingRemoval' } else { 'Retained' }
         Regions = $regions
         ResourceDirectory = $baseDirectory.Name
         DamageType = $source.damageType
@@ -232,6 +254,7 @@ $rows = foreach ($entry in $roster.Values | Sort-Object { [int]$_.TypeId }) {
 
 $shopRows = @($rows | Where-Object IsShopCandidate)
 $nonShopRows = @($rows | Where-Object { -not $_.IsShopCandidate })
+$retainedShopRows = @($shopRows | Where-Object { $_.RosterStatus -eq 'Retained' })
 Assert-Condition ($shopRows.Count -eq 83) "Expected 83 unique shop candidates; found $($shopRows.Count)."
 Assert-Condition ($nonShopRows.Count -eq 4) "Expected 4 unique non-shop units; found $($nonShopRows.Count)."
 
@@ -239,10 +262,11 @@ $unattackableDroneTypeIds = [System.Collections.Generic.HashSet[int]]::new()
 foreach ($typeId in @(1017, 1042, 1355, 1146)) {
     [void]$unattackableDroneTypeIds.Add($typeId)
 }
-$defenderRows = @($shopRows | Where-Object { -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) })
-Assert-Condition ($defenderRows.Count -eq 79) "Expected 79 first-pass defenders; found $($defenderRows.Count)."
+$firstPassDefenderRows = @($shopRows | Where-Object { -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) })
+Assert-Condition ($firstPassDefenderRows.Count -eq 79) "Expected 79 first-pass defenders; found $($firstPassDefenderRows.Count)."
+$defenderRows = @($retainedShopRows | Where-Object { -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) })
 
-$firstPassQuantiles = Get-FirstPassQuantileSummary -Defenders $defenderRows
+$firstPassQuantiles = Get-QuantileSummary -Defenders $firstPassDefenderRows
 $expectedFirstPassQuantiles = @{
     Defense = @{ P25 = 100; P50 = 300; P75 = 775; P90 = 1040 }
     MagicResistance = @{ P25 = 0; P50 = 20; P75 = 32.5; P90 = 50 }
@@ -255,11 +279,12 @@ foreach ($property in $expectedFirstPassQuantiles.Keys) {
         ) "Expected first-pass $property $label=$($expectedFirstPassQuantiles[$property][$label]); found $($firstPassQuantiles[$property][$label])."
     }
 }
+$secondPassQuantiles = Get-QuantileSummary -Defenders $defenderRows
 
 foreach ($row in $rows) {
     Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$row.DamageType)) "Type ID $($row.TypeId) is missing a damage type."
 }
-$attackingRows = @($shopRows | Where-Object { $_.DamageType -ne 'None' })
+$attackingRows = @($retainedShopRows | Where-Object { $_.DamageType -ne 'None' })
 foreach ($row in $attackingRows) {
     Assert-Condition ($row.EffectiveAttackIntervalSeconds -gt 0) "Type ID $($row.TypeId) has a nonpositive effective attack interval."
 }
@@ -291,7 +316,7 @@ foreach ($attacker in $attackingRows) {
 }
 
 $medianIncomingTtdByTypeId = @{}
-foreach ($defender in $shopRows) {
+foreach ($defender in $retainedShopRows) {
     $incomingTtks = [System.Collections.Generic.List[decimal]]::new()
     foreach ($attacker in $attackingRows) {
         $damage = Get-OrdinaryAttackDamage -Attacker $attacker -Defender $defender
@@ -308,6 +333,7 @@ $rows = foreach ($row in $rows) {
         Category = $row.Category
         CurrentRarity = $row.CurrentRarity
         IsShopCandidate = $row.IsShopCandidate
+        RosterStatus = $row.RosterStatus
         Regions = $row.Regions
         ResourceDirectory = $row.ResourceDirectory
         DamageType = $row.DamageType
@@ -327,7 +353,7 @@ $rows = foreach ($row in $rows) {
         P75TtkSeconds = if ($null -ne $metrics) { $metrics.P75TtkSeconds } else { $null }
         PhysicalFloorTargetRate = if ($null -ne $metrics) { $metrics.PhysicalFloorTargetRate } else { $null }
         MedianIncomingTtdSeconds = if ($medianIncomingTtdByTypeId.ContainsKey([int]$row.TypeId)) { $medianIncomingTtdByTypeId[[int]$row.TypeId] } else { $null }
-        BaseChassisNotes = if ($row.DamageType -eq 'None') { 'ability-only' } elseif ($row.IsShopCandidate) { 'raw-base ordinary attacks only; ability adjustment pending' } else { 'non-shop; raw-base survival reference only' }
+        BaseChassisNotes = if ($row.RosterStatus -eq 'PendingRemoval') { 'pending removal; excluded from second-pass matchup populations' } elseif ($row.DamageType -eq 'None') { 'ability-only' } elseif ($row.IsShopCandidate) { 'raw-base ordinary attacks only; ability adjustment pending' } else { 'non-shop; raw-base survival reference only' }
     }
 }
 
@@ -365,4 +391,5 @@ if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
     [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
 }
 [System.IO.File]::WriteAllLines($OutputCsvPath, @($rows | ConvertTo-Csv -NoTypeInformation), [System.Text.UTF8Encoding]::new($false))
-Write-Host "Exported $($rows.Count) rows to '$OutputCsvPath' ($($shopRows.Count) shop candidates, $($nonShopRows.Count) non-shop units)."
+Write-Host "Exported $($rows.Count) rows to '$OutputCsvPath' ($($retainedShopRows.Count) retained, $($shopRows.Count - $retainedShopRows.Count) pending removal, $($nonShopRows.Count) non-shop; $($defenderRows.Count) defenders, $($attackingRows.Count) attackers)."
+Write-Host "Second-pass defender quantiles (P25/P50/P75/P90): DEF=$($secondPassQuantiles.Defense.P25)/$($secondPassQuantiles.Defense.P50)/$($secondPassQuantiles.Defense.P75)/$($secondPassQuantiles.Defense.P90); MR=$($secondPassQuantiles.MagicResistance.P25)/$($secondPassQuantiles.MagicResistance.P50)/$($secondPassQuantiles.MagicResistance.P75)/$($secondPassQuantiles.MagicResistance.P90); HP=$($secondPassQuantiles.MaxHitPoints.P25)/$($secondPassQuantiles.MaxHitPoints.P50)/$($secondPassQuantiles.MaxHitPoints.P75)/$($secondPassQuantiles.MaxHitPoints.P90)."
