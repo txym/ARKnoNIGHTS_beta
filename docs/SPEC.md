@@ -128,6 +128,15 @@
 - 战斗实体数量会分别影响阻挡、攻击、受击、死亡、剩余目标价值和冲家伤害；
 - 单位缺少专用精英二或精英三模型、属性文件时仍可精英化；存在专用数据时优先使用。
 
+精英化单位源数据采用以下已确认的存储与继承规则：
+
+- `Assets/GameData/Units/EliteVariants/Json/*.json` 使用 `unit-elite-variants-v1`，作为对应 `unit-source-v1` 的可选权威 sidecar；
+- 所有导入变体均取其 `unit-levels.json` 的 `level 0`；只有该变体缺少 `level 0` 时，才使用该变体 `unit-source-v1` 中的标准数值；
+- 精英 0、精英 1 选择基础变体，精英 2 选择 `_2`，精英 3 选择 `_3`；目标条目缺失时只继承最近的较低精英化条目，不向较高条目借用；
+- `stats.combat` 与 `stats.shared` 分别以完整块为继承单位。名称和能力列表在省略时继承；显式空能力列表 `[]` 表示清空；
+- 模型块一旦声明就必须完整，且模型变化原子绑定显示名、资源 key/目录、SkeletonData、头像、Skeleton 类型、动画名称、攻击动画时长和该变体能力；
+- 当前里程碑的 Editor 目录生成器只把精英 0 解析进扁平 `unit-catalog-v1`。精英 2/3 的运行时选择、合成系数和局内升阶仍未实现，因此现有“`eliteLevel` 不参与战斗数值或胜负”的规则继续成立。
+
 ### 5.2 准备阶段可执行操作
 
 准备阶段中，玩家可以进行以下操作。
@@ -558,7 +567,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 第一阶段在保留 `battle-fixture-v1` 作为合成算法回归数据的同时，新增两份 Player-safe 的 Resources 文本资源：
 
-- `BattleData/unit-catalog-v1`：由 `Assets/GameData/Units/Json/*.json` 确定性生成的真实单位目录；目录条目含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
+- `BattleData/unit-catalog-v1`：由 `Assets/GameData/Units/Json/*.json` 与对应的可选 `Assets/GameData/Units/EliteVariants/Json/*.json` 确定性生成的真实单位目录；当前生成目标固定为精英 0。目录条目含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
 - `BattleData/task004a-real-1v1`：`local-battle-v1` 对战快照，只含 `schemaVersion`、`battleId`、`maxTicks`、两个带 Home/Away 的玩家和各自单位实例（`unitId`、`typeId`、`zone`、`formationX`、`formationY`、`buffs`）；当前固定回归样本为 Home 3 对 Away 4，双方均混用 `gopro`（`1000`）与 `arcslma`（`5503`），采用打乱且互不重叠的部署坐标。不得重复类型数值或表现资源。
 
 `local-battle-v1` 通过 `typeId` 连接目录后才构造不可变 `BattleInput`；Core 仅接收 Core 值，不能接收 Resources、Spine 或表现对象。未知 schema、未知类型、重复或无效 ID、无效数值、空/不存在的表现资源路径均必须返回结构化诊断，其中包含 schema、battleId、playerId（如适用）和 typeId（如适用）。
@@ -581,7 +590,8 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 - 两个真实源文件使用 `unit-source-v1`，按身份与文本、养成与费用、行为分类、战斗数值、阻挡/价值/能力、资源与动画的顺序定义 lower camel case 字段。`resourceKey` 仅用于技术资源查找；`displayNameZhHans` 与 `skillDescriptionZhHans` 是独立的玩家可见简体中文字段。
 - 当前两个单位已配置简体中文显示名；显示名为空时仍不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`initialEliteLevel` 必须为 `0..3`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。
-- 源 JSON 是唯一权威。Editor 将它确定性生成 Player-safe `unit-catalog-v1`；Player 再从目录读取资源键、中文文本、稀有度、目标价值以及既有战斗/表现字段。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
+- 基础 `unit-source-v1` 与可选 `unit-elite-variants-v1` sidecar 共同构成单位源数据权威。Editor 先解析目标精英化条目，再确定性生成 Player-safe `unit-catalog-v1`；Player 不读取 Editor 源 JSON 或项目外 staging 目录，只从目录读取资源键、中文文本、稀有度、目标价值以及既有战斗/表现字段。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
+- `Assets/Resources/ProfilePicture` 下的单位头像统一按 Default Texture 导入。目录和 Player 校验使用 `Resources.Load<Texture2D>`；现有 uGUI `Image` 通过共享 `UnitPortraitLoader` 将整张 Texture2D 创建为 Sprite 并按资源路径缓存，不先尝试加载 Sprite。该约束只适用于单位头像，不改变 Spine 贴图或其他通用 UI 资源的加载策略。
 
 ## 15. `SUMMON_JELLY_MINIONS` 果冻召唤（2026-07-26）
 

@@ -617,3 +617,14 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - Windows Player 正式流程冒烟：直接启动上述生产 Player，`Artifacts/UnitDeathPresentation/PlayerFormalLoopSmoke.log` 依次记录 `Preparation`、`ui009-round-1` 两场 Track 封存且 `state=Playing`、`battle.completed`、再次进入 `Preparation`，并记录 `playersUnchangedDuringBattle=True`；命中完整回合证据后只终止本轮启动的 PID `54584`。日志未命中未处理异常、`NullReferenceException`、阶段错误或本次死亡表现诊断。旧 `-task006-acceptance` 因正式模式明确阻止 legacy `BattleDemoController.StartOrContinue` 而退出 `1`；隐藏窗口下 `-battleHudCapture` 因首张截图不可见而退出 `1`，两者均未作为当前正式流程通过证据。
 - 范围检查：没有修改 Core、Death 事件格式、目录 JSON、场景、Prefab、Shader、Package 或 ProjectSettings；`.superpowers/` 与 `docs/bonds/` 仍是用户的无关未跟踪内容。
 - 人工验收：项目负责人于 2026-07-27 反馈整体人工观感“还行”，据此记录本次死亡动画、变黑与隐藏的整体视觉验收为可接受。尚未分别记录多单位同时死亡、Home/Away 切换瞬间以及不同 DPI/分辨率的专项人工验收；这些细分项仍不能由自动 RGB、激活状态和 Track 断言完全替代。
+
+## 47. 精英变体源数据与 Texture2D 单位头像（2026-07-27）
+
+- 目录生成：执行 `D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UnitEliteVariants\CatalogGenerate.log`，日志记录 `TASK004A_CATALOG_GENERATED ... units=3 summary=1000:20|5503:54|5504:24`，未命中 C# 编译错误、编译失败或未处理异常。连续两次生成的 `Assets/Resources/BattleData/unit-catalog-v1.json` SHA-256 均为 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`。
+- 精英变体解析器：`Temp/UnitEliteVariants/Resolver-Final/EditModeResults.xml` 为 `5 passed / 0 failed / 0 skipped`，覆盖精英 0/1 基础选择、精英 2/3 专用模型与名称、缺少较高条目时只向低级继承、块级继承、显式空能力列表和非法模型块。
+- 真实目录与头像聚焦回归：`Temp/UnitEliteVariants/BattleCore-Final-2/EditModeResults.xml` 为 `57 passed / 0 failed / 0 skipped`；`Temp/UnitEliteVariants/TDD-Portrait-Green/EditModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`，确认精英 0 目录为猎狗 `820 HP / 190 ATK`、基础 Skeleton 路径，且 Default Texture 头像只经 `Texture2D` 加载后创建一次缓存 Sprite。
+- 全量 EditMode 首次运行 `177 total / 8 failed / 0 skipped`。其中一项仍期待精三名称，另七项的 Tick 100 召唤夹具把真实 1000 的旧精三生命值当作保活条件；精零 820 HP 使战斗提前终局。测试改为期待精零名称，并只在召唤夹具中克隆一个显式高生命陪练，未修改生产战斗规则。复跑 `Temp/UnitEliteVariants/EditMode-All-2/EditModeResults.xml` 为 `177 passed / 0 failed / 0 skipped`，Unity 正常退出。
+- PlayMode：`Temp/UnitEliteVariants/Presentation-PlayMode-2/PlayModeResults.xml` 为 `10 passed / 0 failed / 0 skipped`；`Temp/UnitEliteVariants/Demo-PlayMode/PlayModeResults.xml` 为 `2 passed / 0 failed / 0 skipped`，两次 Unity 均正常退出。播放层首次同样因旧精三保活夹具产生 `10 total / 1 failed / 0 skipped`，按上述隔离方式修正后通过。
+- Windows x64 StrictMode：`Temp/UnitEliteVariants/WindowsStandaloneBuild.log` 记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=2`、总大小 `165680381` 字节和总耗时 `00:00:16.9569107`。构建默认输出位于 Unity 项目 `Temp/TASK-006`，Editor 退出时该临时产物目录被清理，因此本次只保留 BuildReport 日志，没有把磁盘上的 Player 产物计为已保留证据。
+- 尚未实现或验证：精英 2/3 的运行时目录选择、精英 1 数值系数、合成系数、局内升阶，以及新头像在所有目标分辨率/DPI 下的专项人工视觉检查。当前运行时只保证精英 0。
+- 本次实现未创作或暂存工作区中已有的 `1000_gopro` 基础/`_2`/`_3` 模型资源、三个头像及其 `.meta`、基础 `1000_gopro.json` 变更；这些仍由项目负责人单独管理。本实现和生成目录依赖这些资源最终成对纳入版本控制。
