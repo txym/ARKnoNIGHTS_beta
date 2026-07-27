@@ -1430,7 +1430,8 @@ function Get-LanLobbyHostProfileStructureEvidence($Capture)
     {
         $isHostNode = [string]$row.node -like 'LanLobbyRoot/Room/RoomCard_0/*'
         $hasForbiddenNode = $isHostNode -and [string]$row.node -match '(?i)/(Portrait|Avatar|Profile|PlayerName|PlayerId|MemberName|MemberId|Label|Icon)(/|$)'
-        $hasForbiddenSprite = [string]$row.spriteName -in $avatarSprites -or [string]$row.spriteName -match '(?i)(portrait|avatar|profile)'
+        $hasForbiddenSprite = $isHostNode -and
+            ([string]$row.spriteName -in $avatarSprites -or [string]$row.spriteName -match '(?i)(portrait|avatar|profile)')
         if ($hasForbiddenNode -or $hasForbiddenSprite)
         {
             $failures += "Forbidden host profile node/Sprite '$($row.node)' / '$($row.spriteName)' is active in $($row.kind)."

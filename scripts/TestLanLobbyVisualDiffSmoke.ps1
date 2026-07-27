@@ -1748,6 +1748,34 @@ try
         }
     }
 
+    $guestAvatarResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'approved-guest-avatars-remain-allowed' {
+        param($caseManifest,$caseCaptureDirectory)
+        $guestSpecs = @(
+            [pscustomobject]@{ capture='room-full';node='LanLobbyRoot/Room/RoomCard_1/Icon';x=650;topY=300 },
+            [pscustomobject]@{ capture='room-ready';node='LanLobbyRoot/Room/RoomCard_2/Profile/Icon';x=1050;topY=300 }
+        )
+        foreach ($guestSpec in $guestSpecs)
+        {
+            $record = @($caseManifest.captures | Where-Object name -ceq $guestSpec.capture)[0]
+            $sprite = [pscustomobject][ordered]@{
+                node=$guestSpec.node;spriteName='icon_amiy';sourcePath='Combined/[uc]autochesscommon/icon_amiy.png'
+                coordinateOrigin='screen-bottom-left';unit='px';x=$guestSpec.x;y=(1080-$guestSpec.topY-80);width=80;height=80;raycastTarget=$false
+            }
+            $record.spriteSources = @($record.spriteSources) + $sprite
+            $record.sourceAudit = @($record.sourceAudit) + [pscustomobject][ordered]@{
+                node=$sprite.node;kind='bitmap-sprite';isBitmap=$true;spriteName=$sprite.spriteName;materialName=''
+                resourcesPath='UI/Lobby/Home/icon_amiy';sourcePath=$sprite.sourcePath;sha256=$roomSpriteSha['icon_amiy']
+                captures=@([string]$record.name);occurrenceCount=1;raycastTarget=$false
+            }
+            Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory "$($record.name).png") ([Drawing.Color]::FromArgb(255,220,35,170)) $guestSpec.x $guestSpec.topY 80 80
+        }
+    }
+    foreach ($captureName in @('room-host','room-full','room-ready'))
+    {
+        $guestProfileGate = @($guestAvatarResult.report.roomGates | Where-Object name -ceq "$($roomPrefixes[$captureName]).Slot1.ProfileContentAbsence")[0]
+        Assert-True (($guestProfileGate.status -ceq 'Passed') -and $guestProfileGate.structuredAbsencePassed) "$captureName host profile absence must ignore approved guest-slot avatar/profile Sprites"
+    }
+
     $extraAuditResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'material-extra-unmatched-row' {
         param($caseManifest,$caseCaptureDirectory)
         $record = @($caseManifest.captures | Where-Object name -ceq 'room-host')[0]
