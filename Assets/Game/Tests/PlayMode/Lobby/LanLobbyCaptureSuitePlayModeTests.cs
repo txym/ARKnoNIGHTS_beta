@@ -162,6 +162,36 @@ namespace ArknoNights.Lobby.Tests
                 "Room latency must be captured dynamically.");
             Assert.That(roomHost.unityText.Any(text => text.text == "654321"), Is.True,
                 "Room code must be captured dynamically.");
+            AssertAuthoritativeRoomCapture(
+                roomHost,
+                new[]
+                {
+                    new MemberExpectation("capture-host", "Doctor", true)
+                },
+                true,
+                "btn_match_normal");
+            AssertAuthoritativeRoomCapture(
+                parsed.captures.Single(record => record.name == "room-full"),
+                new[]
+                {
+                    new MemberExpectation("capture-host", "Doctor", true),
+                    new MemberExpectation("capture-guest-1", "Amiya", false),
+                    new MemberExpectation("capture-guest-2", "Chen", false),
+                    new MemberExpectation("capture-guest-3", "Kal'tsit", false)
+                },
+                false,
+                "btn_match_grey");
+            AssertAuthoritativeRoomCapture(
+                parsed.captures.Single(record => record.name == "room-ready"),
+                new[]
+                {
+                    new MemberExpectation("capture-host", "Doctor", true),
+                    new MemberExpectation("capture-guest-1", "Amiya", true),
+                    new MemberExpectation("capture-guest-2", "Chen", true),
+                    new MemberExpectation("capture-guest-3", "Kal'tsit", true)
+                },
+                true,
+                "btn_match_normal");
             Assert.That(home.spriteSources.Any(sprite =>
                     sprite.spriteName.StartsWith("room_select_", StringComparison.Ordinal) &&
                     sprite.sourcePath.StartsWith("[uc]autochessouter/room_select_", StringComparison.Ordinal)),
@@ -203,6 +233,190 @@ namespace ArknoNights.Lobby.Tests
             foreach (var room in parsed.captures.Where(record => record.name.StartsWith("room-", StringComparison.Ordinal)))
                 Assert.That(room.codeNativeGeometry.Any(geometry => geometry.name.Contains("PanelFrame")), Is.False,
                     room.name + " must not report inactive Home-only frame geometry.");
+        }
+
+        private static void AssertAuthoritativeRoomCapture(
+            CaptureRecordProbe capture,
+            IReadOnlyList<MemberExpectation> expectedMembers,
+            bool primaryActionInteractable,
+            string primarySpriteName)
+        {
+            Assert.That(capture.width, Is.EqualTo(1920), capture.name + " must remain a 1920x1080 capture.");
+            Assert.That(capture.height, Is.EqualTo(1080), capture.name + " must remain a 1920x1080 capture.");
+            Assert.That(capture.localPlayerId, Is.EqualTo("capture-host"));
+            Assert.That(capture.primaryActionInteractable, Is.EqualTo(primaryActionInteractable));
+            Assert.That(capture.members, Has.Length.EqualTo(expectedMembers.Count));
+            for (var index = 0; index < expectedMembers.Count; index++)
+            {
+                Assert.That(capture.members[index].playerId, Is.EqualTo(expectedMembers[index].PlayerId));
+                Assert.That(capture.members[index].displayName, Is.EqualTo(expectedMembers[index].DisplayName));
+                Assert.That(capture.members[index].isReady, Is.EqualTo(expectedMembers[index].IsReady));
+            }
+
+            Assert.That(capture.unityText.Count(text => text.text == "协议启动"), Is.EqualTo(1),
+                capture.name + " must expose exactly one host primary-action label.");
+            Assert.That(capture.spriteSources.Count(sprite =>
+                sprite.node == "LanLobbyRoot/Room/PrimaryAction" &&
+                sprite.spriteName == primarySpriteName), Is.EqualTo(1));
+            AssertRoomKeyRects(capture, expectedMembers);
+            AssertRoomSourceAudit(capture);
+
+            Assert.That(capture.unityText.Any(text =>
+                string.Equals(text.text, "OPEN SLOT", StringComparison.Ordinal) ||
+                string.Equals(text.text, "WAITING", StringComparison.Ordinal)), Is.False,
+                capture.name + " must not render legacy placeholder literals.");
+            var semanticNodes = capture.keyRects.Select(rect => rect.name)
+                .Concat(capture.spriteSources.Select(sprite => sprite.node))
+                .Concat(capture.unityText.Select(text => text.node))
+                .Concat(capture.sourceAudit.Select(item => item.node))
+                .ToArray();
+            Assert.That(semanticNodes.Any(IsHostProfileNode), Is.False,
+                capture.name + " must not contain host portrait/avatar/profile/name/id nodes.");
+        }
+
+        private static void AssertRoomKeyRects(
+            CaptureRecordProbe capture,
+            IReadOnlyList<MemberExpectation> expectedMembers)
+        {
+            Assert.That(capture.keyRects, Is.Not.Null.And.Not.Empty);
+            Assert.That(capture.keyRects.Select(rect => rect.name), Is.Unique);
+            foreach (var rect in capture.keyRects)
+            {
+                Assert.That(rect.coordinateOrigin, Is.EqualTo("screen-bottom-left"), rect.name);
+                Assert.That(rect.unit, Is.EqualTo("px"), rect.name);
+                Assert.That(rect.width, Is.GreaterThan(0f), rect.name);
+                Assert.That(rect.height, Is.GreaterThan(0f), rect.name);
+            }
+
+            AssertKeyRect(capture, "LanLobbyRoot/Room/LeaveAction");
+            AssertKeyRect(capture, "LanLobbyRoot/Room/LocalLatency");
+            AssertKeyRect(capture, "LanLobbyRoot/Room/PrimaryAction");
+            for (var index = 0; index < LobbyRoomSnapshot.MaximumMembers; index++)
+            {
+                var slot = "LanLobbyRoot/Room/RoomCard_" + index;
+                AssertKeyRect(capture, slot);
+                AssertKeyRect(capture, slot + "/CardBody");
+                AssertKeyRect(capture, slot + "/TopBar");
+                AssertKeyRect(capture, slot + "/ReadyOverlay");
+                AssertKeyRect(capture, slot + "/LowerDecoration");
+                if (index == 0) AssertKeyRect(capture, slot + "/CreatorTag");
+
+                if (index >= expectedMembers.Count)
+                {
+                    AssertKeyRect(capture, slot + "/EmptyContent");
+                    AssertKeyRect(capture, slot + "/EmptyContent/EmptyInviteIcon");
+                    AssertKeyRect(capture, slot + "/EmptyContent/EmptyInviteLabel");
+                    AssertKeyRect(capture, slot + "/EmptyContent/EmptyInviteHint");
+                }
+                else if (expectedMembers[index].IsReady)
+                {
+                    AssertKeyRect(capture, slot + "/OccupiedContent/ReadyIcon");
+                    AssertKeyRect(capture, slot + "/OccupiedContent/ReadyLabel");
+                }
+            }
+        }
+
+        private static void AssertRoomSourceAudit(CaptureRecordProbe capture)
+        {
+            var expectedOccurrences = ExpectedRoomBitmapOccurrences(capture.name);
+            Assert.That(capture.sourceAudit, Is.Not.Null.And.Not.Empty);
+            var bitmapRows = capture.sourceAudit.Where(item => item.isBitmap).ToArray();
+            var codeNativeRows = capture.sourceAudit.Where(item => !item.isBitmap).ToArray();
+            Assert.That(bitmapRows, Has.Length.EqualTo(capture.spriteSources.Length),
+                capture.name + " must audit every active rendered bitmap occurrence.");
+            Assert.That(codeNativeRows, Has.Length.EqualTo(capture.codeNativeGeometry.Length),
+                capture.name + " must audit every active rendered code-native occurrence.");
+            Assert.That(bitmapRows.Select(item => item.node), Is.Unique,
+                capture.name + " bitmap rows must remain per rendered instance.");
+
+            foreach (var item in bitmapRows)
+            {
+                Assert.That(item.kind, Is.EqualTo("bitmap-sprite"));
+                Assert.That(item.spriteName, Is.Not.Null.And.Not.Empty);
+                Assert.That(item.materialName, Is.Empty);
+                Assert.That(ExpectedRoomBitmapSources.ContainsKey(item.spriteName), Is.True,
+                    capture.name + " rendered an unapproved room bitmap: " + item.spriteName);
+                var expectedSource = ExpectedRoomBitmapSources[item.spriteName];
+                Assert.That(item.resourcesPath, Is.EqualTo("UI/Lobby/" + item.spriteName));
+                Assert.That(item.sourcePath, Is.EqualTo("[uc]autochessouter/" + item.spriteName + ".png"));
+                Assert.That(item.sha256, Is.EqualTo(expectedSource.Sha256));
+                Assert.That(item.sourcePath.Contains("$0") || item.sourcePath.Contains("#0"), Is.False);
+                Assert.That(item.captures, Is.EqualTo(new[] { capture.name }));
+                Assert.That(item.occurrenceCount, Is.EqualTo(1));
+            }
+
+            foreach (var item in codeNativeRows)
+            {
+                Assert.That(item.kind, Is.EqualTo("code-native-geometry"));
+                Assert.That(item.spriteName, Is.Empty);
+                Assert.That(item.materialName, Is.Empty);
+                Assert.That(item.resourcesPath, Is.Empty);
+                Assert.That(item.sourcePath, Is.Empty);
+                Assert.That(item.sha256, Is.Empty);
+                Assert.That(item.raycastTarget, Is.False);
+                Assert.That(item.captures, Is.EqualTo(new[] { capture.name }));
+                Assert.That(item.occurrenceCount, Is.EqualTo(1));
+            }
+
+            CollectionAssert.AreEquivalent(
+                expectedOccurrences.Select(pair => pair.Key + "|" + pair.Value),
+                bitmapRows.GroupBy(item => item.spriteName)
+                    .Select(group => group.Key + "|" + group.Sum(item => item.occurrenceCount)),
+                capture.name + " must report the exact rendered bitmap occurrence inventory.");
+            Assert.That(expectedOccurrences["card_bg"], Is.EqualTo(4));
+        }
+
+        private static Dictionary<string, int> ExpectedRoomBitmapOccurrences(string captureName)
+        {
+            switch (captureName)
+            {
+                case "room-host":
+                    return new Dictionary<string, int>
+                    {
+                        { "bg_terrain", 1 }, { "shallow_main", 1 }, { "card_bg", 4 },
+                        { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
+                        { "player_card_self_frame", 1 }, { "card_empty", 3 }, { "bg_plus", 3 },
+                        { "player_card_ready", 1 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
+                        { "btn_topmenu_back", 1 }, { "btn_match_normal", 1 }
+                    };
+                case "room-full":
+                    return new Dictionary<string, int>
+                    {
+                        { "bg_terrain", 1 }, { "shallow_main", 1 }, { "card_bg", 4 },
+                        { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
+                        { "player_card_self_frame", 1 }, { "player_card_ready", 1 },
+                        { "card_deco_self", 1 }, { "host_top_tag", 1 },
+                        { "btn_topmenu_back", 1 }, { "btn_match_grey", 1 }
+                    };
+                case "room-ready":
+                    return new Dictionary<string, int>
+                    {
+                        { "bg_terrain", 1 }, { "shallow_main", 1 }, { "card_bg", 4 },
+                        { "bg_top_ready", 4 }, { "player_card_self_frame", 4 },
+                        { "player_card_ready", 4 }, { "card_deco_self", 4 }, { "host_top_tag", 1 },
+                        { "btn_topmenu_back", 1 }, { "btn_match_normal", 1 }
+                    };
+                default:
+                    Assert.Fail("Unexpected room capture: " + captureName);
+                    return null;
+            }
+        }
+
+        private static void AssertKeyRect(CaptureRecordProbe capture, string name)
+        {
+            Assert.That(capture.keyRects.Count(rect => rect.name == name), Is.EqualTo(1),
+                capture.name + " must export one diagnostic key rect for " + name);
+        }
+
+        private static bool IsHostProfileNode(string node)
+        {
+            if (string.IsNullOrEmpty(node)) return false;
+            var forbiddenSegments = new[]
+            {
+                "/Portrait", "/Avatar", "/Profile", "/PlayerName", "/PlayerId", "/MemberName", "/MemberId"
+            };
+            return forbiddenSegments.Any(segment =>
+                node.IndexOf(segment, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private static void AssertJoinBitmapInventory(CaptureRecordProbe capture)
@@ -380,12 +594,56 @@ namespace ArknoNights.Lobby.Tests
             public float Height { get; }
         }
 
+        private sealed class MemberExpectation
+        {
+            public MemberExpectation(string playerId, string displayName, bool isReady)
+            {
+                PlayerId = playerId;
+                DisplayName = displayName;
+                IsReady = isReady;
+            }
+
+            public string PlayerId { get; }
+            public string DisplayName { get; }
+            public bool IsReady { get; }
+        }
+
+        private static readonly Dictionary<string, BitmapSourceExpectation> ExpectedRoomBitmapSources =
+            new Dictionary<string, BitmapSourceExpectation>
+            {
+                { "bg_terrain", new BitmapSourceExpectation("ECE7B6159268276287C20E3B3A82A5165BCC1D344EDFA6DE3B88EE24A76F988C") },
+                { "shallow_main", new BitmapSourceExpectation("054110DDEE56F1D19FAFA846D821E6CBD83D47BEB70D4C399A84DA4035A11945") },
+                { "player_card_ready", new BitmapSourceExpectation("F34786A3E832E97121EB03614B6D584C871B78E4C5CDD1FA6C5F9CB7D191A4C0") },
+                { "player_card_self_frame", new BitmapSourceExpectation("19F0D43B704F9CB92EE3BE11D9C64879D1BA9B542EDFF90E9DBDF7FCE381C3A3") },
+                { "btn_match_grey", new BitmapSourceExpectation("E774CB0533EB67BD2FE45F50339E36D0A6221BAF594E6AEE5E5C256469A4BA78") },
+                { "card_bg", new BitmapSourceExpectation("050B347451BBEBC74F5E3B09A2470931D9B2A85DEF707A4AAC42B5CE1B0BCEE2") },
+                { "bg_top_normal", new BitmapSourceExpectation("5A9479B9AFDD4FC3F597CCBF4A1A0D92C1BB1B5053D716E8C20267E6B2C77C4F") },
+                { "bg_top_ready", new BitmapSourceExpectation("EFAA99906A087AAF5AD631E4DF8CFCD7E90C4F463621779A13447675F221482D") },
+                { "card_empty", new BitmapSourceExpectation("4DD34E0B5BE318770082B14F245591D80F6ABFF00451744C4BEF3459798DCE31") },
+                { "card_deco_self", new BitmapSourceExpectation("A3217A0EE5C8B1D7325758162C9859BEC765C7B63331881C90CDA4804A93F661") },
+                { "bg_plus", new BitmapSourceExpectation("E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D") },
+                { "btn_match_normal", new BitmapSourceExpectation("62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD") },
+                { "btn_topmenu_back", new BitmapSourceExpectation("BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303") },
+                { "host_top_tag", new BitmapSourceExpectation("861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009") }
+            };
+
+        private sealed class BitmapSourceExpectation
+        {
+            public BitmapSourceExpectation(string sha256)
+            {
+                Sha256 = sha256;
+            }
+
+            public string Sha256 { get; }
+        }
+
         [Serializable] private sealed class CaptureManifestProbe { public CaptureRecordProbe[] captures; }
-        [Serializable] private sealed class CaptureRecordProbe { public string name; public float canvasScale; public string roomCode; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; }
-        [Serializable] private sealed class CaptureMemberProbe { public string playerId; }
+        [Serializable] private sealed class CaptureRecordProbe { public string name; public int width; public int height; public float canvasScale; public string roomCode; public string localPlayerId; public bool primaryActionInteractable; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public CaptureRectProbe[] keyRects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; public SourceAuditProbe[] sourceAudit; }
+        [Serializable] private sealed class CaptureMemberProbe { public string playerId; public string displayName; public bool isReady; }
         [Serializable] private sealed class CaptureRectProbe { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class SpriteSourceProbe { public string node; public string spriteName; public string sourcePath; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class UnityTextProbe { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
         [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public string coordinateOrigin; public string unit; public bool raycastTarget; public float x; public float y; public float width; public float height; }
+        [Serializable] private sealed class SourceAuditProbe { public string node; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public bool raycastTarget; }
     }
 }
