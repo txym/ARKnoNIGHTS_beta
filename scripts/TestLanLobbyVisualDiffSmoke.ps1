@@ -93,6 +93,61 @@ function Fill-CreateOpenFrameFixture($Graphics, $BrightBrush, $LeftBrush, $Nativ
     Fill-ScaledFixtureRectangle $Graphics $LeftBrush $NativeCrop $TargetSize ([ordered]@{ x=25; y=0; width=3; height=236 })
 }
 
+function Fill-JoinDecorationFixture($Graphics, $NativeCrop, $TargetSize, $Bounds, [int] $Text01OffsetX)
+{
+    $orangeBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::Orange)
+    $blockBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 235))
+    $inputBrush = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 112, 112, 112))
+    try
+    {
+        foreach ($bound in @($Bounds | Where-Object { $_.name -in @('block-bank', 'input') }))
+        {
+            $drawBounds = [ordered]@{ x=$bound.x; y=$bound.y; width=$bound.width; height=$bound.height }
+            $brush = if ($bound.name -eq 'block-bank') { $blockBrush } elseif ($bound.name -eq 'input') { $inputBrush } else { $orangeBrush }
+            Fill-ScaledFixtureRectangle $Graphics $brush $NativeCrop $TargetSize $drawBounds
+        }
+        foreach ($bound in @($Bounds | Where-Object { $_.name -notin @('block-bank', 'input') }))
+        {
+            $drawBounds = [ordered]@{ x=$bound.x; y=$bound.y; width=$bound.width; height=$bound.height }
+            if ($bound.name -eq 'text-01') { $drawBounds.x += $Text01OffsetX }
+            Fill-ScaledFixtureRectangle $Graphics $orangeBrush $NativeCrop $TargetSize $drawBounds
+        }
+    }
+    finally { $orangeBrush.Dispose(); $blockBrush.Dispose(); $inputBrush.Dispose() }
+}
+
+function New-JoinDecorationSpriteSources()
+{
+    $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
+    return @(
+        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/LeftBlock_$_"; spriteName = 'room_select_join_left_block'; sourcePath = '[uc]autochessouter/room_select_join_left_block.png' } }
+        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/MiddleBlock_$_"; spriteName = 'room_select_join_middle_block'; sourcePath = '[uc]autochessouter/room_select_join_middle_block.png' } }
+        0..1 | ForEach-Object { [ordered]@{ node = "$prefix/RightBlock_$_"; spriteName = 'room_select_join_right_block'; sourcePath = '[uc]autochessouter/room_select_join_right_block.png' } }
+        [ordered]@{ node = "$prefix/MiddleMask"; spriteName = 'room_select_join_middle_block_mask'; sourcePath = '[uc]autochessouter/room_select_join_middle_block_mask.png' }
+        [ordered]@{ node = "$prefix/Blank"; spriteName = 'room_select_join_blank'; sourcePath = '[uc]autochessouter/room_select_join_blank.png' }
+        0..3 | ForEach-Object { [ordered]@{ node = "$prefix/Ban_$_"; spriteName = 'room_select_join_ban'; sourcePath = '[uc]autochessouter/room_select_join_ban.png' } }
+        [ordered]@{ node = "$prefix/Triangle"; spriteName = 'room_select_join_triangle'; sourcePath = '[uc]autochessouter/room_select_join_triangle.png' }
+        [ordered]@{ node = "$prefix/Logo"; spriteName = 'room_select_join_logo'; sourcePath = '[uc]autochessouter/room_select_join_logo.png' }
+        [ordered]@{ node = "$prefix/Text01"; spriteName = 'room_select_join_text_01'; sourcePath = '[uc]autochessouter/room_select_join_text_01.png' }
+        [ordered]@{ node = "$prefix/Text02"; spriteName = 'room_select_join_text_02'; sourcePath = '[uc]autochessouter/room_select_join_text_02.png' }
+        [ordered]@{ node = "$prefix/RoomCodeInput"; spriteName = 'room_select_join_text_bg'; sourcePath = '[uc]autochessouter/room_select_join_text_bg.png' }
+        [ordered]@{ node = "$prefix/JoinAction/ActionIcon"; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' }
+    )
+}
+
+function New-JoinDecorationGeometry()
+{
+    $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
+    return @(
+        [ordered]@{ name = "$prefix/InteriorBacking"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#000000D1'; x = 1154; y = 204; width = 717; height = 280; spriteName = $null; raycastTarget = $false }
+        [ordered]@{ name = "$prefix/OutlineTop"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; x = 1154; y = 482; width = 717; height = 2; spriteName = $null; raycastTarget = $false }
+        [ordered]@{ name = "$prefix/OutlineLeft"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; x = 1154; y = 204; width = 2; height = 280; spriteName = $null; raycastTarget = $false }
+        [ordered]@{ name = "$prefix/OutlineRight"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#3030308C'; x = 1869; y = 204; width = 2; height = 280; spriteName = $null; raycastTarget = $false }
+        [ordered]@{ name = "$prefix/GuideHorizontal"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; x = 1154; y = 383; width = 717; height = 2; spriteName = $null; raycastTarget = $false }
+        [ordered]@{ name = "$prefix/GuideVertical"; coordinateOrigin='screen-bottom-left'; unit='px'; kind = 'code-native-geometry'; isBitmap = $false; color = '#FFA5008C'; x = 1506; y = 288; width = 2; height = 196; spriteName = $null; raycastTarget = $false }
+    )
+}
+
 try
 {
     New-Item -ItemType Directory -Force -Path $scratch | Out-Null
@@ -106,6 +161,17 @@ try
     $createDecorationNativeCrop = [ordered]@{ x=1382; y=260; width=417; height=187 }
     $createFrameTarget = [ordered]@{ x=1154; y=224; width=717; height=374 }
     $createFrameNativeCrop = [ordered]@{ x=1224; y=232; width=745; height=387 }
+    $joinDecorationTarget = [ordered]@{ x=1154; y=596; width=717; height=280 }
+    $joinDecorationNativeCrop = [ordered]@{ x=1224; y=617; width=745; height=290 }
+    $joinDecorationBounds = @(
+        [ordered]@{ name='logo';          x=91;  y=64;  width=118; height=20; tolerance=2 },
+        [ordered]@{ name='text-01';       x=391; y=56;  width=65;  height=8;  tolerance=2 },
+        [ordered]@{ name='text-02';       x=526; y=62;  width=89;  height=11; tolerance=2 },
+        [ordered]@{ name='triangle';      x=338; y=47;  width=30;  height=17; tolerance=2 },
+        [ordered]@{ name='central-blank'; x=323; y=68;  width=60;  height=61; tolerance=2 },
+        [ordered]@{ name='block-bank';    x=45;  y=107; width=639; height=89; tolerance=4 },
+        [ordered]@{ name='input';         x=115; y=204; width=482; height=60; tolerance=2 }
+    )
     $createDecorationBounds = @(
         [ordered]@{ name='start-room'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=153;y=13;width=84;height=9} },
         [ordered]@{ name='dot-top-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; expected=@{x=118;y=18;width=17;height=17} },
@@ -165,6 +231,7 @@ try
             {
                 Fill-ScaledFixtureRectangle $graphics $cyanBrush $createDecorationNativeCrop $createDecorationTarget $bounds.expected
             }
+            Fill-JoinDecorationFixture $graphics $joinDecorationNativeCrop $joinDecorationTarget $joinDecorationBounds 0
             Fill-CreateOpenFrameFixture $graphics $cyanBrush $cyanBrush $createFrameNativeCrop $createFrameTarget 0
         }
         finally { $contentBrush.Dispose(); $cyanBrush.Dispose() }
@@ -214,6 +281,8 @@ try
                                 $bounds.expected.height)
                         }
                     }
+                    # text-01 deliberately exceeds its 2 px visible-bound tolerance.
+                    Fill-JoinDecorationFixture $graphics $joinDecorationTarget $joinDecorationTarget $joinDecorationBounds 5
                     Fill-CreateOpenFrameFixture $graphics $cyanBrush $lowContrastBrush $createFrameTarget $createFrameTarget 8
                 }
                 finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose(); $cyanBrush.Dispose(); $lowContrastBrush.Dispose() }
@@ -259,12 +328,7 @@ try
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/Text02'; spriteName = 'room_select_create_text_02'; sourcePath = '[uc]autochessouter/room_select_create_text_02.png' },
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/StartRoomDecoration'; spriteName = 'room_select_img_startroom'; sourcePath = '[uc]autochessouter/room_select_img_startroom.png' }
                 )
-            } else { @() }) + $(if ($name -eq 'home') {
-                @(
-                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/SimulationInvite/Icon'; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' },
-                    [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Join/JoinAction/ActionIcon'; spriteName = 'join_icon'; sourcePath = '[uc]autochessouter/join_icon.png' }
-                )
-            } else { @() })
+            } else { @() }) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationSpriteSources } else { @() })
             rects = @(
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_0'; x = 100; y = 100; width = 200; height = 300 },
                 [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_1'; x = 320; y = 100; width = 200; height = 300 },
@@ -282,7 +346,7 @@ try
             })
             codeNativeGeometry = @(
                 [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; x = 0; y = 0; width = 1920; height = 1080 }
-            )
+            ) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationGeometry } else { @() })
         }
     }
     $manifestJson = [ordered]@{ captures = $records } | ConvertTo-Json -Depth 12
@@ -430,6 +494,8 @@ try
     }
     $report = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.json') | ConvertFrom-Json
     $homeCapture = $report.captures | Where-Object name -eq 'home'
+    $joinDecoration = $report.joinDecoration
+    Assert-True ($null -ne $joinDecoration) 'Join decoration report must exist'
     $actionBars = @($report.actionBars)
     Assert-True ($actionBars.Count -eq 2) 'two Home action bars must be reported separately'
     $createAction = $actionBars | Where-Object name -eq 'home-create-action'
@@ -446,6 +512,29 @@ try
     Assert-True (($joinAction.locallyResizedReferenceSizePx.width -eq 717) -and ($joinAction.locallyResizedReferenceSizePx.height -eq 99)) 'Join local reference target must be 717x99'
     Assert-True (($joinAction.comparisonReferenceSizePx.width -eq 717) -and ($joinAction.comparisonReferenceSizePx.height -eq 99)) 'Join metric comparison size must be explicit'
     Assert-True (($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaWidth -eq 0) -and ($joinAction.sizeDeviationPxAfterLocalReferenceResize.deltaHeight -eq 0)) 'Join size delta must remain zero'
+    Assert-True ($joinAction.passed -eq $true) 'accepted home-join-action report must remain passing'
+    Assert-True ($joinDecoration.name -eq 'home-join-decoration') 'Join decoration report name'
+    Assert-True (($joinDecoration.actualRect.x -eq 1154) -and ($joinDecoration.actualRect.y -eq 596) -and ($joinDecoration.actualRect.width -eq 717) -and ($joinDecoration.actualRect.height -eq 280)) 'Join decoration crop'
+    Assert-True ($joinDecoration.simulationInviteAbsent -eq $true) 'SimulationInvite must be absent from Join evidence'
+    Assert-True (($joinDecoration.backingRect.x -eq 1154) -and ($joinDecoration.backingRect.y -eq 596) -and ($joinDecoration.backingRect.width -eq 717) -and ($joinDecoration.backingRect.height -eq 280)) 'Join backing must use its exact screen-top-left geometry'
+    Assert-True ($joinDecoration.backingBottomScreenY -eq 876) 'Join backing bottom must meet the accepted Join action'
+    Assert-True ($joinDecoration.geometryCrossesBackingBottom -eq $false) 'Join decoration geometry must not cross the backing bottom'
+    Assert-True ($joinDecoration.joinActionPassed -eq $true) 'Join decoration must retain the accepted Join action/content gate'
+    Assert-True (@($joinDecoration.components).Count -eq $joinDecorationBounds.Count) 'seven Join decoration visible-bound rows'
+    foreach ($expectedJoinBound in $joinDecorationBounds)
+    {
+        $component = @($joinDecoration.components | Where-Object name -eq $expectedJoinBound.name)
+        Assert-True ($component.Count -eq 1) "Join decoration/$($expectedJoinBound.name) visible bounds must occur once"
+        $component = $component[0]
+        Assert-True (($component.expectedBounds.x -eq $expectedJoinBound.x) -and ($component.expectedBounds.y -eq $expectedJoinBound.y) -and ($component.expectedBounds.width -eq $expectedJoinBound.width) -and ($component.expectedBounds.height -eq $expectedJoinBound.height)) "Join decoration/$($expectedJoinBound.name) expected bounds"
+        Assert-True ($component.tolerancePx -eq $expectedJoinBound.tolerance) "Join decoration/$($expectedJoinBound.name) tolerance"
+        Assert-True ($component.measurementAvailable -eq $true) "Join decoration/$($expectedJoinBound.name) decoded-pixel measurement must be available"
+    }
+    $joinText01 = @($joinDecoration.components | Where-Object name -eq 'text-01')[0]
+    Assert-True ($joinText01.passed -eq $false) 'deliberately displaced Join text-01 must fail its named row'
+    $unexpectedJoinFailures = @($joinDecoration.components | Where-Object { $_.name -ne 'text-01' -and -not $_.passed })
+    Assert-True ($unexpectedJoinFailures.Count -eq 0) "all other Join decoration rows must pass; failed: $(@($unexpectedJoinFailures | ForEach-Object { $_.name }) -join ', ')"
+    Assert-True ($joinDecoration.passed -eq $false) 'Join decoration overall state must be false for the deliberate text-01 offset'
     $decoration = $report.createDecoration
     Assert-True ($decoration.name -eq 'home-create-decoration') 'Create decoration report name'
     Assert-True (($decoration.actualRect.x -eq 1296) -and ($decoration.actualRect.y -eq 252) -and ($decoration.actualRect.width -eq 390) -and ($decoration.actualRect.height -eq 179)) 'Create decoration crop'
@@ -525,7 +614,35 @@ try
     $createIconVisual = @($createAction.contentVisuals | Where-Object name -eq 'icon')[0]
     Assert-True (($createIconVisual.centerDeviationPx.deltaX -eq 2) -and ($createIconVisual.centerDeviationPx.deltaY -eq 0)) 'Create icon fixture must prove a +2 px center failure'
     Assert-True (@($report.materialUsage.bitmapSprites).Count -gt 0) 'material usage must separately list bitmap Sprites'
-    Assert-True (($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'join_icon').occurrenceCount -eq 2) 'Sprite occurrence count must sum rendered instances, not capture presence'
+    Assert-True (($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'join_icon').occurrenceCount -eq 2) 'Join icon occurrence count must sum one JoinAction instance in each Home capture'
+    $joinSpriteCounts = @{
+        room_select_join_left_block = 4
+        room_select_join_middle_block = 8
+        room_select_join_right_block = 4
+        room_select_join_middle_block_mask = 2
+        room_select_join_blank = 2
+        room_select_join_ban = 8
+        room_select_join_triangle = 2
+        room_select_join_logo = 2
+        room_select_join_text_01 = 2
+        room_select_join_text_02 = 2
+        room_select_join_text_bg = 2
+    }
+    foreach ($spriteName in $joinSpriteCounts.Keys)
+    {
+        $spriteUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq $spriteName)
+        Assert-True ($spriteUsage.Count -eq 1) "Join Sprite $spriteName must remain separately audited"
+        Assert-True ($spriteUsage[0].occurrenceCount -eq $joinSpriteCounts[$spriteName]) "Join Sprite $spriteName must preserve its repeated occurrence count"
+        Assert-True ($spriteUsage[0].sourcePath -eq ('[uc]autochessouter/' + $spriteName + '.png')) "Join Sprite $spriteName must preserve its approved source path"
+    }
+    Assert-True (@($report.materialUsage.bitmapSprites | Where-Object { $_.sourcePath -match '\$0|#0' }).Count -eq 0) 'no Join Sprite source may use forbidden $0/#0 unpacked paths'
+    Assert-True (@($report.materialUsage.codeGeneratedGeometry | Where-Object { $_.name -like '*SimulationInvite*' -or $_.name -like '*OutlineBottom*' }).Count -eq 0) 'Join geometry must contain neither SimulationInvite nor OutlineBottom'
+    foreach ($geometryName in @('InteriorBacking','OutlineTop','OutlineLeft','OutlineRight','GuideHorizontal','GuideVertical'))
+    {
+        $geometryUsage = @($report.materialUsage.codeGeneratedGeometry | Where-Object { $_.name -eq ('LanLobbyRoot/Home/RoomSelect/Join/' + $geometryName) })
+        Assert-True ($geometryUsage.Count -eq 1) "Join geometry $geometryName must be separately reported"
+        Assert-True (($geometryUsage[0].isBitmap -eq $false) -and ($geometryUsage[0].occurrenceCount -eq 2)) "Join geometry $geometryName must be sprite-null in both Home captures"
+    }
     $logoUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'room_select_create_logo')
     $wingUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'img_pointer')[0]
     $frameUsage = @($report.materialUsage.bitmapSprites | Where-Object spriteName -eq 'doc_frame_line')[0]
@@ -544,6 +661,7 @@ try
     foreach ($name in @('home-create-action','home-join-action')) { foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ($name + '-' + $kind + '.png'))) "missing $name $kind" } }
     foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ('home-create-decoration-' + $kind + '.png'))) "missing home-create-decoration $kind" }
     foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ('home-create-frame-' + $kind + '.png'))) "missing home-create-frame $kind" }
+    foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $output ('home-join-decoration-' + $kind + '.png'))) "visual failure must still publish home-join-decoration $kind" }
     Assert-True (($report.captures | Measure-Object).Count -eq 5) 'five captures must be reported'
     Assert-True (($report.referenceNormalization -eq 'independent-xy') -and ($homeCapture.actualWidth -eq 1920) -and ($homeCapture.actualHeight -eq 1080) -and ($homeCapture.referenceWidth -eq 2048) -and ($homeCapture.referenceHeight -eq 1118)) 'report must retain native dimensions and independent normalization'
     Assert-True ($homeCapture.maskedPixels -gt 0) 'home must record masked pixels'
@@ -565,6 +683,8 @@ try
     Assert-True ($markdown.Contains('## Home Create upper decoration')) 'Markdown must expose Create decoration visible bounds'
     foreach ($expectedDecoration in $createDecorationBounds) { Assert-True ($markdown.Contains($expectedDecoration.name)) "Markdown missing Create decoration/$($expectedDecoration.name)" }
     Assert-True ($markdown.Contains('## Home Create open-frame continuity')) 'Markdown must expose Create open-frame continuity'
+    Assert-True ($markdown.Contains('## Home Join decoration')) 'Markdown must expose Join decoration visible bounds'
+    foreach ($expectedJoinBound in $joinDecorationBounds) { Assert-True ($markdown.Contains($expectedJoinBound.name)) "Markdown missing Join decoration/$($expectedJoinBound.name)" }
     Assert-True ($markdown.Contains('Search/background')) 'Markdown frame table must expose the background ROI'
     Assert-True ($markdown.Contains('Frame/background median luma')) 'Markdown frame table must expose median luma'
     Assert-True ($markdown.Contains('Contrast delta/minimum')) 'Markdown frame table must expose contrast acceptance'

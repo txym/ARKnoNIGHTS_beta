@@ -21,6 +21,12 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 public class LanLobbyVisualDiffMetric { public long ComparedPixels; public long DifferentPixels; public long ErrorSum; }
 public class LanLobbyVisualBounds { public int X; public int Y; public int Width; public int Height; }
+public sealed class LanLobbyBoundsMeasurement
+{
+    public bool Available { get; set; }
+    public LanLobbyVisualBounds Bounds { get; set; }
+    public string FailureReason { get; set; }
+}
 public sealed class FrameContinuity {
     public int QualifyingPixelCount { get; set; }
     public int CoveredAxisPixels { get; set; }
@@ -65,6 +71,61 @@ public static class LanLobbyVisualDiff {
         return sorted.Count % 2 == 0
             ? (sorted[middle - 1] + sorted[middle]) / 2.0
             : sorted[middle];
+    }
+    static LanLobbyBoundsMeasurement Unavailable(string failureReason) {
+        return new LanLobbyBoundsMeasurement { Available=false, Bounds=null, FailureReason=failureReason };
+    }
+    static LanLobbyBoundsMeasurement AvailableBounds(int minX, int minY, int maxX, int maxY) {
+        if (maxX < minX || maxY < minY) return Unavailable("No qualifying decoded pixels found.");
+        return new LanLobbyBoundsMeasurement {
+            Available=true,
+            Bounds=new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 },
+            FailureReason=null
+        };
+    }
+    public static LanLobbyBoundsMeasurement FindOrangeBounds(
+        Bitmap bitmap, Rectangle search, int minimumRed, int minimumGreen, int maximumBlue, int minimumRedOverGreen)
+    {
+        ValidateSearch(bitmap, search);
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            Color pixel=bitmap.GetPixel(x,y);
+            if(pixel.A == 0 || pixel.R < minimumRed || pixel.G < minimumGreen || pixel.B > maximumBlue ||
+                pixel.R < pixel.G + minimumRedOverGreen) continue;
+            minX=Math.Min(minX,x); minY=Math.Min(minY,y); maxX=Math.Max(maxX,x); maxY=Math.Max(maxY,y);
+        }
+        return AvailableBounds(minX,minY,maxX,maxY);
+    }
+    public static LanLobbyBoundsMeasurement FindLumaBounds(
+        Bitmap bitmap, Rectangle search, int minimumLuminanceInclusive, int maximumLuminanceInclusive)
+    {
+        ValidateSearch(bitmap, search);
+        if(minimumLuminanceInclusive < 0 || maximumLuminanceInclusive > 255 || minimumLuminanceInclusive > maximumLuminanceInclusive)
+            throw new ArgumentOutOfRangeException("luminance");
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            Color pixel=bitmap.GetPixel(x,y);
+            int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
+            if(pixel.A == 0 || luminance < minimumLuminanceInclusive || luminance > maximumLuminanceInclusive) continue;
+            minX=Math.Min(minX,x); minY=Math.Min(minY,y); maxX=Math.Max(maxX,x); maxY=Math.Max(maxY,y);
+        }
+        return AvailableBounds(minX,minY,maxX,maxY);
+    }
+    public static LanLobbyBoundsMeasurement FindNeutralBounds(
+        Bitmap bitmap, Rectangle search, int minimumLuminanceInclusive, int maximumLuminanceInclusive, int maximumChannelSpread)
+    {
+        ValidateSearch(bitmap, search);
+        if(minimumLuminanceInclusive < 0 || maximumLuminanceInclusive > 255 || minimumLuminanceInclusive > maximumLuminanceInclusive || maximumChannelSpread < 0)
+            throw new ArgumentOutOfRangeException("neutralThresholds");
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            Color pixel=bitmap.GetPixel(x,y);
+            int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
+            int channelSpread=Math.Max(pixel.R,Math.Max(pixel.G,pixel.B))-Math.Min(pixel.R,Math.Min(pixel.G,pixel.B));
+            if(pixel.A == 0 || luminance < minimumLuminanceInclusive || luminance > maximumLuminanceInclusive || channelSpread > maximumChannelSpread) continue;
+            minX=Math.Min(minX,x); minY=Math.Min(minY,y); maxX=Math.Max(maxX,x); maxY=Math.Max(maxY,y);
+        }
+        return AvailableBounds(minX,minY,maxX,maxY);
     }
     public static LanLobbyVisualBounds FindDarkBounds(Bitmap bitmap, Rectangle search, int maximumLuminanceExclusive) {
         if (bitmap == null) throw new ArgumentNullException("bitmap");
@@ -341,6 +402,20 @@ $homeCreateDecoration = @{
   approvedTarget=@{x=1296;y=252;width=390;height=179}
   reference=@{x=1419;y=268;width=427;height=191}
 }
+$homeJoinDecoration = @{
+  name='home-join-decoration'
+  approvedTarget=@{x=1154;y=596;width=717;height=280}
+  reference=@{x=1257;y=635;width=763;height=297}
+}
+$joinDecorationContentSpecs = @(
+  @{ name='logo'; measurement='orange'; search=@{x=80;y=54;width=140;height=42}; expected=@{x=91;y=64;width=118;height=20}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
+  @{ name='text-01'; measurement='orange'; search=@{x=380;y=45;width=100;height=35}; expected=@{x=391;y=56;width=65;height=8}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
+  @{ name='text-02'; measurement='orange'; search=@{x=515;y=50;width=110;height=35}; expected=@{x=526;y=62;width=89;height=11}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
+  @{ name='triangle'; measurement='orange'; search=@{x=325;y=35;width=55;height=31}; expected=@{x=338;y=47;width=30;height=17}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
+  @{ name='central-blank'; measurement='orange'; search=@{x=310;y=66;width=85;height=79}; expected=@{x=323;y=68;width=60;height=61}; tolerance=2; thresholds=@{minimumRed=200;minimumGreen=100;maximumBlue=80;minimumRedOverGreen=40} },
+  @{ name='block-bank'; measurement='luma'; search=@{x=35;y=97;width=660;height=110}; expected=@{x=45;y=107;width=639;height=89}; tolerance=4; thresholds=@{minimumLuminanceInclusive=200;maximumLuminanceInclusive=255} },
+  @{ name='input'; measurement='neutral'; search=@{x=105;y=194;width=510;height=75}; expected=@{x=115;y=204;width=482;height=60}; tolerance=2; thresholds=@{minimumLuminanceInclusive=90;maximumLuminanceInclusive=140;maximumChannelSpread=0} }
+)
 $createDecorationContentSpecs = @(
   @{name='start-room'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=145;y=5;width=100;height=24}; expected=@{x=153;y=13;width=84;height=9}},
   @{name='dot-top-left'; mode='all-cyan-pixels'; threshold=35; greenOverRed=8; blueOverRed=5; search=@{x=116;y=15;width=24;height=27}; expected=@{x=118;y=18;width=17;height=17}},
@@ -524,6 +599,29 @@ function Convert-CapturedActionRectangle($Capture, $Spec)
     return $converted
 }
 
+function Convert-CapturedJoinGeometryRectangle($Capture, $Geometry)
+{
+    if ([string]$Geometry.coordinateOrigin -cne 'screen-bottom-left' -or [string]$Geometry.unit -cne 'px')
+    {
+        throw "Join geometry $($Geometry.name) must declare coordinateOrigin=screen-bottom-left and unit=px."
+    }
+    $numbers = @([double]$Geometry.x, [double]$Geometry.y, [double]$Geometry.width, [double]$Geometry.height)
+    if (@($numbers | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) }).Count -gt 0 -or
+        $numbers[0] -lt 0 -or $numbers[1] -lt 0 -or $numbers[2] -le 0 -or $numbers[3] -le 0 -or
+        ($numbers[0] + $numbers[2]) -gt [double]$Capture.width -or ($numbers[1] + $numbers[3]) -gt [double]$Capture.height)
+    {
+        throw "Join geometry $($Geometry.name) is invalid or outside the captured screen."
+    }
+    return [pscustomobject][ordered]@{
+        coordinateOrigin='screen-top-left'
+        unit='px'
+        x=[int][Math]::Round($numbers[0] * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
+        y=[int][Math]::Round(([double]$Capture.height - ($numbers[1] + $numbers[3])) * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+        width=[int][Math]::Round($numbers[2] * 1920.0 / [double]$Capture.width, [MidpointRounding]::AwayFromZero)
+        height=[int][Math]::Round($numbers[3] * 1080.0 / [double]$Capture.height, [MidpointRounding]::AwayFromZero)
+    }
+}
+
 function ConvertTo-LanLobbyMarkdownCell([string] $Value)
 {
     if ($null -eq $Value) { return '' }
@@ -662,6 +760,7 @@ $codeGeneratedGeometry = @($geometryOccurrences | Group-Object Name, Kind, IsBit
 $reportCaptures = @()
 $actionBarReports = @()
 $createDecorationReport = $null
+$joinDecorationReport = $null
 $createFrameReport = $null
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
@@ -802,6 +901,12 @@ try
                 pixelDifferenceRatio = [double]$metric.DifferentPixels / $metric.ComparedPixels
                 averageAbsoluteRgbError = [double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
                 contentVisuals = $contentVisuals
+                passed =
+                    ($actualSpec.x -eq $spec.approvedTarget.x) -and
+                    ($actualSpec.y -eq $spec.approvedTarget.y) -and
+                    ($actualCrop.Width -eq $locallyResizedReferenceCrop.Width) -and
+                    ($actualCrop.Height -eq $locallyResizedReferenceCrop.Height) -and
+                    (@($contentVisuals | Where-Object { -not $_.passed }).Count -eq 0)
             }
             $actualCrop.Save((Join-Path $stagingDirectory ($spec.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
             $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($spec.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
@@ -924,6 +1029,131 @@ try
         $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
         $overlay.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
         $heatmap.Save((Join-Path $stagingDirectory ($homeCreateDecoration.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
+    $actual = $null
+    $nativeReference = $null
+    $actualCrop = $null
+    $nativeReferenceCrop = $null
+    $locallyResizedReferenceCrop = $null
+    $overlay = $null
+    $heatmap = $null
+    try
+    {
+        $actual = [Drawing.Bitmap]::FromFile($homeCapture.path)
+        $nativeReference = [Drawing.Bitmap]::FromFile($referenceHome)
+        $actualSpec = $homeJoinDecoration.approvedTarget
+        $actualRectangle = New-Object Drawing.Rectangle $actualSpec.x, $actualSpec.y, $actualSpec.width, $actualSpec.height
+        $scaledReference = Convert-ActionReferenceRectangle $homeJoinDecoration.reference $nativeReference.Width $nativeReference.Height
+        $actualCrop = New-LanLobbyBitmapCrop $actual $actualRectangle
+        $nativeReferenceCrop = New-LanLobbyBitmapCrop $nativeReference $scaledReference
+        $locallyResizedReferenceCrop = Resize-LanLobbyBitmap $nativeReferenceCrop $actualSpec.width $actualSpec.height ([Drawing.Drawing2D.InterpolationMode]::NearestNeighbor)
+        $overlay = New-LanLobbyActionOverlay $actualCrop $locallyResizedReferenceCrop
+        $heatmap = New-Object Drawing.Bitmap $actualCrop.Width, $actualCrop.Height
+        $fullCrop = New-Object Drawing.Rectangle 0,0,$actualCrop.Width,$actualCrop.Height
+        [long]$maskedPixels = 0
+        $metric = ([LanLobbyVisualDiff]::Compare($actualCrop, $locallyResizedReferenceCrop, [Drawing.Rectangle[]]@(), [Drawing.Rectangle[]]@($fullCrop), [bool[]]@($false), $heatmap, [ref]$maskedPixels))[0]
+        $components = @()
+        foreach ($contentSpec in $joinDecorationContentSpecs)
+        {
+            $search = New-Object Drawing.Rectangle $contentSpec.search.x, $contentSpec.search.y, $contentSpec.search.width, $contentSpec.search.height
+            $thresholds = [ordered]@{}
+            foreach ($key in $contentSpec.thresholds.Keys) { $thresholds[$key] = $contentSpec.thresholds[$key] }
+            $measure = {
+                param([Drawing.Bitmap] $bitmap)
+                switch ($contentSpec.measurement)
+                {
+                    'orange' { return [LanLobbyVisualDiff]::FindOrangeBounds($bitmap, $search, $contentSpec.thresholds.minimumRed, $contentSpec.thresholds.minimumGreen, $contentSpec.thresholds.maximumBlue, $contentSpec.thresholds.minimumRedOverGreen) }
+                    'luma' { return [LanLobbyVisualDiff]::FindLumaBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive) }
+                    'neutral' { return [LanLobbyVisualDiff]::FindNeutralBounds($bitmap, $search, $contentSpec.thresholds.minimumLuminanceInclusive, $contentSpec.thresholds.maximumLuminanceInclusive, $contentSpec.thresholds.maximumChannelSpread) }
+                    default { throw "Unsupported Join decoration measurement: $($contentSpec.measurement)" }
+                }
+            }
+            $referenceMeasurement = & $measure $locallyResizedReferenceCrop
+            $actualMeasurement = & $measure $actualCrop
+            $measurementAvailable = $referenceMeasurement.Available -and $actualMeasurement.Available
+            $measurementError = @($referenceMeasurement.FailureReason, $actualMeasurement.FailureReason | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' / '
+            $expected = $contentSpec.expected
+            $centerDeviation = $null
+            $sizeDeviation = $null
+            $passed = $false
+            if ($measurementAvailable)
+            {
+                $actualBounds = $actualMeasurement.Bounds
+                $actualCenterX = $actualBounds.X + ($actualBounds.Width - 1) / 2.0
+                $actualCenterY = $actualBounds.Y + ($actualBounds.Height - 1) / 2.0
+                $expectedCenterX = $expected.x + ($expected.width - 1) / 2.0
+                $expectedCenterY = $expected.y + ($expected.height - 1) / 2.0
+                $centerDeviation = [ordered]@{ unit='px'; deltaX=($actualCenterX - $expectedCenterX); deltaY=($actualCenterY - $expectedCenterY) }
+                $sizeDeviation = [ordered]@{ unit='px'; deltaWidth=($actualBounds.Width - $expected.width); deltaHeight=($actualBounds.Height - $expected.height) }
+                $passed = [Math]::Abs($centerDeviation.deltaX) -le $contentSpec.tolerance -and
+                    [Math]::Abs($centerDeviation.deltaY) -le $contentSpec.tolerance -and
+                    [Math]::Abs($sizeDeviation.deltaWidth) -le $contentSpec.tolerance -and
+                    [Math]::Abs($sizeDeviation.deltaHeight) -le $contentSpec.tolerance
+            }
+            $components += [pscustomobject][ordered]@{
+                name=$contentSpec.name
+                measurement=$contentSpec.measurement
+                search=[ordered]@{ x=$contentSpec.search.x; y=$contentSpec.search.y; width=$contentSpec.search.width; height=$contentSpec.search.height }
+                thresholds=[pscustomobject]$thresholds
+                tolerancePx=$contentSpec.tolerance
+                measurementAvailable=$measurementAvailable
+                measurementError=$(if ($measurementAvailable) { $null } else { $measurementError })
+                expectedBounds=[ordered]@{ x=$expected.x; y=$expected.y; width=$expected.width; height=$expected.height }
+                referenceBounds=$(if ($referenceMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $referenceMeasurement.Bounds } else { $null })
+                actualBounds=$(if ($actualMeasurement.Available) { ConvertTo-LanLobbyBoundsObject $actualMeasurement.Bounds } else { $null })
+                centerDeviationPx=$centerDeviation
+                sizeDeviationPx=$sizeDeviation
+                passed=$passed
+            }
+        }
+        $joinGeometryPrefix = 'LanLobbyRoot/Home/RoomSelect/Join/'
+        $joinGeometry = @($homeCapture.codeNativeGeometry | Where-Object { $_ -and [string]$_.name -like ($joinGeometryPrefix + '*') })
+        $joinGeometryRects = @(
+            foreach ($geometry in $joinGeometry)
+            {
+                if ([bool]$geometry.isBitmap -or -not [string]::IsNullOrEmpty([string]$geometry.spriteName) -or [bool]$geometry.raycastTarget)
+                {
+                    throw "Join geometry $($geometry.name) must be sprite-null and non-interactive."
+                }
+                $converted = Convert-CapturedJoinGeometryRectangle $homeCapture $geometry
+                [pscustomobject][ordered]@{ name=[string]$geometry.name; x=$converted.x; y=$converted.y; width=$converted.width; height=$converted.height }
+            }
+        )
+        $backingName = $joinGeometryPrefix + 'InteriorBacking'
+        $backingRows = @($joinGeometryRects | Where-Object name -eq $backingName)
+        if ($backingRows.Count -ne 1) { throw "Expected exactly one Join InteriorBacking geometry row; found $($backingRows.Count)." }
+        $backingRect = $backingRows[0]
+        $backingBottomScreenY = $backingRect.y + $backingRect.height
+        $geometryCrossesBackingBottom = @($joinGeometryRects | Where-Object { ($_.y + $_.height) -gt $backingBottomScreenY }).Count -gt 0
+        $simulationInviteAbsent = -not ((ConvertTo-Json $manifest -Depth 12) -match 'SimulationInvite')
+        $outlineBottomAbsent = @($joinGeometryRects | Where-Object { $_.name -like '*OutlineBottom*' }).Count -eq 0
+        $joinActionReport = @($actionBarReports | Where-Object name -eq 'home-join-action')
+        if ($joinActionReport.Count -ne 1) { throw 'Expected exactly one home-join-action report for Join decoration acceptance.' }
+        $joinActionPassed = [bool]$joinActionReport[0].passed
+        $joinDecorationReport = [pscustomobject][ordered]@{
+            name=$homeJoinDecoration.name
+            capture='home'
+            actualRect=[ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$actualSpec.x; y=$actualSpec.y; width=$actualSpec.width; height=$actualSpec.height }
+            referenceRect=[ordered]@{ x=$scaledReference.X; y=$scaledReference.Y; width=$scaledReference.Width; height=$scaledReference.Height }
+            referenceMeasurementCanvas=[ordered]@{ width=$figure9MeasurementSize.width; height=$figure9MeasurementSize.height }
+            locallyResizedReferenceSizePx=[ordered]@{ unit='px'; width=$locallyResizedReferenceCrop.Width; height=$locallyResizedReferenceCrop.Height }
+            comparedPixels=$metric.ComparedPixels
+            pixelDifferenceRatio=[double]$metric.DifferentPixels / $metric.ComparedPixels
+            averageAbsoluteRgbError=[double]$metric.ErrorSum / ($metric.ComparedPixels * 3)
+            components=$components
+            backingRect=[ordered]@{ coordinateOrigin='screen-top-left'; unit='px'; x=$backingRect.x; y=$backingRect.y; width=$backingRect.width; height=$backingRect.height }
+            backingBottomScreenY=$backingBottomScreenY
+            geometryCrossesBackingBottom=$geometryCrossesBackingBottom
+            simulationInviteAbsent=$simulationInviteAbsent
+            outlineBottomAbsent=$outlineBottomAbsent
+            joinActionPassed=$joinActionPassed
+            passed=( @($components | Where-Object { -not $_.passed }).Count -eq 0 -and $simulationInviteAbsent -and $outlineBottomAbsent -and -not $geometryCrossesBackingBottom -and $joinActionPassed )
+        }
+        $actualCrop.Save((Join-Path $stagingDirectory ($homeJoinDecoration.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $locallyResizedReferenceCrop.Save((Join-Path $stagingDirectory ($homeJoinDecoration.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $overlay.Save((Join-Path $stagingDirectory ($homeJoinDecoration.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
+        $heatmap.Save((Join-Path $stagingDirectory ($homeJoinDecoration.name + '-heatmap.png')), [Drawing.Imaging.ImageFormat]::Png)
     }
     finally { if ($actual) { $actual.Dispose() }; if ($nativeReference) { $nativeReference.Dispose() }; if ($actualCrop) { $actualCrop.Dispose() }; if ($nativeReferenceCrop) { $nativeReferenceCrop.Dispose() }; if ($locallyResizedReferenceCrop) { $locallyResizedReferenceCrop.Dispose() }; if ($overlay) { $overlay.Dispose() }; if ($heatmap) { $heatmap.Dispose() } }
     $createActionReport = @(
@@ -1057,6 +1287,7 @@ try
         captures=$reportCaptures
         actionBars=$actionBarReports
         createDecoration=$createDecorationReport
+        joinDecoration=$joinDecorationReport
         createFrame=$createFrameReport
         assets=$assets
         materialUsage=[ordered]@{
@@ -1099,6 +1330,18 @@ try
         $markdown += "| $($edge.name) | $searchAndBackground | $($edge.referenceMeasurement.qualifyingPixelCount)/$([Math]::Round($edge.referenceMeasurement.coverageRatio, 4))/$($edge.referenceMeasurement.largestGapPixels) | $($edge.qualifyingPixelCount)/$([Math]::Round($edge.coverageRatio, 4))/$($edge.largestGapPixels) | $([Math]::Round($edge.frameMedianLuma, 2))/$([Math]::Round($edge.backgroundMedianLuma, 2)) | $([Math]::Round($edge.contrastDelta, 2))/$($edge.minimumContrast) | $($edge.continuityPassed) | $($edge.contrastPassed) | $($edge.passed) |"
     }
     $markdown += @('', '| Lower boundary kind | Action | Visible top (screen Y) | Frame local Y | Position deviation (px) | Size deviation (px) | Content passed | Passed |', '| --- | --- | ---: | ---: | --- | --- | --- | --- |', "| $($createFrameReport.bottomBoundary.kind) | $($createFrameReport.bottomBoundary.action) | $($createFrameReport.bottomBoundary.visibleTopScreenY) | $($createFrameReport.bottomBoundary.frameLocalY) | dx=$($createFrameReport.bottomBoundary.positionDeviationPx1920x1080.deltaX), dy=$($createFrameReport.bottomBoundary.positionDeviationPx1920x1080.deltaY) | dw=$($createFrameReport.bottomBoundary.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($createFrameReport.bottomBoundary.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $($createFrameReport.bottomBoundary.contentPassed) | $($createFrameReport.bottomBoundary.passed) |")
+    $markdown += @('', '## Home Join decoration', '', "Overall passed: $($joinDecorationReport.passed). Actual crop (top-left px): $($joinDecorationReport.actualRect.x),$($joinDecorationReport.actualRect.y),$($joinDecorationReport.actualRect.width),$($joinDecorationReport.actualRect.height).", '', '| Component | Measurement | Search | Thresholds | Tolerance (px) | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Measurement status | Passed |', '| --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- |')
+    foreach ($component in @($joinDecorationReport.components))
+    {
+        $referenceMeasured = if ($component.referenceBounds) { "$($component.referenceBounds.x),$($component.referenceBounds.y),$($component.referenceBounds.width),$($component.referenceBounds.height)" } else { 'unavailable' }
+        $actualMeasured = if ($component.actualBounds) { "$($component.actualBounds.x),$($component.actualBounds.y),$($component.actualBounds.width),$($component.actualBounds.height)" } else { 'unavailable' }
+        $centerDeviation = if ($component.centerDeviationPx) { "dx=$($component.centerDeviationPx.deltaX), dy=$($component.centerDeviationPx.deltaY)" } else { 'n/a' }
+        $sizeDeviation = if ($component.sizeDeviationPx) { "dw=$($component.sizeDeviationPx.deltaWidth), dh=$($component.sizeDeviationPx.deltaHeight)" } else { 'n/a' }
+        $thresholds = @($component.thresholds.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '
+        $measurementStatus = if ($component.measurementAvailable) { 'available' } else { ConvertTo-LanLobbyMarkdownCell ('unavailable: ' + [string]$component.measurementError) }
+        $markdown += "| $($component.name) | $($component.measurement) | $($component.search.x),$($component.search.y),$($component.search.width),$($component.search.height) | $thresholds | $($component.tolerancePx) | $($component.expectedBounds.x),$($component.expectedBounds.y),$($component.expectedBounds.width),$($component.expectedBounds.height) | $referenceMeasured | $actualMeasured | $centerDeviation | $sizeDeviation | $measurementStatus | $($component.passed) |"
+    }
+    $markdown += @('', "Join backing: $($joinDecorationReport.backingRect.x),$($joinDecorationReport.backingRect.y),$($joinDecorationReport.backingRect.width),$($joinDecorationReport.backingRect.height) top-left px; bottom screen Y: $($joinDecorationReport.backingBottomScreenY). SimulationInvite absent: $($joinDecorationReport.simulationInviteAbsent). OutlineBottom absent: $($joinDecorationReport.outlineBottomAbsent). Geometry crosses backing bottom: $($joinDecorationReport.geometryCrossesBackingBottom). Accepted Join action/content passed: $($joinDecorationReport.joinActionPassed).")
     $markdown += @('', '## Region and mask rules', '', '| Name | x | y | width | height | Mask |', '| --- | ---: | ---: | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { foreach ($region in $item.regions) { $markdown += "| $($item.name):$($region.name) | $($region.x) | $($region.y) | $($region.width) | $($region.height) | $($region.mask) |" } }
     $markdown += @('', '## Bitmap Sprite usage', '', '| Sprite | Captures | Resources path | Source-relative path | Imported SHA-256 | Total occurrences |', '| --- | --- | --- | --- | --- | ---: |')
