@@ -22,12 +22,12 @@ namespace ArknoNights.Lobby.Tests
             var client = Run(() => LanRoomClient.JoinForTestsAsync(host.LoopbackEndpoint, Profile("guest")));
             try
             {
+                Assert.That(host.Snapshot.Members.Single(member => member.PlayerId == "host").IsReady, Is.True);
                 client.Tick();
                 Assert.That(client.Snapshot.Members.Select(member => member.PlayerId), Is.EquivalentTo(new[] { "host", "guest" }));
 
                 Run(() => client.SetReadyAsync(true));
                 WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady; }, TimeSpan.FromSeconds(2));
-                Assert.That(host.TrySetReady("host", true, out var hostReadyFailure), Is.True, hostReadyFailure.ToString());
                 Assert.That(host.TryStart("host", out var failure), Is.True, failure.ToString());
 
                 Run(() => client.WaitForStartAsync(TimeSpan.FromSeconds(2)));
@@ -46,6 +46,48 @@ namespace ArknoNights.Lobby.Tests
             var port = host.TcpPort;
             host.Dispose();
             Assert.That(CanBindLoopback(port), Is.True);
+        }
+
+        [Test]
+        public void HostOnlyStart_PublishesStartedSnapshotAndCompletesBroadcast()
+        {
+            var host = Run(() => LanRoomHost.StartAsync(Profile("host")));
+            try
+            {
+                Assert.That(host.Snapshot.Members.Single().IsReady, Is.True);
+                Assert.That(host.TryStart("host", out var failure), Is.True, failure.ToString());
+                Run(() => host.StartBroadcastTask);
+
+                host.Tick();
+                Assert.That(host.Snapshot.HasStarted, Is.True);
+            }
+            finally
+            {
+                Run(() => host.StopAsync());
+            }
+        }
+
+        [Test]
+        public void HostStop_DisconnectsGuestsWithoutPublishingPromotedHost()
+        {
+            var host = Run(() => LanRoomHost.StartAsync(Profile("host")));
+            var client = Run(() => LanRoomClient.JoinAsync(host.LoopbackEndpoint, host.RoomCode, Profile("guest")));
+            try
+            {
+                client.Tick();
+                Assert.That(client.Snapshot.HostPlayerId, Is.EqualTo("host"));
+
+                Run(() => host.StopAsync());
+                WaitUntil(() => !client.IsConnected, TimeSpan.FromSeconds(2));
+                client.Tick();
+
+                Assert.That(client.Snapshot.HostPlayerId, Is.EqualTo("host"));
+                Assert.That(client.Snapshot.HostPlayerId, Is.Not.EqualTo("guest"));
+            }
+            finally
+            {
+                Run(() => client.StopAsync());
+            }
         }
 
         [Test]

@@ -13,7 +13,7 @@ namespace ArknoNights.Lobby
         private LobbyRoomState(LobbyProfile hostProfile, string roomCode)
         {
             this.roomCode = roomCode;
-            members = new List<Member> { new Member(hostProfile) };
+            members = new List<Member> { new Member(hostProfile, isReady: true) };
             revision = 1;
             PublishSnapshot();
         }
@@ -61,7 +61,7 @@ namespace ArknoNights.Lobby
                 return false;
             }
 
-            members.Add(new Member(profile));
+            members.Add(new Member(profile, isReady: false));
             PublishMutation();
             failure = LobbyJoinFailure.None;
             return true;
@@ -100,6 +100,13 @@ namespace ArknoNights.Lobby
             if (member == null)
             {
                 return false;
+            }
+
+            if (string.Equals(snapshot.HostPlayerId, playerId, StringComparison.Ordinal))
+            {
+                members.Clear();
+                PublishMutation();
+                return true;
             }
 
             members.Remove(member);
@@ -145,6 +152,14 @@ namespace ArknoNights.Lobby
             }
 
             var expired = new HashSet<string>(expiredPlayerIds);
+            if (!string.IsNullOrWhiteSpace(snapshot.HostPlayerId) && expired.Contains(snapshot.HostPlayerId))
+            {
+                var dissolvedMemberCount = members.Count;
+                members.Clear();
+                PublishMutation();
+                return dissolvedMemberCount;
+            }
+
             var removed = members.RemoveAll(member => expired.Contains(member.Profile.PlayerId));
             if (removed > 0)
             {
@@ -188,9 +203,10 @@ namespace ArknoNights.Lobby
 
         private sealed class Member
         {
-            public Member(LobbyProfile profile)
+            public Member(LobbyProfile profile, bool isReady)
             {
                 Profile = profile;
+                IsReady = isReady;
             }
 
             public LobbyProfile Profile { get; }

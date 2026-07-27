@@ -1,5 +1,6 @@
 using ArknoNights.Lobby;
 using NUnit.Framework;
+using System.Linq;
 
 namespace ArknoNights.Lobby.Tests
 {
@@ -16,11 +17,50 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(state.TryStart("host", out var notReady), Is.False);
             Assert.That(notReady, Is.EqualTo(LobbyJoinFailure.NotReady));
 
-            state.TrySetReady("host", "host", true, out _);
             state.TrySetReady("guest", "guest", true, out _);
 
             Assert.That(state.TryStart("host", out _), Is.True);
             Assert.That(state.Snapshot.HasStarted, Is.True);
+        }
+
+        [Test]
+        public void CreateHost_StartsReady_AndCanStartAlone()
+        {
+            var room = LobbyRoomState.CreateHost(Profile("host"), "123456");
+
+            Assert.That(room.Snapshot.Members.Single().IsReady, Is.True);
+            Assert.That(room.TryStart("host", out var failure), Is.True, failure.ToString());
+        }
+
+        [Test]
+        public void TryJoin_AddsGuestUnready()
+        {
+            var room = LobbyRoomState.CreateHost(Profile("host"), "123456");
+
+            Assert.That(room.TryJoin(Profile("guest"), out var failure), Is.True, failure.ToString());
+            Assert.That(room.Snapshot.Members.Single(member => member.Profile.PlayerId == "guest").IsReady, Is.False);
+        }
+
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void TryStart_RequiresEveryPresentGuestReady_ButNeverAFullRoom(int memberCount)
+        {
+            var room = LobbyRoomState.CreateHost(Profile("host"), "123456");
+            for (var index = 1; index < memberCount; index++)
+            {
+                Assert.That(room.TryJoin(Profile("guest-" + index), out var joinFailure), Is.True, joinFailure.ToString());
+            }
+
+            Assert.That(room.TryStart("host", out var notReady), Is.False);
+            Assert.That(notReady, Is.EqualTo(LobbyJoinFailure.NotReady));
+
+            for (var index = 1; index < memberCount; index++)
+            {
+                Assert.That(room.TrySetReady("guest-" + index, "guest-" + index, true, out var readyFailure), Is.True, readyFailure.ToString());
+            }
+
+            Assert.That(room.TryStart("host", out var startFailure), Is.True, startFailure.ToString());
         }
 
         [Test]
@@ -46,11 +86,11 @@ namespace ArknoNights.Lobby.Tests
             var state = LobbyRoomState.CreateHost(Profile("host"), "123456");
             var initial = state.Snapshot;
 
-            Assert.That(state.TrySetReady("host", "host", true, out var accepted), Is.True);
+            Assert.That(state.TrySetReady("host", "host", false, out var accepted), Is.True);
             Assert.That(accepted, Is.EqualTo(LobbyJoinFailure.None));
             Assert.That(state.Snapshot, Is.Not.SameAs(initial));
-            Assert.That(initial.Members[0].IsReady, Is.False);
-            Assert.That(state.Snapshot.Members[0].IsReady, Is.True);
+            Assert.That(initial.Members[0].IsReady, Is.True);
+            Assert.That(state.Snapshot.Members[0].IsReady, Is.False);
 
             var beforeUnknownMember = state.Snapshot;
             Assert.That(state.TrySetReady("missing", "missing", true, out var unknown), Is.False);
@@ -59,16 +99,17 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void RemovePlayer_PromotesNextMemberToHostAndPublishesSnapshot()
+        public void RemovePlayer_WhenHostLeaves_DissolvesRoomWithoutPromotion()
         {
             var state = LobbyRoomState.CreateHost(Profile("host"), "123456");
-            state.TryJoin(Profile("guest"), out _);
+            state.TryJoin(Profile("guest-1"), out _);
+            state.TryJoin(Profile("guest-2"), out _);
             var beforeRemoval = state.Snapshot;
 
             Assert.That(state.RemovePlayer("host"), Is.True);
             Assert.That(state.Snapshot, Is.Not.SameAs(beforeRemoval));
-            Assert.That(state.Snapshot.HostPlayerId, Is.EqualTo("guest"));
-            Assert.That(state.Snapshot.Members[0].PlayerId, Is.EqualTo("guest"));
+            Assert.That(state.Snapshot.HostPlayerId, Is.Null);
+            Assert.That(state.Snapshot.Members, Is.Empty);
             Assert.That(state.RemovePlayer("missing"), Is.False);
         }
 
@@ -77,7 +118,6 @@ namespace ArknoNights.Lobby.Tests
         {
             var state = LobbyRoomState.CreateHost(Profile("host"), "123456");
             state.TryJoin(Profile("guest"), out _);
-            state.TrySetReady("host", "host", true, out _);
             state.TrySetReady("guest", "guest", true, out _);
             state.TryStart("host", out _);
 
@@ -103,6 +143,19 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
+        public void PruneExpiredMembers_WhenHostExpires_DissolvesRoomWithoutPromotion()
+        {
+            var state = LobbyRoomState.CreateHost(Profile("host"), "123456");
+            state.TryJoin(Profile("guest-1"), out _);
+            state.TryJoin(Profile("guest-2"), out _);
+
+            state.PruneExpiredMembers(new[] { "host" });
+
+            Assert.That(state.Snapshot.HostPlayerId, Is.Null);
+            Assert.That(state.Snapshot.Members, Is.Empty);
+        }
+
+        [Test]
         public void TryStart_RejectsRoomAfterPruningItsOnlyHost()
         {
             var state = LobbyRoomState.CreateHost(Profile("host"), "123456");
@@ -123,7 +176,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(state.TrySetReady("guest", "host", true, out var failure), Is.False);
             Assert.That(failure, Is.EqualTo(LobbyJoinFailure.UnknownPlayer));
             Assert.That(state.Snapshot, Is.SameAs(beforeUnauthorizedMutation));
-            Assert.That(state.Snapshot.Members[0].IsReady, Is.False);
+            Assert.That(state.Snapshot.Members[0].IsReady, Is.True);
         }
 
         [Test]
