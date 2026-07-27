@@ -9,9 +9,12 @@ $unsafeOutput = Join-Path $projectRoot 'Assets/LanLobbyCommonSmokeForbidden'
 $unmappedOutput = Join-Path $scratch 'unmapped-output'
 $nullRecordOutput = Join-Path $scratch 'null-record-output'
 $assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
+$script:assertionCount = 0
+$script:fixtureCount = 0
 
 function Assert-True([bool] $Condition, [string] $Message)
 {
+    $script:assertionCount++
     if (-not $Condition) { throw "Assertion failed: $Message" }
 }
 
@@ -45,6 +48,7 @@ try
     }
     $manifestPath = Join-Path $scratch 'manifest.json'
     [pscustomobject]@{ captures = $records } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+    $script:fixtureCount++
 
     $manifest = Get-LanLobbyCaptureManifest -ManifestPath $manifestPath
     $usage = @(Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $manifest -AssetMapPath $assetMapPath)
@@ -56,6 +60,7 @@ try
 
     $nullRecordManifestPath = Join-Path $scratch 'manifest-with-null-record.json'
     [pscustomobject]@{ captures = @($records; $null) } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $nullRecordManifestPath -Encoding UTF8
+    $script:fixtureCount++
     Assert-FailsWithoutOutput {
         Get-LanLobbyCaptureManifest -ManifestPath $nullRecordManifestPath | Out-Null
     } $nullRecordOutput 'exactly five capture records'
@@ -71,7 +76,9 @@ try
         Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $unmappedManifest -AssetMapPath $assetMapPath | Out-Null
     } $unmappedOutput 'Unmapped or non-approved sprite source'
 
-    Write-Output 'LAN lobby evidence common smoke: PASS'
+    Assert-True ($script:fixtureCount -gt 0) 'zero generated fixtures is an explicit smoke failure'
+    Assert-True ($script:assertionCount -gt 0) 'zero assertions is an explicit smoke failure'
+    Write-Output "LAN lobby evidence common smoke: PASS (fixtures=$script:fixtureCount; assertions=$script:assertionCount)"
 }
 finally
 {

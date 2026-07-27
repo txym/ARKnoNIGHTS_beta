@@ -6,9 +6,12 @@ Add-Type -AssemblyName System.Drawing
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $exportScript = Join-Path $PSScriptRoot 'ExportLanLobbyVisualDiff.ps1'
 $scratch = Join-Path $projectRoot ('Temp/LAN-LOBBY-VisualDiffSmoke-' + [Guid]::NewGuid().ToString('N'))
+$script:assertionCount = 0
+$script:fixtureCount = 0
 
 function Assert-True([bool] $Condition, [string] $Message)
 {
+    $script:assertionCount++
     if (-not $Condition) { throw "Assertion failed: $Message" }
 }
 
@@ -47,6 +50,7 @@ function Assert-FailsPreservingOutput([scriptblock] $Action, [string] $OutputPat
 
 function New-SolidPng([string] $Path, [int] $Width, [int] $Height, [Drawing.Color] $Color, [scriptblock] $Draw)
 {
+    $script:fixtureCount++
     $bitmap = New-Object Drawing.Bitmap $Width, $Height
     $graphics = [Drawing.Graphics]::FromImage($bitmap)
     try
@@ -59,6 +63,97 @@ function New-SolidPng([string] $Path, [int] $Width, [int] $Height, [Drawing.Colo
     {
         $graphics.Dispose()
         $bitmap.Dispose()
+    }
+}
+
+function New-NormalizedRoomCapture([string] $ReferencePath, [string] $Path)
+{
+    $script:fixtureCount++
+    $reference = [Drawing.Bitmap]::FromFile($ReferencePath)
+    $bitmap = New-Object Drawing.Bitmap 1920, 1080
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try
+    {
+        $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear
+        $graphics.DrawImage($reference, 0, 0, 1920, 1080)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+        $reference.Dispose()
+    }
+}
+
+function Fill-RoomEvidenceFixture(
+    $Graphics,
+    [int] $CanvasWidth,
+    [int] $CanvasHeight,
+    [ValidateSet('room-host','room-full','room-ready')] [string] $State)
+{
+    $scaleX = $CanvasWidth / 1920.0
+    $scaleY = $CanvasHeight / 1080.0
+    $cyan = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 0, 220, 220))
+    $gray = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 105, 105, 105))
+    $light = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 235))
+    function Fill-Normalized($Brush, [double] $X, [double] $Y, [double] $Width, [double] $Height)
+    {
+        $Graphics.FillRectangle(
+            $Brush,
+            [int][Math]::Round($X * $scaleX),
+            [int][Math]::Round($Y * $scaleY),
+            [Math]::Max(1, [int][Math]::Round($Width * $scaleX)),
+            [Math]::Max(1, [int][Math]::Round($Height * $scaleY)))
+    }
+    function Fill-Contour($Brush, [double] $X, [double] $Y, [double] $Width, [double] $Height)
+    {
+        Fill-Normalized $Brush $X $Y $Width 5
+        Fill-Normalized $Brush $X ($Y + $Height - 5) $Width 5
+        Fill-Normalized $Brush $X $Y 5 $Height
+        Fill-Normalized $Brush ($X + $Width - 5) $Y 5 $Height
+    }
+    try
+    {
+        $roots = @(199.5, 588.75, 976.5, 1365.0)
+        for ($slot = 0; $slot -lt 4; $slot++)
+        {
+            $bodyX = $roots[$slot] + 26.25
+            $bodyY = 177.75
+            $isReady = $slot -eq 0 -or $State -eq 'room-ready'
+            $isWaiting = $slot -gt 0 -and $State -eq 'room-full'
+            $isEmpty = $slot -gt 0 -and $State -eq 'room-host'
+            $stateBrush = if ($isReady) { $cyan } else { $gray }
+            Fill-Normalized $stateBrush $bodyX $bodyY 320.25 30
+            Fill-Contour $stateBrush $bodyX $bodyY 320.25 545.25
+            if ($isReady)
+            {
+                Fill-Normalized $light ($bodyX + 138) ($bodyY + 235) 32 26
+                Fill-Normalized $light ($bodyX + 110) ($bodyY + 280) 88 18
+            }
+            elseif ($isWaiting)
+            {
+                Fill-Normalized $gray ($bodyX + 35) ($bodyY + 110) 250 320
+            }
+            elseif ($isEmpty)
+            {
+                Fill-Normalized $gray ($bodyX + 50) ($bodyY + 85) 220 360
+                Fill-Normalized $light ($bodyX + 137) ($bodyY + 230) 46 46
+                Fill-Normalized $light ($bodyX + 117) ($bodyY + 295) 86 20
+            }
+        }
+        Fill-Normalized $light 245 745 84 24
+        $primaryBrush = if ($State -eq 'room-full') { $gray } else { $cyan }
+        Fill-Normalized $primaryBrush 1487.25 942.75 432 94.5
+        Fill-Normalized $light 1525 970 38 38
+        Fill-Normalized $light 1600 978 116 22
+        Fill-Normalized $light 43.5 30 118 52.5
+    }
+    finally
+    {
+        $cyan.Dispose()
+        $gray.Dispose()
+        $light.Dispose()
     }
 }
 
@@ -340,6 +435,72 @@ function Scramble-JoinBlockInternalTopologyFixture([string] $Path)
     }
 }
 
+function Mutate-RoomVisibleThresholdFixture([string] $CaptureDirectory)
+{
+    $black = New-Object Drawing.SolidBrush ([Drawing.Color]::Black)
+    $light = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 235))
+    $cyan = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 0, 220, 220))
+    $gray = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 105, 105, 105))
+    try
+    {
+        $hostPath = Join-Path $CaptureDirectory 'room-host.png'
+        $hostSource = [Drawing.Bitmap]::FromFile($hostPath)
+        $hostBitmap = New-Object Drawing.Bitmap $hostSource
+        $hostSource.Dispose()
+        $graphics = [Drawing.Graphics]::FromImage($hostBitmap)
+        try
+        {
+            # Keep diagnostic RectTransform data untouched while moving the rendered
+            # check pixels +3 px and widening the rendered ready label by +4 px.
+            $graphics.FillRectangle($black, 363, 412, 34, 28)
+            $graphics.FillRectangle($light, 367, 413, 32, 26)
+            $graphics.FillRectangle($black, 335, 457, 94, 20)
+            $graphics.FillRectangle($light, 336, 458, 92, 18)
+            $hostBitmap.Save($hostPath, [Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally { $graphics.Dispose(); $hostBitmap.Dispose() }
+
+        $fullPath = Join-Path $CaptureDirectory 'room-full.png'
+        $fullSource = [Drawing.Bitmap]::FromFile($fullPath)
+        $full = New-Object Drawing.Bitmap $fullSource
+        $fullSource.Dispose()
+        $graphics = [Drawing.Graphics]::FromImage($full)
+        try
+        {
+            # Move only slot 2's visible left contour edge by +5 px.
+            $graphics.FillRectangle($black, 615, 208, 5, 515)
+            $graphics.FillRectangle($gray, 620, 208, 5, 515)
+            $full.Save($fullPath, [Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally { $graphics.Dispose(); $full.Dispose() }
+
+        $readyPath = Join-Path $CaptureDirectory 'room-ready.png'
+        $readySource = [Drawing.Bitmap]::FromFile($readyPath)
+        $ready = New-Object Drawing.Bitmap $readySource
+        $readySource.Dispose()
+        $graphics = [Drawing.Graphics]::FromImage($ready)
+        try
+        {
+            # Preserve slot 3's contour extrema but remove most contour pixels so
+            # edge tolerances remain satisfied while contour Jaccard drops below .95.
+            $graphics.FillRectangle($black, 1008, 213, 310, 500)
+            $graphics.FillRectangle($cyan, 1003, 208, 5, 515)
+            $graphics.FillRectangle($cyan, 1318, 208, 5, 515)
+            $graphics.FillRectangle($cyan, 1003, 208, 320, 5)
+            $graphics.FillRectangle($cyan, 1003, 718, 320, 5)
+            $ready.Save($readyPath, [Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally { $graphics.Dispose(); $ready.Dispose() }
+    }
+    finally
+    {
+        $black.Dispose()
+        $light.Dispose()
+        $cyan.Dispose()
+        $gray.Dispose()
+    }
+}
+
 function New-JoinDecorationGeometry()
 {
     $prefix = 'LanLobbyRoot/Home/RoomSelect/Join'
@@ -361,7 +522,9 @@ try
     New-Item -ItemType Directory -Force -Path $captureDirectory, $referenceDirectory | Out-Null
 
     $figure9 = ([char]0x56FE).ToString() + '9.png'
-    $figure10 = ([char]0x56FE).ToString() + '10.png'
+    $figure11 = ([char]0x56FE).ToString() + '11.png'
+    $figure12 = ([char]0x56FE).ToString() + '12.png'
+    $figure13 = ([char]0x56FE).ToString() + '13.png'
     $createDecorationTarget = [ordered]@{ x=1296; y=252; width=390; height=179 }
     $createDecorationNativeCrop = [ordered]@{ x=1382; y=260; width=417; height=187 }
     $createFrameTarget = [ordered]@{ x=1154; y=224; width=717; height=374 }
@@ -441,9 +604,21 @@ try
         }
         finally { $contentBrush.Dispose(); $cyanBrush.Dispose() }
     }
-    New-SolidPng (Join-Path $referenceDirectory $figure10) 2048 1118 ([Drawing.Color]::FromArgb(255, 65, 75, 85)) $null
+    New-SolidPng (Join-Path $referenceDirectory $figure11) 2560 1440 ([Drawing.Color]::Black) {
+        param($graphics)
+        Fill-RoomEvidenceFixture $graphics 2560 1440 'room-host'
+    }
+    New-SolidPng (Join-Path $referenceDirectory $figure12) 2560 1440 ([Drawing.Color]::Black) {
+        param($graphics)
+        Fill-RoomEvidenceFixture $graphics 2560 1440 'room-full'
+    }
+    New-SolidPng (Join-Path $referenceDirectory $figure13) 2560 1440 ([Drawing.Color]::Black) {
+        param($graphics)
+        Fill-RoomEvidenceFixture $graphics 2560 1440 'room-ready'
+    }
 
     $names = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full')
+    $bgTerrainSha = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $projectRoot 'Assets/Resources/UI/Lobby/bg_terrain.png')).Hash
     $records = @()
     foreach ($name in $names)
     {
@@ -493,7 +668,15 @@ try
                 finally { $maskedBrush.Dispose(); $differenceBrush.Dispose(); $contentBrush.Dispose(); $cyanBrush.Dispose(); $lowContrastBrush.Dispose() }
             }
         }
-        New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 60, 60, 60)) $draw
+        if ($name -like 'room-*')
+        {
+            $roomReferenceName = if ($name -eq 'room-host') { $figure11 } elseif ($name -eq 'room-full') { $figure12 } else { $figure13 }
+            New-NormalizedRoomCapture (Join-Path $referenceDirectory $roomReferenceName) $actualPath
+        }
+        else
+        {
+            New-SolidPng $actualPath 1920 1080 ([Drawing.Color]::FromArgb(255, 60, 60, 60)) $draw
+        }
         $actionRects = if ($name -eq 'home') {
             @(
                 # Deliberately offset and resize Create so the report must derive non-zero deltas.
@@ -552,6 +735,21 @@ try
             codeNativeGeometry = @(
                 [ordered]@{ name = 'LanLobbyRoot/OpaqueBlocker'; kind = 'code-native-geometry'; isBitmap = $false; color = '#060F14FF'; coordinateOrigin='screen-bottom-left'; unit='px'; raycastTarget=$false; x = 0; y = 0; width = 1920; height = 1080 }
             ) + $(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationGeometry } else { @() })
+            sourceAudit = $(if ($name -like 'room-*') {
+                @([ordered]@{
+                    node='LanLobbyRoot/Terrain'
+                    kind='bitmap-sprite'
+                    isBitmap=$true
+                    spriteName='bg_terrain'
+                    materialName=''
+                    resourcesPath='UI/Lobby/bg_terrain'
+                    sourcePath='[uc]autochessouter/bg_terrain.png'
+                    sha256=$bgTerrainSha
+                    captures=@($name)
+                    occurrenceCount=1
+                    raycastTarget=$false
+                })
+            } else { @() })
         }
     }
     foreach ($record in $records)
@@ -739,7 +937,10 @@ try
     $malformedReferences = Join-Path $scratch 'malformed-references'
     New-Item -ItemType Directory -Force -Path $malformedReferences | Out-Null
     Set-Content -LiteralPath (Join-Path $malformedReferences $figure9) -Value 'not an image' -Encoding UTF8
-    Copy-Item -LiteralPath (Join-Path $referenceDirectory $figure10) -Destination (Join-Path $malformedReferences $figure10)
+    foreach ($figure in @($figure11, $figure12, $figure13))
+    {
+        Copy-Item -LiteralPath (Join-Path $referenceDirectory $figure) -Destination (Join-Path $malformedReferences $figure)
+    }
     $preexistingOutput = Join-Path $scratch 'preexisting-output'
     New-Item -ItemType Directory -Force -Path $preexistingOutput | Out-Null
     $sentinel = Join-Path $preexistingOutput 'sentinel.txt'
@@ -754,7 +955,15 @@ try
     $defaultReferenceOutput = Join-Path $scratch 'default-reference-output'
     Assert-FailsWithoutOutput {
         & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $defaultReferenceOutput
-    } $defaultReferenceOutput 'Expected exactly one reference 9'
+    } $defaultReferenceOutput 'Expected exactly one reference named'
+
+    $wrongSizedReferences = Join-Path $scratch 'wrong-sized-room-references'
+    Copy-Item -LiteralPath $referenceDirectory -Destination $wrongSizedReferences -Recurse
+    New-SolidPng (Join-Path $wrongSizedReferences $figure12) 1920 1080 ([Drawing.Color]::Black) $null
+    $wrongSizedOutput = Join-Path $scratch 'wrong-sized-room-reference-output'
+    Assert-FailsWithoutOutput {
+        & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $wrongSizedOutput -ReferenceDirectory $wrongSizedReferences
+    } $wrongSizedOutput 'must be exactly 2560x1440 before normalization'
 
     $referenceFixtureHashes = @(
         Get-ChildItem -LiteralPath $referenceDirectory -File | Sort-Object Name | ForEach-Object {
@@ -777,6 +986,111 @@ try
     }
     $report = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.json') | ConvertFrom-Json
     $homeCapture = $report.captures | Where-Object name -eq 'home'
+    $roomReferenceMap = @{
+        'room-host' = $figure11
+        'room-full' = $figure12
+        'room-ready' = $figure13
+    }
+    foreach ($captureName in $roomReferenceMap.Keys)
+    {
+        $roomCaptureReport = @($report.captures | Where-Object name -eq $captureName)[0]
+        Assert-True ($roomCaptureReport.referenceFigure -ceq $roomReferenceMap[$captureName]) "$captureName must route to its exact Figure 11-13 reference"
+        Assert-True (($roomCaptureReport.referenceWidth -eq 2560) -and ($roomCaptureReport.referenceHeight -eq 1440)) "$captureName reference dimensions must be validated before normalization"
+    }
+    $requiredRoomGates = @(
+        'RoomHost.Slot1.ReadyTopBar',
+        'RoomHost.Slot1.ReadyContour',
+        'RoomHost.Slot1.ReadyCheck',
+        'RoomHost.Slot1.ReadyLabel',
+        'RoomHost.Slot1.CreatorTag',
+        'RoomHost.Slot2.EmptyComposition',
+        'RoomHost.Slot3.EmptyComposition',
+        'RoomHost.Slot4.EmptyComposition',
+        'RoomFull.Slot1.ReadyTopBar',
+        'RoomFull.Slot1.ReadyContour',
+        'RoomFull.Slot1.ReadyCheck',
+        'RoomFull.Slot1.ReadyLabel',
+        'RoomFull.Slot1.CreatorTag',
+        'RoomFull.Slot2.WaitingTopBar',
+        'RoomFull.Slot2.WaitingContour',
+        'RoomFull.Slot3.WaitingTopBar',
+        'RoomFull.Slot3.WaitingContour',
+        'RoomReady.Slot1.ReadyTopBar',
+        'RoomReady.Slot1.ReadyContour',
+        'RoomReady.Slot1.ReadyCheck',
+        'RoomReady.Slot1.ReadyLabel',
+        'RoomReady.Slot1.CreatorTag',
+        'RoomReady.Slot2.ReadyTopBar',
+        'RoomReady.Slot2.ReadyContour',
+        'RoomReady.Slot2.ReadyCheck',
+        'RoomReady.Slot2.ReadyLabel',
+        'RoomReady.Slot3.ReadyTopBar',
+        'RoomReady.Slot3.ReadyContour',
+        'RoomReady.Slot3.ReadyCheck',
+        'RoomReady.Slot3.ReadyLabel',
+        'RoomFull.PrimaryAction.Gray',
+        'RoomFull.PrimaryAction.IconCenter',
+        'RoomFull.PrimaryAction.LabelCenter',
+        'RoomReady.PrimaryAction.Cyan',
+        'RoomReady.PrimaryAction.IconCenter',
+        'RoomReady.PrimaryAction.LabelCenter',
+        'RoomReady.Leave',
+        'RoomHost.Slot1.ProfileContentAbsence',
+        'RoomFull.Slot1.ProfileContentAbsence',
+        'RoomReady.Slot1.ProfileContentAbsence',
+        'RoomHost.LegacyOpenSlotTextAbsence',
+        'RoomFull.LegacyWaitingTextAbsence',
+        'RoomHost.Slot2To3.VisibleContourSpacing',
+        'RoomReady.Slot2To3.VisibleContourSpacing'
+    )
+    foreach ($gateName in $requiredRoomGates)
+    {
+        $gate = @($report.roomGates | Where-Object name -ceq $gateName)
+        Assert-True ($gate.Count -eq 1) "named room gate must occur once: $gateName"
+        $gate = $gate[0]
+        Assert-True (-not [string]::IsNullOrWhiteSpace([string]$gate.capture)) "$gateName capture"
+        Assert-True (-not [string]::IsNullOrWhiteSpace([string]$gate.referenceFigure)) "$gateName reference"
+        Assert-True ($null -ne $gate.roi) "$gateName ROI"
+        Assert-True ($null -ne $gate.exclusions) "$gateName exclusions"
+        Assert-True ($null -ne $gate.thresholds) "$gateName thresholds"
+        Assert-True (-not [string]::IsNullOrWhiteSpace([string]$gate.status)) "$gateName status"
+        Assert-True ($null -ne $gate.materialEvidence) "$gateName material provenance"
+    }
+    foreach ($excludedName in @('RoomFull.Slot4.ReferencePopupExclusion','RoomReady.Slot4.ReferencePopupExclusion'))
+    {
+        $excluded = @($report.roomGates | Where-Object name -ceq $excludedName)
+        Assert-True ($excluded.Count -eq 1) "$excludedName must be emitted"
+        Assert-True (($excluded[0].status -ceq 'ExcludedByReferencePopup') -and ($excluded[0].passed -eq $false)) "$excludedName must be excluded, never passed"
+        Assert-True (-not [string]::IsNullOrWhiteSpace([string]$excluded[0].reason)) "$excludedName exclusion reason"
+    }
+    $diagnosticOnlyGate = @($report.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyTopBar')[0]
+    Assert-True (($diagnosticOnlyGate.diagnosticRectTransform.role -eq 'diagnostic-only') -and
+        ($diagnosticOnlyGate.diagnosticRectTransform.x -eq 100) -and
+        ($diagnosticOnlyGate.actualVisibleBounds.x -ne $diagnosticOnlyGate.diagnosticRectTransform.x) -and
+        $diagnosticOnlyGate.passed) 'transparent-padding/diagnostic RectTransform mismatch alone must not fail matching rendered pixels'
+    Assert-True (@($report.roomExclusions | Where-Object { -not $_.protectedRegionsClear }).Count -eq 0) 'barrage/popup/fourth-slot exclusions must not overlap protected gates'
+    $baselineRoomFailures = @($report.roomGates | Where-Object { $_.status -eq 'Failed' } | ForEach-Object { "$($_.name):$($_.reason):j=$($_.contour.jaccard):edges=$($_.edgeDeltaPx.left)/$($_.edgeDeltaPx.top)/$($_.edgeDeltaPx.right)/$($_.edgeDeltaPx.bottom)" })
+    Assert-True ($baselineRoomFailures.Count -eq 0) "baseline room visible-pixel gates must pass; failed: $($baselineRoomFailures -join ' | ')"
+    Assert-True (@($report.roomGates | Where-Object { $_.status -eq 'Passed' -and -not $_.materialEvidence.passed }).Count -eq 0) 'a room gate may not pass material evidence with SHA/occurrence mismatch'
+    foreach ($wrongFigure in @($figure12,$figure13))
+    {
+        $wrongRouteReferences = Join-Path $scratch ("room-host-routed-to-" + [IO.Path]::GetFileNameWithoutExtension($wrongFigure))
+        Copy-Item -LiteralPath $referenceDirectory -Destination $wrongRouteReferences -Recurse
+        Copy-Item -LiteralPath (Join-Path $referenceDirectory $wrongFigure) -Destination (Join-Path $wrongRouteReferences $figure11) -Force
+        $script:fixtureCount++
+        $wrongRouteOutput = Join-Path $scratch ("room-host-wrong-route-output-" + [IO.Path]::GetFileNameWithoutExtension($wrongFigure))
+        & $exportScript -CaptureDirectory $captureDirectory -OutputDirectory $wrongRouteOutput -ReferenceDirectory $wrongRouteReferences | Out-Null
+        $wrongRouteReport = Get-Content -Raw -LiteralPath (Join-Path $wrongRouteOutput 'visual-diff-report.json') | ConvertFrom-Json
+        Assert-True (@($wrongRouteReport.roomGates | Where-Object { $_.name -like 'RoomHost.*' -and $_.status -eq 'Failed' }).Count -gt 0) "room-host must not pass when the exact Figure 11 filename contains $wrongFigure pixels"
+    }
+    foreach ($visibleGate in @($report.roomGates | Where-Object { $_.maskKind -in @('Cyan','Gray','Dark','Light','Contrast') -and $null -ne $_.actualVisibleBounds }))
+    {
+        Assert-True ($null -ne $visibleGate.actualVisibleBounds) "$($visibleGate.name) actual visible bounds"
+        Assert-True ($null -ne $visibleGate.referenceVisibleBounds) "$($visibleGate.name) reference visible bounds"
+        Assert-True ($null -ne $visibleGate.actualVisibleCenter) "$($visibleGate.name) actual visible center"
+        Assert-True ($null -ne $visibleGate.referenceVisibleCenter) "$($visibleGate.name) reference visible center"
+        Assert-True ([string]$visibleGate.maskDescription -like '*color/contrast*') "$($visibleGate.name) must describe opaque screenshots as color/contrast masks"
+    }
     $joinDecoration = $report.joinDecoration
     Assert-True ($null -ne $joinDecoration) 'Join decoration report must exist'
     $actionBars = @($report.actionBars)
@@ -1029,7 +1343,13 @@ try
     Assert-True ((Test-Path (Join-Path $output 'visual-diff-report.md')) -and (Test-Path (Join-Path $output 'manifest.json'))) 'report and copied manifest must exist'
     $markdown = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.md')
     Assert-True ($markdown.Contains("${figure9}: 2048×1118")) 'Markdown must derive figure 9 native dimensions from decoded reference pixels'
-    Assert-True ($markdown.Contains("${figure10}: 2048×1118")) 'Markdown must derive figure 10 native dimensions from decoded reference pixels'
+    foreach ($figure in @($figure11, $figure12, $figure13))
+    {
+        Assert-True ($markdown.Contains("${figure}: 2560×1440")) "Markdown must derive $figure native dimensions from decoded reference pixels"
+    }
+    Assert-True ($markdown.Contains('## LAN room named visible-pixel gates')) 'Markdown must expose named LAN room visible-pixel gates'
+    foreach ($gateName in $requiredRoomGates) { Assert-True ($markdown.Contains($gateName)) "Markdown missing named room gate $gateName" }
+    Assert-True ($markdown.Contains('ExcludedByReferencePopup')) 'Markdown must preserve excluded fourth-slot status'
     Assert-True ($markdown.Contains('Position deviation (px)')) 'Markdown action table must expose position deviation in px'
     Assert-True ($markdown.Contains('1161,449,711,95')) 'Markdown must contain the manifest-derived Create actual Rect'
     Assert-True ($markdown.Contains('dx=7, dy=-4')) 'Markdown must contain the exact manifest-derived Create position delta'
@@ -1073,6 +1393,43 @@ try
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$asset.sourcePath)) 'asset must have mapped source path'
         Assert-True ([string]$asset.importedSha256 -match '^[0-9A-F]{64}$') 'asset must have SHA-256'
     }
+
+    $thresholdCaptureDirectory = Join-Path $scratch 'room-visible-threshold-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $thresholdCaptureDirectory -Recurse
+    $thresholdManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $thresholdCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $thresholdManifest.captures) { $record.path = Join-Path $thresholdCaptureDirectory ($record.name + '.png') }
+    $thresholdManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $thresholdCaptureDirectory 'manifest.json') -Encoding UTF8
+    Mutate-RoomVisibleThresholdFixture $thresholdCaptureDirectory
+    $thresholdOutput = Join-Path $scratch 'room-visible-threshold-output'
+    & $exportScript -CaptureDirectory $thresholdCaptureDirectory -OutputDirectory $thresholdOutput -ReferenceDirectory $referenceDirectory | Out-Null
+    $thresholdReport = Get-Content -Raw -LiteralPath (Join-Path $thresholdOutput 'visual-diff-report.json') | ConvertFrom-Json
+    $shiftedCheck = @($thresholdReport.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyCheck')[0]
+    Assert-True (($shiftedCheck.thresholds.maximumCenterErrorPxPerAxis -eq 2) -and ([Math]::Abs([double]$shiftedCheck.centerDeltaPx.deltaX) -eq 3) -and ($shiftedCheck.status -eq 'Failed')) 'a 3 px rendered check shift must fail the 2 px center gate'
+    $widenedLabel = @($thresholdReport.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyLabel')[0]
+    Assert-True (($widenedLabel.thresholds.maximumVisibleSizeErrorPx -eq 3) -and ([Math]::Abs([double]$widenedLabel.sizeDeltaPx.deltaWidth) -eq 4) -and ($widenedLabel.status -eq 'Failed')) 'a 4 px rendered-label width change must fail the 3 px size gate'
+    $shiftedContour = @($thresholdReport.roomGates | Where-Object name -eq 'RoomFull.Slot2.WaitingContour')[0]
+    Assert-True (($shiftedContour.thresholds.maximumEdgeErrorPx -eq 4) -and ([Math]::Abs([double]$shiftedContour.edgeDeltaPx.left) -eq 5) -and ($shiftedContour.status -eq 'Failed')) 'a 5 px visible contour-edge shift must fail'
+    $lowJaccard = @($thresholdReport.roomGates | Where-Object name -eq 'RoomReady.Slot3.ReadyContour')[0]
+    Assert-True (($lowJaccard.thresholds.minimumContourJaccard -eq 0.95) -and ([double]$lowJaccard.contour.jaccard -lt 0.95) -and ($lowJaccard.status -eq 'Failed')) 'contour Jaccard below 0.95 must fail'
+    $unchangedRectGate = @($thresholdReport.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyTopBar')[0]
+    Assert-True ($unchangedRectGate.status -eq 'Passed') 'diagnostic RectTransform data must not fail unchanged rendered visible pixels'
+    Assert-True (($shiftedCheck.diagnosticRectTransform.x -eq $unchangedRectGate.diagnosticRectTransform.x) -and ($shiftedCheck.status -eq 'Failed')) 'visible-pixel movement with unchanged diagnostic RectTransform must fail'
+
+    $materialCaptureDirectory = Join-Path $scratch 'room-material-mismatch-captures'
+    Copy-Item -LiteralPath $captureDirectory -Destination $materialCaptureDirectory -Recurse
+    $materialManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $materialCaptureDirectory 'manifest.json') | ConvertFrom-Json
+    foreach ($record in $materialManifest.captures) { $record.path = Join-Path $materialCaptureDirectory ($record.name + '.png') }
+    $materialHost = @($materialManifest.captures | Where-Object name -eq 'room-host')[0]
+    $materialHost.sourceAudit[0].sha256 = ('0' * 64)
+    $materialHost.sourceAudit[0].occurrenceCount = 2
+    $materialManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $materialCaptureDirectory 'manifest.json') -Encoding UTF8
+    $materialOutput = Join-Path $scratch 'room-material-mismatch-output'
+    & $exportScript -CaptureDirectory $materialCaptureDirectory -OutputDirectory $materialOutput -ReferenceDirectory $referenceDirectory | Out-Null
+    $materialReport = Get-Content -Raw -LiteralPath (Join-Path $materialOutput 'visual-diff-report.json') | ConvertFrom-Json
+    $materialGate = @($materialReport.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyTopBar')[0]
+    Assert-True (($materialGate.materialEvidence.shaPassed -eq $false) -and ($materialGate.materialEvidence.occurrencePassed -eq $false)) 'source SHA and rendered occurrence mismatches must both fail material evidence'
+    Assert-True (($materialGate.status -eq 'Failed') -and ($materialGate.passed -eq $false)) 'material mismatch must block a visually matching named gate'
+
     $intrudedCentralCaptureDirectory = Join-Path $scratch 'intruded-central-blank-captures'
     Copy-Item -LiteralPath $captureDirectory -Destination $intrudedCentralCaptureDirectory -Recurse
     $intrudedCentralManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $intrudedCentralCaptureDirectory 'manifest.json') | ConvertFrom-Json
@@ -1209,7 +1566,9 @@ try
         Assert-True ($caseReport.joinDecoration.passed -eq $false) "$($negativeCase.name) must block overall Join acceptance"
         foreach ($kind in @('actual','reference','overlay','heatmap')) { Assert-True (Test-Path -LiteralPath (Join-Path $caseOutput ('home-join-decoration-' + $kind + '.png'))) "$($negativeCase.name) must still publish home-join-decoration $kind" }
     }
-    Write-Output 'LAN lobby visual-diff smoke: PASS'
+    Assert-True ($script:fixtureCount -gt 0) 'zero generated fixtures is an explicit smoke failure'
+    Assert-True ($script:assertionCount -gt 0) 'zero assertions is an explicit smoke failure'
+    Write-Output "LAN lobby visual-diff smoke: PASS (fixtures=$script:fixtureCount; assertions=$script:assertionCount)"
 }
 finally
 {

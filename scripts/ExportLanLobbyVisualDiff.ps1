@@ -25,7 +25,14 @@ public sealed class LanLobbyBoundsMeasurement
 {
     public bool Available { get; set; }
     public LanLobbyVisualBounds Bounds { get; set; }
+    public int PixelCount { get; set; }
     public string FailureReason { get; set; }
+}
+public sealed class LanLobbyMaskComparison
+{
+    public long IntersectionPixels { get; set; }
+    public long UnionPixels { get; set; }
+    public double Jaccard { get; set; }
 }
 public sealed class FrameContinuity {
     public int QualifyingPixelCount { get; set; }
@@ -73,14 +80,78 @@ public static class LanLobbyVisualDiff {
             : sorted[middle];
     }
     static LanLobbyBoundsMeasurement Unavailable(string failureReason) {
-        return new LanLobbyBoundsMeasurement { Available=false, Bounds=null, FailureReason=failureReason };
+        return new LanLobbyBoundsMeasurement { Available=false, Bounds=null, PixelCount=0, FailureReason=failureReason };
     }
-    static LanLobbyBoundsMeasurement AvailableBounds(int minX, int minY, int maxX, int maxY) {
+    static LanLobbyBoundsMeasurement AvailableBounds(int minX, int minY, int maxX, int maxY, int pixelCount=0) {
         if (maxX < minX || maxY < minY) return Unavailable("No qualifying decoded pixels found.");
         return new LanLobbyBoundsMeasurement {
             Available=true,
             Bounds=new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 },
+            PixelCount=pixelCount,
             FailureReason=null
+        };
+    }
+    static bool IsExcluded(Rectangle[] exclusions, int x, int y) {
+        if (exclusions == null) return false;
+        foreach (Rectangle exclusion in exclusions) if (Inside(exclusion,x,y)) return true;
+        return false;
+    }
+    static bool IsVisibleMask(Bitmap bitmap, int x, int y, string maskKind) {
+        Color pixel=bitmap.GetPixel(x,y);
+        if(pixel.A==0) return false;
+        int maximum=Math.Max(pixel.R,Math.Max(pixel.G,pixel.B));
+        int minimum=Math.Min(pixel.R,Math.Min(pixel.G,pixel.B));
+        int spread=maximum-minimum;
+        int luminance=(299*pixel.R+587*pixel.G+114*pixel.B)/1000;
+        switch(maskKind) {
+            case "Cyan": return pixel.G>=80 && pixel.G>=pixel.R+20 && pixel.B>=pixel.R+10;
+            case "Gray": return spread<=18 && luminance>=45 && luminance<=210;
+            case "Dark": return luminance<70;
+            case "Light": return luminance>=170 && spread<=24;
+            case "Contrast": {
+                int maximumDifference=0;
+                int[] dx={-1,1,0,0}; int[] dy={0,0,-1,1};
+                for(int i=0;i<dx.Length;i++) {
+                    int nx=x+dx[i],ny=y+dy[i];
+                    if(nx<0||ny<0||nx>=bitmap.Width||ny>=bitmap.Height) continue;
+                    Color neighbor=bitmap.GetPixel(nx,ny);
+                    maximumDifference=Math.Max(maximumDifference,
+                        Math.Max(Math.Abs(pixel.R-neighbor.R),
+                        Math.Max(Math.Abs(pixel.G-neighbor.G),Math.Abs(pixel.B-neighbor.B))));
+                }
+                return spread>=25 || maximumDifference>=25;
+            }
+            default: throw new ArgumentOutOfRangeException("maskKind");
+        }
+    }
+    public static LanLobbyBoundsMeasurement FindVisibleMaskBounds(
+        Bitmap bitmap, Rectangle search, string maskKind, Rectangle[] exclusions)
+    {
+        ValidateSearch(bitmap,search);
+        int minX=search.Right,minY=search.Bottom,maxX=-1,maxY=-1,pixelCount=0;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            if(IsExcluded(exclusions,x,y) || !IsVisibleMask(bitmap,x,y,maskKind)) continue;
+            pixelCount++; minX=Math.Min(minX,x);minY=Math.Min(minY,y);maxX=Math.Max(maxX,x);maxY=Math.Max(maxY,y);
+        }
+        return pixelCount==0
+            ? Unavailable("No visible color/contrast mask pixels found.")
+            : AvailableBounds(minX,minY,maxX,maxY,pixelCount);
+    }
+    public static LanLobbyMaskComparison CompareVisibleMasks(
+        Bitmap actual, Bitmap reference, Rectangle search, string maskKind, Rectangle[] exclusions)
+    {
+        ValidateSearch(actual,search); ValidateSearch(reference,search);
+        long intersection=0,union=0;
+        for(int y=search.Y;y<search.Bottom;y++) for(int x=search.X;x<search.Right;x++) {
+            if(IsExcluded(exclusions,x,y)) continue;
+            bool a=IsVisibleMask(actual,x,y,maskKind),r=IsVisibleMask(reference,x,y,maskKind);
+            if(a&&r) intersection++;
+            if(a||r) union++;
+        }
+        return new LanLobbyMaskComparison {
+            IntersectionPixels=intersection,
+            UnionPixels=union,
+            Jaccard=union==0 ? 0.0 : (double)intersection/union
         };
     }
     public static LanLobbyBoundsMeasurement FindOrangeBounds(
@@ -515,7 +586,7 @@ public static class LanLobbyVisualDiff {
         if (backgroundLuma.Count == 0)
         {
             result.Available=false;
-            result.FailureReason="No non-transparent background samples found.";
+            result.FailureReason="No decoded background color samples found.";
             return result;
         }
         result.FrameMedianLuma=Median(frameLuma);
@@ -779,13 +850,139 @@ $createFrameEdges = @(
   }
 )
 $figure9MeasurementSize = @{ width=2102; height=1149 }
+$figure9FileName = ([char]0x56FE).ToString() + '9.png'
+$figure11FileName = ([char]0x56FE).ToString() + '11.png'
+$figure12FileName = ([char]0x56FE).ToString() + '12.png'
+$figure13FileName = ([char]0x56FE).ToString() + '13.png'
+$referenceByCapture = [ordered]@{
+  'home'=$figure9FileName
+  'discovered-prefill'=$figure9FileName
+  'room-host'=$figure11FileName
+  'room-full'=$figure12FileName
+  'room-ready'=$figure13FileName
+}
+$roomSlotRoots = @(
+  @{x=200;y=178;width=364;height=665;bodyX=226},
+  @{x=589;y=178;width=364;height=665;bodyX=615},
+  @{x=977;y=178;width=364;height=665;bodyX=1003},
+  @{x=1365;y=178;width=364;height=665;bodyX=1391}
+)
+$roomProtectedRegions = [ordered]@{
+  hostSlot=@{x=200;y=178;width=364;height=665}
+  slot2=@{x=589;y=178;width=364;height=665}
+  slot3=@{x=977;y=178;width=364;height=665}
+  primaryAction=@{x=1487;y=943;width=432;height=95}
+  leave=@{x=44;y=30;width=118;height=53}
+}
+$roomExclusionsByCapture = @{
+  'room-host'=@(
+    @{name='upper-scrolling-comments';reason='Figure 11 upper scrolling comments are outside room UI acceptance.';x=200;y=0;width=1500;height=140}
+  )
+  'room-full'=@(
+    @{name='upper-scrolling-comments';reason='Figure 12 upper scrolling comments are outside room UI acceptance.';x=200;y=0;width=1500;height=140},
+    @{name='right-side-popup';reason='Figure 12 right-side popup overlaps the obscured fourth-slot side and non-room pixels.';x=1660;y=140;width=260;height=760},
+    @{name='complete-fourth-slot';reason='Figure 12 popup obscures the complete fourth-slot reference.';x=1365;y=178;width=364;height=665}
+  )
+  'room-ready'=@(
+    @{name='upper-scrolling-comments';reason='Figure 13 upper scrolling comments are outside room UI acceptance.';x=200;y=0;width=1500;height=140},
+    @{name='right-side-popup';reason='Figure 13 right-side popup overlaps the obscured fourth-slot side and non-room pixels.';x=1660;y=140;width=260;height=760},
+    @{name='complete-fourth-slot';reason='Figure 13 popup obscures the complete fourth-slot reference.';x=1365;y=178;width=364;height=665}
+  )
+}
 $roomRegions = @(
-  @{ name='ignored-top-left'; x=0.00; y=0.00; width=0.22; height=0.15; mask=$true },
-  @{ name='ignored-player-art'; x=0.11; y=0.20; width=0.80; height=0.50; mask=$true },
-  @{ name='ignored-bottom-right-mode'; x=0.55; y=0.88; width=0.25; height=0.10; mask=$true },
+  @{ name='ignored-upper-comments'; x=0.1041666667; y=0.00; width=0.78125; height=0.1296296296; mask=$true },
   @{ name='room-background'; x=0.22; y=0.00; width=0.78; height=1.00; mask=$false },
   @{ name='player-card-layout'; x=0.11; y=0.16; width=0.80; height=0.66; mask=$false }
 )
+
+function New-LanLobbyRoomGateSpec(
+    [string] $Name,
+    [string] $Capture,
+    $Roi,
+    [ValidateSet('Cyan','Gray','Dark','Light','Contrast')] [string] $MaskKind,
+    [bool] $IsContour,
+    $DiagnosticRectTransform)
+{
+    return [pscustomobject][ordered]@{
+        name=$Name
+        capture=$Capture
+        roi=[pscustomobject]$Roi
+        exclusions=@($roomExclusionsByCapture[$Capture] | ForEach-Object { [pscustomobject]$_ })
+        maskKind=$MaskKind
+        isContour=$IsContour
+        thresholds=$(if ($IsContour) {
+            [pscustomobject][ordered]@{ maximumEdgeErrorPx=4; minimumContourJaccard=0.95 }
+        } else {
+            [pscustomobject][ordered]@{ maximumCenterErrorPxPerAxis=2; maximumVisibleSizeErrorPx=3 }
+        })
+        diagnosticRectTransform=$DiagnosticRectTransform
+    }
+}
+
+function Get-LanLobbyRoomGateSpecs($Capture)
+{
+    $captureName = [string]$Capture.name
+    $prefix = switch ($captureName) { 'room-host' {'RoomHost'} 'room-full' {'RoomFull'} 'room-ready' {'RoomReady'} }
+    $diagnosticRect = @($Capture.rects | Where-Object { $_ -and [string]$_.name -match 'RoomCard_0$' } | Select-Object -First 1)
+    $diagnostic = if ($diagnosticRect.Count -eq 1) { [pscustomobject][ordered]@{ x=$diagnosticRect[0].x;y=$diagnosticRect[0].y;width=$diagnosticRect[0].width;height=$diagnosticRect[0].height;role='diagnostic-only' } } else { $null }
+    $gates = @()
+    if ($captureName -eq 'room-host')
+    {
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyTopBar' $captureName @{x=218;y=170;width=337;height=46} 'Cyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyContour' $captureName @{x=218;y=208;width=337;height=523} 'Cyan' $true $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyCheck' $captureName @{x=354;y=403;width=54;height=48} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.ReadyLabel' $captureName @{x=326;y=448;width=110;height=38} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomHost.Slot1.CreatorTag' $captureName @{x=237;y=737;width=100;height=40} 'Light' $false $diagnostic
+        for ($slot=1;$slot -lt 4;$slot++)
+        {
+            $root=$roomSlotRoots[$slot]
+            $gates += New-LanLobbyRoomGateSpec "RoomHost.Slot$($slot+1).EmptyComposition" $captureName @{x=$root.x;y=$root.y;width=$root.width;height=$root.height} 'Gray' $true $diagnostic
+        }
+    }
+    elseif ($captureName -eq 'room-full')
+    {
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyTopBar' $captureName @{x=218;y=170;width=337;height=46} 'Cyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyContour' $captureName @{x=218;y=208;width=337;height=523} 'Cyan' $true $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyCheck' $captureName @{x=354;y=403;width=54;height=48} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.ReadyLabel' $captureName @{x=326;y=448;width=110;height=38} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomFull.Slot1.CreatorTag' $captureName @{x=237;y=737;width=100;height=40} 'Light' $false $diagnostic
+        foreach ($slot in @(1,2))
+        {
+            $root=$roomSlotRoots[$slot]
+            $gates += New-LanLobbyRoomGateSpec "RoomFull.Slot$($slot+1).WaitingTopBar" $captureName @{x=($root.bodyX-8);y=170;width=337;height=46} 'Gray' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "RoomFull.Slot$($slot+1).WaitingContour" $captureName @{x=($root.bodyX-8);y=208;width=337;height=523} 'Gray' $true $diagnostic
+        }
+    }
+    elseif ($captureName -eq 'room-ready')
+    {
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyTopBar' $captureName @{x=218;y=170;width=337;height=46} 'Cyan' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyContour' $captureName @{x=218;y=208;width=337;height=523} 'Cyan' $true $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyCheck' $captureName @{x=354;y=403;width=54;height=48} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.ReadyLabel' $captureName @{x=326;y=448;width=110;height=38} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Slot1.CreatorTag' $captureName @{x=237;y=737;width=100;height=40} 'Light' $false $diagnostic
+        foreach ($slot in @(1,2))
+        {
+            $root=$roomSlotRoots[$slot]
+            $slotNumber=$slot+1
+            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyTopBar" $captureName @{x=($root.bodyX-8);y=170;width=337;height=46} 'Cyan' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyContour" $captureName @{x=($root.bodyX-8);y=208;width=337;height=523} 'Cyan' $true $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyCheck" $captureName @{x=($root.bodyX+128);y=403;width=54;height=48} 'Light' $false $diagnostic
+            $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyLabel" $captureName @{x=($root.bodyX+100);y=448;width=110;height=38} 'Light' $false $diagnostic
+        }
+    }
+    if ($captureName -in @('room-full','room-ready'))
+    {
+        $color = if ($captureName -eq 'room-full') { 'Gray' } else { 'Cyan' }
+        $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.$color" $captureName @{x=1479;y=935;width=441;height=104} $color $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.IconCenter" $captureName @{x=1517;y=962;width=55;height=55} 'Light' $false $diagnostic
+        $gates += New-LanLobbyRoomGateSpec "$prefix.PrimaryAction.LabelCenter" $captureName @{x=1592;y=970;width=132;height=38} 'Light' $false $diagnostic
+    }
+    if ($captureName -eq 'room-ready')
+    {
+        $gates += New-LanLobbyRoomGateSpec 'RoomReady.Leave' $captureName @{x=36;y=22;width=134;height=69} 'Light' $false $diagnostic
+    }
+    return @($gates)
+}
 
 function Convert-NormalizedRectangle($Region, [int] $Width, [int] $Height)
 {
@@ -843,6 +1040,198 @@ function Resize-LanLobbyBitmap(
 function ConvertTo-LanLobbyBoundsObject($Bounds)
 {
     return [ordered]@{ x=$Bounds.X; y=$Bounds.Y; width=$Bounds.Width; height=$Bounds.Height }
+}
+
+function ConvertTo-LanLobbyRectangle($Record)
+{
+    return New-Object Drawing.Rectangle ([int]$Record.x), ([int]$Record.y), ([int]$Record.width), ([int]$Record.height)
+}
+
+function Get-LanLobbyVisibleBounds
+{
+    param(
+        [Parameter(Mandatory)] [Drawing.Bitmap] $Image,
+        [Parameter(Mandatory)] $Roi,
+        [Parameter(Mandatory)] [ValidateSet('Cyan','Gray','Dark','Light','Contrast')] [string] $MaskKind,
+        $Exclusions = @()
+    )
+
+    $roiRectangle = ConvertTo-LanLobbyRectangle $Roi
+    [Drawing.Rectangle[]]$exclusionRectangles = @($Exclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
+    $measurement = [LanLobbyVisualDiff]::FindVisibleMaskBounds($Image, $roiRectangle, $MaskKind, $exclusionRectangles)
+    if (-not $measurement.Available)
+    {
+        return [pscustomobject][ordered]@{
+            available=$false
+            failureReason=$measurement.FailureReason
+            bounds=$null
+            center=$null
+            pixelCount=0
+        }
+    }
+    $bounds = $measurement.Bounds
+    return [pscustomobject][ordered]@{
+        available=$true
+        failureReason=$null
+        bounds=[pscustomobject](ConvertTo-LanLobbyBoundsObject $bounds)
+        center=[pscustomobject][ordered]@{
+            x=$bounds.X + ($bounds.Width - 1) / 2.0
+            y=$bounds.Y + ($bounds.Height - 1) / 2.0
+        }
+        pixelCount=[int]$measurement.PixelCount
+    }
+}
+
+function Measure-LanLobbyVisiblePlacement
+{
+    param(
+        [Parameter(Mandatory)] [Drawing.Bitmap] $ActualImage,
+        [Parameter(Mandatory)] [Drawing.Bitmap] $ReferenceImage,
+        [Parameter(Mandatory)] $Gate
+    )
+
+    $actual = Get-LanLobbyVisibleBounds -Image $ActualImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    $reference = Get-LanLobbyVisibleBounds -Image $ReferenceImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    $thresholds = [pscustomobject]$Gate.thresholds
+    if (-not $actual.available -or -not $reference.available)
+    {
+        return [pscustomobject][ordered]@{
+            actual=$actual
+            reference=$reference
+            edgeDeltaPx=$null
+            centerDeltaPx=$null
+            sizeDeltaPx=$null
+            contour=[pscustomobject][ordered]@{ intersectionPixels=0; unionPixels=0; jaccard=0.0 }
+            thresholds=$thresholds
+            status='Failed'
+            reason=@($actual.failureReason,$reference.failureReason | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' / '
+            passed=$false
+        }
+    }
+
+    $actualRight = $actual.bounds.x + $actual.bounds.width
+    $referenceRight = $reference.bounds.x + $reference.bounds.width
+    $actualBottom = $actual.bounds.y + $actual.bounds.height
+    $referenceBottom = $reference.bounds.y + $reference.bounds.height
+    $edgeDelta = [pscustomobject][ordered]@{
+        unit='px'
+        left=$actual.bounds.x - $reference.bounds.x
+        top=$actual.bounds.y - $reference.bounds.y
+        right=$actualRight - $referenceRight
+        bottom=$actualBottom - $referenceBottom
+    }
+    $centerDelta = [pscustomobject][ordered]@{
+        unit='px'
+        deltaX=$actual.center.x - $reference.center.x
+        deltaY=$actual.center.y - $reference.center.y
+    }
+    $sizeDelta = [pscustomobject][ordered]@{
+        unit='px'
+        deltaWidth=$actual.bounds.width - $reference.bounds.width
+        deltaHeight=$actual.bounds.height - $reference.bounds.height
+    }
+    [Drawing.Rectangle[]]$exclusionRectangles = @($Gate.exclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
+    $comparison = [LanLobbyVisualDiff]::CompareVisibleMasks(
+        $ActualImage,
+        $ReferenceImage,
+        (ConvertTo-LanLobbyRectangle $Gate.roi),
+        [string]$Gate.maskKind,
+        $exclusionRectangles)
+    $contour = [pscustomobject][ordered]@{
+        intersectionPixels=[long]$comparison.IntersectionPixels
+        unionPixels=[long]$comparison.UnionPixels
+        jaccard=[Math]::Round([double]$comparison.Jaccard, 6)
+    }
+    $isContour = [bool]$Gate.isContour
+    $passed = if ($isContour)
+    {
+        [Math]::Abs($edgeDelta.left) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($edgeDelta.top) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($edgeDelta.right) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($edgeDelta.bottom) -le [double]$thresholds.maximumEdgeErrorPx -and
+        $contour.jaccard -ge [double]$thresholds.minimumContourJaccard
+    }
+    else
+    {
+        [Math]::Abs($centerDelta.deltaX) -le [double]$thresholds.maximumCenterErrorPxPerAxis -and
+        [Math]::Abs($centerDelta.deltaY) -le [double]$thresholds.maximumCenterErrorPxPerAxis -and
+        [Math]::Abs($sizeDelta.deltaWidth) -le [double]$thresholds.maximumVisibleSizeErrorPx -and
+        [Math]::Abs($sizeDelta.deltaHeight) -le [double]$thresholds.maximumVisibleSizeErrorPx
+    }
+    return [pscustomobject][ordered]@{
+        actual=$actual
+        reference=$reference
+        edgeDeltaPx=$edgeDelta
+        centerDeltaPx=$centerDelta
+        sizeDeltaPx=$sizeDelta
+        contour=$contour
+        thresholds=$thresholds
+        status=$(if ($passed) { 'Passed' } else { 'Failed' })
+        reason=$(if ($passed) { 'Visible color/contrast pixels satisfy the blocking placement thresholds.' } else { 'Visible color/contrast pixels exceed a blocking placement threshold.' })
+        passed=$passed
+    }
+}
+
+function Test-LanLobbyRectanglesOverlap($Left, $Right)
+{
+    return $Left.x -lt ($Right.x + $Right.width) -and
+        ($Left.x + $Left.width) -gt $Right.x -and
+        $Left.y -lt ($Right.y + $Right.height) -and
+        ($Left.y + $Left.height) -gt $Right.y
+}
+
+function Get-LanLobbyRoomMaterialEvidence($Capture, $SpriteUsage)
+{
+    $failures = @()
+    $shaPassed = $true
+    $occurrencePassed = $true
+    $auditProperty = $Capture.PSObject.Properties['sourceAudit']
+    [array]$auditRows = if ($null -eq $auditProperty) { @() } else { @($auditProperty.Value | Where-Object { $_ -and [bool]$_.isBitmap }) }
+    if ($auditRows.Count -eq 0)
+    {
+        $failures += "Capture '$($Capture.name)' has no bitmap sourceAudit rows."
+        $shaPassed = $false
+        $occurrencePassed = $false
+    }
+    foreach ($sprite in @($Capture.spriteSources))
+    {
+        [array]$audit = @($auditRows | Where-Object { [string]$_.node -ceq [string]$sprite.node -and [string]$_.spriteName -ceq [string]$sprite.spriteName })
+        [array]$approved = @($SpriteUsage | Where-Object { $_.CaptureName -ceq [string]$Capture.name -and $_.SpriteName -ceq [string]$sprite.spriteName })
+        if ($audit.Count -ne 1 -or $approved.Count -ne 1)
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' does not have one matching approved material row."
+            $shaPassed = $false
+            $occurrencePassed = $false
+            continue
+        }
+        if ([string]$audit[0].sha256 -cne [string]$approved[0].ImportedSha256 -or [string]$audit[0].sha256 -cnotmatch '^[0-9A-F]{64}$')
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' SHA-256 does not match the imported approved source."
+            $shaPassed = $false
+        }
+        if ([int]$audit[0].occurrenceCount -ne 1 -or @($audit[0].captures).Count -ne 1 -or [string]$audit[0].captures[0] -cne [string]$Capture.name)
+        {
+            $failures += "Rendered Sprite '$($sprite.node)' occurrence evidence does not identify exactly one occurrence in this capture."
+            $occurrencePassed = $false
+        }
+    }
+    foreach ($group in @($Capture.spriteSources | Group-Object spriteName))
+    {
+        $auditedCount = [int](($auditRows | Where-Object spriteName -ceq $group.Name | Measure-Object occurrenceCount -Sum).Sum)
+        if ($auditedCount -ne $group.Count)
+        {
+            $failures += "Sprite '$($group.Name)' audited occurrence total $auditedCount does not match rendered total $($group.Count)."
+            $occurrencePassed = $false
+        }
+    }
+    return [pscustomobject][ordered]@{
+        acceptanceRole='blocking'
+        shaPassed=$shaPassed
+        occurrencePassed=$occurrencePassed
+        passed=($shaPassed -and $occurrencePassed)
+        failures=@($failures)
+        rows=@($auditRows)
+    }
 }
 
 function Add-LanLobbyBoundsAdjustment($Measurement, $Adjustment, [string] $Label)
@@ -1265,6 +1654,23 @@ function Test-LanLobbyReferenceImage([string] $ReferencePath)
     }
 }
 
+function Resolve-LanLobbyCaptureReference([string] $ExpectedFileName, [string[]] $Directories)
+{
+    $matches = @(
+        foreach ($directory in $Directories)
+        {
+            if (-not (Test-Path -LiteralPath $directory -PathType Container)) { throw "Reference directory not found: $directory" }
+            Get-ChildItem -LiteralPath $directory -File -Filter '*.png' |
+                Where-Object { $_.Name -ceq $ExpectedFileName }
+        }
+    )
+    if ($matches.Count -ne 1)
+    {
+        throw "Expected exactly one reference named $ExpectedFileName; found $($matches.Count)."
+    }
+    return $matches[0].FullName
+}
+
 $captureDirectory = [IO.Path]::GetFullPath($CaptureDirectory)
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $captureDirectory 'VisualDiff' }
 $outputDirectory = Assert-LanLobbySafeOutputDirectory -ProjectRoot $projectRoot -OutputDirectory $OutputDirectory
@@ -1274,10 +1680,25 @@ $manifest = Get-LanLobbyCaptureManifest -ManifestPath $manifestPath
 Assert-LanLobbyCaptureEvidenceSchema $manifest
 $assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
 $spriteUsage = Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $manifest -AssetMapPath $assetMapPath
-$referenceHome = Resolve-LanLobbyReferenceImage -Suffix '9' -ReferenceDirectory $referenceDirectories
-$referenceRoom = Resolve-LanLobbyReferenceImage -Suffix '10' -ReferenceDirectory $referenceDirectories
-$referenceHomeProbe = Test-LanLobbyReferenceImage -ReferencePath $referenceHome
-$referenceRoomProbe = Test-LanLobbyReferenceImage -ReferencePath $referenceRoom
+$referencePaths = @{}
+$referenceProbes = @{}
+foreach ($captureName in $referenceByCapture.Keys)
+{
+    $expectedFileName = [string]$referenceByCapture[$captureName]
+    if (-not $referencePaths.ContainsKey($expectedFileName))
+    {
+        $referencePath = Resolve-LanLobbyCaptureReference -ExpectedFileName $expectedFileName -Directories $referenceDirectories
+        $probe = Test-LanLobbyReferenceImage -ReferencePath $referencePath
+        if ($expectedFileName -in @($figure11FileName,$figure12FileName,$figure13FileName) -and
+            ($probe.Width -ne 2560 -or $probe.Height -ne 1440))
+        {
+            throw "Room reference $expectedFileName must be exactly 2560x1440 before normalization; decoded $($probe.Width)x$($probe.Height)."
+        }
+        $referencePaths[$expectedFileName] = $referencePath
+        $referenceProbes[$expectedFileName] = $probe
+    }
+}
+$referenceHome = $referencePaths[$figure9FileName]
 
 # Dimension validation deliberately occurs before New-Item so failed captures cannot leave evidence output behind.
 foreach ($capture in @($manifest.captures))
@@ -1417,14 +1838,31 @@ $actionBarReports = @()
 $createDecorationReport = $null
 $joinDecorationReport = $null
 $createFrameReport = $null
+$roomGates = @()
+$roomExclusionReports = @()
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
     foreach ($capture in @($manifest.captures))
     {
         $isRoom = $capture.name -like 'room-*'
-        $referencePath = if ($isRoom) { $referenceRoom } else { $referenceHome }
-        $regionSpecs = if ($isRoom) { $roomRegions } else { $homeRegions }
+        $referencePath = $referencePaths[[string]$referenceByCapture[[string]$capture.name]]
+        $regionSpecs = if ($isRoom) {
+            @(
+                $roomRegions | Where-Object { $_.name -ne 'ignored-upper-comments' }
+                foreach ($exclusion in @($roomExclusionsByCapture[[string]$capture.name]))
+                {
+                    @{
+                        name=('ignored-' + $exclusion.name)
+                        x=$exclusion.x / 1920.0
+                        y=$exclusion.y / 1080.0
+                        width=$exclusion.width / 1920.0
+                        height=$exclusion.height / 1080.0
+                        mask=$true
+                    }
+                }
+            )
+        } else { $homeRegions }
         $actual = $null
         $nativeReference = $null
         $normalizedReference = $null
@@ -1438,7 +1876,12 @@ try
             $overlay = New-Object Drawing.Bitmap 1920, 1080
             $heatmap = New-Object Drawing.Bitmap 1920, 1080
             $graphics = [Drawing.Graphics]::FromImage($normalizedReference)
-            try { $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear; $graphics.DrawImage($nativeReference, 0, 0, 1920, 1080) } finally { $graphics.Dispose() }
+            try
+            {
+                $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear
+                $graphics.DrawImage($nativeReference, 0, 0, 1920, 1080)
+            }
+            finally { $graphics.Dispose() }
             $overlayGraphics = [Drawing.Graphics]::FromImage($overlay)
             $overlayAttributes = New-Object Drawing.Imaging.ImageAttributes
             try
@@ -1466,6 +1909,153 @@ try
             [double]$weightedDifference = if ($compared -eq 0) { 0.0 } else { (($measured | ForEach-Object { $_.pixelDifferenceRatio * $_.comparedPixels } | Measure-Object -Sum).Sum / $compared) }
             [double]$weightedError = if ($compared -eq 0) { 0.0 } else { (($measured | ForEach-Object { $_.averageAbsoluteRgbError * $_.comparedPixels } | Measure-Object -Sum).Sum / $compared) }
             $reportCaptures += [pscustomobject][ordered]@{ name=[string]$capture.name; actualWidth=1920; actualHeight=1080; referenceWidth=$nativeReference.Width; referenceHeight=$nativeReference.Height; referenceNormalization='independent-xy'; referenceFigure=[IO.Path]::GetFileName($referencePath); regions=$regions; maskedPixels=$maskedPixels; comparedPixels=$compared; pixelDifferenceRatio=$weightedDifference; averageAbsoluteRgbError=$weightedError; attention=($weightedDifference -gt 0.25 -or $weightedError -gt 48); roomCards=if ($isRoom) { Get-RoomCardGeometry $capture } else { @() }; referenceCardLayoutRegion=if ($isRoom) { $regions | Where-Object name -eq 'player-card-layout' } else { $null } }
+            if ($isRoom)
+            {
+                $captureName = [string]$capture.name
+                $captureExclusions = @($roomExclusionsByCapture[$captureName])
+                $protected = @($roomProtectedRegions.GetEnumerator() | ForEach-Object {
+                    [pscustomobject][ordered]@{ name=$_.Key; rect=[pscustomobject]$_.Value }
+                })
+                $exclusionRows = @(
+                    foreach ($exclusion in $captureExclusions)
+                    {
+                        $overlaps = @($protected | Where-Object { Test-LanLobbyRectanglesOverlap $exclusion $_.rect } | ForEach-Object name)
+                        [pscustomobject][ordered]@{
+                            capture=$captureName
+                            name=$exclusion.name
+                            reason=$exclusion.reason
+                            roi=[pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=$exclusion.x;y=$exclusion.y;width=$exclusion.width;height=$exclusion.height }
+                            protectedRegionsClear=($overlaps.Count -eq 0)
+                            overlappingProtectedRegions=$overlaps
+                        }
+                    }
+                )
+                if (@($exclusionRows | Where-Object { -not $_.protectedRegionsClear }).Count -gt 0)
+                {
+                    throw "Room reference exclusions overlap protected named gates for capture '$captureName'."
+                }
+                $roomExclusionReports += $exclusionRows
+                $materialEvidence = Get-LanLobbyRoomMaterialEvidence $capture $spriteUsage
+                $captureGateRows = @()
+                foreach ($gateSpec in @(Get-LanLobbyRoomGateSpecs $capture))
+                {
+                    $measurement = Measure-LanLobbyVisiblePlacement $actual $normalizedReference $gateSpec
+                    $gatePassed = $measurement.passed -and $materialEvidence.passed
+                    $gateStatus = if ($gatePassed) { 'Passed' } else { 'Failed' }
+                    $gateReason = if (-not $materialEvidence.passed) {
+                        'Blocking material SHA-256 or rendered occurrence evidence failed.'
+                    } else { $measurement.reason }
+                    $gateRow = [pscustomobject][ordered]@{
+                        name=$gateSpec.name
+                        capture=$captureName
+                        referenceFigure=[IO.Path]::GetFileName($referencePath)
+                        roi=[pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=$gateSpec.roi.x;y=$gateSpec.roi.y;width=$gateSpec.roi.width;height=$gateSpec.roi.height }
+                        exclusions=@($gateSpec.exclusions | ForEach-Object {
+                            [pscustomobject][ordered]@{ name=$_.name;reason=$_.reason;x=$_.x;y=$_.y;width=$_.width;height=$_.height }
+                        })
+                        maskKind=$gateSpec.maskKind
+                        maskDescription='Decoded opaque screenshot color/contrast mask measured directly from rendered RGB values.'
+                        diagnosticRectTransform=$gateSpec.diagnosticRectTransform
+                        actualVisibleBounds=$measurement.actual.bounds
+                        referenceVisibleBounds=$measurement.reference.bounds
+                        actualVisibleCenter=$measurement.actual.center
+                        referenceVisibleCenter=$measurement.reference.center
+                        actualVisiblePixelCount=$measurement.actual.pixelCount
+                        referenceVisiblePixelCount=$measurement.reference.pixelCount
+                        edgeDeltaPx=$measurement.edgeDeltaPx
+                        centerDeltaPx=$measurement.centerDeltaPx
+                        sizeDeltaPx=$measurement.sizeDeltaPx
+                        contour=$measurement.contour
+                        thresholds=$measurement.thresholds
+                        materialEvidence=$materialEvidence
+                        status=$gateStatus
+                        reason=$gateReason
+                        passed=$gatePassed
+                    }
+                    $captureGateRows += $gateRow
+                    if (-not $gatePassed)
+                    {
+                        foreach ($diagnosticBitmap in @($overlay,$heatmap))
+                        {
+                            $diagnosticGraphics = [Drawing.Graphics]::FromImage($diagnosticBitmap)
+                            $diagnosticPen = New-Object Drawing.Pen ([Drawing.Color]::Red), 3
+                            try { $diagnosticGraphics.DrawRectangle($diagnosticPen, (ConvertTo-LanLobbyRectangle $gateSpec.roi)) }
+                            finally { $diagnosticPen.Dispose(); $diagnosticGraphics.Dispose() }
+                        }
+                    }
+                }
+
+                $profileRoi = [pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=250;y=525;width=250;height=160 }
+                $profileActual = Get-LanLobbyVisibleBounds $actual $profileRoi 'Light' @($captureExclusions)
+                $profileReference = Get-LanLobbyVisibleBounds $normalizedReference $profileRoi 'Light' @($captureExclusions)
+                $profileAbsent = -not $profileActual.available -and -not $profileReference.available -and $materialEvidence.passed
+                $capturePrefix = switch ($captureName) { 'room-host' {'RoomHost'} 'room-full' {'RoomFull'} 'room-ready' {'RoomReady'} }
+                $captureGateRows += [pscustomobject][ordered]@{
+                    name="$capturePrefix.Slot1.ProfileContentAbsence";capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
+                    roi=$profileRoi;exclusions=@($captureExclusions);maskKind='Light';maskDescription='Decoded opaque screenshot light-color mask; absence requires zero qualifying pixels.'
+                    diagnosticRectTransform=$null;actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                    edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=[pscustomobject]@{intersectionPixels=0;unionPixels=0;jaccard=$null}
+                    thresholds=[pscustomobject]@{maximumVisiblePixelCount=0};materialEvidence=$materialEvidence
+                    status=$(if($profileAbsent){'Passed'}else{'Failed'});reason=$(if($profileAbsent){'Host profile-content ROI contains no qualifying visible pixels.'}else{'Host profile-content absence or material evidence failed.'});passed=$profileAbsent
+                }
+                $forbiddenText = if ($captureName -eq 'room-host') { 'OPEN SLOT' } elseif ($captureName -eq 'room-full') { 'WAITING' } else { $null }
+                if ($forbiddenText)
+                {
+                    $textAbsent = @($capture.unityText | Where-Object { [string]$_.text -ceq $forbiddenText }).Count -eq 0 -and $materialEvidence.passed
+                    $captureGateRows += [pscustomobject][ordered]@{
+                        name=$(if($captureName -eq 'room-host'){'RoomHost.LegacyOpenSlotTextAbsence'}else{'RoomFull.LegacyWaitingTextAbsence'})
+                        capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
+                        roi=[pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=200;y=178;width=1529;height=665};exclusions=@($captureExclusions)
+                        maskKind='manifest-text-absence';maskDescription='Structured active Unity Text evidence from the capture manifest.';diagnosticRectTransform=$null
+                        actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                        edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=$null;thresholds=[pscustomobject]@{maximumOccurrenceCount=0}
+                        materialEvidence=$materialEvidence;status=$(if($textAbsent){'Passed'}else{'Failed'});reason=$(if($textAbsent){"Active Unity Text contains no '$forbiddenText'."}else{"Forbidden active Unity Text '$forbiddenText' or material evidence failed."});passed=$textAbsent
+                    }
+                }
+                [array]$spacingNames = if ($captureName -eq 'room-host') {
+                    @('RoomHost.Slot2.EmptyComposition','RoomHost.Slot3.EmptyComposition')
+                } elseif ($captureName -eq 'room-ready') {
+                    @('RoomReady.Slot2.ReadyContour','RoomReady.Slot3.ReadyContour')
+                } else { @() }
+                if (@($spacingNames).Count -eq 2)
+                {
+                    $leftGate=@($captureGateRows | Where-Object name -eq $spacingNames[0])[0]
+                    $rightGate=@($captureGateRows | Where-Object name -eq $spacingNames[1])[0]
+                    $spacingAvailable = $null -ne $leftGate.actualVisibleCenter -and
+                        $null -ne $rightGate.actualVisibleCenter -and
+                        $null -ne $leftGate.referenceVisibleCenter -and
+                        $null -ne $rightGate.referenceVisibleCenter
+                    $actualSpacing = if ($spacingAvailable) { $rightGate.actualVisibleCenter.x-$leftGate.actualVisibleCenter.x } else { $null }
+                    $referenceSpacing = if ($spacingAvailable) { $rightGate.referenceVisibleCenter.x-$leftGate.referenceVisibleCenter.x } else { $null }
+                    $spacingDelta = if ($spacingAvailable) { $actualSpacing-$referenceSpacing } else { $null }
+                    $spacingPassed=$spacingAvailable -and [Math]::Abs($spacingDelta)-le 4 -and $materialEvidence.passed
+                    $captureGateRows += [pscustomobject][ordered]@{
+                        name=$(if($captureName -eq 'room-host'){'RoomHost.Slot2To3.VisibleContourSpacing'}else{'RoomReady.Slot2To3.VisibleContourSpacing'})
+                        capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
+                        roi=[pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=589;y=178;width=752;height=665};exclusions=@($captureExclusions)
+                        maskKind='derived-visible-contour-spacing';maskDescription='Derived from the two authoritative visible contour centers.';diagnosticRectTransform=$null
+                        actualVisibleBounds=@($leftGate.actualVisibleBounds,$rightGate.actualVisibleBounds);referenceVisibleBounds=@($leftGate.referenceVisibleBounds,$rightGate.referenceVisibleBounds)
+                        actualVisibleCenter=@($leftGate.actualVisibleCenter,$rightGate.actualVisibleCenter);referenceVisibleCenter=@($leftGate.referenceVisibleCenter,$rightGate.referenceVisibleCenter)
+                        edgeDeltaPx=$null;centerDeltaPx=[pscustomobject][ordered]@{unit='px';actualSpacing=$actualSpacing;referenceSpacing=$referenceSpacing;spacingDelta=$spacingDelta};sizeDeltaPx=$null;contour=$null
+                        thresholds=[pscustomobject]@{maximumSpacingErrorPx=4};materialEvidence=$materialEvidence;status=$(if($spacingPassed){'Passed'}else{'Failed'})
+                        reason=$(if($spacingPassed){'Repeated visible contour spacing satisfies the 4 px gate.'}elseif(-not $spacingAvailable){'Repeated visible contour spacing is unavailable because a required visible contour is empty.'}else{'Repeated visible contour spacing or material evidence failed.'});passed=$spacingPassed
+                    }
+                }
+                if ($captureName -in @('room-full','room-ready'))
+                {
+                    $captureGateRows += [pscustomobject][ordered]@{
+                        name=$(if($captureName -eq 'room-full'){'RoomFull.Slot4.ReferencePopupExclusion'}else{'RoomReady.Slot4.ReferencePopupExclusion'})
+                        capture=$captureName;referenceFigure=[IO.Path]::GetFileName($referencePath)
+                        roi=[pscustomobject][ordered]@{coordinateOrigin='screen-top-left';unit='px';x=1365;y=178;width=364;height=665}
+                        exclusions=@($captureExclusions);maskKind=$null;maskDescription='No visible measurement is accepted from the popup-obscured fourth-slot reference.'
+                        diagnosticRectTransform=$null;actualVisibleBounds=$null;referenceVisibleBounds=$null;actualVisibleCenter=$null;referenceVisibleCenter=$null
+                        edgeDeltaPx=$null;centerDeltaPx=$null;sizeDeltaPx=$null;contour=$null
+                        thresholds=[pscustomobject]@{acceptance='excluded-never-passed'};materialEvidence=$materialEvidence
+                        status='ExcludedByReferencePopup';reason="The complete fourth slot is obscured by the Figure $($(if($captureName -eq 'room-full'){12}else{13})) right-side popup; Figure 11 is the only blocking fourth-slot reference.";passed=$false
+                    }
+                }
+                $roomGates += $captureGateRows
+            }
             $actual.Save((Join-Path $stagingDirectory ($capture.name + '-actual.png')), [Drawing.Imaging.ImageFormat]::Png)
             $normalizedReference.Save((Join-Path $stagingDirectory ($capture.name + '-reference.png')), [Drawing.Imaging.ImageFormat]::Png)
             $overlay.Save((Join-Path $stagingDirectory ($capture.name + '-overlay.png')), [Drawing.Imaging.ImageFormat]::Png)
@@ -2057,6 +2647,8 @@ try
         createDecoration=$createDecorationReport
         joinDecoration=$joinDecorationReport
         createFrame=$createFrameReport
+        roomExclusions=$roomExclusionReports
+        roomGates=$roomGates
         assets=$assets
         materialUsage=[ordered]@{
             bitmapSprites=$assets
@@ -2071,6 +2663,32 @@ try
     })
     $markdown = @('# LAN Lobby Visual Difference Report', '', "Reference figure native dimensions (decoded from this export): $($referenceDimensionLines -join '; '). Each reference is independently normalized on X and Y to 1920×1080. This is non-blocking layout/color reporting, not a pixel-equality claim.", '', '## Captures', '', '| Capture | Figure | Difference ratio | Avg RGB error | Attention |', '| --- | --- | ---: | ---: | --- |')
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
+    $markdown += @(
+        '',
+        '## LAN room named visible-pixel gates',
+        '',
+        'Blocking placement uses decoded opaque screenshot color/contrast masks measured directly from rendered RGB values. Diagnostic RectTransform rectangles do not override visible-pixel results.',
+        '',
+        '| Gate | Capture / reference | ROI | Mask | Actual / reference visible bounds | Center delta | Size delta | Edge delta | Jaccard | Thresholds | Material | Status / reason |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- |'
+    )
+    foreach ($gate in @($roomGates))
+    {
+        $actualBounds = if ($gate.actualVisibleBounds -is [array]) { @($gate.actualVisibleBounds | Where-Object { $null -ne $_ } | ForEach-Object { "$($_.x),$($_.y),$($_.width),$($_.height)" }) -join '; ' } elseif ($gate.actualVisibleBounds) { "$($gate.actualVisibleBounds.x),$($gate.actualVisibleBounds.y),$($gate.actualVisibleBounds.width),$($gate.actualVisibleBounds.height)" } else { 'n/a' }
+        $referenceBounds = if ($gate.referenceVisibleBounds -is [array]) { @($gate.referenceVisibleBounds | Where-Object { $null -ne $_ } | ForEach-Object { "$($_.x),$($_.y),$($_.width),$($_.height)" }) -join '; ' } elseif ($gate.referenceVisibleBounds) { "$($gate.referenceVisibleBounds.x),$($gate.referenceVisibleBounds.y),$($gate.referenceVisibleBounds.width),$($gate.referenceVisibleBounds.height)" } else { 'n/a' }
+        $centerDelta = if ($gate.centerDeltaPx) { @($gate.centerDeltaPx.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', ' } else { 'n/a' }
+        $sizeDelta = if ($gate.sizeDeltaPx) { "dw=$($gate.sizeDeltaPx.deltaWidth), dh=$($gate.sizeDeltaPx.deltaHeight)" } else { 'n/a' }
+        $edgeDelta = if ($gate.edgeDeltaPx) { "l/t/r/b=$($gate.edgeDeltaPx.left)/$($gate.edgeDeltaPx.top)/$($gate.edgeDeltaPx.right)/$($gate.edgeDeltaPx.bottom)" } else { 'n/a' }
+        $jaccard = if ($gate.contour -and $null -ne $gate.contour.jaccard) { $gate.contour.jaccard } else { 'n/a' }
+        $thresholdText = @($gate.thresholds.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '
+        $materialText = "sha=$($gate.materialEvidence.shaPassed), occurrences=$($gate.materialEvidence.occurrencePassed), passed=$($gate.materialEvidence.passed)"
+        $markdown += "| $($gate.name) | $($gate.capture) / $($gate.referenceFigure) | $($gate.roi.x),$($gate.roi.y),$($gate.roi.width),$($gate.roi.height) | $($gate.maskKind) | $actualBounds / $referenceBounds | $centerDelta | $sizeDelta | $edgeDelta | $jaccard | $thresholdText | $materialText | $($gate.status): $(ConvertTo-LanLobbyMarkdownCell ([string]$gate.reason)) |"
+    }
+    $markdown += @('', '### Room reference exclusions', '', '| Capture | Exclusion | ROI | Protected regions clear | Reason |', '| --- | --- | --- | --- | --- |')
+    foreach ($exclusion in @($roomExclusionReports))
+    {
+        $markdown += "| $($exclusion.capture) | $($exclusion.name) | $($exclusion.roi.x),$($exclusion.roi.y),$($exclusion.roi.width),$($exclusion.roi.height) | $($exclusion.protectedRegionsClear) | $(ConvertTo-LanLobbyMarkdownCell ([string]$exclusion.reason)) |"
+    }
     $markdown += @('', 'Masked pixels are transparent black in heatmaps and excluded from metrics.', '', '## Home action bars', '', 'Action comparisons use measured native Figure 9 crops. The manifest-derived actual crop and approved target use 1920×1080 screen coordinates with a top-left origin. The native reference crop is locally resized to the approved target size; a separately reported comparison copy is resized to the actual crop only for pixel metrics and overlays. The legacy full-screen report retains its existing independent-X/Y normalization.', '', '| Name | Actual Rect (px) | Approved target Rect (px) | Native reference Rect (px) | Locally resized reference | Comparison reference | Position deviation (px) | Size deviation after local resize (px) | Difference ratio | Avg RGB error |', '| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: |')
     foreach ($item in $actionBarReports) { $markdown += "| $($item.name) | $($item.actualRect.x),$($item.actualRect.y),$($item.actualRect.width),$($item.actualRect.height) | $($item.approvedTargetRectPx1920x1080.x),$($item.approvedTargetRectPx1920x1080.y),$($item.approvedTargetRectPx1920x1080.width),$($item.approvedTargetRectPx1920x1080.height) | $($item.referenceRect.x),$($item.referenceRect.y),$($item.referenceRect.width),$($item.referenceRect.height) | $($item.locallyResizedReferenceSizePx.width)x$($item.locallyResizedReferenceSizePx.height) px | $($item.comparisonReferenceSizePx.width)x$($item.comparisonReferenceSizePx.height) px | dx=$($item.positionDeviationPx1920x1080.deltaX), dy=$($item.positionDeviationPx1920x1080.deltaY) | dw=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaWidth), dh=$($item.sizeDeviationPxAfterLocalReferenceResize.deltaHeight) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) |" }
     $markdown += @('', '## Home action content visible bounds', '', 'Actual and locally resized Figure 9 reference crops use the same luminance threshold. Acceptance is based on the four fixed expected visible bounds, not on full Sprite or Text Rect centers.', '', '| Element | Expected | Reference measured | Actual measured | Center deviation (px) | Size deviation (px) | Passed |', '| --- | --- | --- | --- | --- | --- | --- |')
