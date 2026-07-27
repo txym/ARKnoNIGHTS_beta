@@ -10,7 +10,7 @@
 
 **Approved design:** `docs/superpowers/specs/2026-07-27-room-select-join-decoration-design.md`
 
-**Scope guard:** Do not change Create UI, either accepted action bar, discovery/prefill semantics, room-code validation, Room UI, LAN transport, Unity/Package versions, or imported PNG/meta files. Do not create a composite Join bitmap. At most three visible Player calibration cycles are allowed.
+**Scope guard:** Do not change Create UI, either accepted action bar, discovery/prefill semantics, room-code validation, Room UI, LAN transport, Unity/Package versions, or imported PNG/meta files. Do not create a composite Join bitmap. The original plan allowed at most three visible Player calibration cycles; the dated, one-shot post-review exception and the actual five-run accounting are recorded below.
 
 ---
 
@@ -409,6 +409,18 @@ Commit each retained correction separately:
 git add Assets/Game/Runtime/Lobby/LanLobbyView.cs Assets/Game/Tests/PlayMode/Lobby/LanLobbyViewPlayModeTests.cs Assets/Game/Tests/PlayMode/Lobby/LanLobbyCaptureSuitePlayModeTests.cs
 git commit -m "fix: calibrate join decoration bounds"
 ```
+
+### Execution addendum: approved post-review exception and visible-run accounting (2026-07-27)
+
+The original three-cycle stopping rule above remains the historical rule. Actual execution produced five visible Windows Player runs:
+
+1. `Cycle-1` was run once; its real manifest schema was incompatible with the exporter and no `VisualDiff` was produced.
+2. `Cycle-2` was run once; the detector was corrected without another Player, after which `triangle` and `block-bank` still failed.
+3. `Cycle-3` was run once; all seven rows passed, but manual inspection retained a placeholder caveat.
+4. `Verification-Final` was a fresh visible Player run after the placeholder correction. It was therefore the fourth visible Player run. Earlier wording that it “did not count” as a fourth cycle was incorrect and is retained only as a documented process deviation.
+5. Final review then found that the block-bank outer union could pass while its internal orange topology was compressed. The user explicitly authorized exactly one additional post-review correction cycle. `PostReview-Cycle-1` was that fifth visible Player run and the only Player run under the exception.
+
+No second post-review build, Player, capture, or runtime correction was performed. The first report from the fifth run correctly passed the new block topology but falsely expanded the central-blank measurement because a neighboring middle block entered its broad detector. The evidence-only central-anchor correction replayed the same retained screenshot into `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final`; it did not create a sixth Player run.
 
 ---
 

@@ -49,6 +49,9 @@ From back to front, the Join region contains:
    `room_select_join_right_block` Images. Their overlaps reproduce the single
    Figure 9 block bank; the group target visible screen union is
    `(1199,703,639,89)`.
+   The retained four middle Rects use Join-local `(left,top,width)` values
+   `(271,118,74)`, `(343,118,106)`, `(504,118,108)`, and
+   `(606,118,108)`; each height remains source-aspect-derived.
 4. One visible `room_select_join_middle_block_mask` over the block bank to
    form the black central interruption.
 5. One `room_select_join_blank` centered at target visible bounds
@@ -128,6 +131,11 @@ Tests and evidence must lock:
 - per-state and aggregate Sprite occurrence counts and approved source paths;
 - no `$0` or `#0` source;
 - no decoration Graphic intersects the accepted Join action Rect.
+- the block-bank outer union and a nested, blocking orange-column topology
+  profile. In Join-local ROI `(35,107,660,89)`, a column is occupied when at
+  least three pixels satisfy `R>=100`, `R-G>=15`, and `B<=130`; acceptance
+  requires span start/end deviation at most `4 px`, occupied-column-count
+  delta at most `20`, and binary-profile Jaccard at least `0.95`.
 
 The visual exporter adds a `home-join-decoration` crop for actual, reference,
 overlay, and heatmap images. Its structured report covers the header,
@@ -151,6 +159,25 @@ or LAN code. Stop immediately when all named Join rows and manual inspection
 pass. Stop after Cycle 3 even if they fail, retain the final artifacts, and
 report the unresolved measurements without claiming completion.
 
+### Approved exception and actual run history (2026-07-27)
+
+The three-cycle rule above was the approved design guard. Execution history is
+preserved rather than rewritten:
+
+1. `Cycle-1`, `Cycle-2`, and `Cycle-3` were the three planned visible Player
+   runs.
+2. `Verification-Final`, run after the placeholder correction, was in fact a
+   fourth visible Player run. The former claim that it was “not a fourth
+   calibration cycle” was a process-accounting error.
+3. Final review then exposed an outer-union false positive in `block-bank`.
+   The user authorized exactly one additional post-review correction cycle.
+   `PostReview-Cycle-1` was the fifth visible Player run and the only run under
+   that exception.
+
+No second post-review Player was run. The retained fifth-run screenshots were
+replayed after an evidence-only central-anchor detector correction; that replay
+did not change runtime, rebuild, recapture, or add another visible run.
+
 ## Acceptance
 
 - The Figure 9 Join decoration reads as one coherent orange/gray block bank,
@@ -170,5 +197,7 @@ report the unresolved measurements without claiming completion.
 For named header, triangle, blank, and input rows, the final visible center
 deviation is at most `2 px` per axis and the width/height deviation is at most
 `3 px`. The block-bank union permits at most `4 px` center and size deviation
-per axis because its repeated translucent edges merge. The backing boundary
+per axis because its repeated translucent edges merge. The block-bank
+`internalTopology` gate above is independently blocking, so a matching outer
+union cannot hide a compressed or missing internal run. The backing boundary
 permits at most `1 px` deviation and must never cross screen `y=876`.

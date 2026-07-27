@@ -176,27 +176,27 @@ Manual inspection of `VisualDiff-2/home-actual.png` and the Create-frame actual/
 
 ## Home Join decoration — final retained evidence (current authoritative, 2026-07-27)
 
-Authoritative Join record: commit `24806571adddee9dc48855967fd7b0a3e44ecbb6`. The Figure 9 Join upper decoration, room-code input background, centered `输入同盟密钥` placeholder, removed `SimulationInvite`, repeated-Sprite inventory, accepted Join action, and material provenance pass their current blocking gates. This result does not repair or supersede the separate Create open-frame visual failure above; it proves only that the Join work left Create unchanged.
+Authoritative Join record: commit `b645e5bed8db106f23a7a73f55b69ba75468b987` (`fix: align join block topology`). The Figure 9 Join upper decoration, room-code input background, centered `输入同盟密钥` placeholder, removed `SimulationInvite`, repeated-Sprite inventory, accepted Join action, material provenance, outer bounds, and blocking internal block topology pass. This result does not repair or supersede the separate Create open-frame visual failure above; it proves only that the Join work left Create unchanged.
 
 ### Final build and visible Player capture
 
-- Windows x86_64 build output: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/WindowsStandalone/ARKnoNIGHTS.exe`.
-- Build log: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/WindowsStandaloneBuild.log`.
+- Windows x86_64 build output: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/WindowsStandalone/ARKnoNIGHTS.exe`.
+- Build log: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/WindowsStandaloneBuild.log`.
 - Unity process exit: `0`.
-- BuildReport: `result=Succeeded`, `errors=0`, `warnings=0`, `totalSize=184845930`, `totalTime=00:00:09.6019372`.
+- BuildReport: `result=Succeeded`, `errors=0`, `warnings=0`, `totalSize=184845930`, `totalTime=00:00:04.3866279`.
 - The Player was launched visibly with D3D11 at `1920×1080`, without `-batchmode`, a hidden-window argument, or a background service.
-- Player evidence: PID `8548`, process session `1`, Explorer interactive session `1`, nonzero window handle `46534514`, visible title `ArkNoNight`, exit `0`.
-- Player log: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/PlayerCapture.log`; it records `[LanLobby][capture.completed] count=5` and has zero case-insensitive `error|exception|warning` matches.
-- Capture directory: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures`.
-- Manifest: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/manifest.json`; `119302` bytes, BOM-less UTF-8, valid JSON, exactly five capture records.
+- Player evidence: PID `50776`, current/Explorer/Player sessions `1/1/1`, exit `0`.
+- Player log: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/PlayerCapture.log`; it records `[LanLobby][capture.completed] count=5` and has zero case-insensitive `error|exception|warning` matches.
+- Capture directory: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures`.
+- Manifest: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures/manifest.json`; `119250` bytes, BOM-less UTF-8, valid JSON, exactly five capture records.
 
 | Capture | Exact path | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
-| `home` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/home.png` | 646420 | `E690B268C66C4A728EDEAF8E94C4F354A1B280DA95EF23E9D5E64D11A3002C9E` |
-| `discovered-prefill` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/discovered-prefill.png` | 652259 | `F08F48E5431FF5F7157A2DB25C530957BBDFB91ACA35AFE049DB95329E096147` |
-| `room-host` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/room-host.png` | 740070 | `487E7E99397377F7C22316E4EC71CF902EE745DA7C7B22D690D35F7641DD8395` |
-| `room-ready` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/room-ready.png` | 691294 | `73B5CD77DFD4866015ACDCFB9B2264743FE5A731B6F2F8B3F97AE43F059C033F` |
-| `room-full` | `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures/room-full.png` | 700509 | `BB2E6C8BF8BD549F8B149FB3582EDCA376C1C216BF0BF22815533FAB85A8DBC1` |
+| `home` | `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures/home.png` | 658906 | `9464B159A9C16F989C54E9105F658A91F74A0873A3E3575D15CD3573DFE3B485` |
+| `discovered-prefill` | `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures/discovered-prefill.png` | 665273 | `B48C3F96890B8B4ED46818EE10C4E72255ADC164456F000DFD199F7BFC8F96BD` |
+| `room-host` | `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures/room-host.png` | 740070 | `487E7E99397377F7C22316E4EC71CF902EE745DA7C7B22D690D35F7641DD8395` |
+| `room-ready` | `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures/room-ready.png` | 691294 | `73B5CD77DFD4866015ACDCFB9B2264743FE5A731B6F2F8B3F97AE43F059C033F` |
+| `room-full` | `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures/room-full.png` | 700509 | `BB2E6C8BF8BD549F8B149FB3582EDCA376C1C216BF0BF22815533FAB85A8DBC1` |
 
 Every PNG is non-empty, decodes successfully, and is exactly `1920×1080`.
 
@@ -204,12 +204,12 @@ Every PNG is non-empty, decodes successfully, and is exactly `1920×1080`.
 
 Exporter exit: `0`. Exact retained files:
 
-- JSON: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/visual-diff-report.json`;
-- Markdown: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/visual-diff-report.md`;
-- actual crop: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-actual.png`;
-- normalized Figure 9 crop: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-reference.png`;
-- overlay: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-overlay.png`;
-- heatmap: `Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff/home-join-decoration-heatmap.png`.
+- JSON: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/visual-diff-report.json`;
+- Markdown: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/visual-diff-report.md`;
+- actual crop: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/home-join-decoration-actual.png`;
+- normalized Figure 9 crop: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/home-join-decoration-reference.png`;
+- overlay: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/home-join-decoration-overlay.png`;
+- heatmap: `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/home-join-decoration-heatmap.png`.
 
 The native Figure 9 crop is `(1257,635,763,297)` on `2102×1149`. The normalized actual/target crop and Join backing are `(1154,596,717,280)` on `1920×1080`, ending at the accepted Join action top `y=876`. All seven adjusted decoded-pixel rows are measurable and pass:
 
@@ -233,14 +233,28 @@ The native Figure 9 crop is `(1257,635,763,297)` on `2102×1149`. The normalized
 - accepted `home-join-action` passes at `(1154,876,717,99)` with unchanged icon/label content;
 - required repeated Sprite inventory and approved provenance pass.
 
-The placeholder was independently measured inside the `717×280` crop. Final actual bounds are `(272,220,166,27)` versus normalized Figure 9 `(271,221,168,25)`: center delta `(0,0)`, edge deltas left `+1`, top `-1`, right `-1`, bottom `+1`, and size delta `(-2,+2)`. The baked search icon is `(130,217,30,35)` and placeholder text starts at `x=272`, leaving `112 px` of clear horizontal space; the text is centered and does not overlap the icon.
+The central-blank detector now isolates the four fixed-reference quadrants from neighboring middle-block orange. Its final raw actual bounds are `(324,69,58,58)`; the adjusted row above remains within the unchanged `2 px` tolerance.
 
-### Bounded-cycle history
+The `block-bank` row also contains a nested blocking `internalTopology` check, which prevents the former outer-union false positive. Its ROI is `(35,107,660,89)`; a column is occupied when at least three pixels satisfy `R>=100`, `R-G>=15`, and `B<=130`. The acceptance gates are maximum span-edge deviation `4 px`, maximum occupied-column-count delta `20`, and minimum profile Jaccard `0.95`.
+
+| Topology | Runs | Occupied columns |
+| --- | --- | ---: |
+| Figure 9 reference | `150..219`, `222..587` | 436 |
+| Post-review Player | `150..219`, `222..483`, `485..587` | 435 |
+
+The final comparison has Jaccard `0.997706`, count delta `-1`, and start/end/width deltas `0/0/0`; both the outer bounds and internal topology pass.
+
+The placeholder was independently measured inside the `717×280` crop. Final actual bounds are `(273,220,165,27)` versus normalized Figure 9 `(272,221,167,25)`; both centers are exactly `(355,233)`. The text is centered and does not overlap the baked input icon.
+
+### Complete visible-Player history and approved exception
 
 1. `Cycle-1`: build/capture produced five valid Player screenshots, but the real manifest lacked the explicit coordinate/raycast schema assumed by the synthetic fixture. Export failed before output (`spriteName` property mismatch); `Cycle-1/VisualDiff` is absent. Cycle 1 is preserved as invalid schema evidence, not visual acceptance.
 2. `Cycle-2`: numeric build exit `0`, visible Player exit `0`, and five captures succeeded. The first `Cycle-2/VisualDiff` report failed because fixed-reference detector thresholds made `logo`, `text-02`, `block-bank`, and `input` unavailable. After the detector-only correction, `Cycle-2/VisualDiff-DetectorFix-R2` made all seven rows measurable, but `triangle` and `block-bank` still failed their unchanged tolerances; manual Join acceptance remained failed.
-3. `Cycle-3`: the final allowed geometry correction changed only the measured triangle and outer block placement. `Cycle-3/VisualDiff` passed all seven rows and every structural gate, but manual inspection retained a placeholder horizontal-position/font-size caveat. No fourth calibration cycle was run.
-4. `Verification-Final`: after the focused placeholder-only correction at `24806571`, a fresh build, visible Player, five captures, manifest, exporter, manual inspection, and placeholder measurement passed. This is the final evidence root; it is post-correction verification, not a fourth calibration cycle.
+3. `Cycle-3`: the final planned geometry correction changed only the measured triangle and outer block placement. `Cycle-3/VisualDiff` passed all seven rows and every then-existing structural gate, but manual inspection retained a placeholder horizontal-position/font-size caveat.
+4. `Verification-Final`: after the focused placeholder-only correction at `24806571`, a fresh build, visible Player, five captures, manifest, exporter, manual inspection, and placeholder measurement passed the then-existing gates. This was the fourth visible Player run. The old statement that it was “not a fourth calibration cycle” was incorrect and is retained as a process deviation. Final review later showed that its outer block union hid a compressed topology: reference runs `150..219/222..587`, `436` columns; actual run `214..517`, `304` columns; Jaccard `0.689498`, count delta `-132`, and start/end deltas `+64/-70`.
+5. The user then authorized exactly one additional post-review correction cycle. `PostReview-Cycle-1` was the fifth visible Player run and the only run under that exception. The retained middle Rects are `(left,top,width)` `271,118,74`, `343,118,106`, `504,118,108`, and `606,118,108`. Its first report passed the corrected topology but falsely expanded `central-blank` because neighboring `MiddleBlock_2` entered the broad detector. The evidence-only central-anchor fix replayed the same retained screenshot into `VisualDiff-CentralAnchorFix-Final`; it did not rebuild, recapture, alter runtime, or create a sixth Player run.
+
+No second post-review Player, build, capture, or runtime correction was performed.
 
 ### Complete final bitmap material table
 
@@ -305,7 +319,7 @@ The exact aggregate Join Sprite occurrence counts are:
 | `room_select_join_text_bg` | 2 | `discovered-prefill, home` |
 | `room_select_join_triangle` | 2 | `discovered-prefill, home` |
 
-Each Home state therefore has exactly one Join action icon; the removed Simulation Invite no longer contributes a second icon.
+Each Home state therefore has exactly `21` Join Sprite occurrences and exactly one Join action icon; the removed Simulation Invite no longer contributes a second icon.
 
 ### Code-native geometry
 
@@ -326,11 +340,17 @@ For each `home` and `discovered-prefill` manifest record, the six Join rows are 
 
 ### Final regression and Create invariance
 
-- Focused XML and matching summaries: Layout `6/6`, View `16/16`, Capture `3/3`, Controller `3/3`; aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`.
+- Fresh focused XML and matching summaries under `Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Verification-Final/{Layout,View,Capture,Controller}`: Layout `6/6`, View `16/16`, Capture `3/3`, Controller `3/3`; aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`. Layout used a bounded stop only after complete results; the other three suites exited normally.
 - `scripts/TestLanLobbyVisualDiffSmoke.ps1`, `scripts/TestExportLanLobbyEvidenceSmoke.ps1`, and `scripts/TestLanLobbyEvidenceCommonSmoke.ps1` each printed `PASS` and exited `0`.
 - Final report audit printed `FINAL MANIFEST/REPORT AUDIT: PASS`, with `captures=5`, `joinVisualRows=7/7`, `bitmapRows=36`, `joinGeometryRowsPerHome=6`, `homeGeometryRows=8`, and `discoveredGeometryRows=8`.
-- The final and Cycle 3 `home-create-frame-actual.png` files are both `155035` bytes and share SHA-256 `AB0565B99828ED3BDB8E210445BFB1C9458727A03049D303D9EF46DCA8E38FD1`.
-- A full-screen Cycle 3/final comparison found `4020` changed pixels, all within input rectangle `(1269,800,482,60)`; `OutsideInputExclusion=0`. Thus the placeholder correction did not change Create or either accepted action bar.
+- Every one of the unchanged `36` bitmap material rows has a nonempty Resources/source path, uppercase 64-hex imported hash, capture list, and positive occurrence count. Aggregate Join Sprite counts remain `join_icon=2`, `ban=8`, `blank=2`, `join_btn_bg=2`, `left=4`, `logo=2`, `middle=8`, `mask=2`, `right=4`, `text01=2`, `text02=2`, `text_bg=2`, and `triangle=2`; no source contains `$0`, `#0`, `atlas`, or `derived`.
+- The retained post-review and pre-correction Create crops share SHA-256 `AB0565B99828ED3BDB8E210445BFB1C9458727A03049D303D9EF46DCA8E38FD1`; the Create comparison ROI `(1154,177,717,346)` has zero differing pixels.
 - This pixel identity is an invariance check only. The historical Create report still has `createFrame.passed=false` because its top continuity/contrast and right contrast failed; this Join task does not claim those Create gates were fixed.
+
+The retained binary operationally corresponds to commit `b645e5b`: current runtime/test files equal their exact HEAD blobs; `LanLobbyView.cs` was written at `20:11:44.610`, before the retained `Assembly-CSharp.dll` at `20:13:50.883`; and the manifest middle-block screen X/width values `1303/74`, `1375/106`, `1536/108`, `1638/108`, minus Join screen X `1032`, equal the four committed local values. The former `335/108`, `402/108`, `469/108`, `536/108` implementation cannot produce this manifest. Retained hashes are:
+
+- `Assembly-CSharp.dll`: `8489A09B12D0068C36DBBAC29C093AD900B8D733CE75475149FB76B5F3437BB0`;
+- capture manifest: `A568E44B12D61130180A5E61C6AA8E280BDFDEFC34265B147BEC7348B37AC28A`;
+- accepted final JSON: `B1D09C0D5599ECB4508BA5EB139B31EEC204ADFC4E6F6DC93449C6F474900F7E`.
 
 The same-Wi-Fi Windows/Android two-device flow remains manually unverified as recorded above. The final Player evidence proves the production UI/capture/build path and preserved LAN-facing events, but it does not substitute for the physical-device discovery/join/readiness/start/disconnect procedure.

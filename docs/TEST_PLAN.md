@@ -584,20 +584,20 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 
 ## Home Join decoration final verification (current authoritative, 2026-07-27)
 
-This section is the current acceptance procedure and retained evidence for the Figure 9 `加入同盟` upper decoration at commit `24806571adddee9dc48855967fd7b0a3e44ecbb6`. It supersedes earlier Join inventory/count/layout claims, including the historical `join_icon=4`, `SimulationInvite` presence, View `14/14`, and aggregate `26/26` records. It does not supersede or repair the separate Create open-frame result above: that historical Create visual gate remains failed and out of scope for this Join task.
+This section is the current acceptance procedure and retained evidence for the Figure 9 `加入同盟` upper decoration at commit `b645e5bed8db106f23a7a73f55b69ba75468b987` (`fix: align join block topology`). It supersedes earlier authoritative Join layout/evidence claims while preserving the five visible-Player runs as history. It does not supersede or repair the separate Create open-frame result above: that historical Create visual gate remains failed and out of scope for this Join task.
 
 ### Focused Unity regression
 
 Run the four suites serially; each output directory must be absent before the run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\Layout' -TimeoutSeconds 900
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\View' -TimeoutSeconds 900
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\Capture' -TimeoutSeconds 900
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\Verification-Final\Controller' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\Layout' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\View' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\Capture' -TimeoutSeconds 900
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\Controller' -TimeoutSeconds 900
 ```
 
-Final XML and matching `summary.txt` counts are Layout `6/6/0/0`, View `16/16/0/0`, Capture `3/3/0/0`, and Controller `3/3/0/0`: aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`. Every suite must discover at least one test. Layout, View, and Capture may use the runner's bounded `forced-stop-after-results` only after complete passing XML is written; Controller must retain its actual normal-exit result. Logs must contain no `error CS*`, `Compilation failed`, `Scripts have compiler errors`, `Aborting batchmode due to failure`, `Unhandled Exception`, or `Fatal Error`.
+Fresh XML and matching `summary.txt` counts are Layout `6/6/0/0`, View `16/16/0/0`, Capture `3/3/0/0`, and Controller `3/3/0/0`: aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`. Every suite discovered at least one test. Layout used the runner's bounded stop only after complete passing results; View, Capture, and Controller exited normally. The four logs contain no compiler or fatal error match.
 
 ### Evidence smokes
 
@@ -630,41 +630,47 @@ All three must exit `0` and print, respectively, `LAN lobby visual-diff smoke: P
 
 `joinDecoration.passed` is blocking and requires all seven rows plus all structural gates: backing position/size within `1 px`; no Join geometry below its backing; no Join decoration Graphic or geometry crossing `y=876`; boundary data available; `SimulationInvite` absent; `OutlineBottom` absent; accepted `home-join-action` content/action pass; exact repeated Sprite inventory and approved provenance pass. Full-image difference metrics remain informational and do not replace these named gates.
 
-The placeholder is additionally measured inside crop search `x=200..550,y=205..263` using neutral pixels with channel spread `<=12` and mean luminance `>=120`. The final Player must produce actual `(272,220,166,27)` against normalized Figure 9 `(271,221,168,25)`, center delta `(0,0)`, size delta `(-2,+2)`, and no overlap with the baked input icon.
+The `block-bank` row must pass both its outer bounds and nested blocking `internalTopology`. The topology ROI is `(35,107,660,89)` in crop-top-left pixels. Qualifying orange pixels use `R>=100`, `R-G>=15`, `B<=130`; a column is occupied with at least `3` qualifying pixels. Gates are maximum span-edge deviation `4 px`, maximum occupied-column-count delta `20`, and minimum binary-profile Jaccard `0.95`. Current reference runs are `150..219/222..587` with `436` occupied columns; current actual runs are `150..219/222..483/485..587` with `435` columns. Jaccard is `0.997706`, count delta is `-1`, and start/end/width deltas are `0/0/0`, so the topology passes.
+
+The placeholder is additionally measured inside crop search `x=200..550,y=205..263` using neutral pixels with channel spread `<=12` and mean luminance `>=160`. The final Player produces actual `(273,220,165,27)` against normalized Figure 9 `(272,221,167,25)`; both centers are `(355,233)`, and the text does not overlap the baked input icon. The isolated central-blank raw actual bounds must be `(324,69,58,58)`.
 
 ### Bounded calibration history and stopping rule
 
-At most three calibration cycles are allowed; no fourth calibration cycle may be used to hide a failure.
+The original plan allowed at most three calibration cycles. The complete run accounting is retained because that limit was exceeded before final review, and the user then authorized exactly one additional post-review correction cycle:
 
 1. `Cycle-1` retained five valid Player captures, but its legacy manifest lacked the explicit Sprite/geometry coordinate schema. Export failed before output with the real/synthetic schema mismatch; `Cycle-1\VisualDiff` is absent and Cycle 1 is not acceptance evidence.
 2. `Cycle-2` retained a successful build and Player capture. Its first report exposed decoded-pixel detector defects and failed; after the detector fix, `Cycle-2\VisualDiff-DetectorFix-R2` made all seven rows measurable but `triangle` and `block-bank` still failed unchanged tolerances.
-3. `Cycle-3` applied only the measured triangle/end-block geometry correction. `Cycle-3\VisualDiff` passed all seven rows and structural gates, but manual inspection retained a placeholder position/font-size caveat. The later placeholder-only correction was verified by a fresh final regression/build/visible Player at `24806571`; `Verification-Final` is post-correction verification, not a fourth calibration cycle.
+3. `Cycle-3` applied only the measured triangle/end-block geometry correction. `Cycle-3\VisualDiff` passed all seven rows and structural gates, but manual inspection retained a placeholder position/font-size caveat.
+4. `Verification-Final` was a fresh build and visible Player run after the placeholder-only correction at `24806571`. It was the fourth visible Player run; the earlier wording that it “did not count” was incorrect and is retained as a process deviation. Final review then proved its outer block union was a false positive: the reference topology was `150..219/222..587`, `436` columns, while actual was `214..517`, `304` columns, Jaccard `0.689498`, count delta `-132`, and edge deltas `+64/-70`.
+5. Under the user's one-shot exception, `PostReview-Cycle-1` was the fifth visible Player run and the only post-review Player. It used middle Rects `(left,top,width)` `271,118,74`, `343,118,106`, `504,118,108`, and `606,118,108`. Its first report passed topology but the broad central detector included a neighboring block; an evidence-only detector correction replayed the same screenshot. No sixth Player and no second post-review build, capture, or runtime correction occurred.
 
 ### Final retained build, Player, and visual evidence
 
-Build with `Task006StandaloneBuild.BuildWindowsX64` to:
+The current authoritative runtime evidence is the retained fifth run. Build output:
 
-`Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/WindowsStandalone/ARKnoNIGHTS.exe`
+`Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/WindowsStandalone/ARKnoNIGHTS.exe`
 
-Require numeric Unity exit `0`, `BuildReport result=Succeeded`, `errors=0`, and `warnings=0`. Launch that Player visibly (no `-batchmode`, hidden window, or service) with D3D11 at `1920×1080` and output to:
+The retained build has numeric Unity exit `0`, `BuildReport result=Succeeded`, `errors=0`, `warnings=0`, and `totalSize=184845930`. Its visible D3D11 Player ran at `1920×1080` in interactive session `1` (PID `50776`) and exited `0`. Capture output:
 
-`Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/Player/Captures`
+`Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures`
 
-Require Player exit `0`, a nonzero visible window handle in the interactive session, `[LanLobby][capture.completed] count=5`, five non-empty decodable `1920×1080` PNGs, and a BOM-less five-record `manifest.json`.
+The Player log contains `[LanLobby][capture.completed] count=5` and no case-insensitive `error|exception|warning`; the directory contains five non-empty decodable `1920×1080` PNGs and a BOM-less, parseable five-record `manifest.json`.
 
-Export once to the initially absent:
+The final accepted evidence-only replay is:
 
-`Artifacts/LAN-LOBBY/JoinDecoration/Verification-Final/VisualDiff`
+`Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final`
 
 Retain and inspect:
 
-- `Player/WindowsStandaloneBuild.log`;
-- `Player/PlayerCapture.log`;
-- `Player/Captures/{home,discovered-prefill,room-host,room-ready,room-full}.png`;
-- `Player/Captures/manifest.json`;
-- `VisualDiff/visual-diff-report.json`;
-- `VisualDiff/visual-diff-report.md`;
-- `VisualDiff/home-join-decoration-{actual,reference,overlay,heatmap}.png`.
+- `PostReview-Cycle-1/WindowsStandaloneBuild.log`;
+- `PostReview-Cycle-1/PlayerCapture.log`;
+- `PostReview-Cycle-1/Captures/{home,discovered-prefill,room-host,room-ready,room-full}.png`;
+- `PostReview-Cycle-1/Captures/manifest.json`;
+- `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/visual-diff-report.json`;
+- `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/visual-diff-report.md`;
+- `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/home-join-decoration-{actual,reference,overlay,heatmap}.png`.
+
+Binary/source correspondence is independently checkable: the current runtime and test files equal their `b645e5b` blobs; `LanLobbyView.cs` was written at `20:11:44.610`, and the retained `Assembly-CSharp.dll` at `20:13:50.883`; the manifest's middle-block screen X/width values `1303/74`, `1375/106`, `1536/108`, `1638/108`, minus Join screen X `1032`, equal the four committed local values above. The old implementation's `335/108`, `402/108`, `469/108`, `536/108` cannot produce the retained manifest geometry.
 
 The final manifest/report audit must require five captures; one `join_icon` per Home state and `2` aggregate; two left/four middle/two right block instances per Home state; one mask, one blank, four bans, one triangle, one logo, two header texts, and one input background per Home state; six Join code-native, sprite-null, non-raycast geometry rows per Home state; no `SimulationInvite`, `OutlineBottom`, `$0`, `#0`, atlas, or derived source; and a Resources path, approved source, uppercase SHA-256, capture list, and positive occurrence count for every bitmap row.
 
