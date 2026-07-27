@@ -16,10 +16,19 @@ namespace ArknoNights.Lobby.Tests
         private GameObject root;
         private global::LanLobbyView view;
         private int joinRequests;
+        private readonly List<Canvas> canvasesDisabledForIsolation = new List<Canvas>();
 
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            joinRequests = 0;
+            foreach (var existingView in Object.FindObjectsOfType<global::LanLobbyView>())
+            {
+                var existingCanvas = existingView.GetComponent<Canvas>();
+                if (existingCanvas == null || !existingCanvas.enabled) continue;
+                existingCanvas.enabled = false;
+                canvasesDisabledForIsolation.Add(existingCanvas);
+            }
             root = new GameObject("LanLobbyViewTests");
             view = root.AddComponent<global::LanLobbyView>();
             view.JoinRequested += OnJoinRequested;
@@ -34,6 +43,11 @@ namespace ArknoNights.Lobby.Tests
             {
                 if (eventSystem.name == "LanLobbyEventSystem") Object.Destroy(eventSystem.gameObject);
             }
+            foreach (var canvas in canvasesDisabledForIsolation)
+            {
+                if (canvas != null) canvas.enabled = true;
+            }
+            canvasesDisabledForIsolation.Clear();
             yield return null;
         }
 
