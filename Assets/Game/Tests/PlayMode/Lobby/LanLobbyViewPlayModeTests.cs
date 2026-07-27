@@ -298,6 +298,20 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
+        public IEnumerator HomeRoomSelect_JoinPlaceholderUsesMeasuredPresentation()
+        {
+            var input = view.transform.Find("LanLobbyRoot/Home/RoomSelect/Join/RoomCodeInput").GetComponent<InputField>();
+            var placeholder = input.placeholder as Text;
+
+            Assert.That(placeholder, Is.Not.Null);
+            Assert.That(placeholder.text, Is.EqualTo("输入同盟密钥"));
+            Assert.That(placeholder.alignment, Is.EqualTo(TextAnchor.MiddleCenter));
+            Assert.That(placeholder.fontSize, Is.EqualTo(28));
+            Assert.That(placeholder.color, Is.EqualTo(new Color(214f / 255f, 214f / 255f, 214f / 255f, 1f)));
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator HomeRoomSelect_JoinDecorationUsesMeasuredOverlapAndKeepsInputFunctional()
         {
             var roomSelect = view.transform.Find("LanLobbyRoot/Home/RoomSelect").GetComponent<RectTransform>();

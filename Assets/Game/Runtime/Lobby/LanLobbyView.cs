@@ -408,6 +408,10 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionSpriteTopLeft(text02, 648f, 73f, 89f);
 
         roomCodeInput = Input("RoomCodeInput", parent, "输入同盟密钥", 30, "Home/room_select_join_text_bg");
+        var roomCodePlaceholder = roomCodeInput.placeholder as Text;
+        roomCodePlaceholder.alignment = TextAnchor.MiddleCenter;
+        roomCodePlaceholder.fontSize = 28;
+        roomCodePlaceholder.color = new Color(214f / 255f, 214f / 255f, 214f / 255f, 1f);
         roomCodeInput.characterLimit = LobbyRoomCode.Length;
         roomCodeInput.contentType = InputField.ContentType.IntegerNumber;
         roomCodeInput.textComponent.alignment = TextAnchor.MiddleCenter;
