@@ -64,7 +64,7 @@
 - [ ] **Step 5: Run the extractor**
 
   ```powershell
-  & 'docs/numerical_architecture/tools/Export-UnitRarityDataset.ps1' `
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'docs/numerical_architecture/tools/Export-UnitRarityDataset.ps1' `
     -BondSpecPath 'docs/bonds/BONDS_SPEC.md' `
     -StagingRoot 'G:/ARKnoNIGHTS_tools/spine-fetcher-output-variants-20260725/staging' `
     -OutputCsvPath 'docs/numerical_architecture/2026-07-27_unit_rarity_dataset.csv'
@@ -124,7 +124,7 @@
 
 - [ ] **Step 6: Regenerate and validate**
 
-  Run the Task 1 command again. Reject NaN, Infinity, negative TTK, a nonpositive effective interval on an attacking unit, or missing damage type.
+  Run the Task 1 process-scoped `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...` command again. Reject NaN, Infinity, negative TTK, a nonpositive effective interval on an attacking unit, or missing damage type.
 
 - [ ] **Step 7: Commit matchup metrics**
 
@@ -349,7 +349,7 @@
 
 - [ ] **Step 1: Run the extractor from a clean process**
 
-  Run the exact Task 1 command with the final pending-removal ID list and require exit 0.
+  Run the exact Task 1 process-scoped `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...` command with the final pending-removal ID list and require exit 0.
 
 - [ ] **Step 2: Run structural assertions**
 
