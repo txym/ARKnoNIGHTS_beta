@@ -508,3 +508,167 @@ Cycle 3 报告中的 8 行 code-native geometry 与 bitmap 来源表分开记录
 | `LanLobbyRoot/OpaqueBlocker` | `code-native-geometry` | `false` | `#060F14FF` | `discovered-prefill, home, room-full, room-host, room-ready` | 5 |
 
 这些行的 `isBitmap=false`、无 Sprite、无自定义材质且 `raycastTarget=false`；它们不计入 bitmap 来源合规。
+
+## LAN 房间统一 PortraitFrame——Task 6 最终核查（2026-07-28，当前权威补充）
+
+### 结论
+
+本次最终 focused Unity 测试、三项 evidence smoke、Cycle 3 截图/manifest、素材来源、构建与 Player 日志核查为 **verification PASS**；图 11–13 的统一 PortraitFrame 实际像素验收为 **FAIL**。统一几何是已确认的玩家可见要求，不能把“共享 backing 已实现”写成“参考图已经通过”。
+
+`24f1280` 的纠正导出报告共有 62 个命名房间门：
+
+- `Passed`: 22
+- `Failed`: 38
+- `ExcludedByReferencePopup`: 2，且两项均为 `passed=false`
+- PortraitFrame 素材/来源失败：0
+
+本节的 62 门结果取代上一节仅包含旧槽位门的 52 门统计，作为当前 PortraitFrame 校准结论。
+
+### 实现与最终 backing
+
+本轮运行时/测试/证据实现涉及：
+
+- `Assets/Game/Runtime/Lobby/LanLobbyRoomLayout.cs`
+- `Assets/Game/Runtime/Lobby/LanLobbyView.cs`
+- `Assets/Game/Runtime/Initial/LanLobbyCaptureSuite.cs`
+- `Assets/Game/Tests/EditMode/Lobby/LanLobbyRoomLayoutEditModeTests.cs`
+- `Assets/Game/Tests/PlayMode/Lobby/LanLobbyViewPlayModeTests.cs`
+- `Assets/Game/Tests/PlayMode/Lobby/LanLobbyCaptureSuitePlayModeTests.cs`
+- `scripts/ExportLanLobbyVisualDiff.ps1`
+- `scripts/TestLanLobbyVisualDiffSmoke.ps1`
+
+最终 `CardBody`（概念上的 PortraitFrame）在 `363.75×664.5` 槽位根内的局部 bottom-left 矩形为 `(-96.5,27.5,566,695)`。等价 top-left 参数是 `left=-96.5`、`top=-58`、`width=566`、`height=695`：raw backing 向槽位顶部上方越界 `58 px`，与 `LowerDecoration` 的 raw 几何重叠为 `120-27.5=92.5 px`。
+
+四个槽位及 Empty/Waiting/Ready/host 状态共享这一矩形；现有 View 测试同时证明 Ready 翻转后的归一化世界 footprint 不变。`CardBody` 绘制在状态内容后面，`TopBar` 和 `LowerDecoration` 在其前面。房主槽继续不填入头像、立绘、玩家名、玩家 ID 或资料卡内容。
+
+### Cycle 3 Player 与 detector-only 重导出
+
+Cycle 3 runtime/layout/capture 源状态是提交 `a8314dc`。从该状态生成的 Windows x64 构建日志记录：
+
+```text
+result=Succeeded
+platform=StandaloneWindows64
+totalSize=185656666
+totalTime=00:00:03.4280226
+errors=0
+warnings=0
+```
+
+Player 以可见 Direct3D 11、`1920×1080` 运行，日志含
+`[LanLobby][capture.completed] count=5`，未匹配到 error、exception、
+failed、fatal 或 missing Sprite。五张 canonical PNG 都能解码，且抽样
+确认非黑、非单色：
+
+| PNG | 尺寸 | SHA-256 |
+| --- | ---: | --- |
+| `home.png` | `1920×1080` | `93C8799DD93FD03C9D9FB42DDAE463E642565DA23DC14D37426BF9C8CE6639B7` |
+| `discovered-prefill.png` | `1920×1080` | `D6DBECED5CF99CA3F749AF961F9C95D84957D8AA0498E9609498AE91D86A958B` |
+| `room-host.png` | `1920×1080` | `9E1FCA1498E5AC54CF1C1A0E4621EA46AEA8A11DE38CFDC20F6DEBA89B8ECEBE` |
+| `room-full.png` | `1920×1080` | `337FF209D5958F1934E11CB16FE8B46AD120D63C29A87D65829267487DA6E3F2` |
+| `room-ready.png` | `1920×1080` | `AD89BD2CCBCD06FC8F124FAB1B00D558AA35B90E9ED276872D260809D41B6B25` |
+
+Capture manifest 是严格 UTF-8 JSON，恰好含上述五条记录；Capture 与 Evidence manifest 的 SHA-256 同为 `16126A6DDCC8B1E5E1BC90AD8ED2666CD86AF45B02951FA364D5AF920A4CFD15`。
+
+提交 `24f1280` 只纠正 `scripts/ExportLanLobbyVisualDiff.ps1` 与
+`scripts/TestLanLobbyVisualDiffSmoke.ps1` 的离线实际像素证据；它没有
+修改 runtime、layout、capture 或 Cycle 3 PNG。该提交从既有 Cycle
+1/2/3 captures 重导出 Evidence/VisualDiff，没有重新构建、没有启动
+Player、没有创建 Cycle 4。计划中的“detector 后 fresh Player”条件因
+三次校准硬停止而未执行，不能记为通过。
+
+最终绝对路径：
+
+- 截图：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\Captures`
+- 并排证据：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\Evidence`
+- JSON、Markdown 与叠图：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\VisualDiff`
+- 构建日志：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\WindowsStandaloneBuild.log`
+- Player 日志：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\PlayerCapture.log`
+
+### 最终实际像素结果与所有新增阻塞
+
+共识网格是 `257×513`，eligible contributor 恰好 10 条，投票规则是
+`6/10`；确定性 target 含 `488` 个实际参考轮廓像素。每个 actual
+pixel 只按自身 `TopBar`/`LowerDecoration` 锚点映射一次；没有填充
+bounds、线段、内部区域、源 aperture、manifest backing 或 ROI。
+
+| Gate | decoded | normalized | intersection | union | Jaccard | TopBar width delta |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `RoomHost.Slot1.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
+| `RoomHost.Slot2.PortraitFrame` | 1036 | 1026 | 488 | 1026 | 0.475634 | **4** |
+| `RoomHost.Slot3.PortraitFrame` | 1016 | 1004 | 479 | 1013 | 0.472853 | 3 |
+| `RoomHost.Slot4.PortraitFrame` | 1034 | 1022 | 486 | 1024 | 0.474609 | 1 |
+| `RoomReady.Slot1.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
+| `RoomReady.Slot2.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
+| `RoomReady.Slot3.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
+| `RoomFull.Slot1.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
+| `RoomFull.Slot2.PortraitFrame` | 1036 | 1026 | 488 | 1026 | 0.475634 | **4** |
+| `RoomFull.Slot3.PortraitFrame` | 1018 | 1006 | 480 | 1014 | 0.473373 | 3 |
+
+结果为 `0/10`：normalized set `1004..1026`、intersection `479..488`、
+union `1013..1026`、Jaccard `0.472853..0.480315`，全部低于未修改的
+`0.95`。所有十条的 shared geometry 与 material evidence 通过，
+raw overlap 都是 `92.5 px`、连续背景缝隙都是 `0 px`。
+`RoomHost.Slot2.PortraitFrame` 和 `RoomFull.Slot2.PortraitFrame` 还因
+上横条可见宽度差 `4 px > 3 px` 失败。
+
+另有两个 Cycle 2 到 Cycle 3 的命名回归：
+
+- `RoomReady.Slot2.ReadyTopBar`：actual `(615,170,323,46)`，reference `(616,170,319,46)`，宽度差 `4 px > 3 px`；
+- `RoomHost.Slot2To3.VisibleContourSpacing`：actual 间距 `383.5 px`，reference `388 px`，差 `-4.5 px`，绝对值超过 `4 px`。
+
+两个 popup 排除项仍为
+`RoomReady.Slot4.ReferencePopupExclusion` 和
+`RoomFull.Slot4.ReferencePopupExclusion`；二者都是
+`ExcludedByReferencePopup` 且 `passed=false`。图 11 第四槽仍是唯一
+无遮挡的第四槽参考。
+
+### 素材使用与完整性
+
+PortraitFrame 唯一 bitmap 素材：
+
+| Sprite | Resources | 批准来源 | SHA-256 | room-host | room-ready | room-full | 总计 |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: |
+| `card_bg` | `UI/Lobby/card_bg` | `[uc]autochessouter/card_bg.png` | `050B347451BBEBC74F5E3B09A2470931D9B2A85DEF707A4AAC42B5CE1B0BCEE2` | 4 | 4 | 4 | 12 |
+
+批准源文件位于
+`G:\素材\11.14\Unpacked_1763129662\Android\ui\autochess\[uc]autochessouter\card_bg.png`；
+只读复核的文件长度为 `14479` 字节，SHA 与上表一致。素材根目录只读
+审计为 `2310` 个文件、`40486009` 字节、0 个 reparse point。
+
+从本计划基线 `7b5d092` 到 detector 提交 `24f1280`，没有新增或修改
+bitmap、参考图、Package、Unity 版本、场景、Prefab、ScriptableObject
+或 `.meta`；也没有在外部素材目录写入、移动或删除文件。
+
+### 最终自动验证
+
+所有测试使用 `D:\2022.3.62f1c1\Editor\Unity.exe`、工作区
+`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`、`900` 秒超时串行执行：
+
+| 过滤器 | 结果 | fail/skip/inconclusive/notRun | shutdown | 目录 |
+| --- | ---: | ---: | --- | --- |
+| `LanLobbyRoomLayoutEditModeTests` | 12/12 | 0/0/0/0 | `forced-stop-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Layout` |
+| `LobbyAssetMapEditModeTests` | 30/30 | 0/0/0/0 | `forced-stop-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Assets` |
+| `LanLobbyViewPlayModeTests` | 31/31 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/View` |
+| `LanLobbyCaptureSuitePlayModeTests` | 5/5 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Capture` |
+| `LanLobbyControllerPlayModeTests` | 4/4 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Controller` |
+
+总计 `82/82`；每个目录都有非零可读 XML、日志和 summary。所有 Final
+Unity 日志均未匹配到 C# compiler error、unhandled exception、
+NullReferenceException、missing Sprite 或 fatal。前两个 forced-stop 是
+完整结果写出后的 runner 清理，不是 timeout。
+
+三项 smoke：
+
+- VisualDiff：`48 fixtures / 2019 assertions`，PASS（本次 wall-clock 约 `122.06 s`；未预先采集进程 CPU，故不猜测 CPU 时间）；
+- Evidence exporter：`5 / 15`，PASS；
+- Evidence common：`13 / 53`，PASS。
+
+自动测试/证据工具本身通过并不覆盖上面的视觉失败。
+
+### 未验证与已知阻断
+
+- PortraitFrame 参考图验收未通过：10 个 actual-pixel Jaccard 门全部失败，两条 Slot 2 宽度门失败，并保留两条普通 gate 回归。
+- 三次可见 Player 配额已经耗尽；未运行 detector 后的新 Player，也未创建 Cycle 4。
+- stale-after-start snapshot 仍可能覆盖 `HasStarted`。
+- accept/stop 生命周期竞态仍未修复。
+- Windows 与 Android 两台物理设备同一 Wi-Fi 下的发现、房间号预填、加入、准备切换、开始、离开和房主解散流程仍未人工验证。

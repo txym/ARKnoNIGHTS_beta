@@ -776,3 +776,90 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifact
 - `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Player.log`
 
 Windows 与 Android 实机连接到同一 Wi-Fi 后的发现、房间号预填、加入、准备切换、开始广播、非房主离开和房主解散流程仍为人工且未验证；不得由单机 Editor、PlayMode 或 Windows 截图推断为已通过。
+
+## 34. LAN 房间统一 PortraitFrame 最终验证（2026-07-28，当前权威补充）
+
+### 几何、层级与测试合同
+
+运行时兼容名 `CardBody` 表示玩家可见的 PortraitFrame。以下新增/替换测试直接覆盖统一几何：
+
+- `RoomLayout_UsesOneCompensatedPortraitFrameWithDeepLowerOverlap`
+- `RoomLayout_EnlargesOnlyPortraitFrameAndPreservesExistingSlotChildren`
+- `RoomSlot_AllStatesKeepOnePortraitFrameFootprint`
+- `RoomSlot_LayersFrameBehindContentAndBars`
+- `CaptureDimensions_RejectUnsupportedSizesBeforeCoordinateExport`
+
+`RoomSlot_AllStatesKeepOnePortraitFrameFootprint` 必须用归一化世界角证明 Empty、Waiting、Ready 和 host 的同槽/跨槽 footprint 一致；Ready 的 `localScale=(1,-1,1)` 不得改变归一化结果。层级必须保持 `CardBody` 在状态内容之后、`TopBar` 与 `LowerDecoration` 之前，并继续验证其他组件矩形和非交互装饰未移动。
+
+### 实际像素相对坐标门
+
+PortraitFrame 阻塞式比较使用成对的左右可见 side pixels，并把每个已解码像素恰好映射一次到该条记录自身锚点定义的 `257×513` 网格：
+
+- 水平锚点是自身已解码 `TopBar` 左右可见边；
+- 纵向锚点是自身已解码 `TopBar` 下沿和 `LowerDecoration` 上沿；
+- eligible contributor 恰好为 10 条：图 11 槽 1–4、图 12 槽 1–3、图 13 槽 1–3；
+- 每个网格 cell 至少由 `6/10` 个贡献者观察到才进入确定性 target；
+- 不填充 bounds、线段、内部区域、源 aperture、manifest backing 或 ROI。
+
+阻塞阈值保持：中心每轴 `<=2 px`、可见宽度 `<=3 px`、每边 `<=4 px`、实际像素 Jaccard `>=0.95`、backing/下横条重叠 `>=60 px`、连续背景缝隙 `<=1 px`，并同时要求共享几何和精确 `card_bg` 素材关联通过。绝对屏幕坐标只作诊断。
+
+VisualDiff smoke 必须包含：
+
+- PortraitFrame、`TopBar` 与 `LowerDecoration` 水平联合平移仍通过，frame-only 水平平移失败；
+- 三者纵向联合平移仍通过，绝对 Y 诊断发生变化，frame-only 纵向平移失败；
+- bounds/extrema 保持不变但删除足够实际轮廓像素时，Jaccard 必须低于 `0.95` 并阻塞；
+- `4 px` 可见宽度、`2 px` 缝隙、状态几何不一致、素材错误和 popup 排除错误必须阻塞。
+
+### 最终 focused suites 与实际命令
+
+开始前必须确认工作区干净，且没有 Unity/Player 进程占用
+`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`。Unity 固定为
+`D:\2022.3.62f1c1\Editor\Unity.exe`，每项超时 `900` 秒并严格串行运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyRoomLayoutEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Layout' -TimeoutSeconds 900
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LobbyAssetMapEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Assets' -TimeoutSeconds 900
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\View' -TimeoutSeconds 900
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Capture' -TimeoutSeconds 900
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Controller' -TimeoutSeconds 900
+```
+
+最终结果：
+
+| 过滤器 | 结果 | 失败/跳过/不确定/未运行 | shutdown | 保留目录 |
+| --- | ---: | ---: | --- | --- |
+| `ArknoNights.Lobby.Tests.LanLobbyRoomLayoutEditModeTests` | 12/12 | 0/0/0/0 | `forced-stop-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Layout` |
+| `ArknoNights.Lobby.Tests.LobbyAssetMapEditModeTests` | 30/30 | 0/0/0/0 | `forced-stop-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Assets` |
+| `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests` | 31/31 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/View` |
+| `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests` | 5/5 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Capture` |
+| `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests` | 4/4 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Controller` |
+
+合计 `82/82`。前两个 `forced-stop-after-results` 都是在完整可读、非零、全绿 XML 写出后的有界清理路径，不是 timeout 或跳过。
+
+三项 smoke 的实际命令与结果：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyVisualDiffSmoke.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestExportLanLobbyEvidenceSmoke.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyEvidenceCommonSmoke.ps1
+```
+
+- VisualDiff：`48 fixtures / 2019 assertions`，PASS；
+- Evidence exporter：`5 / 15`，PASS；
+- Evidence common：`13 / 53`，PASS。
+
+### Player 周期、最终证据与真实失败
+
+本任务最多允许三次新的可见 Windows Player 校准。Cycle 1、2、3 已分别消耗第 1/3、2/3、3/3 次；三轮在实际像素重导出后均为 `0/10` PortraitFrame 通过。不得创建 Cycle 4。
+
+Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可解码、非黑、非单色的 `1920×1080` PNG 和 UTF-8 五记录 manifest。`24f1280` 只修改离线 evidence exporter/smoke，并从既有 Cycle 1/2/3 PNG 重导出 canonical Evidence/VisualDiff；它没有修改 runtime、layout、capture 或这些 PNG。因此一般计划中的“detector 后再跑一次 fresh Player”条件因三周期硬停止而**未执行**，不得记作通过。
+
+最终路径：
+
+- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\Captures`
+- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\Evidence`
+- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\VisualDiff`
+- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\WindowsStandaloneBuild.log`
+- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\PlayerCapture.log`
+
+当前 10 个门的 target 为 `488` 个共识像素，actual normalized set 为 `1004..1026`，intersection 为 `479..488`，union 为 `1013..1026`，Jaccard 为 `0.472853..0.480315 < 0.95`，所以视觉验收是 **FAILED**。`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 还各有 `4 px > 3 px` 的宽度差；`RoomReady.Slot2.ReadyTopBar` 和 `RoomHost.Slot2To3.VisibleContourSpacing` 是 Cycle 3 命名回归。图 12/13 第四槽继续为 `ExcludedByReferencePopup` 且 `passed=false`。

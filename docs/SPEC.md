@@ -562,3 +562,32 @@ LAN Home 右侧的 `加入同盟` 区域按图 9 构成一个连续的橙灰色�
 - 房主槽不得渲染头像、角色立绘、玩家名、玩家 ID 或资料卡内容，但保留已准备边框、勾选图标、“已就绪”和创建者标识。
 - 视觉验收以实际渲染的可见图形为准，而不是纹理矩形或RectTransform中心。
 - 在 `1920×1080` 下，阻塞式图标/标签的可见中心每轴误差不得超过 `2 px`、可见尺寸误差不得超过 `3 px`；长轮廓/组合槽位每条可见边误差不得超过 `4 px`，命名 ROI 内的可见轮廓 Jaccard 不得低于 `0.95`。
+
+## 16. LAN 房间统一立绘边框契约与当前验收状态（2026-07-28，当前权威补充）
+
+本节补充第 15 节的房间页视觉规则。运行时为兼容既有清单与调用方仍使用节点/属性名 `CardBody`，但其玩家可见语义是 `PortraitFrame`（立绘区域边框）。
+
+统一几何是玩家可见要求，不等于当前实现已经通过参考图验收：
+
+- 四个玩家槽以及 Empty、Waiting、Ready、host 状态必须使用同一套归一化 `CardBody`/PortraitFrame backing 几何；状态切换和 Ready 的纵向翻转不得改变其世界空间 footprint。
+- PortraitFrame 必须绘制在状态内容后面；`TopBar`、`LowerDecoration` 绘制在其前面。边框必须延伸到下方头像名称横条的覆盖区，`LowerDecoration` 必须遮住延长段和接缝。
+- `TopBar`、`ReadyTopBar`、`StateOverlay`、`EmptyInvite`、`ReadyIcon`、`ReadyLabel`、`LowerDecoration`、`CreatorTag`、按钮、Leave、延迟和槽位根不得因边框补偿而移动。
+- 房主槽仍不得填入头像、立绘、玩家名、玩家 ID 或资料卡内容。
+- backing 与 `LowerDecoration` 的几何重叠不得小于 `60 px`，下方横条上沿附近的连续背景缝隙不得超过 `1 px`。
+
+PortraitFrame 的阻塞式位置比较使用每张截图自身已解码的 `TopBar` 与 `LowerDecoration` 作为相对锚点；绝对屏幕坐标只作诊断，不阻塞统一几何。图 11 的 1–4 槽、图 12 的 1–3 槽、图 13 的 1–3 槽构成恰好 10 个未遮挡贡献者，并由同一确定性共识目标验收。实际截图像素是唯一可见轮廓事实源，不得用 bounds 内部、线段、源 aperture、manifest backing、ROI 或其他推断像素回填。
+
+在 `1920×1080` 下继续使用以下硬门槛，不得降低：
+
+- 可见中心每轴误差 `<= 2 px`；
+- 可见宽度误差 `<= 3 px`；
+- 每条可见边误差 `<= 4 px`；
+- 实际像素轮廓 Jaccard `>= 0.95`；
+- backing/下横条几何重叠 `>= 60 px`；
+- 连续背景缝隙 `<= 1 px`；
+- Empty/Waiting/Ready/host 共享几何必须通过；
+- 每个 CardBody 必须精确使用 `UI/Lobby/card_bg`，批准来源 `[uc]autochessouter/card_bg.png`，SHA-256 `050B347451BBEBC74F5E3B09A2470931D9B2A85DEF707A4AAC42B5CE1B0BCEE2`。
+
+图 12/13 的完整第四槽仍分别为 `RoomFull.Slot4.ReferencePopupExclusion` 和 `RoomReady.Slot4.ReferencePopupExclusion`；二者状态必须是 `ExcludedByReferencePopup` 且 `passed=false`，不得改记为通过。图 11 第四槽仍是唯一无遮挡的第四槽参考。
+
+当前 Cycle 3 并未满足上述契约：10 个 eligible PortraitFrame gate 为 `0/10` 通过，实际像素 Jaccard 为 `0.472853..0.480315`，全部低于 `0.95`；`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 还存在 `4 px > 3 px` 的上横条可见宽度差。`RoomReady.Slot2.ReadyTopBar` 的宽度差为 `4 px > 3 px`，`RoomHost.Slot2To3.VisibleContourSpacing` 的间距差为 `-4.5 px`、绝对值超过 `4 px`，二者是 Cycle 2 到 Cycle 3 的命名回归。三次可见 Player 校准已经全部使用；在新的授权任务前，不得将本轮描述为完成或启动第四次校准。
