@@ -91,6 +91,12 @@ function Test-CombatMetricHelpers {
     Assert-Equal ([decimal]854.5) $unitAxis.WinsorizedValues[3] 'unit-axis high clamp'
     Assert-Equal ([decimal]6) (Get-GeometricCombinedValue -Output ([decimal]4) -Defense ([decimal]9)) 'synthetic geometric combination'
     Assert-Equal ([decimal]18) (Get-GeometricCombinedValue -Output ([decimal]12) -Defense ([decimal]27)) 'duplicated population geometric combination'
+    Assert-Equal ([decimal]2) (Get-AttackRateFactor -AttackSpeedAdditive 100 -FinalAttackSpeedMultiplier 1) 'attack speed +100 doubles attack rate'
+    Assert-Equal ([decimal]0.5) (Get-AttackRateFactor -AttackSpeedAdditive -50 -FinalAttackSpeedMultiplier 1) 'attack speed -50 halves attack rate'
+    Assert-Equal ([decimal]1.5) (Get-AttackRateFactor -AttackSpeedAdditive 100 -FinalAttackSpeedMultiplier ([decimal]0.75)) 'attack speed final multiplier applies after additive zone'
+    $zeroAttackRate = Get-AttackRateFactor -AttackSpeedAdditive -100 -FinalAttackSpeedMultiplier 1
+    Assert-Equal ([decimal]0) $zeroAttackRate 'attack speed clamped to zero'
+    Assert-Condition (-not [double]::IsNaN([double]$zeroAttackRate) -and -not [double]::IsInfinity([double]$zeroAttackRate)) 'zero attack speed produced a non-finite attack rate.'
 
     Assert-Throws { Get-PhysicalDamage -Attack -1 -Defense 0 } 'negative attack'
     Assert-Throws { Get-EffectiveAttackInterval -Attacker ([pscustomobject]@{ TypeId = 1; EffectiveAttackIntervalSeconds = 0 }) } 'nonpositive attack interval'
@@ -154,6 +160,10 @@ function Get-ShopAbilityTypeIds {
             [void]$abilityTypeIds.Add($Matches.TypeId)
         }
     }
+    foreach ($typeId in @('1058', '1095', '1281')) {
+        Assert-Condition ($shopSet.Contains($typeId)) "Required unmarked ability TypeId '$typeId' is not a shop unit."
+        [void]$abilityTypeIds.Add($typeId)
+    }
     return @($abilityTypeIds | Sort-Object { [int]$_ })
 }
 
@@ -170,7 +180,9 @@ function Test-AbilityInputContract {
 
     $scenarioKeys = @($abilityInput.UnitScenarios.Keys | ForEach-Object { [string]$_ })
     $riskKeys = @($abilityInput.ExplicitRiskOnly.Keys | ForEach-Object { [string]$_ })
-    foreach ($typeId in Get-ShopAbilityTypeIds -BondSpecPath $BondSpecPath -ShopTypeIds $ShopTypeIds) {
+    $coveredAbilityTypeIds = @(Get-ShopAbilityTypeIds -BondSpecPath $BondSpecPath -ShopTypeIds $ShopTypeIds)
+    Assert-Equal 48 $coveredAbilityTypeIds.Count 'marked and required-unmarked ability TypeId count'
+    foreach ($typeId in $coveredAbilityTypeIds) {
         Assert-Condition ($typeId -in $scenarioKeys -or $typeId -in $riskKeys) "BONDS ability TypeId '$typeId' is absent from UnitScenarios and ExplicitRiskOnly."
     }
     foreach ($scenarioKey in $scenarioKeys) {
@@ -197,7 +209,17 @@ function Test-AbilityInputContract {
     Assert-Equal ([decimal]2) ([decimal]$unit10077.Parameters.SkillPointsPerSecond) '10077 SP/s'
     Assert-Equal ([decimal]3) ([decimal]$unit10077.Parameters.InitialSkillPoints) '10077 initial SP'
     Assert-Equal ([decimal]5) ([decimal]$unit10077.Parameters.SkillPointCost) '10077 SP cost'
-    Assert-Equal '1/3.5/6/8.5/11/13.5/16/18.5' ((@($unit10077.Parameters.SpawnTimesSeconds) | ForEach-Object { [string]([decimal]$_) }) -join '/') '10077 20-second summon times'
+    Assert-Condition (-not $unit10077.Parameters.ContainsKey('SpawnTimesSeconds')) '10077 must derive summon times from SP parameters instead of storing them.'
+    foreach ($scenario in $abilityInput.UnitScenarios.Values) {
+        Assert-Condition (-not $scenario.Parameters.ContainsKey('BurstAtSeconds')) "TypeId $($scenario.TypeId) stores an unused BurstAtSeconds."
+        Assert-Condition (-not $scenario.Parameters.ContainsKey('HealAtSeconds')) "TypeId $($scenario.TypeId) stores an unused HealAtSeconds."
+    }
+    Assert-Equal ([decimal]10.2) ([decimal]$abilityInput.UnitScenarios['1131'].Parameters.SummonAtSeconds) '1131 summon time includes death delay'
+    Assert-Equal ([decimal]10.2) ([decimal]$abilityInput.UnitScenarios['1132'].Parameters.SummonAtSeconds) '1132 summon time includes death delay'
+    foreach ($typeId in @('1058', '1095', '1281')) {
+        Assert-Condition ($abilityInput.ExplicitRiskOnly.ContainsKey($typeId)) "Unmarked ability TypeId $typeId is absent from ExplicitRiskOnly."
+        Assert-Condition (@($abilityInput.ExplicitRiskOnly[$typeId]).Count -gt 0) "Unmarked ability TypeId $typeId has no explicit risk."
+    }
 
     foreach ($typeId in @('10031', '1238', '1243')) {
         $scenario = $abilityInput.UnitScenarios[$typeId]
@@ -412,7 +434,8 @@ try {
             'OutputReference', 'DefenseReference', 'PanelPower', 'PanelModelStatus',
             'AbilityModelKind', 'OutputScenarioLow', 'OutputScenarioMain', 'OutputScenarioHigh',
             'DefenseScenarioMain', 'EquivalentEntityContribution', 'AbilityPowerMultiplier',
-            'ContinuousPower', 'AbilityEvidence', 'RiskFlags'
+            'ContinuousPower', 'AbilityEvidence', 'RiskFlags', 'ScenarioEventCount',
+            'ScenarioEventTimesSeconds', 'ScenarioAttackCount', 'ScenarioSpecialAttackCount'
         )) {
         Assert-Condition ($rows[0].PSObject.Properties.Name -contains $property) "CSV is missing combat metric column '$property'."
     }
@@ -453,6 +476,44 @@ try {
         $row = @($rows | Where-Object TypeId -eq $typeId)[0]
         Assert-Condition ([string]$row.AbilityEvidence -notmatch '\u9690\u533f|Stealth|\u9644\u52a0\u6cd5\u672f|\u591a\u65b9\u5411') "Type ID $typeId contains a forbidden unsupported modifier in exported scoring evidence."
     }
+    $row10039 = @($rows | Where-Object TypeId -eq '10039')[0]
+    Assert-Equal ([decimal]10) ([decimal]$row10039.DefenseScenarioMain) '10039 exported main defense scenario'
+
+    $row10073 = @($rows | Where-Object TypeId -eq '10073')[0]
+    $row10077 = @($rows | Where-Object TypeId -eq '10077')[0]
+    Assert-Equal 8 ([int]$row10077.ScenarioEventCount) '10077 exported summon count'
+    Assert-Equal '1/3.5/6/8.5/11/13.5/16/18.5' ([string]$row10077.ScenarioEventTimesSeconds) '10077 derived summon times'
+    Assert-Equal ([decimal]$row10073.PanelPower * [decimal]4.1) ([decimal]$row10077.EquivalentEntityContribution) '10077 derived summon contribution'
+
+    $row1089 = @($rows | Where-Object TypeId -eq '1089')[0]
+    Assert-Equal ([decimal]1) ([decimal]$row1089.OutputScenarioMain) '1089 no in-window death burst'
+    Assert-Equal 0 ([int]$row1089.ScenarioEventCount) '1089 in-window burst event count'
+    $row1021 = @($rows | Where-Object TypeId -eq '1021')[0]
+    Assert-Equal 1 ([int]$row1021.ScenarioEventCount) '1021 in-window burst event count'
+    Assert-Equal '11' ([string]$row1021.ScenarioEventTimesSeconds) '1021 death plus burst-delay resolution time'
+
+    foreach ($typeId in @('1058', '1095', '1281')) {
+        $riskRow = @($rows | Where-Object TypeId -eq $typeId)[0]
+        Assert-Equal 'ExplicitRiskOnly' ([string]$riskRow.AbilityModelKind) "unmarked ability $typeId model kind"
+        Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$riskRow.RiskFlags)) "Unmarked ability TypeId $typeId has empty exported RiskFlags."
+        Assert-Equal ([decimal]1) ([decimal]$riskRow.AbilityPowerMultiplier) "unmarked ability $typeId numeric contribution"
+    }
+
+    $row1131 = @($rows | Where-Object TypeId -eq '1131')[0]
+    $row1132 = @($rows | Where-Object TypeId -eq '1132')[0]
+    Assert-Equal '10.2' ([string]$row1131.ScenarioEventTimesSeconds) '1131 exported summon time'
+    Assert-Equal '10.2' ([string]$row1132.ScenarioEventTimesSeconds) '1132 exported summon time'
+    Assert-Equal ([decimal]1.5) ([decimal]$row1132.EquivalentEntityContribution / [decimal]$row1131.EquivalentEntityContribution) '1131/1132 delayed summon count ratio'
+
+    foreach ($typeId in @('1371', '1372')) {
+        $cycleRow = @($rows | Where-Object TypeId -eq $typeId)[0]
+        Assert-Equal 20 ([int]$cycleRow.ScenarioAttackCount) "$typeId 20-second attack count"
+        Assert-Equal 6 ([int]$cycleRow.ScenarioSpecialAttackCount) "$typeId complete three-hit cycle count"
+    }
+    $row1372 = @($rows | Where-Object TypeId -eq '1372')[0]
+    Assert-Equal ([decimal]1) ([decimal]$row1372.OutputScenarioLow) '1372 low tail-aware output'
+    Assert-Equal ([decimal]1.3) ([decimal]$row1372.OutputScenarioMain) '1372 main tail-aware output'
+    Assert-Equal ([decimal]1.6) ([decimal]$row1372.OutputScenarioHigh) '1372 high tail-aware output'
     foreach ($typeId in @('1017', '1042', '1146', '1355', '1008', '1026', '1333')) {
         $row = @($rows | Where-Object TypeId -eq $typeId)
         Assert-Equal 1 $row.Count "special combat TypeId $typeId count"

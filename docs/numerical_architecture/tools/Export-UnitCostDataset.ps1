@@ -306,11 +306,75 @@ function Get-MapDecimal {
 }
 
 function Get-AttackRateFactor {
-    param([Parameter(Mandatory = $true)][decimal]$AttackSpeedBonus)
+    param(
+        [Parameter(Mandatory = $true)][decimal]$AttackSpeedAdditive,
+        [Parameter(Mandatory = $true)][decimal]$FinalAttackSpeedMultiplier
+    )
 
-    $factor = ([decimal]200 + $AttackSpeedBonus) / [decimal]200
-    Assert-Condition ($factor -gt 0) "Attack-speed bonus '$AttackSpeedBonus' produces a nonpositive attack-rate factor."
-    return $factor
+    $finalAttackSpeed = [decimal][Math]::Max(
+        [double]0,
+        [double](([decimal]100 + $AttackSpeedAdditive) * $FinalAttackSpeedMultiplier)
+    )
+    return $finalAttackSpeed / [decimal]100
+}
+
+function Get-AutomaticSkillCastTimes {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$WindowSeconds,
+        [Parameter(Mandatory = $true)][decimal]$SkillPointsPerSecond,
+        [Parameter(Mandatory = $true)][decimal]$InitialSkillPoints,
+        [Parameter(Mandatory = $true)][decimal]$SkillPointCost
+    )
+
+    Assert-Condition ($WindowSeconds -gt 0) "Automatic-skill window '$WindowSeconds' must be positive."
+    Assert-Condition ($SkillPointsPerSecond -gt 0) "Automatic-skill SP rate '$SkillPointsPerSecond' must be positive."
+    Assert-Condition ($InitialSkillPoints -ge 0 -and $InitialSkillPoints -lt $SkillPointCost) "Automatic-skill initial SP '$InitialSkillPoints' must be nonnegative and below cost '$SkillPointCost'."
+    Assert-Condition ($SkillPointCost -gt 0) "Automatic-skill cost '$SkillPointCost' must be positive."
+    $firstCast = ($SkillPointCost - $InitialSkillPoints) / $SkillPointsPerSecond
+    $castInterval = $SkillPointCost / $SkillPointsPerSecond
+    $times = [System.Collections.Generic.List[decimal]]::new()
+    for ($castTime = $firstCast; $castTime -le $WindowSeconds; $castTime += $castInterval) {
+        $times.Add($castTime)
+    }
+    return $times.ToArray()
+}
+
+function Get-DiscreteCycleOutputRatio {
+    param(
+        [Parameter(Mandatory = $true)]$Row,
+        [Parameter(Mandatory = $true)][object[]]$Defenders,
+        [Parameter(Mandatory = $true)][decimal]$WindowSeconds,
+        [Parameter(Mandatory = $true)][decimal[]]$AttackCycleMultipliers,
+        [Parameter(Mandatory = $true)][decimal[]]$AttackCycleTargetCounts
+    )
+
+    Assert-Condition ($WindowSeconds -gt 0) "Type ID $($Row.TypeId) has a nonpositive cycle window."
+    Assert-Condition ($AttackCycleMultipliers.Count -gt 0 -and $AttackCycleMultipliers.Count -eq $AttackCycleTargetCounts.Count) "Type ID $($Row.TypeId) has inconsistent cycle data."
+    $attackCount = [int][Math]::Floor([double]($WindowSeconds / [decimal]$Row.EffectiveAttackIntervalSeconds))
+    $specialAttackCount = [int][Math]::Floor([double]($attackCount / $AttackCycleMultipliers.Count))
+    if ($attackCount -eq 0) {
+        return [pscustomobject]@{ Ratio = [decimal]1; AttackCount = 0; SpecialAttackCount = 0 }
+    }
+    $ordinaryAttackCount = $attackCount - $specialAttackCount
+    $specialMultiplier = [decimal]$AttackCycleMultipliers[-1]
+    $specialTargetCount = [decimal]$AttackCycleTargetCounts[-1]
+    $ratios = foreach ($defender in $Defenders) {
+        $ordinaryDamage = Get-OrdinaryAttackDamage -Attacker $Row -Defender $defender
+        $specialAttacker = [pscustomobject]@{
+            TypeId = $Row.TypeId
+            DamageType = $Row.DamageType
+            Attack = [decimal]$Row.Attack * $specialMultiplier
+            EffectiveAttackIntervalSeconds = $Row.EffectiveAttackIntervalSeconds
+        }
+        $specialDamage = Get-OrdinaryAttackDamage -Attacker $specialAttacker -Defender $defender
+        (($ordinaryDamage * $ordinaryAttackCount) + ($specialDamage * $specialAttackCount * $specialTargetCount)) /
+            ($ordinaryDamage * $attackCount)
+    }
+    return [pscustomobject]@{
+        Ratio = Get-Median -Values ([decimal[]]$ratios)
+        AttackCount = $attackCount
+        SpecialAttackCount = $specialAttackCount
+    }
 }
 
 function Get-AttackStateOutputRatio {
@@ -319,7 +383,8 @@ function Get-AttackStateOutputRatio {
         [Parameter(Mandatory = $true)][object[]]$Defenders,
         [Parameter(Mandatory = $true)][decimal]$BaselineMedianDps,
         [decimal]$AttackMultiplier = 1,
-        [decimal]$AttackSpeedBonus = 0,
+        [decimal]$AttackSpeedAdditive = 0,
+        [decimal]$FinalAttackSpeedMultiplier = 1,
         [decimal]$TargetCount = 1,
         [decimal]$DefenseIgnoreFraction = 0,
         [decimal]$FlatAttackBonus = 0
@@ -334,7 +399,7 @@ function Get-AttackStateOutputRatio {
         Attack = ([decimal]$Row.Attack * $AttackMultiplier) + $FlatAttackBonus
         EffectiveAttackIntervalSeconds = $Row.EffectiveAttackIntervalSeconds
     }
-    $attackRateFactor = Get-AttackRateFactor -AttackSpeedBonus $AttackSpeedBonus
+    $attackRateFactor = Get-AttackRateFactor -AttackSpeedAdditive $AttackSpeedAdditive -FinalAttackSpeedMultiplier $FinalAttackSpeedMultiplier
     $dpsValues = foreach ($defender in $Defenders) {
         $effectiveDefender = [pscustomobject]@{
             Defense = [decimal]$defender.Defense * ([decimal]1 - $DefenseIgnoreFraction)
@@ -416,8 +481,9 @@ function Get-AuraPowerPerTarget {
         [Parameter(Mandatory = $true)][hashtable]$Parameters
     )
 
-    if (Test-MapKey -Map $Parameters -Key 'AuraAttackSpeedBonus') {
-        $incomingRate = Get-AttackRateFactor -AttackSpeedBonus ([decimal]$Parameters.AuraAttackSpeedBonus)
+    if (Test-MapKey -Map $Parameters -Key 'AuraAttackSpeedAdditive') {
+        $incomingRate = Get-AttackRateFactor -AttackSpeedAdditive ([decimal]$Parameters.AuraAttackSpeedAdditive) -FinalAttackSpeedMultiplier 1
+        Assert-Condition ($incomingRate -gt 0) 'An aura that reduces final attack speed to zero needs a separate finite survival-window model.'
         return [decimal][Math]::Sqrt([double]([decimal]1 / $incomingRate)) - [decimal]1
     }
 
@@ -544,6 +610,10 @@ try {
         if ($line -match ('^(?<TypeId>\d+)\s+.+?' + $abilityMarkerPattern) -and $shopSet.Contains($Matches.TypeId)) {
             Assert-Condition ($scenarioTypeIds.Contains($Matches.TypeId) -or $riskTypeIds.Contains($Matches.TypeId)) "BONDS ability TypeId '$($Matches.TypeId)' is absent from UnitScenarios and ExplicitRiskOnly."
         }
+    }
+    foreach ($typeId in @('1058', '1095', '1281')) {
+        Assert-Condition ($shopSet.Contains($typeId)) "Required unmarked ability TypeId '$typeId' is not a shop unit."
+        Assert-Condition ($scenarioTypeIds.Contains($typeId) -or $riskTypeIds.Contains($typeId)) "Required unmarked ability TypeId '$typeId' is absent from UnitScenarios and ExplicitRiskOnly."
     }
 
     $unitPattern = '^(?<TypeId>\d+)\s+(?<DisplayName>.+?)\s+' + $rarityLabel + '(?<Rarity>[1-6])(?:\s|$)'
@@ -849,6 +919,9 @@ try {
         $equivalentLow = [decimal]0
         $equivalentMain = [decimal]0
         $equivalentHigh = [decimal]0
+        $scenarioEventTimes = [System.Collections.Generic.List[decimal]]::new()
+        $scenarioAttackCount = $null
+        $scenarioSpecialAttackCount = $null
         $baselineDps = if ($rawDpsMediansByTypeId.ContainsKey([int]$row.TypeId)) { [decimal]$rawDpsMediansByTypeId[[int]$row.TypeId] } else { [decimal]0 }
 
         if ($null -ne $scenario -and $baselineDps -gt 0) {
@@ -861,13 +934,14 @@ try {
                     $duration = [decimal]$segment.DurationSeconds
                     Assert-Condition ($duration -ge 0) "Type ID $($row.TypeId) has a negative output-segment duration."
                     $attackMultiplier = if ($segment.ContainsKey('AttackMultiplier')) { [decimal]$segment.AttackMultiplier } else { [decimal]1 }
-                    $attackSpeedBonus = if ($segment.ContainsKey('AttackSpeedBonus')) { [decimal]$segment.AttackSpeedBonus } else { [decimal]0 }
+                    $attackSpeedAdditive = if ($segment.ContainsKey('AttackSpeedAdditive')) { [decimal]$segment.AttackSpeedAdditive } else { [decimal]0 }
+                    $finalAttackSpeedMultiplier = if ($segment.ContainsKey('FinalAttackSpeedMultiplier')) { [decimal]$segment.FinalAttackSpeedMultiplier } else { [decimal]1 }
                     $targetLow = if ($segment.ContainsKey('TargetCountLow')) { [decimal]$segment.TargetCountLow } else { [decimal]1 }
                     $targetMain = if ($segment.ContainsKey('TargetCountMain')) { [decimal]$segment.TargetCountMain } else { $targetLow }
                     $targetHigh = if ($segment.ContainsKey('TargetCountHigh')) { [decimal]$segment.TargetCountHigh } else { $targetMain }
-                    $outputLow += $duration * (Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier $attackMultiplier -AttackSpeedBonus $attackSpeedBonus -TargetCount $targetLow)
-                    $outputMain += $duration * (Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier $attackMultiplier -AttackSpeedBonus $attackSpeedBonus -TargetCount $targetMain)
-                    $outputHigh += $duration * (Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier $attackMultiplier -AttackSpeedBonus $attackSpeedBonus -TargetCount $targetHigh)
+                    $outputLow += $duration * (Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier $attackMultiplier -AttackSpeedAdditive $attackSpeedAdditive -FinalAttackSpeedMultiplier $finalAttackSpeedMultiplier -TargetCount $targetLow)
+                    $outputMain += $duration * (Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier $attackMultiplier -AttackSpeedAdditive $attackSpeedAdditive -FinalAttackSpeedMultiplier $finalAttackSpeedMultiplier -TargetCount $targetMain)
+                    $outputHigh += $duration * (Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier $attackMultiplier -AttackSpeedAdditive $attackSpeedAdditive -FinalAttackSpeedMultiplier $finalAttackSpeedMultiplier -TargetCount $targetHigh)
                     $totalDuration += $duration
                 }
                 Assert-Condition ($totalDuration -eq $window) "Type ID $($row.TypeId) output segments cover '$totalDuration' seconds, expected '$window'."
@@ -877,27 +951,26 @@ try {
             }
             if ($scenario.ModelKind -ceq 'OpeningHitsThenSteady20Seconds') {
                 $openingCount = [decimal]$parameters.OpeningAttackCount
-                $openingSpeedBonus = [decimal]$parameters.OpeningAttackSpeedBonus
-                $openingDuration = $openingCount * [decimal]$row.EffectiveAttackIntervalSeconds / (Get-AttackRateFactor -AttackSpeedBonus $openingSpeedBonus)
+                $openingSpeedAdditive = [decimal]$parameters.OpeningAttackSpeedAdditive
+                $openingAttackRate = Get-AttackRateFactor -AttackSpeedAdditive $openingSpeedAdditive -FinalAttackSpeedMultiplier 1
+                Assert-Condition ($openingAttackRate -gt 0) "Type ID $($row.TypeId) opening state cannot reach its release attack count at zero attack speed."
+                $openingDuration = $openingCount * [decimal]$row.EffectiveAttackIntervalSeconds / $openingAttackRate
                 $openingDuration = [decimal][Math]::Min([double]$window, [double]$openingDuration)
                 $steadyDuration = $window - $openingDuration
-                $openingRatio = Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackSpeedBonus $openingSpeedBonus
+                $openingRatio = Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackSpeedAdditive $openingSpeedAdditive
                 $steadyIgnore = Get-MapDecimal -Map $parameters -Key 'SteadyDefenseIgnoreFraction' -Default 0
                 $steadyRatio = Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier ([decimal]$parameters.SteadyAttackMultiplier) -DefenseIgnoreFraction $steadyIgnore
                 $outputLow = $outputMain = $outputHigh = (($openingRatio * $openingDuration) + ($steadyRatio * $steadyDuration)) / $window
             }
             if (Test-MapKey -Map $parameters -Key 'AttackCycleMultipliers') {
-                $multipliers = @($parameters.AttackCycleMultipliers)
+                $multipliers = [decimal[]]@($parameters.AttackCycleMultipliers)
                 foreach ($scenarioName in @('Low', 'Main', 'High')) {
                     $targetKey = 'AttackCycleTargetCounts' + $scenarioName
-                    $targetCounts = if ($parameters.ContainsKey($targetKey)) { @($parameters[$targetKey]) } else { @(for ($index = 0; $index -lt $multipliers.Count; $index++) { 1 }) }
-                    Assert-Condition ($targetCounts.Count -eq $multipliers.Count) "Type ID $($row.TypeId) cycle target count does not match its multiplier count."
-                    $cycleRatio = [decimal]0
-                    for ($index = 0; $index -lt $multipliers.Count; $index++) {
-                        $cycleRatio += Get-AttackStateOutputRatio -Row $row -Defenders $defenderRows -BaselineMedianDps $baselineDps -AttackMultiplier ([decimal]$multipliers[$index]) -TargetCount ([decimal]$targetCounts[$index])
-                    }
-                    $cycleRatio /= [decimal]$multipliers.Count
-                    Set-Variable -Name ('output' + $scenarioName) -Value $cycleRatio
+                    $targetCounts = if ($parameters.ContainsKey($targetKey)) { [decimal[]]@($parameters[$targetKey]) } else { [decimal[]]@(for ($index = 0; $index -lt $multipliers.Count; $index++) { 1 }) }
+                    $cycleResult = Get-DiscreteCycleOutputRatio -Row $row -Defenders $defenderRows -WindowSeconds $window -AttackCycleMultipliers $multipliers -AttackCycleTargetCounts $targetCounts
+                    Set-Variable -Name ('output' + $scenarioName) -Value $cycleResult.Ratio
+                    $scenarioAttackCount = $cycleResult.AttackCount
+                    $scenarioSpecialAttackCount = $cycleResult.SpecialAttackCount
                 }
             }
             if (Test-MapKey -Map $parameters -Key 'FirstAttackMultiplier') {
@@ -922,16 +995,29 @@ try {
                 $outputHigh *= $uptime
             }
             if (Test-MapKey -Map $parameters -Key 'BurstAttackMultiplier') {
-                $burstAttacker = [pscustomobject]@{
-                    TypeId = $row.TypeId
-                    DamageType = if ($parameters.ContainsKey('BurstDamageType')) { [string]$parameters.BurstDamageType } else { [string]$row.DamageType }
-                    Attack = [decimal]$row.Attack * [decimal]$parameters.BurstAttackMultiplier
-                    EffectiveAttackIntervalSeconds = 1
+                $deathAtSeconds = if ($parameters.ContainsKey('DeathAtSeconds')) {
+                    [decimal]$parameters.DeathAtSeconds
                 }
-                $burstDamage = Get-Median -Values ([decimal[]]@($defenderRows | ForEach-Object { Get-OrdinaryAttackDamage -Attacker $burstAttacker -Defender $_ }))
-                $outputLow += ($burstDamage * [decimal]$parameters.BurstTargetsLow / $window) / $baselineDps
-                $outputMain += ($burstDamage * [decimal]$parameters.BurstTargetsMain / $window) / $baselineDps
-                $outputHigh += ($burstDamage * [decimal]$parameters.BurstTargetsHigh / $window) / $baselineDps
+                elseif ($parameters.ContainsKey('SelfDamagePerSecond')) {
+                    [decimal]$row.MaxHitPoints / [decimal]$parameters.SelfDamagePerSecond
+                }
+                else {
+                    throw "Type ID $($row.TypeId) burst has no auditable death-time input."
+                }
+                $burstResolutionSeconds = $deathAtSeconds + [decimal]$parameters.BurstDelaySeconds
+                if ($burstResolutionSeconds -le $window) {
+                    $scenarioEventTimes.Add($burstResolutionSeconds)
+                    $burstAttacker = [pscustomobject]@{
+                        TypeId = $row.TypeId
+                        DamageType = if ($parameters.ContainsKey('BurstDamageType')) { [string]$parameters.BurstDamageType } else { [string]$row.DamageType }
+                        Attack = [decimal]$row.Attack * [decimal]$parameters.BurstAttackMultiplier
+                        EffectiveAttackIntervalSeconds = 1
+                    }
+                    $burstDamage = Get-Median -Values ([decimal[]]@($defenderRows | ForEach-Object { Get-OrdinaryAttackDamage -Attacker $burstAttacker -Defender $_ }))
+                    $outputLow += ($burstDamage * [decimal]$parameters.BurstTargetsLow / $window) / $baselineDps
+                    $outputMain += ($burstDamage * [decimal]$parameters.BurstTargetsMain / $window) / $baselineDps
+                    $outputHigh += ($burstDamage * [decimal]$parameters.BurstTargetsHigh / $window) / $baselineDps
+                }
             }
             if (Test-MapKey -Map $parameters -Key 'CounterMagicDamagePerHit') {
                 $counterAttacker = [pscustomobject]@{ TypeId = $row.TypeId; DamageType = 'Magic'; Attack = [decimal]$parameters.CounterMagicDamagePerHit; EffectiveAttackIntervalSeconds = 1 }
@@ -965,8 +1051,14 @@ try {
         }
         if ($null -ne $scenario -and $parameters.ContainsKey('SummonTypeId')) {
             $summonPower = [decimal]$powerByTypeId[[int]$parameters.SummonTypeId]
-            if ($parameters.ContainsKey('SpawnTimesSeconds')) {
-                foreach ($spawnTime in @($parameters.SpawnTimesSeconds)) {
+            if ($parameters.ContainsKey('SkillPointsPerSecond')) {
+                $spawnTimes = @(Get-AutomaticSkillCastTimes `
+                        -WindowSeconds $window `
+                        -SkillPointsPerSecond ([decimal]$parameters.SkillPointsPerSecond) `
+                        -InitialSkillPoints ([decimal]$parameters.InitialSkillPoints) `
+                        -SkillPointCost ([decimal]$parameters.SkillPointCost))
+                foreach ($spawnTime in $spawnTimes) {
+                    $scenarioEventTimes.Add([decimal]$spawnTime)
                     $contribution = $summonPower * [decimal]$parameters.SummonCountPerCast * [decimal][Math]::Max([double]0, [double](($window - [decimal]$spawnTime) / $window))
                     $equivalentMain += $contribution
                 }
@@ -974,17 +1066,20 @@ try {
             elseif ($scenario.ModelKind -ceq 'AttackCycleSummon20Seconds') {
                 $spawnInterval = [decimal]$parameters.AttacksPerSummon * [decimal]$row.EffectiveAttackIntervalSeconds
                 for ($spawnTime = $spawnInterval; $spawnTime -le $window; $spawnTime += $spawnInterval) {
+                    $scenarioEventTimes.Add($spawnTime)
                     $equivalentMain += $summonPower * (($window - $spawnTime) / $window)
                 }
             }
             else {
                 $summonCount = [decimal]$parameters.SummonCount
                 $spawnTime = [decimal]$parameters.SummonAtSeconds
+                $scenarioEventTimes.Add($spawnTime)
                 $equivalentMain += $summonPower * $summonCount * (($window - $spawnTime) / $window)
             }
             $equivalentLow = $equivalentHigh = $equivalentMain
         }
         if ($null -ne $scenario -and $parameters.ContainsKey('RandomSummons')) {
+            $scenarioEventTimes.Add([decimal]$parameters.SummonAtSeconds)
             foreach ($randomSummon in @($parameters.RandomSummons)) {
                 $equivalentMain += [decimal]$powerByTypeId[[int]$randomSummon.TypeId] * [decimal]$randomSummon.Probability * (($window - [decimal]$parameters.SummonAtSeconds) / $window)
             }
@@ -1032,6 +1127,10 @@ try {
         $properties.ContinuousPower = $continuousPower
         $properties.AbilityEvidence = $evidence
         $properties.RiskFlags = $riskText -join ' | '
+        $properties.ScenarioEventCount = $scenarioEventTimes.Count
+        $properties.ScenarioEventTimesSeconds = @($scenarioEventTimes | ForEach-Object { $_.ToString('0.############################', [System.Globalization.CultureInfo]::InvariantCulture) }) -join '/'
+        $properties.ScenarioAttackCount = $scenarioAttackCount
+        $properties.ScenarioSpecialAttackCount = $scenarioSpecialAttackCount
         [pscustomobject]$properties
     }
     $rows = @($abilityRows)

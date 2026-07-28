@@ -448,6 +448,8 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 ### 7.4.1 攻击、死亡与 Tick 内结算
 
 - 正式单位的基础攻击间隔为源单位 JSON 中 `attackIntervalSeconds` 的一半，即 `baseAttackIntervalSeconds = attackIntervalSeconds × 0.5`；先得到基础攻击间隔秒数，再按 `20 TPS` 向上取整为 Core 使用的 `AttackIntervalTicks`；
+- 上述 `× 0.5` 只负责从源数据得到基础实际攻击间隔，与攻速加算区和最终乘区分开计算。基础攻速固定为 `100`，最终攻速为 `FinalAttackSpeed = max(0, (100 + AttackSpeedAdditive) × FinalAttackSpeedMultiplier)`，最终攻击间隔为 `FinalInterval = BaseInterval / (FinalAttackSpeed / 100)`；
+- `FinalAttackSpeed = 0` 时单位攻击频率与 DPS 均为 `0`，不得执行除以零，也不得产生 `Infinity`；
 - Core 中的 `AttackIntervalTicks` 始终表示已经完成上述换算的实际攻击间隔，不得在 `BattleRunner`、表现层或 UI 中再次折半。直接以 Tick 定义攻击间隔的合成 fixture 同样填写实际间隔 Tick，不套用源 JSON 换算规则；
 - 单位维护下一次允许攻击开始的最早 Tick；首次满足范围且不在冷却时可立即攻击；
 - 攻击开始产生 Attack 事件和待结算攻击。其有效动画时长为 `min(原始动画 Tick, 攻击间隔 Tick)`，并在有效动画结束 Tick 结算伤害；

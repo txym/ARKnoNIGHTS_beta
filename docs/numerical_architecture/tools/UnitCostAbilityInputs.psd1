@@ -23,8 +23,8 @@
         '1021' = @{
             TypeId = 1021
             ModelKind = 'DeathBurst20Seconds'
-            Parameters = @{ WindowSeconds = 20; BurstAtSeconds = 10; BurstAttackMultiplier = 4.0; BurstTargetsLow = 1; BurstTargetsMain = 2; BurstTargetsHigh = 3 }
-            Evidence = @('BONDS: death burst is 400% ATK physical splash, radius 1.25, delay 1 second. Scenario convention: death at the 10-second midpoint; AoE sensitivity 1/2/3.')
+            Parameters = @{ WindowSeconds = 20; DeathAtSeconds = 10; BurstDelaySeconds = 1; BurstAttackMultiplier = 4.0; BurstTargetsLow = 1; BurstTargetsMain = 2; BurstTargetsHigh = 3 }
+            Evidence = @('BONDS: death burst is 400% ATK physical splash, radius 1.25, delay 1 second. Scenario convention: death at 10 seconds and burst resolution at 11 seconds; AoE sensitivity 1/2/3.')
             UnquantifiedRisk = @('Actual death time, air-target mix and affected target count are not confirmed.')
         }
         '1025' = @{
@@ -44,8 +44,8 @@
         '1042' = @{
             TypeId = 1042
             ModelKind = 'SupportAura20Seconds'
-            Parameters = @{ WindowSeconds = 20; AuraAttackSpeedBonus = -50; AuraTargetsLow = 1; AuraTargetsMain = 3; AuraTargetsHigh = 5 }
-            Evidence = @('BONDS: enemies within radius 2.5 have ASPD -50. Baseline attack rate is 200 after the confirmed interval halving; prevented output per target is 1-(200-50)/200. Aura sensitivity is 1/3/5.')
+            Parameters = @{ WindowSeconds = 20; AuraAttackSpeedAdditive = -50; AuraTargetsLow = 1; AuraTargetsMain = 3; AuraTargetsHigh = 5 }
+            Evidence = @('BONDS: enemies within radius 2.5 have additive ASPD -50. After the separate source-interval halving, confirmed base attack speed is 100, so the target attack-rate factor is (100-50)/100=0.5. Aura sensitivity is 1/3/5.')
             UnquantifiedRisk = @('Actual route, affected enemies, uptime, stacking and silence timing are not confirmed.')
         }
         '1043' = @{
@@ -79,50 +79,50 @@
         '1089' = @{
             TypeId = 1089
             ModelKind = 'SelfDamageDeathBurst20Seconds'
-            Parameters = @{ WindowSeconds = 20; SelfDamagePerSecond = 800; BurstAttackMultiplier = 2.0; BurstTargetsLow = 1; BurstTargetsMain = 2; BurstTargetsHigh = 3; BurstDamageType = 'Magic' }
-            Evidence = @('BONDS: 800 source-less true self-damage/s and 200% ATK magic death splash, radius 1.5, delay 1.3 seconds. Death time is min(20, HP/800); AoE sensitivity is 1/2/3.')
+            Parameters = @{ WindowSeconds = 20; SelfDamagePerSecond = 800; BurstDelaySeconds = 1.3; BurstAttackMultiplier = 2.0; BurstTargetsLow = 1; BurstTargetsMain = 2; BurstTargetsHigh = 3; BurstDamageType = 'Magic' }
+            Evidence = @('BONDS: 800 source-less true self-damage/s and 200% ATK magic death splash, radius 1.5, delay 1.3 seconds. Death time is HP/800 and the burst contributes only if death time + 1.3 is within 20 seconds; AoE sensitivity is 1/2/3.')
             UnquantifiedRisk = @('External damage/healing can change death time and whether the burst occurs in-window.')
         }
         '1116' = @{
             TypeId = 1116
             ModelKind = 'OpeningHitsThenSteady20Seconds'
-            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedBonus = -50; SteadyAttackMultiplier = 1.5 }
+            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedAdditive = -50; SteadyAttackMultiplier = 1.5 }
             Evidence = @('BONDS: initial ASPD -50; before attack 4, release and gain ATK +50%. Formula gives the first three attacks the opening state and the remainder the released state.')
             UnquantifiedRisk = @()
         }
         '1118' = @{
             TypeId = 1118
             ModelKind = 'OpeningHitsThenSteady20Seconds'
-            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedBonus = -50; SteadyAttackMultiplier = 1.5; SteadyDefenseIgnoreFraction = 0.60 }
+            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedAdditive = -50; SteadyAttackMultiplier = 1.5; SteadyDefenseIgnoreFraction = 0.60 }
             Evidence = @('BONDS: first three attacks at ASPD -50; released attacks gain ATK +50% and ignore 60% of target DEF.')
             UnquantifiedRisk = @()
         }
         '1119' = @{
             TypeId = 1119
             ModelKind = 'OpeningHitsThenSteady20Seconds'
-            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedBonus = -50; SteadyAttackMultiplier = 1.5; DefenseActiveStartSeconds = 10; MagicResistanceBonus = 40; RegenPerSecond = 300 }
+            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedAdditive = -50; SteadyAttackMultiplier = 1.5; DefenseActiveStartSeconds = 10; MagicResistanceBonus = 40; RegenPerSecond = 300 }
             Evidence = @('BONDS: first three attacks at ASPD -50; released attacks gain ATK +50%, MR +40 and regen 300/s. Output release follows attack count; defense effects use the fixed 10-second midpoint convention.')
             UnquantifiedRisk = @('Actual release time changes defense-effect uptime.')
         }
         '1121' = @{
             TypeId = 1121
             ModelKind = 'OpeningHitsThenSteady20Seconds'
-            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedBonus = -50; SteadyAttackMultiplier = 1.5; DefenseBonus = 300; DefenseActiveStartSeconds = 0; DefenseActiveEndSeconds = 10 }
+            Parameters = @{ WindowSeconds = 20; OpeningAttackCount = 3; OpeningAttackSpeedAdditive = -50; SteadyAttackMultiplier = 1.5; DefenseBonus = 300; DefenseActiveStartSeconds = 0; DefenseActiveEndSeconds = 10 }
             Evidence = @('BONDS: initial ASPD -50 and DEF +300; before attack 4, release and gain ATK +50%. Output follows attack count; opening DEF uses the fixed first 10 seconds.')
             UnquantifiedRisk = @('Actual release time and the first-release ally effect are not fully determined.')
         }
         '1131' = @{
             TypeId = 1131
             ModelKind = 'DeathSummon20Seconds'
-            Parameters = @{ WindowSeconds = 20; SummonAtSeconds = 10; SummonTypeId = 1137; SummonCount = 2 }
-            Evidence = @('BONDS E0: 0.2 seconds after death, summon two 1137. Scenario convention: parent death at 10 seconds; contribution uses child PanelPower * remaining lifetime / 20.')
+            Parameters = @{ WindowSeconds = 20; SummonAtSeconds = 10.2; SummonTypeId = 1137; SummonCount = 2 }
+            Evidence = @('BONDS E0: 0.2 seconds after death, summon two 1137. Scenario convention: parent death at 10 seconds, so spawn is at 10.2 seconds; contribution uses child PanelPower * remaining lifetime / 20.')
             UnquantifiedRisk = @('Actual death time and spawn placement are encounter dependent.')
         }
         '1132' = @{
             TypeId = 1132
             ModelKind = 'DeathSummon20Seconds'
-            Parameters = @{ WindowSeconds = 20; SummonAtSeconds = 10; SummonTypeId = 1137; SummonCount = 3 }
-            Evidence = @('BONDS E0: 0.2 seconds after death, summon three 1137. Scenario convention: parent death at 10 seconds; contribution uses child PanelPower * remaining lifetime / 20.')
+            Parameters = @{ WindowSeconds = 20; SummonAtSeconds = 10.2; SummonTypeId = 1137; SummonCount = 3 }
+            Evidence = @('BONDS E0: 0.2 seconds after death, summon three 1137. Scenario convention: parent death at 10 seconds, so spawn is at 10.2 seconds; contribution uses child PanelPower * remaining lifetime / 20.')
             UnquantifiedRisk = @('Actual death time and spawn placement are encounter dependent.')
         }
         '1146' = @{
@@ -205,15 +205,15 @@
         '1264' = @{
             TypeId = 1264
             ModelKind = 'TimedAttackSpeed20Seconds'
-            Parameters = @{ WindowSeconds = 20; OutputSegments = @(@{ DurationSeconds = 15; AttackSpeedBonus = 100 }, @{ DurationSeconds = 5 }) }
-            Evidence = @('BONDS: after first damage, ASPD +100 for 15 seconds. Scenario convention: first damage occurs at time 0; remaining five seconds are baseline.')
+            Parameters = @{ WindowSeconds = 20; OutputSegments = @(@{ DurationSeconds = 15; AttackSpeedAdditive = 100 }, @{ DurationSeconds = 5 }) }
+            Evidence = @('BONDS: after first damage, additive ASPD +100 for 15 seconds. Confirmed base attack speed 100 makes the active attack-rate factor 2; scenario convention: first damage occurs at time 0.')
             UnquantifiedRisk = @('Actual first-damage time and movement-speed path effect are encounter dependent.')
         }
         '1274' = @{
             TypeId = 1274
             ModelKind = 'ThresholdAttackSpeed20Seconds'
-            Parameters = @{ WindowSeconds = 20; OutputSegments = @(@{ DurationSeconds = 10 }, @{ DurationSeconds = 10; AttackSpeedBonus = 100 }) }
-            Evidence = @('BONDS: first time below 50% HP, ASPD +100. Scenario convention: threshold at 10 seconds.')
+            Parameters = @{ WindowSeconds = 20; OutputSegments = @(@{ DurationSeconds = 10 }, @{ DurationSeconds = 10; AttackSpeedAdditive = 100 }) }
+            Evidence = @('BONDS: first time below 50% HP, additive ASPD +100. Confirmed base attack speed 100 makes the active attack-rate factor 2; scenario convention: threshold at 10 seconds.')
             UnquantifiedRisk = @('Actual threshold time and movement-speed path effect are encounter dependent.')
         }
         '1314' = @{
@@ -241,14 +241,14 @@
             TypeId = 1371
             ModelKind = 'PeriodicAttack20Seconds'
             Parameters = @{ WindowSeconds = 20; AttackCycleMultipliers = @(1.0, 1.0, 1.3) }
-            Evidence = @('BONDS: after two attacks, the next deals 130% ATK physical damage. Formula repeats the three-hit cycle.')
+            Evidence = @('BONDS: after two attacks, the next deals 130% ATK physical damage. Formula uses floor(20/base interval) actual attacks and floor(attack count/3) enhanced attacks; an incomplete tail remains ordinary.')
             UnquantifiedRisk = @()
         }
         '1372' = @{
             TypeId = 1372
             ModelKind = 'PeriodicAoe20Seconds'
             Parameters = @{ WindowSeconds = 20; AttackCycleMultipliers = @(1.0, 1.0, 1.0); AttackCycleTargetCountsLow = @(1, 1, 1); AttackCycleTargetCountsMain = @(1, 1, 2); AttackCycleTargetCountsHigh = @(1, 1, 3) }
-            Evidence = @('BONDS: after two attacks, the next deals 100% ATK physical damage in a cross. AoE sensitivity gives that third hit 1/2/3 targets.')
+            Evidence = @('BONDS: after two attacks, the next deals 100% ATK physical damage in a cross. Formula uses floor(20/base interval) actual attacks and floor(attack count/3) splash attacks; AoE sensitivity gives each completed third hit 1/2/3 targets.')
             UnquantifiedRisk = @('Actual cross occupancy and air-target exclusions are encounter dependent.')
         }
         '1375' = @{
@@ -275,8 +275,8 @@
         '5503' = @{
             TypeId = 5503
             ModelKind = 'ScheduledSummon20Seconds'
-            Parameters = @{ WindowSeconds = 20; SummonTypeId = 5504; SummonCountPerCast = 3; SkillPointsPerSecond = 2; InitialSkillPoints = 5; SkillPointCost = 15; SpawnTimesSeconds = @(5.0, 12.5, 20.0) }
-            Evidence = @('BONDS: initial SP 5, cost 15, summon three 5504. SPEC: automatic skills recover 2 SP/s. Casts occur at 5, 12.5 and the 20-second endpoint; endpoint children have zero remaining-window contribution.')
+            Parameters = @{ WindowSeconds = 20; SummonTypeId = 5504; SummonCountPerCast = 3; SkillPointsPerSecond = 2; InitialSkillPoints = 5; SkillPointCost = 15 }
+            Evidence = @('BONDS: initial SP 5, cost 15, summon three 5504. SPEC: automatic skills recover 2 SP/s. The exporter derives casts at 5, 12.5 and the 20-second endpoint; endpoint children have zero remaining-window contribution.')
             UnquantifiedRisk = @('Actual battle termination and spawn survival can reduce contribution.')
         }
         '7002' = @{
@@ -289,8 +289,8 @@
         '10004' = @{
             TypeId = 10004
             ModelKind = 'ThresholdHeal20Seconds'
-            Parameters = @{ WindowSeconds = 20; HealFractionOfMaxHp = 0.50; HealAtSeconds = 10 }
-            Evidence = @('BONDS: first time below 50% HP, heal to 100%. Scenario convention: trigger at 10 seconds after exactly half HP has been lost, adding 50% max HP.')
+            Parameters = @{ WindowSeconds = 20; HealFractionOfMaxHp = 0.50 }
+            Evidence = @('BONDS: first time below 50% HP, heal to 100%. The effective-HP budget adds 50% max HP without claiming a trigger time.')
             UnquantifiedRisk = @('Actual trigger time, overkill and healing prevention are not confirmed.')
         }
         '10006' = @{
@@ -324,8 +324,8 @@
         '10077' = @{
             TypeId = 10077
             ModelKind = 'ScheduledSummon20Seconds'
-            Parameters = @{ WindowSeconds = 20; SummonTypeId = 10073; SummonCountPerCast = 1; SkillPointsPerSecond = 2; InitialSkillPoints = 3; SkillPointCost = 5; SpawnTimesSeconds = @(1.0, 3.5, 6.0, 8.5, 11.0, 13.5, 16.0, 18.5) }
-            Evidence = @('Approved design section 4 and SPEC: 2 SP/s, initial 3 SP, cost 5. Cast times are (5-3)/2=1 then every 5/2=2.5 seconds through 18.5; contribution is 10073 PanelPower * remaining lifetime / 20.')
+            Parameters = @{ WindowSeconds = 20; SummonTypeId = 10073; SummonCountPerCast = 1; SkillPointsPerSecond = 2; InitialSkillPoints = 3; SkillPointCost = 5 }
+            Evidence = @('Approved design section 4 and SPEC: 2 SP/s, initial 3 SP, cost 5. The exporter derives first cast (5-3)/2=1 and then every 5/2=2.5 seconds through 18.5; contribution is 10073 PanelPower * remaining lifetime / 20.')
             UnquantifiedRisk = @('Actual battle termination and summoned-entity deaths can reduce contribution.')
         }
         '10078' = @{
@@ -345,13 +345,16 @@
         '10127' = @{
             TypeId = 10127
             ModelKind = 'AttackSpeedDamageReduction20Seconds'
-            Parameters = @{ WindowSeconds = 20; OutputSegments = @(@{ DurationSeconds = 20; AttackSpeedBonus = 100 }); PhysicalDamageTakenMultiplier = 0.50; MagicDamageTakenMultiplier = 0.50 }
-            Evidence = @('BONDS: ASPD +100 and physical/magic damage taken -50% for the full window. Relative attack rate is (200+100)/200.')
+            Parameters = @{ WindowSeconds = 20; OutputSegments = @(@{ DurationSeconds = 20; AttackSpeedAdditive = 100 }); PhysicalDamageTakenMultiplier = 0.50; MagicDamageTakenMultiplier = 0.50 }
+            Evidence = @('BONDS: additive ASPD +100 and physical/magic damage taken -50% for the full window. Confirmed base attack speed 100 makes the attack-rate factor 2.')
             UnquantifiedRisk = @()
         }
     }
 
     ExplicitRiskOnly = @{
+        '1058'  = @('BONDS confirms block count 2, but the approved 20-second model has no confirmed conversion from block slots to continuous power; numeric contribution is zero.')
+        '1095'  = @('BONDS confirms each attack reduces the current target DEF by 10 with unlimited stacking, but target switching and stack persistence scenarios are not confirmed; numeric contribution is zero.')
+        '1281'  = @('BONDS confirms three 1277 successors are unloaded on defeat, but the parent death time is not confirmed; numeric contribution is zero.')
         '10001' = @('Unblockable and move speed +150% last 1.5 seconds after the first below-50% trigger; route length and trigger time are not confirmed, so numeric contribution is zero.')
         '1017'  = @('Actual route, recipients, uptime, stacking and silence timing are not confirmed.')
         '1021'  = @('Actual death time, air-target mix and affected target count are not confirmed.')
