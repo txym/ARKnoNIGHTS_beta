@@ -51,10 +51,14 @@ try
         HostOnlyStart = Convert-FromUtf8Base64 '5LuF5oi/5Li75LiA5Lq655qE5oi/6Ze05Y+v5Lul56uL5Y2z5byA5aeL5ri45oiP44CC'
         HostLeaveDissolves = Convert-FromUtf8Base64 '5oi/5Li756a75byA5Lya6Kej5pWj5oi/6Ze05bm25YGc5q2i5p2D5aiB5oi/6Ze05pyN5Yqh44CC'
         NoHostMigration = Convert-FromUtf8Base64 '5LiN5pSv5oyB5oi/5Li76L+B56e75oiW5bCG5YW25LuW5oiQ5ZGY5pmL5Y2H5Li65oi/5Li744CC'
+        GuestLeaveRestoresEmpty = Convert-FromUtf8Base64 '6Z2e5oi/5Li756a75byA5Y+q56e76Zmk6K+l5oiQ5ZGY5bm25oGi5aSN56m65qe944CC'
         GuestActionLabels = Convert-FromUtf8Base64 '5oiQ5ZGY5pON5L2c5qCH562+5Li64oCc5YeG5aSH5bCx57uq4oCd5LiO4oCc5Y+W5raI5YeG5aSH4oCd44CC'
         HostActionLabel = Convert-FromUtf8Base64 '5oi/5Li75pON5L2c5qCH562+5Li64oCc5Y2P6K6u5ZCv5Yqo4oCd44CC'
         PopupExclusion = Convert-FromUtf8Base64 '5Zu+MTLkuI7lm74xM+WboOWPs+S+p+W8ueeql+mBruaMoeiAjOaOkumZpOWujOaVtOeahOesrOWbm+S4queOqeWutuanve+8jOS4lOaOkumZpOmhueS4jeiusOS4uumAmui/h+OAgg=='
         VisibleArtworkAuthority = Convert-FromUtf8Base64 '6KeG6KeJ6aqM5pS25Lul5a6e6ZmF5riy5p+T55qE5Y+v6KeB5Zu+5b2i5Li65YeG77yM6ICM5LiN5piv57q555CG55+p5b2i5oiWUmVjdFRyYW5zZm9ybeS4reW/g+OAgg=='
+    }
+    $forbiddenDocumentationPatterns = [ordered]@{
+        ObsoleteFourPlayerStart = Convert-FromUtf8Base64 '5oi/6Ze05YaFXHMq6L6+5YiwXHMqNFxzKuWQjeeOqeWutuWQjlxzKlss77yMXT9ccyrnlLHmiL/kuLvngrnlh7tccypb4oCcIl0/5byA5aeL5ri45oiPW+KAnSJdP1xzKlvjgIIuXT8='
     }
     foreach ($documentationPath in @(
         (Join-Path $projectRoot 'docs/SPEC.md'),
@@ -67,6 +71,10 @@ try
         foreach ($contract in $documentationContracts.GetEnumerator())
         {
             Assert-True $documentationText.Contains([string]$contract.Value) "$([IO.Path]::GetFileName($documentationPath)) must state documentation contract '$($contract.Key)'."
+        }
+        foreach ($forbiddenPattern in $forbiddenDocumentationPatterns.GetEnumerator())
+        {
+            Assert-True (-not [regex]::IsMatch($documentationText, [string]$forbiddenPattern.Value)) "$([IO.Path]::GetFileName($documentationPath)) must not state obsolete documentation rule '$($forbiddenPattern.Key)'."
         }
     }
 

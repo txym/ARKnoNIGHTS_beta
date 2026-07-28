@@ -424,7 +424,7 @@ Cycle 3 Windows x64 构建结果为 `Succeeded`，错误 `0`，警告 `2`（均�
 | `LanLobbyCaptureSuitePlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Capture` |
 | `LanLobbyControllerPlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Controller` |
 
-总计 100/100 通过，0 失败、0 跳过。每个目录保留 XML、日志和 `summary.txt`。本节提交前的串行复跑确认 Task 9 文档/证据 smoke 为 VisualDiff `36 fixtures / 1633 assertions`、Evidence exporter `5 / 15`、Evidence common `5 / 39`。
+总计 100/100 通过，0 失败、0 跳过。每个目录保留 XML、日志和 `summary.txt`。本节提交前的串行复跑确认 Task 9 文档/证据 smoke 为 VisualDiff `36 fixtures / 1633 assertions`、Evidence exporter `5 / 15`、Evidence common `5 / 45`。
 
 Windows 与 Android 同一 Wi-Fi 下的两台物理设备发现、房间号预填、加入、准备切换、开始广播、离开与房主解散流程仍未人工执行，不能由上述单机证据推断为通过。
 
