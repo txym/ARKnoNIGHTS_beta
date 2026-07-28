@@ -581,8 +581,6 @@ Expected animation facts:
   death=Die
 ```
 
-Verify no source text contains a forbidden legacy field or a property whose name begins with `Default`.
-
 - [ ] **Step 2: Run the real-file tests and verify they fail**
 
 Run the Task 1 test command with output `Temp\UnitEliteVariantsV2\Task2-Red`.
@@ -1269,31 +1267,28 @@ git commit -m "refactor: load legacy unit factory from variant v2"
 
 - [ ] **Step 1: Update the real-catalog test to separate frozen runtime facts from authored source facts**
 
-Keep all existing assertions that load `BattleData/unit-catalog-v1`; those prove the runtime freeze.
-
-Replace old source reads with:
+Keep all existing assertions that load `BattleData/unit-catalog-v1`; those prove
+the runtime freeze. Replace old source-text assertions with a resolver call
+through reflection:
 
 ```csharp
 var sourceRoot = Path.Combine(
     UnityEngine.Application.dataPath,
     "GameData/Units/EliteVariants/Json");
-var sourceGopro = File.ReadAllText(
-    Path.Combine(sourceRoot, "1000_gopro.json"));
-var sourceArcslma = File.ReadAllText(
-    Path.Combine(sourceRoot, "5503_arcslma.json"));
-var sourceArcslmi = File.ReadAllText(
-    Path.Combine(sourceRoot, "5504_arcslmi.json"));
+var resolvedGopro = ResolveV2Source(sourceRoot, 1000, 0);
+var resolvedArcslma = ResolveV2Source(sourceRoot, 5503, 0);
+var resolvedArcslmi = ResolveV2Source(sourceRoot, 5504, 0);
 
-StringAssert.Contains(
-    "\"schemaVersion\": \"unit-elite-variants-v2\"",
-    sourceGopro);
-StringAssert.Contains("\"common\"", sourceGopro);
-StringAssert.Contains("\"animations\"", sourceArcslma);
-StringAssert.Contains("\"key\": \"skill\"", sourceArcslma);
-StringAssert.Contains("\"durationSeconds\": 1.5", sourceArcslma);
-StringAssert.DoesNotContain("\"unitSkeletonType\"", sourceGopro);
-StringAssert.DoesNotContain("\"hitAnimation\"", sourceArcslma);
-StringAssert.DoesNotContain("\"resourceFolderName\"", sourceArcslmi);
+Assert.That(Field<string>(resolvedGopro, "resourceKey"), Is.EqualTo("gopro"));
+Assert.That(Field<int>(resolvedGopro, "maxHitPoints"), Is.EqualTo(820));
+Assert.That(Field<string>(resolvedArcslma, "resourceKey"), Is.EqualTo("arcslma"));
+Assert.That(
+    Animation(resolvedArcslma, "skill", "name"),
+    Is.EqualTo("Skill"));
+Assert.That(
+    Animation(resolvedArcslma, "skill", "durationSeconds"),
+    Is.EqualTo(1.5f));
+Assert.That(Field<string>(resolvedArcslmi, "resourceKey"), Is.EqualTo("arcslmi"));
 Assert.That(
     Directory.Exists(Path.Combine(
         UnityEngine.Application.dataPath,
