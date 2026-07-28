@@ -560,8 +560,7 @@ namespace ArknoNights.Battle.Tests
                 source.TauntLevel,
                 source.IsSyntheticFixtureData,
                 source.InnateAbilityIds,
-                source.ActionMethod,
-                source.SkillAnimations);
+                source.ActionMethod);
         }
 
         private static BattleRunResult WithoutDynamicEventSnapshots(BattleRunResult source)

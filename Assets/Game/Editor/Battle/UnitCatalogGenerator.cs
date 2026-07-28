@@ -190,10 +190,12 @@ public static class UnitCatalogGenerator
         ResolvedUnitVariant source,
         string sourcePath)
     {
-        if (source.attackMethod < 0
-            || source.attackMethod > 1
-            || source.actionMethod < 1
-            || source.actionMethod > 4)
+        if (source.attackMethod != 1
+            || string.Equals(source.damageType, "None", StringComparison.Ordinal)
+            || !source.canBlock
+            || source.blockCapacity != 1
+            || source.moveSpeedMetresPerSecond <= 0f
+            || source.attackIntervalSeconds <= 0f)
         {
             throw new InvalidOperationException(
                 "UNIT_CATALOG_V1_SOURCE_UNREPRESENTABLE path=" + sourcePath
@@ -252,36 +254,17 @@ public static class UnitCatalogGenerator
         }
 
         var move = source.RequireAnimation("move", sourcePath);
-        var attack = source.attackMethod == 0
-            ? null
-            : source.RequireAnimation("attack", sourcePath);
+        var attack = source.RequireAnimation("attack", sourcePath);
         var death = source.RequireAnimation("death", sourcePath);
-        var skillAnimations = source.animations
-            .Where(item => item != null
-                && item.key.StartsWith("skill", StringComparison.Ordinal))
-            .OrderBy(item => item.key, StringComparer.Ordinal)
-            .Select(item => new SkillAnimationBinding
-            {
-                key = item.key,
-                name = item.name,
-                originalAnimationTicks = ConvertSecondsToTicks(
-                    item.durationSeconds,
-                    sourcePath + ":" + item.key)
-            })
-            .ToArray();
         var moveSpeed = ConvertMetresPerSecondToCentimetres(
             source.moveSpeedMetresPerSecond,
             sourcePath);
-        var attackIntervalTicks = attack == null
-            ? 0
-            : ConvertSecondsToTicks(
-                source.BaseAttackIntervalSeconds,
-                sourcePath + ":baseAttackIntervalSeconds");
-        var attackAnimationTicks = attack == null
-            ? 0
-            : ConvertSecondsToTicks(
-                attack.durationSeconds,
-                sourcePath + ":attack");
+        var attackIntervalTicks = ConvertSecondsToTicks(
+            source.BaseAttackIntervalSeconds,
+            sourcePath + ":baseAttackIntervalSeconds");
+        var attackAnimationTicks = ConvertSecondsToTicks(
+            attack.durationSeconds,
+            sourcePath + ":attack");
         var damageType = ParseDamageType(source.damageType, sourcePath);
         var attackMethod = ConvertAttackMethod(source.attackMethod, sourcePath);
         var portraitResourcePath =
@@ -328,7 +311,6 @@ public static class UnitCatalogGenerator
             attackAnimationDurationTicks = attackAnimationTicks,
             damageType = damageType.ToString(),
             attackMethod = attackMethod.ToString(),
-            actionMethod = source.actionMethod,
             blockCapacity = source.blockCapacity,
             tauntLevel = source.tauntLevel,
             lifeDeduct = source.lifeDeduct,
@@ -339,10 +321,9 @@ public static class UnitCatalogGenerator
             skeletonDataResourcePath = skeletonResourcePath,
             unitSkelType = LegacyMappedSkeletonType,
             moveAnimation = move.name,
-            attackAnimation = attack == null ? string.Empty : attack.name,
+            attackAnimation = attack.name,
             hitAnimation = string.Empty,
-            deathAnimation = death.name,
-            skillAnimations = skillAnimations
+            deathAnimation = death.name
         };
     }
 
@@ -403,7 +384,7 @@ public static class UnitCatalogGenerator
     {
         var centimetres = metresPerSecond * 100f;
         var integerCentimetres = Mathf.RoundToInt(centimetres);
-        if (metresPerSecond < 0f
+        if (metresPerSecond <= 0f
             || Mathf.Abs(centimetres - integerCentimetres) > 0.0001f)
         {
             throw new InvalidOperationException(
@@ -443,11 +424,6 @@ public static class UnitCatalogGenerator
 
     private static AttackMethod ConvertAttackMethod(int value, string sourcePath)
     {
-        if (value == 0)
-        {
-            return AttackMethod.None;
-        }
-
         if (value == 1)
         {
             return AttackMethod.Melee;
@@ -486,14 +462,6 @@ public static class UnitCatalogGenerator
     }
 
     [Serializable]
-    private sealed class SkillAnimationBinding
-    {
-        public string key;
-        public string name;
-        public int originalAnimationTicks;
-    }
-
-    [Serializable]
     private sealed class UnitCatalogEntry
     {
         public string typeId;
@@ -515,7 +483,6 @@ public static class UnitCatalogGenerator
         public int attackAnimationDurationTicks;
         public string damageType;
         public string attackMethod;
-        public int actionMethod;
         public int blockCapacity;
         public int tauntLevel;
         public int lifeDeduct;
@@ -528,6 +495,5 @@ public static class UnitCatalogGenerator
         public string attackAnimation;
         public string hitAnimation;
         public string deathAnimation;
-        public SkillAnimationBinding[] skillAnimations;
     }
 }

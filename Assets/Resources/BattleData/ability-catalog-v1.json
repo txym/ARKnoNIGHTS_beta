@@ -11,28 +11,10 @@
             "initialSkillPoints": 5,
             "requiredSkillPoints": 15,
             "skillPointGeneration": "Automatic",
-            "animationKey": "skill",
             "summonTypeId": "5504",
             "count": 3,
             "sideLengthCentimetres": 100,
-            "inheritPathFromCaster": false,
-            "unitTrait": ""
-        },
-        {
-            "abilityId": "UNTARGETABLE",
-            "displayNameZhHans": "",
-            "descriptionZhHans": "不会成为敌方单位的攻击目标。",
-            "activationKind": "Passive",
-            "silencePolicy": "Unaffected",
-            "initialSkillPoints": 0,
-            "requiredSkillPoints": 0,
-            "skillPointGeneration": "None",
-            "animationKey": "",
-            "summonTypeId": "",
-            "count": 0,
-            "sideLengthCentimetres": 0,
-            "inheritPathFromCaster": false,
-            "unitTrait": "Untargetable"
+            "inheritPathFromCaster": false
         }
     ]
 }

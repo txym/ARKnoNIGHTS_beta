@@ -14,7 +14,7 @@ namespace ArknoNights.Battle.Tests
             var input = CreateInput(
                 "skill-double-speed",
                 117,
-                Caster(30, 1000),
+                Caster(1000),
                 Enemy(0),
                 Unit("caster", "caster", 5, 2),
                 Unit("enemy", "enemy", 5, 2));
@@ -48,7 +48,7 @@ namespace ArknoNights.Battle.Tests
             var input = CreateInput(
                 "skill-waits-for-attack",
                 130,
-                Caster(30, 92, 100),
+                Caster(92, 100),
                 Enemy(100),
                 Unit("caster", "caster", 5, 4),
                 Unit("enemy", "enemy", 5, 4));
@@ -73,13 +73,14 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void OddSkillDuration_RoundsUpAfterHalving()
         {
-            var animation = new UnitSkillAnimationDefinition("skill", 31);
+            var animation = Ability(31);
 
-            Assert.That(animation.EffectiveDurationTicks, Is.EqualTo(16));
+            Assert.That(
+                animation.SkillAnimationEffectiveDurationTicks,
+                Is.EqualTo(16));
         }
 
         private static UnitDefinition Caster(
-            int skillAnimationTicks,
             int attackIntervalTicks,
             int moveSpeed = 0)
         {
@@ -98,13 +99,7 @@ namespace ArknoNights.Battle.Tests
                 0,
                 true,
                 new[] { "SUMMON_JELLY_MINIONS" },
-                1,
-                new[]
-                {
-                    new UnitSkillAnimationDefinition(
-                        "skill",
-                        skillAnimationTicks)
-                });
+                1);
         }
 
         private static UnitDefinition Enemy(int moveSpeed)
@@ -143,7 +138,8 @@ namespace ArknoNights.Battle.Tests
                 true);
         }
 
-        private static AbilityDefinition Ability()
+        private static AbilityDefinition Ability(
+            int skillAnimationTicks = 30)
         {
             return new AbilityDefinition(
                 "SUMMON_JELLY_MINIONS",
@@ -156,7 +152,8 @@ namespace ArknoNights.Battle.Tests
                 SkillPointGeneration.Automatic,
                 new SummonEffectDefinition("5504", 3, 100, false),
                 null,
-                "skill");
+                "skill",
+                skillAnimationTicks);
         }
 
         private static UnitSnapshot Unit(

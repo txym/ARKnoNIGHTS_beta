@@ -512,7 +512,7 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 - `Idle`、`Move`、`Attack` 或 `Death` 动作类型；
 - 实例级 MaxHP、CurrentHP 和 CurrentShield。
 
-动作优先级为 `Death > Attack > Move > Idle`。Damage 只更新 CurrentHP，不产生 Hit 动作，也不打断 Attack；新 Track 播放路径不得调用 Hit 动画。
+动作优先级为 `Death > Attack > Skill > Move > Idle`。Damage 只更新 CurrentHP，不产生 Hit 动作，也不打断 Attack；新 Track 播放路径不得调用 Hit 动画。已经开始的 Attack 在其有效动画结束 Tick（含）前不会被 Skill 打断；期间达到施放条件的技能保持满 SP，等到攻击动画结束后的下一 Tick 施放，并在施法动画占用期间阻止该单位开始下一次攻击或移动。
 
 连续播放只有在跨过 Death 事件时才为现存单位触发死亡动画、动画完成后的 `0.5` 秒变黑和隐藏。播放控制器从任意 Track Tick 初次绑定、重新绑定或回退重建视图时，该 Tick 已经死亡（`DeathTick <= PresentationTick`）的单位不得创建或显示，也不得从头补播死亡动画；无需还原死亡动画或变黑阶段的准确进度。回退到单位死亡前的 Tick 时，可以按该 Tick 的存活采样重新创建单位。切换观察目标导致重新绑定时遵守同一规则；从 Tick `0` 重播则按完整时间线重新触发后续死亡表现。正式回合到达最大 Track EndTick 时不得在派发终局 Death 的同一帧清理视图，必须等当前可见视图不再报告待完成的终局表现后再重置显示层。
 
@@ -633,9 +633,10 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 ## 15. `SUMMON_JELLY_MINIONS` 果冻召唤（2026-07-26）
 
-- 自动技能的 SP 回复速率是全局规则：20 TPS 下每秒回复 `2 SP`，即每 `10 Tick` 回复 `1 SP`。每个单位的每个技能仍保存彼此独立的私有 SP 与施放次数；该速率不写入单位或能力源 JSON。`SUMMON_JELLY_MINIONS` 初始为 `5 SP`、需要并消耗 `15 SP`，因此持续存活且战斗未结束时首次在 Tick `100` 施放，消耗后再次积累并在 Tick `250` 施放。
+- 自动技能的 SP 回复速率是全局规则：20 TPS 下每秒回复 `2 SP`，即每 `10 Tick` 回复 `1 SP`。每个单位的每个技能仍保存彼此独立的私有 SP 与施放次数；该速率不写入单位或能力源 JSON。`SUMMON_JELLY_MINIONS` 初始为 `5 SP`、需要并消耗 `15 SP`；没有攻击动画占用时首次在 Tick `100` 施放，消耗后再次积累并在 Tick `250` 施放。若达到所需 SP 时正在攻击，则 SP 保持封顶，施放延后到攻击动画完整结束后的下一 Tick；SP 只在实际施放时消耗，因此后续恢复周期也从实际施放时点顺延。
+- 所有 Skill 动画固定按 `2×` 播放。v2 单位源只保存动画稳定 key、真实 Spine 名称和源时长；独立的 `skill-animation-catalog-v1` 绑定单位、能力和这组动画事实，不修改冻结的 `unit-catalog-v1` / `ability-catalog-v1`。Core 先以 `ceil(durationSeconds × 20)` 得到源动画 Tick，再以 `(sourceTicks + 1) / 2` 得到 `2×` 后的有效占用 Tick，向上取整以保证最后一个动画关键帧完整播放。
 - 每次施放以施法者当前位置为中心，在一个地图格大小的正方形内生成三个 `5504`。该正方形边长固定为 `1 m`（`100 cm`），位置由 Core 的整数定点算法确定，不使用 Unity 浮点随机或 `Random`。
 - 新生成单位不继承施法者的路径、目标或阻挡关系。它们在生成 Tick 只产生 Spawn 与不可变实例快照，从下一 Tick 起才按普通单位的索敌、嘲讽与稳定决胜规则各自重新选择目标和行动。
 - 同一 Tick 先完成已到达伤害、Death、阻挡解除与索敌清理，再判断战斗是否终局。若清理后已终局，该 Tick 不回复 SP、不施放定时技能，召唤不能延长已经结束的战斗；BattleEnded 仍是该终局 Tick 的最后事件。
 - `BattleRunResult` 为动态实例保留唯一负数实例 ID、生成位置、激活 Tick、完整单位状态及只读实例快照索引。Presentation 只能从该封存结果编译动态 Track：初始单位在 Tick `0` 建立视图，动态 `5504` 在各自 Spawn Tick 建立视图；Home/Away 投影、暂停、变速、观察切换和 Replay 均不得重算或回写 Core。Replay 清理旧动态视图，并在再次越过对应 Spawn Tick 时用相同 ID 与快照重建。
-- `Assets/GameData/Units/EliteVariants/Json` 与 `Assets/GameData/Abilities/Json` 是人工维护的权威源；单位/能力目录生成器只读、校验、稳定排序并写各自生成目录，不回写源 JSON。任何已部署单位引用的 innate ability 都必须在封存的 ability definitions 中解析成功；未知能力 ID 或未知召唤类型返回结构化验证错误，不允许静默省略能力。
+- `Assets/GameData/Units/EliteVariants/Json` 与 `Assets/GameData/Abilities/Json` 是人工维护的权威源；单位、能力与技能动画目录生成器只读、校验、稳定排序并写各自生成目录，不回写源 JSON。任何已部署单位引用的 innate ability 都必须在封存的 ability definitions 中解析成功；未知能力 ID、未知召唤类型或缺少 Skill 动画绑定返回结构化验证错误，不允许静默省略能力。

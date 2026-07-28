@@ -68,6 +68,23 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, string animationKey)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                animationKey,
+                0)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -80,6 +97,7 @@ namespace ArknoNights.Battle.Core
             SummonEffect = summonEffect;
             UnitTraitEffect = unitTraitEffect;
             AnimationKey = animationKey ?? string.Empty;
+            SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
 
         public string AbilityId { get; }
@@ -93,5 +111,8 @@ namespace ArknoNights.Battle.Core
         public SummonEffectDefinition SummonEffect { get; }
         public UnitTraitEffectDefinition UnitTraitEffect { get; }
         public string AnimationKey { get; }
+        public int SkillAnimationOriginalDurationTicks { get; }
+        public int SkillAnimationEffectiveDurationTicks =>
+            (SkillAnimationOriginalDurationTicks + 1) / 2;
     }
 }

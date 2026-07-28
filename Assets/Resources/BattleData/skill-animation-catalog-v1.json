@@ -1,0 +1,13 @@
+{
+    "schemaVersion": "skill-animation-catalog-v1",
+    "catalogId": "mainline-skill-animations",
+    "bindings": [
+        {
+            "typeId": "5503",
+            "abilityId": "SUMMON_JELLY_MINIONS",
+            "animationKey": "skill",
+            "animationName": "Skill",
+            "originalAnimationTicks": 30
+        }
+    ]
+}

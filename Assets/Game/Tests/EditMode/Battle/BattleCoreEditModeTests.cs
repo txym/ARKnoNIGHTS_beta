@@ -55,6 +55,8 @@ namespace ArknoNights.Battle.Tests
             Assert.That(ability.RequiredSkillPoints, Is.EqualTo(15));
             Assert.That(ability.SkillPointGeneration, Is.EqualTo(SkillPointGeneration.Automatic));
             Assert.That(ability.AnimationKey, Is.EqualTo("skill"));
+            Assert.That(ability.SkillAnimationOriginalDurationTicks, Is.EqualTo(30));
+            Assert.That(ability.SkillAnimationEffectiveDurationTicks, Is.EqualTo(15));
             Assert.That(ability.SummonEffect.SummonTypeId, Is.EqualTo("5504"));
             Assert.That(ability.SummonEffect.Count, Is.EqualTo(3));
             Assert.That(ability.SummonEffect.SideLengthCentimetres, Is.EqualTo(100));
@@ -1127,8 +1129,7 @@ namespace ArknoNights.Battle.Tests
                 0,
                 true,
                 new[] { abilityId },
-                1,
-                new[] { new UnitSkillAnimationDefinition("skill", 30) });
+                1);
 
         private static UnitSnapshot Unit(string id, string typeId, int x, int y)
             => new UnitSnapshot(id, typeId, UnitZone.Deployed, new FormationCoordinate(x, y), Array.Empty<BuffPlaceholder>());
@@ -1143,7 +1144,10 @@ namespace ArknoNights.Battle.Tests
                 5,
                 15,
                 SkillPointGeneration.Automatic,
-                new SummonEffectDefinition("5504", 3, 100, false));
+                new SummonEffectDefinition("5504", 3, 100, false),
+                null,
+                "skill",
+                30);
 
         private static BattleInput CreateJellySummonInput(string battleId, int maxTicks)
         {
@@ -1178,8 +1182,7 @@ namespace ArknoNights.Battle.Tests
                 item.TauntLevel,
                 item.IsSyntheticFixtureData,
                 Array.Empty<string>(),
-                item.ActionMethod,
-                item.SkillAnimations)).ToArray();
+                item.ActionMethod)).ToArray();
             var specification = new BattleInputSpecification(
                 source.SchemaVersion,
                 source.BattleId + "-without-abilities",

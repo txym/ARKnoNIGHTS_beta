@@ -312,8 +312,9 @@ v2 是唯一人工维护的单位源，首批只完成 `1000`、`5503`、`5504`�
 
 ## 24. Mainline 果冻召唤数据流与生命周期（2026-07-26）
 
-- 权威数据流为 `Units/EliteVariants/Json(v2) + Abilities/Json → UnitEliteVariantResolver(target elite 0) + UnitCatalogGenerator/AbilityCatalogGenerator → frozen unit-catalog-v1 + ability-catalog-v1 → BattleInputFactory → BattleRunner`。解析器和两个生成器只读源数据并执行 schema、继承、引用、数值及稳定顺序验证；不会从资源或目录反向改写源 JSON。
+- 权威数据流为 `Units/EliteVariants/Json(v2) + Abilities/Json → UnitEliteVariantResolver(target elite 0) + UnitCatalogGenerator/AbilityCatalogGenerator/SkillAnimationCatalogGenerator → frozen unit-catalog-v1 + ability-catalog-v1 + skill-animation-catalog-v1 → BattleInputFactory → BattleRunner`。解析器和三个生成器只读源数据并执行 schema、继承、引用、数值及稳定顺序验证；技能动画目录独立绑定单位、能力、动画 key/名称与源时长，不扩展或重写冻结的两个 v1 目录，也不会从资源或目录反向改写源 JSON。
 - `LocalBattleLoader`、准备阶段封存器和 `PreparationBattleLoopController` 会把已验证的 ability definitions 与单位定义一起封存。`BattleInputFactory` 验证单位固有能力 ID 与 summon type 均可解析，遗漏目录或未知 ID 会结构化失败。
-- 全局自动恢复为 `2 SP/s`，在 20 TPS 下每 10 Tick 增加一点；每个 `RuntimeAbilityState` 私有保存 SP 和施放次数。`SUMMON_JELLY_MINIONS` 在 Tick 100/250 施放，每次在施法者中心 100cm × 100cm 方形中确定性生成三个 5504，并分配递减负数 ID。
+- 全局自动恢复为 `2 SP/s`，在 20 TPS 下每 10 Tick 增加一点；每个 `RuntimeAbilityState` 私有保存 SP 和施放次数。没有攻击占用时，`SUMMON_JELLY_MINIONS` 在 Tick 100/250 施放；若 SP 满时正在攻击，SP 封顶并延后到攻击动画结束后的下一 Tick，实际施放后才消费 SP，后续周期随之顺延。每次施放在施法者中心 100cm × 100cm 方形中确定性生成三个 5504，并分配递减负数 ID。
+- Skill 事件携带动画 key、源动画 Tick 与有效动画 Tick。源动画 Tick 为 `ceil(durationSeconds × 20)`，所有 Skill 的有效占用固定为 `(sourceTicks + 1) / 2`，Presentation 固定以 `2×` 播放。Core 不允许 Skill 打断已开始的 Attack，并在 Skill 占用期间阻止施法者开始攻击或移动；Track 动作优先级为 `Death > Attack > Skill > Move > Idle`。
 - Tick 在处理本 Tick 伤害、Death、阻挡解除和目标清理后判定终局；终局 Tick 不恢复 SP、不施放技能。非终局 Spawn 只创建无路径、无目标、无阻挡继承的新实例，`ActivationTick = SpawnTick + 1`，之后按普通单位规则重新索敌。
 - `BattleRunResult.UnitSnapshots` 是初始和动态实例的不可变索引。`BattlePresentationTrackCompiler` 从此索引建立动态 Track；Playback 在越过 Spawn Tick 时创建目录映射视图，Replay/Dispose 清理旧视图，并以相同实例 ID 重建，绝不重新运行 Core。

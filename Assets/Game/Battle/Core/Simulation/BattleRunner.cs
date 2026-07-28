@@ -492,17 +492,10 @@ namespace ArknoNights.Battle.Core
                     || IsAttackAnimationLocked(caster)
                     || IsSkillAnimationLocked(caster))
                     continue;
-                if (!caster.Definition.TryGetSkillAnimation(
-                        abilityState.Definition.AnimationKey,
-                        out var animation))
-                    throw new InvalidOperationException(
-                        "Validated skill animation is missing at runtime: "
-                        + caster.TypeId
-                        + "/"
-                        + abilityState.Definition.AnimationKey);
                 var castOrdinal = abilityState.ConsumeCast();
                 caster.SkillAnimationLockUntilTick =
-                    CurrentTick + animation.EffectiveDurationTicks;
+                    CurrentTick
+                    + abilityState.Definition.SkillAnimationEffectiveDurationTicks;
                 Emit(
                     BattleEventType.Skill,
                     caster.UnitId,
@@ -515,8 +508,8 @@ namespace ArknoNights.Battle.Core
                     0,
                     0,
                     0,
-                    animation.OriginalDurationTicks,
-                    animation.EffectiveDurationTicks,
+                    abilityState.Definition.SkillAnimationOriginalDurationTicks,
+                    abilityState.Definition.SkillAnimationEffectiveDurationTicks,
                     null,
                     BattleStopReason.None,
                     abilityState.Definition.AnimationKey);

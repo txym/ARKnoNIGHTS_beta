@@ -97,7 +97,7 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
         string attack,
         string hit,
         string death,
-        IEnumerable<ArknoNights.Battle.Infrastructure.UnitSkillAnimationCatalogBinding> skills)
+        IEnumerable<ArknoNights.Battle.Infrastructure.SkillAnimationCatalogBinding> skills)
     {
         unitSkel = configuredUnitSkel ? configuredUnitSkel : unitSkel;
         moveAnimation = move ?? string.Empty;
@@ -106,10 +106,13 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
         deathAnimation = death ?? string.Empty;
         skillAnimations.Clear();
         foreach (var skill in skills
-                     ?? Array.Empty<ArknoNights.Battle.Infrastructure.UnitSkillAnimationCatalogBinding>())
+                     ?? Array.Empty<ArknoNights.Battle.Infrastructure.SkillAnimationCatalogBinding>())
         {
-            if (skill == null || string.IsNullOrWhiteSpace(skill.Key)) continue;
-            skillAnimations[skill.Key] = skill.AnimationName ?? string.Empty;
+            if (skill == null
+                || string.IsNullOrWhiteSpace(skill.AnimationKey))
+                continue;
+            skillAnimations[skill.AnimationKey] =
+                skill.AnimationName ?? string.Empty;
         }
     }
 

@@ -12,7 +12,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class UnitSourceConsumerEditModeTests
     {
         private const string ExpectedRuntimeCatalogHash =
-            "218096EFA11080C6B383030718017E82062D772E2D39E5BEE4247E38612D1580";
+            "359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA";
 
         [Test]
         public void Generate_ProjectsResolvedEliteZeroVariantsToIsolatedV1Catalog()
@@ -60,12 +60,6 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 document.units.Single(unit => unit.typeId == "5503").hitAnimation,
                 Is.Empty);
-            var skill = document.units.Single(unit => unit.typeId == "5503")
-                .skillAnimations.Single();
-            Assert.That(skill.key, Is.EqualTo("skill"));
-            Assert.That(skill.name, Is.EqualTo("Skill"));
-            Assert.That(skill.originalAnimationTicks, Is.EqualTo(30));
-            Assert.That((skill.originalAnimationTicks + 1) / 2, Is.EqualTo(15));
             Assert.That(
                 document.units.Single(unit => unit.typeId == "5504")
                     .attackAnimationDurationTicks,
@@ -73,28 +67,44 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void Generate_ProjectsNonAttackerWithoutAttackTimingOrAnimation()
+        public void Generate_RejectsUnrepresentableV2SourceWithoutTouchingOutput()
         {
             var sourceDirectory = CopyRealSources(
-                "non-attacker",
+                "unrepresentable",
                 "5504_arcslmi.json",
                 MakeNonAttacker);
+            AssertAtomicFailure(
+                sourceDirectory,
+                "UNIT_CATALOG_V1_SOURCE_UNREPRESENTABLE");
+        }
+
+        [Test]
+        public void SkillAnimationCatalogGenerator_ProjectsSourceDurationWithoutChangingFrozenCatalog()
+        {
             var outputPath = NewIsolatedPath(
-                "non-attacker-output",
-                "unit-catalog-v1.json");
+                "skill-animation-projection",
+                "skill-animation-catalog-v1.json");
             var hashBefore = RuntimeCatalogHash();
 
-            InvokeGenerator(sourceDirectory, outputPath);
+            InvokeSkillAnimationGenerator(
+                RealSourceDirectory(),
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                outputPath);
 
             Assert.That(RuntimeCatalogHash(), Is.EqualTo(hashBefore));
-            var document = JsonUtility.FromJson<CatalogProjectionDocument>(
-                File.ReadAllText(outputPath));
-            var projected = document.units.Single(unit => unit.typeId == "5504");
-            Assert.That(projected.attackMethod, Is.EqualTo("None"));
-            Assert.That(projected.actionMethod, Is.EqualTo(1));
-            Assert.That(projected.attackIntervalTicks, Is.Zero);
-            Assert.That(projected.attackAnimationDurationTicks, Is.Zero);
-            Assert.That(projected.attackAnimation, Is.Empty);
+            var document =
+                JsonUtility.FromJson<SkillAnimationCatalogDocument>(
+                    File.ReadAllText(outputPath));
+            var binding = document.bindings.Single();
+            Assert.That(binding.typeId, Is.EqualTo("5503"));
+            Assert.That(
+                binding.abilityId,
+                Is.EqualTo("SUMMON_JELLY_MINIONS"));
+            Assert.That(binding.animationKey, Is.EqualTo("skill"));
+            Assert.That(binding.animationName, Is.EqualTo("Skill"));
+            Assert.That(binding.originalAnimationTicks, Is.EqualTo(30));
         }
 
         [Test]
@@ -271,6 +281,37 @@ namespace ArknoNights.Battle.Tests
                     new object[] { sourceDirectory, outputPath }));
         }
 
+        private static void InvokeSkillAnimationGenerator(
+            string unitSourceDirectory,
+            string abilitySourceDirectory,
+            string outputPath)
+        {
+            var generator = Type.GetType(
+                "SkillAnimationCatalogGenerator, Assembly-CSharp-Editor");
+            Assert.That(
+                generator,
+                Is.Not.Null,
+                "Skill animation catalog generator type must exist.");
+            var generate = generator.GetMethod(
+                "Generate",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string), typeof(string), typeof(string) },
+                null);
+            Assert.That(
+                generate,
+                Is.Not.Null,
+                "Generate(string, string, string) must exist.");
+            generate.Invoke(
+                null,
+                new object[]
+                {
+                    unitSourceDirectory,
+                    abilitySourceDirectory,
+                    outputPath
+                });
+        }
+
         private static IReadOnlyList<string> InvokeDeclaredAbilityCollector(
             string sourceDirectory)
         {
@@ -386,21 +427,24 @@ namespace ArknoNights.Battle.Tests
             public int deploymentCost;
             public int rarity;
             public int attackAnimationDurationTicks;
-            public int attackIntervalTicks;
             public int unitSkelType;
-            public int actionMethod;
-            public string attackMethod;
             public string moveAnimation;
-            public string attackAnimation;
             public string hitAnimation;
-            public SkillAnimationProjection[] skillAnimations;
         }
 
         [Serializable]
-        private sealed class SkillAnimationProjection
+        private sealed class SkillAnimationCatalogDocument
         {
-            public string key;
-            public string name;
+            public SkillAnimationCatalogEntry[] bindings;
+        }
+
+        [Serializable]
+        private sealed class SkillAnimationCatalogEntry
+        {
+            public string typeId;
+            public string abilityId;
+            public string animationKey;
+            public string animationName;
             public int originalAnimationTicks;
         }
     }
