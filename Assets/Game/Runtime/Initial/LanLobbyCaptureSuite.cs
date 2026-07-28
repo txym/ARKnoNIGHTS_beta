@@ -436,25 +436,34 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             case "btn_topmenu_back": source = RootSource(spriteName, "BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303"); return true;
             case "img_return": source = RootSource(spriteName, "3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09"); return true;
             case "host_top_tag": source = RootSource(spriteName, "861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009"); return true;
-            case "room_select_right_bg": case "room_select_title_icon": case "room_select_dot": case "room_select_img_startroom":
-            case "room_select_create_btn_bg_down": case "room_select_create_left_line": case "room_select_create_logo":
-            case "room_select_create_middleicon": case "room_select_create_text_01": case "room_select_create_text_02":
-            case "img_pointer": case "doc_frame_line":
-            case "room_select_join_ban": case "room_select_join_blank": case "room_select_join_btn_bg_down":
-            case "room_select_join_left_block": case "room_select_join_logo": case "room_select_join_middle_block":
-            case "room_select_join_middle_block_mask": case "room_select_join_right_block": case "room_select_join_text_01":
-            case "room_select_join_text_02": case "room_select_join_text_bg": case "room_select_join_triangle":
-                source = new ApprovedSource(
-                    "UI/Lobby/Home/" + spriteName,
-                    AssetSourcePrefix + spriteName + ".png",
-                    string.Empty);
-                return true;
-            case "icon_amiy": case "icon_clementi": case "icon_kirar": case "icon_zumam":
-                source = new ApprovedSource(
-                    "UI/Lobby/Home/" + spriteName,
-                    CombinedAvatarSourcePrefix + spriteName + ".png",
-                    string.Empty);
-                return true;
+            case "doc_frame_line": source = HomeSource(spriteName, "4E4D96093514340112A0799D61611A65DA41153ACBD21F271184E0C0BB311C97"); return true;
+            case "img_pointer": source = HomeSource(spriteName, "3CD944DC7F0F3B7DE675E8BBE23EEA9640D95DE65B4B2E91F14648385284F697"); return true;
+            case "room_select_create_btn_bg_down": source = HomeSource(spriteName, "8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149"); return true;
+            case "room_select_create_left_line": source = HomeSource(spriteName, "4893EDC89BF8D9DFE3914673B0446D764D0663327579DAE19744E17C74296CA4"); return true;
+            case "room_select_create_logo": source = HomeSource(spriteName, "908CC693B473E82FB92B84B3A825A18A0530DC4BFFE6A2266139241939A91CB4"); return true;
+            case "room_select_create_middleicon": source = HomeSource(spriteName, "F728D411AA11A67775AA2A3CBBB1CBED665B914E1BE645DCCDB6BD34BCE288C2"); return true;
+            case "room_select_create_text_01": source = HomeSource(spriteName, "52DC9A7C8E48DEC53AAF69D91A6FD0E0AA60483C1EE1412E32A007B8DF2E2D72"); return true;
+            case "room_select_create_text_02": source = HomeSource(spriteName, "9C87A8FE6DFB72362BA8A84B089B66BC80F01822E2E3C0713396499D93F2CE33"); return true;
+            case "room_select_dot": source = HomeSource(spriteName, "056E14212EA8E02D175D03582C4726FABA09AD518E89DB318CD3EF793E996DB0"); return true;
+            case "room_select_img_startroom": source = HomeSource(spriteName, "495AA8F2BD5CD97EE12192DACC2CFD8A15731F0E131F9CD74F936B92A49E7E02"); return true;
+            case "room_select_join_ban": source = HomeSource(spriteName, "F1ACA192CCCD6399884810A52CDC15E733C415E83579325779E67EB700EB052E"); return true;
+            case "room_select_join_blank": source = HomeSource(spriteName, "099A060B78BCA5E39CA82E9747C94BFBC011868DE4AC18CB11C9149BC99AA2CD"); return true;
+            case "room_select_join_btn_bg_down": source = HomeSource(spriteName, "71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468"); return true;
+            case "room_select_join_left_block": source = HomeSource(spriteName, "1D10B384025DCF05972D7AEAFDF438FD88DB9B3B9B829DFD541E15103F100D10"); return true;
+            case "room_select_join_logo": source = HomeSource(spriteName, "85FB957F0BC4A5172B0F454F77F6195068484B6DEBBD6DFCEE2A2AD1D5D93B59"); return true;
+            case "room_select_join_middle_block": source = HomeSource(spriteName, "997CF5A781848535654D21D9B97D6105DA07F959AECB134DF1FB2F570E9861CA"); return true;
+            case "room_select_join_middle_block_mask": source = HomeSource(spriteName, "95D0FAAF36EEF6681486944D95AB3F453DB0D9B70F23CD2E0DE12F57E2609EC5"); return true;
+            case "room_select_join_right_block": source = HomeSource(spriteName, "11C872C6DE561E4409085E958D1CDEFA7647E9EEC5883ED91E45162B2B9FE6B8"); return true;
+            case "room_select_join_text_01": source = HomeSource(spriteName, "F09FD74598C6EEF1066FB53CDA294681FAEA469981B6F215B7E7DD674E63CC39"); return true;
+            case "room_select_join_text_02": source = HomeSource(spriteName, "F9DCC617D9BB74218E1554939A0897F39516B7965D9400EAD6CCB2DE85E19DD0"); return true;
+            case "room_select_join_text_bg": source = HomeSource(spriteName, "36260875697359E27930467D123D2B684A2DE51D2448A5B295885D06AA518472"); return true;
+            case "room_select_join_triangle": source = HomeSource(spriteName, "BA585545BC5EF8F6CC126BBFDE59F63A1C75D4B761646A22CCFEA195CB9B7FF7"); return true;
+            case "room_select_right_bg": source = HomeSource(spriteName, "F65BE15390749F0FA175B49C310E90E9F3A29C753F2D320068B0831A5EBFDE53"); return true;
+            case "room_select_title_icon": source = HomeSource(spriteName, "7C0E9E67D349013FC49DBAF33E1F462C0DF4171B1C6681DB50517629B4BDFF6C"); return true;
+            case "icon_amiy": source = CombinedAvatarSource(spriteName, "14D5F8D3A8026751B511942517B9815BA3E04438857FEA649EF8A8A02B64868B"); return true;
+            case "icon_clementi": source = CombinedAvatarSource(spriteName, "D5195FFE5CCCC61EA49DBC1CF3CD0493DA4CE131D033DEC7F91B446EC77152F8"); return true;
+            case "icon_kirar": source = CombinedAvatarSource(spriteName, "A9B279D39C74BD8EDD9CCDC8F8A7AA6157E445639F99800E95481DF6BE84CEFA"); return true;
+            case "icon_zumam": source = CombinedAvatarSource(spriteName, "B656BF323746029AD66469F350DCCC5B52F903F68E1ACEB2E202068AF41A1302"); return true;
             default:
                 source = default(ApprovedSource);
                 return false;
@@ -466,6 +475,22 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         return new ApprovedSource(
             "UI/Lobby/" + spriteName,
             AssetSourcePrefix + spriteName + ".png",
+            sha256);
+    }
+
+    private static ApprovedSource HomeSource(string spriteName, string sha256)
+    {
+        return new ApprovedSource(
+            "UI/Lobby/Home/" + spriteName,
+            AssetSourcePrefix + spriteName + ".png",
+            sha256);
+    }
+
+    private static ApprovedSource CombinedAvatarSource(string spriteName, string sha256)
+    {
+        return new ApprovedSource(
+            "UI/Lobby/Home/" + spriteName,
+            CombinedAvatarSourcePrefix + spriteName + ".png",
             sha256);
     }
 

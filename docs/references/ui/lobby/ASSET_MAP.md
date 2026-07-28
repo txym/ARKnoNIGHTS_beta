@@ -37,31 +37,31 @@ All root `UI/Lobby` rows use an `Unpacked direct` normal filename from the appro
 | btn_topmenu_back.png | [uc]autochessouter/btn_topmenu_back.png | UI/Lobby/btn_topmenu_back | Room top-menu back button | Preserve | BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303 | Unpacked direct |
 | img_return.png | [uc]autochessouter/img_return.png | UI/Lobby/img_return | Room square return action | Exact | 3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09 | Unpacked direct |
 | host_top_tag.png | [uc]autochessouter/host_top_tag.png | UI/Lobby/host_top_tag | Host room slot top tag | Preserve | 861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009 | Unpacked direct |
-| room_select_right_bg.png | [uc]autochessouter/room_select_right_bg.png | UI/Lobby/Home/room_select_right_bg | Home right-side background | Preserve |
-| room_select_title_icon.png | [uc]autochessouter/room_select_title_icon.png | UI/Lobby/Home/room_select_title_icon | Home title ornament | Preserve |
-| room_select_dot.png | [uc]autochessouter/room_select_dot.png | UI/Lobby/Home/room_select_dot | Home dot ornament | Preserve |
-| room_select_img_startroom.png | [uc]autochessouter/room_select_img_startroom.png | UI/Lobby/Home/room_select_img_startroom | Home room-start decoration | Preserve |
-| room_select_create_btn_bg_down.png | [uc]autochessouter/room_select_create_btn_bg_down.png | UI/Lobby/Home/room_select_create_btn_bg_down | Create action background | Nine-slice |
-| room_select_create_left_line.png | [uc]autochessouter/room_select_create_left_line.png | UI/Lobby/Home/room_select_create_left_line | Create section line | Preserve |
-| room_select_create_logo.png | [uc]autochessouter/room_select_create_logo.png | UI/Lobby/Home/room_select_create_logo | Create section logo | Preserve |
-| room_select_create_middleicon.png | [uc]autochessouter/room_select_create_middleicon.png | UI/Lobby/Home/room_select_create_middleicon | Create middle ornament | Preserve |
-| room_select_create_text_01.png | [uc]autochessouter/room_select_create_text_01.png | UI/Lobby/Home/room_select_create_text_01 | Create label ornament 01 | Preserve |
-| room_select_create_text_02.png | [uc]autochessouter/room_select_create_text_02.png | UI/Lobby/Home/room_select_create_text_02 | Create label ornament 02 | Preserve |
-| room_select_join_ban.png | [uc]autochessouter/room_select_join_ban.png | UI/Lobby/Home/room_select_join_ban | Join unavailable ornament | Preserve |
-| room_select_join_blank.png | [uc]autochessouter/room_select_join_blank.png | UI/Lobby/Home/room_select_join_blank | Join code blank | Nine-slice |
-| room_select_join_btn_bg_down.png | [uc]autochessouter/room_select_join_btn_bg_down.png | UI/Lobby/Home/room_select_join_btn_bg_down | Join action background | Nine-slice |
-| room_select_join_left_block.png | [uc]autochessouter/room_select_join_left_block.png | UI/Lobby/Home/room_select_join_left_block | Join left block | Preserve |
-| room_select_join_logo.png | [uc]autochessouter/room_select_join_logo.png | UI/Lobby/Home/room_select_join_logo | Join section logo | Preserve |
-| room_select_join_middle_block.png | [uc]autochessouter/room_select_join_middle_block.png | UI/Lobby/Home/room_select_join_middle_block | Join middle block | Preserve |
-| room_select_join_middle_block_mask.png | [uc]autochessouter/room_select_join_middle_block_mask.png | UI/Lobby/Home/room_select_join_middle_block_mask | Join middle mask | Preserve |
-| room_select_join_right_block.png | [uc]autochessouter/room_select_join_right_block.png | UI/Lobby/Home/room_select_join_right_block | Join right block | Preserve |
-| room_select_join_text_01.png | [uc]autochessouter/room_select_join_text_01.png | UI/Lobby/Home/room_select_join_text_01 | Join label ornament 01 | Preserve |
-| room_select_join_text_02.png | [uc]autochessouter/room_select_join_text_02.png | UI/Lobby/Home/room_select_join_text_02 | Join label ornament 02 | Preserve |
-| room_select_join_text_bg.png | [uc]autochessouter/room_select_join_text_bg.png | UI/Lobby/Home/room_select_join_text_bg | Join label background | Preserve |
-| room_select_join_triangle.png | [uc]autochessouter/room_select_join_triangle.png | UI/Lobby/Home/room_select_join_triangle | Join direction ornament | Preserve |
-| img_pointer.png | [uc]autochessouter/img_pointer.png | UI/Lobby/Home/img_pointer | Create tapered wing segment | Preserve |
-| doc_frame_line.png | [uc]autochessouter/doc_frame_line.png | UI/Lobby/Home/doc_frame_line | Create outline segment | Preserve |
-| icon_amiy.png | Combined/[uc]autochesscommon/icon_amiy.png | UI/Lobby/Home/icon_amiy | Home avatar option | Preserve |
-| icon_clementi.png | Combined/[uc]autochesscommon/icon_clementi.png | UI/Lobby/Home/icon_clementi | Home avatar option | Preserve |
-| icon_kirar.png | Combined/[uc]autochesscommon/icon_kirar.png | UI/Lobby/Home/icon_kirar | Home avatar option | Preserve |
-| icon_zumam.png | Combined/[uc]autochesscommon/icon_zumam.png | UI/Lobby/Home/icon_zumam | Home avatar option | Preserve |
+| room_select_right_bg.png | [uc]autochessouter/room_select_right_bg.png | UI/Lobby/Home/room_select_right_bg | Home right-side background | Preserve | F65BE15390749F0FA175B49C310E90E9F3A29C753F2D320068B0831A5EBFDE53 | Unpacked direct |
+| room_select_title_icon.png | [uc]autochessouter/room_select_title_icon.png | UI/Lobby/Home/room_select_title_icon | Home title ornament | Preserve | 7C0E9E67D349013FC49DBAF33E1F462C0DF4171B1C6681DB50517629B4BDFF6C | Unpacked direct |
+| room_select_dot.png | [uc]autochessouter/room_select_dot.png | UI/Lobby/Home/room_select_dot | Home dot ornament | Preserve | 056E14212EA8E02D175D03582C4726FABA09AD518E89DB318CD3EF793E996DB0 | Unpacked direct |
+| room_select_img_startroom.png | [uc]autochessouter/room_select_img_startroom.png | UI/Lobby/Home/room_select_img_startroom | Home room-start decoration | Preserve | 495AA8F2BD5CD97EE12192DACC2CFD8A15731F0E131F9CD74F936B92A49E7E02 | Unpacked direct |
+| room_select_create_btn_bg_down.png | [uc]autochessouter/room_select_create_btn_bg_down.png | UI/Lobby/Home/room_select_create_btn_bg_down | Create action background | Nine-slice | 8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149 | Unpacked direct |
+| room_select_create_left_line.png | [uc]autochessouter/room_select_create_left_line.png | UI/Lobby/Home/room_select_create_left_line | Create section line | Preserve | 4893EDC89BF8D9DFE3914673B0446D764D0663327579DAE19744E17C74296CA4 | Unpacked direct |
+| room_select_create_logo.png | [uc]autochessouter/room_select_create_logo.png | UI/Lobby/Home/room_select_create_logo | Create section logo | Preserve | 908CC693B473E82FB92B84B3A825A18A0530DC4BFFE6A2266139241939A91CB4 | Unpacked direct |
+| room_select_create_middleicon.png | [uc]autochessouter/room_select_create_middleicon.png | UI/Lobby/Home/room_select_create_middleicon | Create middle ornament | Preserve | F728D411AA11A67775AA2A3CBBB1CBED665B914E1BE645DCCDB6BD34BCE288C2 | Unpacked direct |
+| room_select_create_text_01.png | [uc]autochessouter/room_select_create_text_01.png | UI/Lobby/Home/room_select_create_text_01 | Create label ornament 01 | Preserve | 52DC9A7C8E48DEC53AAF69D91A6FD0E0AA60483C1EE1412E32A007B8DF2E2D72 | Unpacked direct |
+| room_select_create_text_02.png | [uc]autochessouter/room_select_create_text_02.png | UI/Lobby/Home/room_select_create_text_02 | Create label ornament 02 | Preserve | 9C87A8FE6DFB72362BA8A84B089B66BC80F01822E2E3C0713396499D93F2CE33 | Unpacked direct |
+| room_select_join_ban.png | [uc]autochessouter/room_select_join_ban.png | UI/Lobby/Home/room_select_join_ban | Join unavailable ornament | Preserve | F1ACA192CCCD6399884810A52CDC15E733C415E83579325779E67EB700EB052E | Unpacked direct |
+| room_select_join_blank.png | [uc]autochessouter/room_select_join_blank.png | UI/Lobby/Home/room_select_join_blank | Join code blank | Nine-slice | 099A060B78BCA5E39CA82E9747C94BFBC011868DE4AC18CB11C9149BC99AA2CD | Unpacked direct |
+| room_select_join_btn_bg_down.png | [uc]autochessouter/room_select_join_btn_bg_down.png | UI/Lobby/Home/room_select_join_btn_bg_down | Join action background | Nine-slice | 71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468 | Unpacked direct |
+| room_select_join_left_block.png | [uc]autochessouter/room_select_join_left_block.png | UI/Lobby/Home/room_select_join_left_block | Join left block | Preserve | 1D10B384025DCF05972D7AEAFDF438FD88DB9B3B9B829DFD541E15103F100D10 | Unpacked direct |
+| room_select_join_logo.png | [uc]autochessouter/room_select_join_logo.png | UI/Lobby/Home/room_select_join_logo | Join section logo | Preserve | 85FB957F0BC4A5172B0F454F77F6195068484B6DEBBD6DFCEE2A2AD1D5D93B59 | Unpacked direct |
+| room_select_join_middle_block.png | [uc]autochessouter/room_select_join_middle_block.png | UI/Lobby/Home/room_select_join_middle_block | Join middle block | Preserve | 997CF5A781848535654D21D9B97D6105DA07F959AECB134DF1FB2F570E9861CA | Unpacked direct |
+| room_select_join_middle_block_mask.png | [uc]autochessouter/room_select_join_middle_block_mask.png | UI/Lobby/Home/room_select_join_middle_block_mask | Join middle mask | Preserve | 95D0FAAF36EEF6681486944D95AB3F453DB0D9B70F23CD2E0DE12F57E2609EC5 | Unpacked direct |
+| room_select_join_right_block.png | [uc]autochessouter/room_select_join_right_block.png | UI/Lobby/Home/room_select_join_right_block | Join right block | Preserve | 11C872C6DE561E4409085E958D1CDEFA7647E9EEC5883ED91E45162B2B9FE6B8 | Unpacked direct |
+| room_select_join_text_01.png | [uc]autochessouter/room_select_join_text_01.png | UI/Lobby/Home/room_select_join_text_01 | Join label ornament 01 | Preserve | F09FD74598C6EEF1066FB53CDA294681FAEA469981B6F215B7E7DD674E63CC39 | Unpacked direct |
+| room_select_join_text_02.png | [uc]autochessouter/room_select_join_text_02.png | UI/Lobby/Home/room_select_join_text_02 | Join label ornament 02 | Preserve | F9DCC617D9BB74218E1554939A0897F39516B7965D9400EAD6CCB2DE85E19DD0 | Unpacked direct |
+| room_select_join_text_bg.png | [uc]autochessouter/room_select_join_text_bg.png | UI/Lobby/Home/room_select_join_text_bg | Join label background | Preserve | 36260875697359E27930467D123D2B684A2DE51D2448A5B295885D06AA518472 | Unpacked direct |
+| room_select_join_triangle.png | [uc]autochessouter/room_select_join_triangle.png | UI/Lobby/Home/room_select_join_triangle | Join direction ornament | Preserve | BA585545BC5EF8F6CC126BBFDE59F63A1C75D4B761646A22CCFEA195CB9B7FF7 | Unpacked direct |
+| img_pointer.png | [uc]autochessouter/img_pointer.png | UI/Lobby/Home/img_pointer | Create tapered wing segment | Preserve | 3CD944DC7F0F3B7DE675E8BBE23EEA9640D95DE65B4B2E91F14648385284F697 | Unpacked direct |
+| doc_frame_line.png | [uc]autochessouter/doc_frame_line.png | UI/Lobby/Home/doc_frame_line | Create outline segment | Preserve | 4E4D96093514340112A0799D61611A65DA41153ACBD21F271184E0C0BB311C97 | Unpacked direct |
+| icon_amiy.png | Combined/[uc]autochesscommon/icon_amiy.png | UI/Lobby/Home/icon_amiy | Home avatar option | Preserve | 14D5F8D3A8026751B511942517B9815BA3E04438857FEA649EF8A8A02B64868B | Combined atlas sprite |
+| icon_clementi.png | Combined/[uc]autochesscommon/icon_clementi.png | UI/Lobby/Home/icon_clementi | Home avatar option | Preserve | D5195FFE5CCCC61EA49DBC1CF3CD0493DA4CE131D033DEC7F91B446EC77152F8 | Combined atlas sprite |
+| icon_kirar.png | Combined/[uc]autochesscommon/icon_kirar.png | UI/Lobby/Home/icon_kirar | Home avatar option | Preserve | A9B279D39C74BD8EDD9CCDC8F8A7AA6157E445639F99800E95481DF6BE84CEFA | Combined atlas sprite |
+| icon_zumam.png | Combined/[uc]autochesscommon/icon_zumam.png | UI/Lobby/Home/icon_zumam | Home avatar option | Preserve | B656BF323746029AD66469F350DCCC5B52F903F68E1ACEB2E202068AF41A1302 | Combined atlas sprite |

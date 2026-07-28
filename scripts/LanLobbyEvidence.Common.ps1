@@ -76,21 +76,32 @@ function Get-LanLobbyAssetMap
     $root = Get-LanLobbyEvidenceProjectRoot -ProjectRoot $ProjectRoot
     if (-not (Test-Path -LiteralPath $AssetMapPath -PathType Leaf)) { throw "Approved asset map not found: $AssetMapPath" }
     $entries = @{}
+    $approvedCombinedAvatars = @('icon_amiy', 'icon_clementi', 'icon_kirar', 'icon_zumam')
     foreach ($line in Get-Content -LiteralPath $AssetMapPath)
     {
-        if ($line -notmatch '^\|\s*([^|]+\.png)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|') { continue }
+        if ($line -notmatch '^\|\s*([^|]+\.png)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|') { continue }
         $spriteFile = $matches[1].Trim()
         $sourcePath = $matches[2].Trim()
         $resourcesPath = $matches[3].Trim()
+        $declaredSha256 = $matches[6].Trim()
         $spriteName = [IO.Path]::GetFileNameWithoutExtension($spriteFile)
         if ($entries.ContainsKey($spriteName)) { throw "Asset map contains duplicate sprite entry: $spriteName" }
+        if ($sourcePath.Contains('$0') -or $sourcePath.Contains('#0')) { throw "Asset map contains a forbidden direct variant: $spriteName -> $sourcePath" }
+        if ($sourcePath.StartsWith('Combined/', [StringComparison]::Ordinal) -and $spriteName -notin $approvedCombinedAvatars)
+        {
+            throw "Asset map contains a non-approved Combined sprite: $spriteName -> $sourcePath"
+        }
+        if ($declaredSha256 -cnotmatch '^[A-F0-9]{64}$') { throw "Asset map SHA-256 is incomplete or non-canonical: $spriteName" }
         $importedPng = Join-Path $root ('Assets/Resources/' + $resourcesPath + '.png')
         if (-not (Test-Path -LiteralPath $importedPng -PathType Leaf)) { throw "Approved imported sprite is missing: $importedPng" }
+        $importedSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $importedPng).Hash
+        if ($importedSha256 -cne $declaredSha256) { throw "Asset map SHA-256 does not match the imported Sprite: $spriteName" }
         $entries[$spriteName] = [pscustomobject]@{
             SpriteName = $spriteName
             ResourcesPath = $resourcesPath
             SourcePath = $sourcePath
-            ImportedSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $importedPng).Hash
+            DeclaredSha256 = $declaredSha256
+            ImportedSha256 = $importedSha256
         }
     }
     if ($entries.Count -eq 0) { throw "Approved asset map has no usable entries: $AssetMapPath" }
@@ -108,16 +119,44 @@ function Get-LanLobbySpriteUsage
         $sources = @($capture.spriteSources | Where-Object { $null -ne $_ })
         if ($sources.Count -eq 0) { throw "Capture $($capture.name) has no sprite provenance." }
         $counts = @{}
+        $nodes = @{}
         foreach ($sprite in $sources)
         {
+            $node = [string]$sprite.node
             $spriteName = [string]$sprite.spriteName
+            $resourcesPath = [string]$sprite.resourcesPath
             $sourcePath = [string]$sprite.sourcePath
+            $sha256 = [string]$sprite.sha256
+            $captures = @($sprite.captures | Where-Object { $null -ne $_ })
+            $occurrenceCount = [int]$sprite.occurrenceCount
+            if ([string]::IsNullOrWhiteSpace($node) -or $nodes.ContainsKey($node))
+            {
+                throw "Capture $($capture.name) contains an empty or duplicate Sprite node: $node"
+            }
+            $nodes[$node] = $true
             if ([string]::IsNullOrWhiteSpace($spriteName) -or [string]::IsNullOrWhiteSpace($sourcePath) -or -not $assetMap.ContainsKey($spriteName) -or $assetMap[$spriteName].SourcePath -cne $sourcePath)
             {
                 throw "Unmapped or non-approved sprite source: $spriteName -> $sourcePath"
             }
+            $entry = $assetMap[$spriteName]
+            if ([string]::IsNullOrWhiteSpace($resourcesPath) -or $entry.ResourcesPath -cne $resourcesPath)
+            {
+                throw "Resources path does not match the approved catalog: $spriteName -> $resourcesPath"
+            }
+            if ($sha256 -cnotmatch '^[A-F0-9]{64}$' -or $entry.DeclaredSha256 -cne $sha256)
+            {
+                throw "SHA-256 does not match the approved catalog: $spriteName -> $sha256"
+            }
+            if ($captures.Count -ne 1 -or [string]$captures[0] -cne [string]$capture.name)
+            {
+                throw "Sprite capture list does not identify exactly its containing capture: $spriteName"
+            }
+            if ($occurrenceCount -ne 1)
+            {
+                throw "Sprite occurrence count must be exactly one per rendered node: $spriteName -> $occurrenceCount"
+            }
             if (-not $counts.ContainsKey($spriteName)) { $counts[$spriteName] = 0 }
-            $counts[$spriteName]++
+            $counts[$spriteName] += $occurrenceCount
         }
         foreach ($spriteName in ($counts.Keys | Sort-Object))
         {

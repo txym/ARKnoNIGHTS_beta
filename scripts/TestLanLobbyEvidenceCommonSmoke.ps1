@@ -83,7 +83,15 @@ try
         [pscustomobject]@{
             name = $_
             path = $captureImage
-            spriteSources = @([pscustomobject]@{ spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' })
+            spriteSources = @([pscustomobject]@{
+                node = 'LanLobbyRoot/Terrain'
+                spriteName = 'bg_terrain'
+                resourcesPath = 'UI/Lobby/bg_terrain'
+                sourcePath = '[uc]autochessouter/bg_terrain.png'
+                sha256 = 'ECE7B6159268276287C20E3B3A82A5165BCC1D344EDFA6DE3B88EE24A76F988C'
+                captures = @($_)
+                occurrenceCount = 1
+            })
         }
     }
     $manifestPath = Join-Path $scratch 'manifest.json'
@@ -98,6 +106,27 @@ try
     Assert-True ($first.ResourcesPath -eq 'UI/Lobby/bg_terrain') 'Resources path must be parsed from ASSET_MAP.'
     Assert-True ($first.ImportedSha256 -match '^[A-Fa-f0-9]{64}$') 'Imported PNG SHA-256 must be complete.'
 
+    $provenanceMutations = @(
+        [pscustomobject]@{ Name = 'empty Resources path'; Field = 'resourcesPath'; Value = ''; Expected = 'Resources path' },
+        [pscustomobject]@{ Name = 'wrong Resources path'; Field = 'resourcesPath'; Value = 'UI/Lobby/not-approved'; Expected = 'Resources path' },
+        [pscustomobject]@{ Name = 'empty SHA-256'; Field = 'sha256'; Value = ''; Expected = 'SHA-256' },
+        [pscustomobject]@{ Name = 'wrong SHA-256'; Field = 'sha256'; Value = ('0' * 64); Expected = 'SHA-256' },
+        [pscustomobject]@{ Name = 'empty captures'; Field = 'captures'; Value = @(); Expected = 'capture list' },
+        [pscustomobject]@{ Name = 'wrong captures'; Field = 'captures'; Value = @('room-ready'); Expected = 'capture list' },
+        [pscustomobject]@{ Name = 'zero occurrence count'; Field = 'occurrenceCount'; Value = 0; Expected = 'occurrence count' },
+        [pscustomobject]@{ Name = 'wrong occurrence count'; Field = 'occurrenceCount'; Value = 2; Expected = 'occurrence count' }
+    )
+    foreach ($mutation in $provenanceMutations)
+    {
+        $mutatedManifest = ([pscustomobject]@{ captures = $records } | ConvertTo-Json -Depth 8 | ConvertFrom-Json)
+        $mutatedManifest.captures[0].spriteSources[0].($mutation.Field) = $mutation.Value
+        $mutationOutput = Join-Path $scratch ('mutation-' + ($mutation.Name -replace '[^A-Za-z0-9]+', '-'))
+        $script:fixtureCount++
+        Assert-FailsWithoutOutput {
+            Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $mutatedManifest -AssetMapPath $assetMapPath | Out-Null
+        } $mutationOutput $mutation.Expected
+    }
+
     $nullRecordManifestPath = Join-Path $scratch 'manifest-with-null-record.json'
     [pscustomobject]@{ captures = @($records; $null) } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $nullRecordManifestPath -Encoding UTF8
     $script:fixtureCount++
@@ -110,7 +139,15 @@ try
     } $unsafeOutput 'safe ignored project directory'
 
     $unmappedManifest = [pscustomobject]@{ captures = @(
-        [pscustomobject]@{ name = 'home'; path = $captureImage; spriteSources = @([pscustomobject]@{ spriteName = 'not-approved'; sourcePath = '[uc]autochessouter/not-approved.png' }) }
+        [pscustomobject]@{ name = 'home'; path = $captureImage; spriteSources = @([pscustomobject]@{
+            node = 'LanLobbyRoot/NotApproved'
+            spriteName = 'not-approved'
+            resourcesPath = 'UI/Lobby/not-approved'
+            sourcePath = '[uc]autochessouter/not-approved.png'
+            sha256 = ('0' * 64)
+            captures = @('home')
+            occurrenceCount = 1
+        }) }
     ) }
     Assert-FailsWithoutOutput {
         Get-LanLobbySpriteUsage -ProjectRoot $projectRoot -Manifest $unmappedManifest -AssetMapPath $assetMapPath | Out-Null

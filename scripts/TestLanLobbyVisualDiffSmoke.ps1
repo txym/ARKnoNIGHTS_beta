@@ -5,7 +5,12 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $exportScript = Join-Path $PSScriptRoot 'ExportLanLobbyVisualDiff.ps1'
+$assetMapPath = Join-Path $projectRoot 'docs/references/ui/lobby/ASSET_MAP.md'
 $scratch = Join-Path $projectRoot ('Temp/LAN-LOBBY-VisualDiffSmoke-' + [Guid]::NewGuid().ToString('N'))
+$approvedAssets = & {
+    . (Join-Path $PSScriptRoot 'LanLobbyEvidence.Common.ps1')
+    Get-LanLobbyAssetMap -ProjectRoot $projectRoot -AssetMapPath $assetMapPath
+}
 $script:assertionCount = 0
 $script:fixtureCount = 0
 
@@ -921,6 +926,15 @@ try
     {
         foreach ($spriteSource in $record.spriteSources)
         {
+            $approvedAsset = $approvedAssets[[string]$spriteSource.spriteName]
+            if ($null -eq $approvedAsset)
+            {
+                throw "Smoke fixture has no approved asset-map row for $($spriteSource.spriteName)."
+            }
+            $spriteSource['resourcesPath'] = $approvedAsset.ResourcesPath
+            $spriteSource['sha256'] = $approvedAsset.DeclaredSha256
+            $spriteSource['captures'] = @([string]$record.name)
+            $spriteSource['occurrenceCount'] = 1
             if (-not $spriteSource.Contains('coordinateOrigin'))
             {
                 $spriteSource['coordinateOrigin'] = 'screen-bottom-left'
@@ -1792,6 +1806,8 @@ try
                 param($record,$caseCaptureDirectory)
                 $sprite = [pscustomobject][ordered]@{
                     node='LanLobbyRoot/Room/RoomCard_0/Icon';spriteName='icon_amiy';sourcePath='Combined/[uc]autochesscommon/icon_amiy.png'
+                    resourcesPath='UI/Lobby/Home/icon_amiy';sha256=$roomSpriteSha['icon_amiy']
+                    captures=@([string]$record.name);occurrenceCount=1
                     coordinateOrigin='screen-bottom-left';unit='px';x=270;y=700;width=80;height=80;raycastTarget=$false
                 }
                 $record.spriteSources = @($record.spriteSources) + $sprite
@@ -1847,6 +1863,8 @@ try
             $record = @($caseManifest.captures | Where-Object name -ceq $guestSpec.capture)[0]
             $sprite = [pscustomobject][ordered]@{
                 node=$guestSpec.node;spriteName='icon_amiy';sourcePath='Combined/[uc]autochesscommon/icon_amiy.png'
+                resourcesPath='UI/Lobby/Home/icon_amiy';sha256=$roomSpriteSha['icon_amiy']
+                captures=@([string]$record.name);occurrenceCount=1
                 coordinateOrigin='screen-bottom-left';unit='px';x=$guestSpec.x;y=(1080-$guestSpec.topY-80);width=80;height=80;raycastTarget=$false
             }
             $record.spriteSources = @($record.spriteSources) + $sprite

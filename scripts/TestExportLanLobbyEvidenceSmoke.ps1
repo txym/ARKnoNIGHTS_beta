@@ -58,7 +58,15 @@ try
         [pscustomobject]@{
             name = $_
             path = $sourcePng
-            spriteSources = @([pscustomobject]@{ spriteName = 'bg_terrain'; sourcePath = '[uc]autochessouter/bg_terrain.png' })
+            spriteSources = @([pscustomobject]@{
+                node = 'LanLobbyRoot/Terrain'
+                spriteName = 'bg_terrain'
+                resourcesPath = 'UI/Lobby/bg_terrain'
+                sourcePath = '[uc]autochessouter/bg_terrain.png'
+                sha256 = 'ECE7B6159268276287C20E3B3A82A5165BCC1D344EDFA6DE3B88EE24A76F988C'
+                captures = @($_)
+                occurrenceCount = 1
+            })
         }
     }
     [pscustomobject]@{ captures = $records } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $captureDirectory 'manifest.json') -Encoding UTF8

@@ -1740,13 +1740,32 @@ function Assert-LanLobbyCaptureEvidenceSchema($Manifest)
 
         foreach ($sprite in @($capture.spriteSources))
         {
-            foreach ($propertyName in @('node','spriteName','sourcePath'))
+            foreach ($propertyName in @('node','spriteName','resourcesPath','sourcePath','sha256'))
             {
                 if ($null -eq $sprite.PSObject.Properties[$propertyName] -or
                     [string]::IsNullOrWhiteSpace([string]$sprite.$propertyName))
                 {
                     throw "Capture '$($capture.name)' SpriteSource is missing required capture field '$propertyName'."
                 }
+            }
+            if ([string]$sprite.sha256 -cnotmatch '^[A-F0-9]{64}$')
+            {
+                throw "Capture '$($capture.name)' SpriteSource '$($sprite.node)' must declare an uppercase 64-hex SHA-256."
+            }
+            $spriteCaptures = @()
+            if ($null -ne $sprite.PSObject.Properties['captures'])
+            {
+                $spriteCaptures = @($sprite.captures | Where-Object { $null -ne $_ })
+            }
+            if ($null -eq $sprite.PSObject.Properties['captures'] -or
+                $spriteCaptures.Count -ne 1 -or
+                [string]$spriteCaptures[0] -cne [string]$capture.name)
+            {
+                throw "Capture '$($capture.name)' SpriteSource '$($sprite.node)' must declare its containing capture exactly once."
+            }
+            if ($null -eq $sprite.PSObject.Properties['occurrenceCount'] -or [int]$sprite.occurrenceCount -ne 1)
+            {
+                throw "Capture '$($capture.name)' SpriteSource '$($sprite.node)' must declare occurrenceCount=1."
             }
             Assert-LanLobbyCapturedRectangleSchema $sprite "SpriteSource '$($sprite.node)'"
         }

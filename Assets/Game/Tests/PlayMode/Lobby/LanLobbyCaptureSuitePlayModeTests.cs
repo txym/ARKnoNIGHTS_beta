@@ -76,7 +76,11 @@ namespace ArknoNights.Lobby.Tests
                 {
                     Assert.That(spriteSource.node, Is.Not.Null.And.Not.Empty);
                     Assert.That(spriteSource.spriteName, Is.Not.Null.And.Not.Empty);
+                    Assert.That(spriteSource.resourcesPath, Is.Not.Null.And.Not.Empty, spriteSource.node);
                     Assert.That(spriteSource.sourcePath, Is.Not.Null.And.Not.Empty);
+                    Assert.That(spriteSource.sha256, Does.Match("^[A-F0-9]{64}$"), spriteSource.node);
+                    Assert.That(spriteSource.captures, Is.EqualTo(new[] { captureRecord.name }), spriteSource.node);
+                    Assert.That(spriteSource.occurrenceCount, Is.EqualTo(1), spriteSource.node);
                     Assert.That(spriteSource.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
                     Assert.That(spriteSource.unit, Is.EqualTo("px"));
                     Assert.That(spriteSource.width, Is.GreaterThan(0f));
@@ -738,7 +742,7 @@ namespace ArknoNights.Lobby.Tests
         [Serializable] private sealed class CaptureRecordProbe { public string name; public int width; public int height; public float canvasScale; public string roomCode; public string localPlayerId; public bool primaryActionInteractable; public CaptureMemberProbe[] members; public CaptureRectProbe[] rects; public CaptureRectProbe[] keyRects; public SpriteSourceProbe[] spriteSources; public UnityTextProbe[] unityText; public CodeNativeGeometryProbe[] codeNativeGeometry; public SourceAuditProbe[] sourceAudit; }
         [Serializable] private sealed class CaptureMemberProbe { public string playerId; public string displayName; public bool isReady; }
         [Serializable] private sealed class CaptureRectProbe { public string name; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
-        [Serializable] private sealed class SpriteSourceProbe { public string node; public bool isBitmap; public string spriteName; public string sourcePath; public bool raycastTarget; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
+        [Serializable] private sealed class SpriteSourceProbe { public string node; public bool isBitmap; public string spriteName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public bool raycastTarget; public string coordinateOrigin; public string unit; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class UnityTextProbe { public string node; public string text; public string fontName; public string fontResourcePath; public bool hasBitmapSource; public string bitmapSourcePath; }
         [Serializable] private sealed class CodeNativeGeometryProbe { public string name; public string kind; public bool isBitmap; public string color; public string coordinateOrigin; public string unit; public bool raycastTarget; public float x; public float y; public float width; public float height; }
         [Serializable] private sealed class SourceAuditProbe { public string node; public string kind; public bool isBitmap; public string spriteName; public string materialName; public string resourcesPath; public string sourcePath; public string sha256; public string[] captures; public int occurrenceCount; public bool raycastTarget; }
