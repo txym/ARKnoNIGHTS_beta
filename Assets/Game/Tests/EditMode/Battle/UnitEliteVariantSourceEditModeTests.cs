@@ -425,27 +425,167 @@ namespace ArknoNights.Battle.Tests
                 Path.Combine(Application.dataPath, "GameData/Units/Json")), Is.False);
         }
 
-        [TestCase(1000, 0, "猎狗", "gopro", 820, 190)]
-        [TestCase(1000, 2, "猎狗pro", "gopro_2", 1700, 260)]
-        [TestCase(1000, 3, "狂暴的猎狗pro", "gopro_3", 3000, 370)]
-        [TestCase(5503, 0, "果冻小子", "arcslma", 18000, 1100)]
-        [TestCase(5504, 0, "果冻丁", "arcslmi", 2500, 290)]
-        public void RealSources_ResolveExpectedVariantFacts(
-            int typeId,
-            int eliteLevel,
-            string name,
-            string resourceKey,
-            int hp,
-            int attack)
+        private static IEnumerable<TestCaseData> RealSourceFactCases()
         {
-            var resolved = ResolveReal(typeId, eliteLevel);
-            Assert.That(Field<string>(resolved, "displayNameZhHans"), Is.EqualTo(name));
-            Assert.That(Field<string>(resolved, "resourceKey"), Is.EqualTo(resourceKey));
-            Assert.That(Field<int>(resolved, "maxHitPoints"), Is.EqualTo(hp));
-            Assert.That(Field<int>(resolved, "attack"), Is.EqualTo(attack));
+            yield return RealSourceFactCase(new RealSourceFacts
+            {
+                TypeId = 1000,
+                EliteLevel = 0,
+                SourceVariant = "1000_gopro",
+                DisplayNameZhHans = "猎狗",
+                Rarity = 1,
+                MaxHitPoints = 820,
+                Attack = 190,
+                Defense = 0,
+                MagicResistance = 20,
+                MoveSpeedMetresPerSecond = 1.9f,
+                AttackIntervalSeconds = 1.4f,
+                LifeDeduct = 1,
+                ResourceKey = "gopro",
+                SkeletonDataResourceName = "enemy_1000_gopro_SkeletonData",
+                ProfilePictureResourceName = "UIImage_1000_gopro",
+                InnateAbilityIds = Array.Empty<string>()
+            });
+            yield return RealSourceFactCase(new RealSourceFacts
+            {
+                TypeId = 1000,
+                EliteLevel = 2,
+                SourceVariant = "1000_gopro_2",
+                DisplayNameZhHans = "猎狗pro",
+                Rarity = 1,
+                MaxHitPoints = 1700,
+                Attack = 260,
+                Defense = 0,
+                MagicResistance = 20,
+                MoveSpeedMetresPerSecond = 1.9f,
+                AttackIntervalSeconds = 1.4f,
+                LifeDeduct = 1,
+                ResourceKey = "gopro_2",
+                SkeletonDataResourceName = "enemy_1000_gopro_2_SkeletonData",
+                ProfilePictureResourceName = "UIImage_1000_gopro_2",
+                InnateAbilityIds = Array.Empty<string>()
+            });
+            yield return RealSourceFactCase(new RealSourceFacts
+            {
+                TypeId = 1000,
+                EliteLevel = 3,
+                SourceVariant = "1000_gopro_3",
+                DisplayNameZhHans = "狂暴的猎狗pro",
+                Rarity = 1,
+                MaxHitPoints = 3000,
+                Attack = 370,
+                Defense = 0,
+                MagicResistance = 20,
+                MoveSpeedMetresPerSecond = 1.9f,
+                AttackIntervalSeconds = 1.4f,
+                LifeDeduct = 1,
+                ResourceKey = "gopro_3",
+                SkeletonDataResourceName = "enemy_1000_gopro_3_SkeletonData",
+                ProfilePictureResourceName = "UIImage_1000_gopro_3",
+                InnateAbilityIds = Array.Empty<string>()
+            });
+            yield return RealSourceFactCase(new RealSourceFacts
+            {
+                TypeId = 5503,
+                EliteLevel = 0,
+                SourceVariant = "5503_arcslma",
+                DisplayNameZhHans = "果冻小子",
+                Rarity = 6,
+                MaxHitPoints = 18000,
+                Attack = 1100,
+                Defense = 0,
+                MagicResistance = 0,
+                MoveSpeedMetresPerSecond = 0.2f,
+                AttackIntervalSeconds = 4.0f,
+                LifeDeduct = 1,
+                ResourceKey = "arcslma",
+                SkeletonDataResourceName = "enemy_5503_arcslma_SkeletonData",
+                ProfilePictureResourceName = "UIImage_5503_arcslma",
+                InnateAbilityIds = new[] { "SUMMON_JELLY_MINIONS" }
+            });
+            yield return RealSourceFactCase(new RealSourceFacts
+            {
+                TypeId = 5504,
+                EliteLevel = 0,
+                SourceVariant = "5504_arcslmi",
+                DisplayNameZhHans = "果冻丁",
+                Rarity = 3,
+                MaxHitPoints = 2500,
+                Attack = 290,
+                Defense = 100,
+                MagicResistance = 20,
+                MoveSpeedMetresPerSecond = 1.9f,
+                AttackIntervalSeconds = 1.5f,
+                LifeDeduct = 1,
+                ResourceKey = "arcslmi",
+                SkeletonDataResourceName = "enemy_5504_arcslmi_SkeletonData",
+                ProfilePictureResourceName = "UIImage_5504_arcslmi",
+                InnateAbilityIds = Array.Empty<string>()
+            });
+        }
+
+        private static TestCaseData RealSourceFactCase(RealSourceFacts facts)
+        {
+            return new TestCaseData(facts).SetName(
+                "RealSources_ResolveExpectedVariantFacts(" + facts.TypeId
+                + ",Elite" + facts.EliteLevel + ")");
+        }
+
+        [TestCaseSource(nameof(RealSourceFactCases))]
+        public void RealSources_ResolveExpectedVariantFacts(RealSourceFacts expected)
+        {
+            var resolved = ResolveReal(expected.TypeId, expected.EliteLevel);
+            Assert.That(Field<int>(resolved, "typeId"), Is.EqualTo(expected.TypeId));
+            Assert.That(
+                Field<int>(resolved, "minEliteLevel"),
+                Is.EqualTo(expected.EliteLevel));
+            Assert.That(
+                Field<string>(resolved, "sourceVariant"),
+                Is.EqualTo(expected.SourceVariant));
+            Assert.That(Field<int>(resolved, "statsLevel"), Is.Zero);
+            Assert.That(
+                Field<string>(resolved, "displayNameZhHans"),
+                Is.EqualTo(expected.DisplayNameZhHans));
+            Assert.That(Field<string>(resolved, "skillDescriptionZhHans"), Is.Empty);
+            Assert.That(Field<int>(resolved, "rarity"), Is.EqualTo(expected.Rarity));
             Assert.That(Field<int>(resolved, "deploymentCost"), Is.EqualTo(2));
+            Assert.That(Field<int>(resolved, "attackMethod"), Is.EqualTo(1));
+            Assert.That(Field<int>(resolved, "actionMethod"), Is.EqualTo(1));
             Assert.That(Field<float>(resolved, "attackRadiusMetres"), Is.Zero);
             Assert.That(Field<float>(resolved, "blockRadiusMetres"), Is.Zero);
+            Assert.That(Field<bool>(resolved, "canBlock"), Is.True);
+            Assert.That(Field<int>(resolved, "blockCapacity"), Is.EqualTo(1));
+            Assert.That(Field<int>(resolved, "tauntLevel"), Is.Zero);
+            Assert.That(Field<string>(resolved, "damageType"), Is.EqualTo("Physical"));
+            Assert.That(
+                Field<int>(resolved, "maxHitPoints"),
+                Is.EqualTo(expected.MaxHitPoints));
+            Assert.That(Field<int>(resolved, "attack"), Is.EqualTo(expected.Attack));
+            Assert.That(Field<int>(resolved, "defense"), Is.EqualTo(expected.Defense));
+            Assert.That(
+                Field<int>(resolved, "magicResistance"),
+                Is.EqualTo(expected.MagicResistance));
+            Assert.That(
+                Field<float>(resolved, "moveSpeedMetresPerSecond"),
+                Is.EqualTo(expected.MoveSpeedMetresPerSecond));
+            Assert.That(
+                Field<float>(resolved, "attackIntervalSeconds"),
+                Is.EqualTo(expected.AttackIntervalSeconds));
+            Assert.That(
+                Field<int>(resolved, "lifeDeduct"),
+                Is.EqualTo(expected.LifeDeduct));
+            Assert.That(
+                Field<string>(resolved, "resourceKey"),
+                Is.EqualTo(expected.ResourceKey));
+            Assert.That(
+                Field<string>(resolved, "skeletonDataResourceName"),
+                Is.EqualTo(expected.SkeletonDataResourceName));
+            Assert.That(
+                Field<string>(resolved, "profilePictureResourceName"),
+                Is.EqualTo(expected.ProfilePictureResourceName));
+            CollectionAssert.AreEqual(
+                expected.InnateAbilityIds,
+                Field<IList>(resolved, "innateAbilityIds").Cast<string>());
         }
 
         [TestCase(1000, 0, "Idle", "Run_Loop", "Attack", 1.0f, "Die", null, 0f)]
@@ -702,6 +842,13 @@ namespace ArknoNights.Battle.Tests
             var resourceKey = Field<string>(resolved, "resourceKey");
             var skeletonDataResourceName =
                 Field<string>(resolved, "skeletonDataResourceName");
+            var profilePictureResourceName =
+                Field<string>(resolved, "profilePictureResourceName");
+            var portraitPath = "ProfilePicture/" + profilePictureResourceName;
+            Assert.That(
+                Resources.Load<Texture2D>(portraitPath),
+                Is.Not.Null,
+                "Portrait Texture2D missing: " + portraitPath);
             var resourcePath = BuildSkeletonDataResourcePath(
                 typeId,
                 resourceKey,
@@ -794,6 +941,26 @@ namespace ArknoNights.Battle.Tests
             var field = source.GetType().GetField(name, BindingFlags.Instance | BindingFlags.Public);
             Assert.That(field, Is.Not.Null, "Missing resolved field: " + name);
             field.SetValue(source, value);
+        }
+
+        public sealed class RealSourceFacts
+        {
+            internal int TypeId;
+            internal int EliteLevel;
+            internal string SourceVariant;
+            internal string DisplayNameZhHans;
+            internal int Rarity;
+            internal int MaxHitPoints;
+            internal int Attack;
+            internal int Defense;
+            internal int MagicResistance;
+            internal float MoveSpeedMetresPerSecond;
+            internal float AttackIntervalSeconds;
+            internal int LifeDeduct;
+            internal string ResourceKey;
+            internal string SkeletonDataResourceName;
+            internal string ProfilePictureResourceName;
+            internal string[] InnateAbilityIds;
         }
     }
 }
