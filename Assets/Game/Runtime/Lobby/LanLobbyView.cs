@@ -12,6 +12,8 @@ public sealed class LanLobbyView : MonoBehaviour
     private const int MaximumVisibleDiscoveryRooms = 4;
     private const string FontPath = "Fonts/Novecento wide Normal Regular.woff2";
     private const string SpriteRoot = "UI/Lobby/";
+    private const float RoomReferenceWidth = 1920f;
+    private const float RoomReferenceHeight = 1080f;
 
     private enum RoomSlotPresentationState
     {
@@ -68,6 +70,9 @@ public sealed class LanLobbyView : MonoBehaviour
     private int avatarIndex;
     private int readyCardCount;
     private int discoveryOverflowCount;
+    private float lastRoomPresentationWidth = -1f;
+    private float lastRoomPresentationHeight = -1f;
+    private float lastRoomCanvasScale = -1f;
 
     public event Action CreateRequested;
     public event Action<string> JoinRequested;
@@ -91,6 +96,11 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         Build();
         ShowHome();
+    }
+
+    private void LateUpdate()
+    {
+        RefreshRoomPresentation();
     }
 
     public void ShowHome()
@@ -272,9 +282,49 @@ public sealed class LanLobbyView : MonoBehaviour
         homeRoot = Rect("Home", root);
         Stretch(homeRoot);
         roomRoot = Rect("Room", root);
-        Stretch(roomRoot);
+        roomRoot.anchorMin = Vector2.zero;
+        roomRoot.anchorMax = Vector2.zero;
+        roomRoot.pivot = Vector2.zero;
+        roomRoot.anchoredPosition = Vector2.zero;
+        roomRoot.sizeDelta = new Vector2(RoomReferenceWidth, RoomReferenceHeight);
         BuildHome(homeRoot);
         BuildRoom(roomRoot);
+        RefreshRoomPresentation();
+    }
+
+    private void RefreshRoomPresentation()
+    {
+        if (roomRoot == null || canvas == null) return;
+        var presentationRect = roomRoot.parent as RectTransform;
+        if (presentationRect == null) return;
+
+        var canvasScale = Mathf.Max(canvas.scaleFactor, .0001f);
+        var presentationWidth = presentationRect.rect.width * canvasScale;
+        var presentationHeight = presentationRect.rect.height * canvasScale;
+        if (presentationWidth <= 0f || presentationHeight <= 0f) return;
+        if (Mathf.Approximately(lastRoomPresentationWidth, presentationWidth)
+            && Mathf.Approximately(lastRoomPresentationHeight, presentationHeight)
+            && Mathf.Approximately(lastRoomCanvasScale, canvasScale))
+        {
+            return;
+        }
+
+        lastRoomPresentationWidth = presentationWidth;
+        lastRoomPresentationHeight = presentationHeight;
+        lastRoomCanvasScale = canvasScale;
+
+        // Room children retain the calibrated 1920x1080 geometry. This root is
+        // the explicit 16:9 letterbox container that maps it into the current
+        // canvas pixel rect without applying CanvasScaler's aspect blend twice.
+        var contentScalePixels = Mathf.Min(
+            presentationWidth / RoomReferenceWidth,
+            presentationHeight / RoomReferenceHeight);
+        var leftInsetPixels = (presentationWidth - RoomReferenceWidth * contentScalePixels) * .5f;
+        var bottomInsetPixels = (presentationHeight - RoomReferenceHeight * contentScalePixels) * .5f;
+        var localScale = contentScalePixels / canvasScale;
+
+        roomRoot.anchoredPosition = new Vector2(leftInsetPixels / canvasScale, bottomInsetPixels / canvasScale);
+        roomRoot.localScale = new Vector3(localScale, localScale, 1f);
     }
 
     private void BuildHome(Transform parent)

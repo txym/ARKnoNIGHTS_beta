@@ -589,6 +589,18 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
+        public IEnumerator RoomLayout_At1920By1200_RendersLetterboxedRoomRects()
+        {
+            yield return AssertRenderedRoomLayoutAtResolution(1920, 1200);
+        }
+
+        [UnityTest]
+        public IEnumerator RoomLayout_At2560By1080_RendersLetterboxedRoomRects()
+        {
+            yield return AssertRenderedRoomLayoutAtResolution(2560, 1080);
+        }
+
+        [UnityTest]
         public IEnumerator DestroyingView_RemovesItsOwnedEventSystem()
         {
             Assert.That(Object.FindObjectsOfType<UnityEngine.EventSystems.EventSystem>(), Has.Some.Matches<UnityEngine.EventSystems.EventSystem>(item => item.name == "LanLobbyEventSystem"));
@@ -1327,6 +1339,54 @@ namespace ArknoNights.Lobby.Tests
         {
             Assert.That(point.x, Is.InRange(0f, (float)Screen.width));
             Assert.That(point.y, Is.InRange(0f, (float)Screen.height));
+        }
+
+        private IEnumerator AssertRenderedRoomLayoutAtResolution(int width, int height)
+        {
+            var scaler = view.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+            scaler.scaleFactor = 1f;
+            var lobbyRoot = RequireChild(view.transform, "LanLobbyRoot").GetComponent<RectTransform>();
+            lobbyRoot.anchorMin = Vector2.zero;
+            lobbyRoot.anchorMax = Vector2.zero;
+            lobbyRoot.pivot = Vector2.zero;
+            lobbyRoot.anchoredPosition = Vector2.zero;
+            lobbyRoot.sizeDelta = new Vector2(width, height);
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+            view.ShowRoom(HostOnlyRoom("654321"), "host");
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+
+            var room = RequireChild(view.transform, "LanLobbyRoot/Room");
+            var expected = global::LanLobbyRoomLayout.ForSize(width, height);
+            AssertRenderedScreenRect(
+                RequireChild(room, "RoomCard_0").GetComponent<RectTransform>(),
+                expected.Slots[0].Root);
+            AssertRenderedScreenRect(
+                RequireChild(room, "LeaveAction").GetComponent<RectTransform>(),
+                expected.LeaveAction);
+            AssertRenderedScreenRect(
+                RequireChild(room, "LocalLatency").GetComponent<RectTransform>(),
+                expected.Latency);
+            AssertRenderedScreenRect(
+                RequireChild(room, "PrimaryAction").GetComponent<RectTransform>(),
+                expected.PrimaryAction);
+        }
+
+        private static void AssertRenderedScreenRect(
+            RectTransform actual,
+            global::LanLobbyRect expected,
+            float tolerance = .75f)
+        {
+            var corners = new Vector3[4];
+            actual.GetWorldCorners(corners);
+            var bottomLeft = RectTransformUtility.WorldToScreenPoint(null, corners[0]);
+            var topRight = RectTransformUtility.WorldToScreenPoint(null, corners[2]);
+            Assert.That(bottomLeft.x, Is.EqualTo(expected.Left).Within(tolerance), actual.name + " left");
+            Assert.That(bottomLeft.y, Is.EqualTo(expected.Bottom).Within(tolerance), actual.name + " bottom");
+            Assert.That(topRight.x - bottomLeft.x, Is.EqualTo(expected.Width).Within(tolerance), actual.name + " width");
+            Assert.That(topRight.y - bottomLeft.y, Is.EqualTo(expected.Height).Within(tolerance), actual.name + " height");
         }
 
         private static PointerEventData PointerAt(RectTransform target)
