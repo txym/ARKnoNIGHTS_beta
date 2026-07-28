@@ -1,10 +1,15 @@
 # 自包含单位精英变体 v2 源数据设计
 
-状态：已确认，尚未实施。
+状态：已实施（首批 1000、5503、5504；其余单位导入未开始）。
+
+当前实施保持现有 Player Resources 目录冻结；正式运行时仍只读取生成目录。
+源直读 `UnitFactory` 仅作为 legacy/debug 适配器保留并进入销毁计划，旧 Hit/
+presentation 链的完整销毁范围继续由 `docs/bonds/UnitAnimation.md` 维护。
+独立动画层尚未实施。
 
 ## 1. 背景
 
-项目当前存在两套单位源 JSON：
+迁移前项目存在两套单位源 JSON：
 
 - `Assets/GameData/Units/Json/*.json` 使用 `unit-source-v1`，保存单位级规则、精零数值和模型绑定；
 - `Assets/GameData/Units/EliteVariants/Json/*.json` 使用 `unit-elite-variants-v1`，作为依赖前者的稀疏精英变体 sidecar。

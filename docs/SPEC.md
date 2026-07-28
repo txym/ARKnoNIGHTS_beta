@@ -113,7 +113,7 @@
 
 本地测试玩家的初始可用部署费用为 `99`。部署费用在阶段切换时保持不变：部署成功时扣除对应费用，撤退成功时返还 `100%` 已占用费用，进入或退出战斗阶段不会自动重置为 `99`。
 
-单位类型 JSON 需要包含初始精英化等级。单位实例创建到玩家状态后独立保存自己的当前精英化等级；UI 读取玩家单位实例状态，不把类型 JSON 当作运行时精英化状态的权威来源。
+当前 Player-safe 单位目录继续提供初始精英化等级。单位实例创建到玩家状态后独立保存自己的当前精英化等级；UI 读取玩家单位实例状态，不把目录或人工维护源 JSON 当作运行时精英化状态的权威来源。
 
 当前确认的真实单位初始精英化等级为：`gopro`（`1000`）=`0`，`arcslma`（`5503`）=`0`。不得由稀有度推断该字段。
 
@@ -131,14 +131,14 @@
 
 完整对局不设置单名玩家同时存活战斗实体数的全局上限。召唤物生成后是普通战斗实体，使用自身单位类型数据正常参与索敌、移动、阻挡、攻击、受击、死亡、冲家和目标价值结算；不得因为其来源是召唤而跳过这些流程。除塑路者分形继续遵守其能力定义中的共享数量门槛外，其他召唤物当前不设置单种召唤物共享数量上限，因此允许持续召唤能力随战斗时长继续扩大实体数和潜在玩家生命伤害。正式战斗时长仍待确认。
 
-精英化单位源数据采用以下已确认的存储与继承规则：
+精英化单位源数据采用以下已确认并已为首批单位实施的存储与继承规则：
 
-- `Assets/GameData/Units/EliteVariants/Json/*.json` 使用 `unit-elite-variants-v1`，作为对应 `unit-source-v1` 的可选权威 sidecar；
-- 所有导入变体均取其 `unit-levels.json` 的 `level 0`；只有该变体缺少 `level 0` 时，才使用该变体 `unit-source-v1` 中的标准数值；
-- 精英 0、精英 1 选择基础变体，精英 2 选择 `_2`，精英 3 选择 `_3`；目标条目缺失时只继承最近的较低精英化条目，不向较高条目借用；
-- `stats.combat` 与 `stats.shared` 分别以完整块为继承单位。名称和能力列表在省略时继承；显式空能力列表 `[]` 表示清空；
-- 模型块一旦声明就必须完整，且模型变化原子绑定显示名、资源 key/目录、SkeletonData、头像、Skeleton 类型、动画名称、攻击动画时长和该变体能力；
-- 当前里程碑的 Editor 目录生成器只把精英 0 解析进扁平 `unit-catalog-v1`。精英 2/3 的运行时选择、合成系数和局内升阶仍未实现，因此现有“`eliteLevel` 不参与战斗数值或胜负”的规则继续成立。
+- `Assets/GameData/Units/EliteVariants/Json/*.json` 的 `unit-elite-variants-v2` 是唯一人工维护的单位源；当前仅完成 `1000`、`5503`、`5504`，其余单位尚未导入；
+- 每个 TypeId 的 v2 文档包含公共规则和全部已导入变体；精英 0 必须完整，高阶条目缺失的名称、能力列表或原子块只继承最近的较低条目，显式空能力列表 `[]` 表示清空；
+- `stats.combat`、`stats.shared` 与 `model` 分别以完整块为继承单位；`sourceVariant` 是物理资源文件夹的权威名称，模型块一旦声明就必须完整；
+- `model.animations[]` 以稳定语义 key 保存真实 Spine 动画名，并为需要时长的实际使用动画保存正数源时长；源数据不保存 `Default`、Hit、Skeleton 类型、动画行为、状态机或播放倍速；
+- 当前 Editor 目录生成器只把精英 0 投影进扁平 `unit-catalog-v1`。精英 2/3 的运行时选择、合成系数和局内升阶仍未实现，因此现有“`eliteLevel` 不参与战斗数值或胜负”的规则继续成立；
+- v2 允许合法表达不攻击且不阻挡的单位；由于旧扁平目录不能表示该组合，投影时必须显式失败，不能强制改写为可攻击或可阻挡单位。
 
 ### 5.2 准备阶段可执行操作
 
@@ -155,7 +155,7 @@
 3. 若不存在可合并堆叠且待部署区已经达到 `13` 个槽位，则新单位进入 `Overflow`。
 4. 每个购买得到的单位仍具有独立单位 ID；购买不会直接把单位部署到场上，也不会扣除部署费用。
 
-单位类型源 JSON 和 Player-safe catalog 均不保存独立的商店价格字段。商品价格直接等于单位稀有度 `rarity`；领域层或 UI 只读快照可以暴露派生的 `Price` 便于显示，但该值必须每次由 `Rarity` 计算，不得保存第二份可能与稀有度漂移的配置。当前 `gopro`（`1000`）稀有度为 `1`，商品价格为 `1`；`arcslma`（`5503`）稀有度为 `4`，商品价格为 `4`。
+单位类型源 JSON 和 Player-safe catalog 均不保存独立的商店价格字段。商品价格直接等于运行时目录稀有度 `rarity`；领域层或 UI 只读快照可以暴露派生的 `Price` 便于显示，但该值必须每次由 `Rarity` 计算，不得保存第二份可能与稀有度漂移的配置。人工维护 v2 源的稀有度为 `1000=1`、`5503=6`、`5504=3`；首批迁移期间 Player-safe 目录保持冻结并继续暴露迁移前值（包括 `5503=4`），所以当前 Demo 中 `gopro` 商品价格为 `1`、`arcslma` 商品价格仍为 `4`。在后续目录迁移前，源稀有度不得被误述为当前玩家可见价格。
 
 完整对局的自然刷新规则已经确认：
 
@@ -411,7 +411,7 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 - 单位之间的距离严格小于 `0.25` 米时可建立对称阻挡关系，距离恰好等于边界不建立；每条关系同时占用双方各一个阻挡容量。单位只要仍有空位，可以同时阻挡多个单位；任一方死亡、失效或超出半径时双向解除该关系；
 - 阻挡在本 Tick 的批量移动之后评估。任一单位正在向自己的目标移动时，也可被另一名以它为目标、且进入范围的敌方单位拦截；建立关系后双方从下一 Tick 起停止移动，不会改写各自的常规索敌目标。攻击优先保留仍在攻击范围内的常规目标；仅当该目标离开攻击范围或失效时，才改为按稳定升序 unit ID 选择存活阻挡对象。没有阻挡关系的单位同样会在其常规目标进入攻击范围时停止移动并攻击；
 - 对同一单位 A 的同 Tick 入站阻挡候选，A 依次选择：`A 当前锁定目标`（如也在候选内）、候选单位嘲讽等级降序、候选单位到 A 自己门格的欧氏距离平方升序、候选 unit ID 升序，直到 A 或候选方的阻挡容量耗尽。不同目标同时争用同一候选的剩余容量时，按目标 unit ID 升序作为最终稳定兜底；
-- `unit-source-v1` 源单位 JSON 使用 `tauntLevel` 表示基础嘲讽等级；其值映射到 Core 的同名 `tauntLevel`。当前 `gopro` 与 `arcslma` 均明确配置为 `0`；
+- `unit-elite-variants-v2` 的 `common.tauntLevel` 表示基础嘲讽等级；其值映射到 Core 的同名 `tauntLevel`。当前 `gopro` 与 `arcslma` 均明确配置为 `0`；
 - 攻击不要求攻击者与目标之间已经建立阻挡关系，但目标必须位于攻击者的攻击范围内；Attack 事件生成后，其 Damage 结算只要求攻击者和事件中记录的目标仍存活，目标在动画期间离开攻击范围不取消该次伤害；
 - 已有任一阻挡关系的单位停止移动；未建立关系的单位在其当前攻击目标仍位于攻击范围内时同样停止移动，不会因目标满容量而继续前进。
 - 表现层单位默认面向世界右方；Move 事件只有世界 X 方向的位移会更新左右朝向，向左时相对默认朝向绕 Y 轴旋转 `180°`，向右恢复默认朝向。世界 Z 方向仅表示上下移动，不改变左右朝向；Attack 事件发生时，攻击者按攻击目标的投影世界方向更新左右朝向，纯 Z 方向仍保留现有左右朝向，后续 Move 事件可再次覆盖该朝向。
@@ -601,12 +601,12 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 第一阶段在保留 `battle-fixture-v1` 作为合成算法回归数据的同时，新增两份 Player-safe 的 Resources 文本资源：
 
-- `BattleData/unit-catalog-v1`：由 `Assets/GameData/Units/Json/*.json` 与对应的可选 `Assets/GameData/Units/EliteVariants/Json/*.json` 确定性生成的真实单位目录；当前生成目标固定为精英 0。目录条目含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
+- `BattleData/unit-catalog-v1`：正式 Player 当前读取的冻结扁平单位目录；`UnitCatalogGenerator` 的人工维护输入已经迁移为 `Assets/GameData/Units/EliteVariants/Json/*.json` 中的 v2 文档，解析目标固定为精英 0，但首批三单位迁移不重新生成现有目录。目录条目继续包含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
 - `BattleData/task004a-real-1v1`：`local-battle-v1` 对战快照，只含 `schemaVersion`、`battleId`、`maxTicks`、两个带 Home/Away 的玩家和各自单位实例（`unitId`、`typeId`、`zone`、`formationX`、`formationY`、`buffs`）；当前固定回归样本为 Home 3 对 Away 4，双方均混用 `gopro`（`1000`）与 `arcslma`（`5503`），采用打乱且互不重叠的部署坐标。不得重复类型数值或表现资源。
 
 `local-battle-v1` 通过 `typeId` 连接目录后才构造不可变 `BattleInput`；Core 仅接收 Core 值，不能接收 Resources、Spine 或表现对象。未知 schema、未知类型、重复或无效 ID、无效数值、空/不存在的表现资源路径均必须返回结构化诊断，其中包含 schema、battleId、playerId（如适用）和 typeId（如适用）。
 
-源单位的 `moveSpeedMetresPerSecond` 以米/秒严格换算为厘米/秒。`attackIntervalSeconds` 先乘以 `0.5` 得到正式单位的基础攻击间隔秒数，再以 20 TPS 换算为 `AttackIntervalTicks`；`attackAnimationDurationSeconds` 不折半，直接以 20 TPS 换算为原始攻击动画 Tick。项目负责人已于 2026-07-18 确认秒数不能整除为 Tick 时向上取整；该规则分别应用于已经折半的基础攻击间隔秒数和未经折半的攻击动画秒数。当前真实目录应得到 `gopro=14 Tick`、`arcslma=40 Tick`、`arcslmi=15 Tick` 的基础攻击间隔。已由 Unity/Spine API 核验：`gopro/Attack=1.0s=20 Tick`，`arcslma/Attack=2.666667s=54 Tick`。当前两单位均为 `Physical`、`Melee`、阻挡容量 1、嘲讽等级 0；旧映射可以继续保存 Hit 动画名称以兼容已有数据，但新 Track 播放路径不调用 Hit，Death 仍使用经核验的 `Die`。
+源单位的 `moveSpeedMetresPerSecond` 以米/秒严格换算为厘米/秒。`attackIntervalSeconds` 先乘以 `0.5` 得到正式单位的基础攻击间隔秒数，再以 20 TPS 换算为 `AttackIntervalTicks`；`animations[]` 中攻击 key 的 `durationSeconds` 不折半，直接以 20 TPS 换算为原始攻击动画 Tick。项目负责人已于 2026-07-18 确认秒数不能整除为 Tick 时向上取整；该规则分别应用于已经折半的基础攻击间隔秒数和未经折半的攻击动画秒数。当前冻结真实目录保持 `gopro=14 Tick`、`arcslma=40 Tick`、`arcslmi=15 Tick` 的基础攻击间隔，并保持其迁移前费用、稀有度、Skeleton 类型和动画字段。已由 Unity/Spine API 核验：`gopro/Attack=1.0s=20 Tick`，`arcslma/Attack=2.666667s=54 Tick`。`UnitCatalogGenerator` 的 legacy v1 兼容投影将 v2 模型映射为临时的 Skeleton Type 2 并写入空 Hit 名称；Type 2 只是旧表现层传输值，不是人工维护的单位事实。新 Track 播放路径不调用 Hit，Death 仍使用经核验的 `Die`。
 
 ## 12. UI-004 本地准备—战斗循环（2026-07-22）
 
@@ -616,15 +616,19 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 ## 13. UNIT-DATA-001 单位源数据契约（2026-07-23）
 
+- 当前权威链为 `Assets/GameData/Units/EliteVariants/Json/*.json → UnitEliteVariantResolver(target elite 0) → UnitCatalogGenerator → frozen flat unit-catalog-v1 → existing Player loaders`。正式 Player 只读生成的 Resources 目录，不能直接读取 Editor 源 JSON。
+- v2 是唯一人工维护的单位源；首批只实施 `1000`、`5503`、`5504`。每个文档的精英 0 完整，高阶条目按最近较低条目继承原子块，`sourceVariant` 决定物理资源文件夹。
+- `animations[]` 只保存稳定 key、真实 Spine 名称和必需的源时长；`Default`、Hit、Skeleton 类型、动画行为与播放倍速均不属于 v2 源契约。
+- 人工维护 v2 稀有度为 `1000=1`、`5503=6`、`5504=3`；冻结目录仍暴露迁移前值。合法但旧目录无法表达的不攻击/不阻挡 v2 单位必须投影失败。
+- 源直读 `UnitFactory` 是 legacy/debug 适配器，正式运行时不依赖它，并在后续正式数据路径不再需要时销毁。旧 Hit/presentation 链的完整销毁范围由 `docs/bonds/UnitAnimation.md` 维护。
+
 ## 14. UI-INFO-001 单位详情投影（2026-07-24）
 
 - 准备阶段由本地 PlayerState 与独立临时敌方 PlayerState 一起封存；任意跨方 unitId 冲突都会中止并提供可定位诊断。
 - eliteLevel 仅作为实例表现元数据穿过 PlayerState、BattleInput 与 Presentation，不参与战斗数值或胜负。
 - UnitInformationPanel 只读取 UnitDetailSnapshot：名称未配置显示 `--`；未结算 Buff 的六项动态属性显示 `--`，不猜测 Buff 效果。
 
-- 两个真实源文件使用 `unit-source-v1`，按身份与文本、养成与费用、行为分类、战斗数值、阻挡/价值/能力、资源与动画的顺序定义 lower camel case 字段。`resourceKey` 仅用于技术资源查找；`displayNameZhHans` 与 `skillDescriptionZhHans` 是独立的玩家可见简体中文字段。
-- 当前两个单位已配置简体中文显示名；显示名为空时仍不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`initialEliteLevel` 必须为 `0..3`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。
-- 基础 `unit-source-v1` 与可选 `unit-elite-variants-v1` sidecar 共同构成单位源数据权威。Editor 先解析目标精英化条目，再确定性生成 Player-safe `unit-catalog-v1`；Player 不读取 Editor 源 JSON 或项目外 staging 目录，只从目录读取资源键、中文文本、稀有度、目标价值以及既有战斗/表现字段。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
+- 已导入单位均配置简体中文显示名；显示名为空时仍不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
 - `Assets/Resources/ProfilePicture` 下的单位头像统一按 Default Texture 导入。目录和 Player 校验使用 `Resources.Load<Texture2D>`；现有 uGUI `Image` 通过共享 `UnitPortraitLoader` 将整张 Texture2D 创建为 Sprite 并按资源路径缓存，不先尝试加载 Sprite。该约束只适用于单位头像，不改变 Spine 贴图或其他通用 UI 资源的加载策略。
 
 ## 15. `SUMMON_JELLY_MINIONS` 果冻召唤（2026-07-26）
@@ -634,4 +638,4 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 新生成单位不继承施法者的路径、目标或阻挡关系。它们在生成 Tick 只产生 Spawn 与不可变实例快照，从下一 Tick 起才按普通单位的索敌、嘲讽与稳定决胜规则各自重新选择目标和行动。
 - 同一 Tick 先完成已到达伤害、Death、阻挡解除与索敌清理，再判断战斗是否终局。若清理后已终局，该 Tick 不回复 SP、不施放定时技能，召唤不能延长已经结束的战斗；BattleEnded 仍是该终局 Tick 的最后事件。
 - `BattleRunResult` 为动态实例保留唯一负数实例 ID、生成位置、激活 Tick、完整单位状态及只读实例快照索引。Presentation 只能从该封存结果编译动态 Track：初始单位在 Tick `0` 建立视图，动态 `5504` 在各自 Spawn Tick 建立视图；Home/Away 投影、暂停、变速、观察切换和 Replay 均不得重算或回写 Core。Replay 清理旧动态视图，并在再次越过对应 Spawn Tick 时用相同 ID 与快照重建。
-- `Assets/GameData/Units/Json` 与 `Assets/GameData/Abilities/Json` 是人工维护的权威源；单位/能力目录生成器只读、校验、稳定排序并写各自生成目录，不回写源 JSON。任何已部署单位引用的 innate ability 都必须在封存的 ability definitions 中解析成功；未知能力 ID 或未知召唤类型返回结构化验证错误，不允许静默省略能力。
+- `Assets/GameData/Units/EliteVariants/Json` 与 `Assets/GameData/Abilities/Json` 是人工维护的权威源；单位/能力目录生成器只读、校验、稳定排序并写各自生成目录，不回写源 JSON。任何已部署单位引用的 innate ability 都必须在封存的 ability definitions 中解析成功；未知能力 ID 或未知召唤类型返回结构化验证错误，不允许静默省略能力。

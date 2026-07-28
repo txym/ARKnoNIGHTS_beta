@@ -56,18 +56,18 @@ TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译�
 
 ### 5.1 单位初始化
 
-当前单位初始化不是自动场景流程，而是由初始化调试按钮触发：
+旧单位初始化不是正式 Player 数据链，而是由初始化调试按钮触发的 legacy/debug 流程：
 
 1. `ButtonDebug.Debugbutton` 调用 `UnitFactory.SpawnAll`；
-2. `UnitFactory` 扫描 `Application.dataPath/GameData/Units/Json` 下的 `*.json`，当前仓库内有 `1000_gopro.json`、`5503_arcslma.json` 和 `5504_arcslmi.json`；
-3. JSON 经 `JsonUtility` 反序列化为 `UnitJson`；
-4. 工厂为每种类型创建内存中的 `UnitTemplate`，并按 `typeID` 写入静态字典；
+2. `UnitFactory` 通过共享 `UnitEliteVariantResolver` 读取 `Application.dataPath/GameData/Units/EliteVariants/Json` 下的 v2 文档，当前只包含 `1000`、`5503`、`5504`；
+3. 工厂在创建对象前完成全部文档、精英 0、资源与必要动画绑定校验；
+4. 工厂把已解析的 v2 事实显式适配到内存 `UnitTemplate`，并按 `typeID` 写入静态字典；
 5. 工厂加载 `Resources/Prefabs/DefaultUnit` 并为每种类型实例化一个对象；
-6. 工厂动态添加 `UnitIdentity` 和对应的 `UnitSkelType1` 或 `UnitSkelType2`；
+6. 工厂动态添加 `UnitIdentity` 和兼容用 `UnitSkelType2`；
 7. 工厂按 JSON 字段加载 Spine `SkeletonDataAsset`；
 8. `ButtonDebug` 把单位类型填入 `VirtualSlotPanel`，建立可点击、可拖拽的单位 UI。
 
-工厂为每种类型生成的单位对象分配负数 `unitID`。这套编号只服务当前原型，尚未接入 SPEC 所描述的对战输入快照或玩家单位持久数据。
+工厂为每种类型生成的单位对象分配负数 `unitID`。这套编号只服务旧原型，尚未接入 SPEC 所描述的对战输入快照或玩家单位持久数据；正式 Player 运行时不读取该源目录。源直读适配器在正式运行数据不再需要后销毁。
 
 ### 5.2 单位详情 UI
 
@@ -154,7 +154,7 @@ TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译�
 
 1. `UnitDeployment.Update` 在所有构建中调用 `ConvertCoordinate`。TASK-001 已将不依赖 `UnityEditor` 的方法移出 `#if UNITY_EDITOR`，保留 `OnDrawGizmosSelected` 为 Editor 专用；复核后的 Windows Standalone 编译不再报告该符号缺失。
 2. `UITest.targetSprite` 的条件编译作用域已在 TASK-006 修复：变量在条件块外声明，Editor `AssetDatabase` 与 Player `Resources.Load` 分支仅各自赋值；Windows Standalone 构建已复测成功。
-3. `UnitFactory` 仍从 `Application.dataPath` 下的松散 JSON 路径读取数据，是旧原型风险。第一阶段新 Demo 不调用该链路，而是从 `Resources` 加载 `unit-catalog-v1` 与 `local-battle-v1`；该新链路已在实际 Player 中验证。
+3. `UnitFactory` 仍从 `Application.dataPath` 下的 v2 源目录读取数据，是待销毁的旧原型风险。第一阶段新 Demo 不调用该链路，而是从 `Resources` 加载冻结的 `unit-catalog-v1` 与 `local-battle-v1`；该正式链路已在实际 Player 中验证。
 4. 旧第一方业务代码仍位于 `Assembly-CSharp`，但 Battle Core、fixture 适配层和 EditMode 测试已具备独立程序集隔离；新 Core 不反向依赖旧程序集。
 5. `Runtime/Deployment` 直接依赖 `Assets/Game/Debug` 中的 `ButtonDebug`、`MoveTest` 和 `EventTest`。因此 Debug 目录当前是实际运行链的一部分，不能作为可独立移除的开发辅助层。
 6. 当前没有统一的 Bootstrap 或 Game Manager。初始化分散在运行时静态钩子、场景组件生命周期和调试按钮中。
@@ -215,15 +215,19 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 `Assets/Game/Battle/Infrastructure/RealBattleDataLoader.cs` 新增 Player-safe 数据边界：`UnitCatalogLoader` 以 `Resources.Load<TextAsset>` 加载 `Assets/Resources/BattleData/unit-catalog-v1.json`，验证数值、枚举、ID、Prefab/Skeleton Resources 路径并公开只读 `UnitCatalog`；`LocalBattleLoader` 再读取 `task004a-real-1v1.json`，以目录定义连接玩家实例，构造已有的不可变 `BattleInput`。`BattleInputFactory` 同时接受旧 `battle-fixture-v1` 和适配后的 `local-battle-v1`，两者的 Core 输入、事件和 runner 语义不变。
 
-目录由 `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs` 从基础 `unit-source-v1` 与同名可选 `unit-elite-variants-v1` sidecar 生成。Editor-only `UnitEliteVariantResolver` 按 `基础源 + 最近较低条目继承` 解析目标精英化；当前生成目标固定为精英 0，高阶变体不会进入 Player 目录。解析结果再经稳定排序、type ID/resource key/稀有度/精英化/目标价值校验、米/秒和秒/Tick 严格换算，以及 Unity/Spine 动画与 Attack 时长验证后写入 Resources 输出；`Task004aSpineProbe` 保留为可重复的动画证据探针。运行时不读取 `Application.dataPath/GameData/...`，也不读取项目外的 staging 目录。
+目录生成器 `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs` 只读取 `Assets/GameData/Units/EliteVariants/Json/*.json` 中的 `unit-elite-variants-v2` 文档。共享 `UnitEliteVariantResolver` 要求精英 0 完整，并按最近较低条目继承高阶条目省略的 `stats.combat`、`stats.shared`、`model` 等原子块；`sourceVariant` 是物理资源文件夹权威。当前生成目标固定为精英 0，高阶变体不会进入 Player 目录。解析结果再经稳定排序、type ID/resource key/稀有度/目标价值校验、米/秒和秒/Tick 严格换算，以及 Unity/Spine 动画与时长验证后写入 Resources 输出；`Task004aSpineProbe` 保留为可重复的动画证据探针。
 
 当前目录数据流为：
 
-`unit-source-v1 + optional unit-elite-variants-v1 → UnitEliteVariantResolver(target elite 0) → UnitCatalogGenerator → flat unit-catalog-v1 → existing Player loaders`
+`Assets/GameData/Units/EliteVariants/Json/*.json → UnitEliteVariantResolver(target elite 0) → UnitCatalogGenerator → frozen flat unit-catalog-v1 → existing Player loaders`
 
-`UnitCatalogEntry` 明确分离 `ResourceKey`、可为空的 `DisplayNameZhHans`、可为空的 `SkillDescriptionZhHans` 与 `LifeDeduct`；`UnitCatalogLoader` 对目录 `rarity=1..6` 和非负 `lifeDeduct` 进行运行时校验。`PlayerState` 将目录 `Rarity` 原样投影至 `StagingStackSnapshot`，UI 不读取 Editor 源 JSON 或由精英化等级推断稀有度。`UnitFactory` 和 `UnitJsonBake` 分别将新字段适配到旧 `UnitTemplate`、以及读取 `typeId + innateAbilityIds`，不保留双格式源读取。
+v2 是唯一人工维护的单位源，首批只完成 `1000`、`5503`、`5504`，其余单位尚未导入。模型 `animations[]` 保存稳定 key、真实 Spine 名称和必需的源时长；`Default`、Hit、Skeleton 类型、动画行为和播放倍速不进入源契约。人工维护稀有度为 `1000=1`、`5503=6`、`5504=3`。现有 `unit-catalog-v1` 与 `ability-catalog-v1` 在首批迁移中保持字节冻结，因此 Player 仍暴露迁移前目录值；正式 Player 只读这些 Resources 目录，不读取 Editor 源或项目外 staging 数据。
 
-`MappedBattlePresentationViewFactory` 现优先从目录按真实 Core type ID 自动解析 `Prefabs/DefaultUnit`、SkeletonDataAsset、legacy ID、`unitskeltype` 和动画名；既有 Inspector Binding 仍是显式覆盖。新创建的 `UnitSkelBase` 在 `Start` 前由目录注入只读表现速度/间隔，避免依赖旧 `UnitFactory.SpawnAll` 的模板缓存。`UnitSkelPresentationView` 使用目录动画；空 Hit 为无操作降级，缺 Death 仍沿用隐藏已死亡视图的策略。整个桥接仍只从结果事件流向 Unity，绝不反向写入 Core。
+`UnitCatalogEntry` 明确分离 `ResourceKey`、可为空的 `DisplayNameZhHans`、可为空的 `SkillDescriptionZhHans` 与 `LifeDeduct`；`UnitCatalogLoader` 对冻结目录的 `rarity=1..6` 和非负 `lifeDeduct` 进行运行时校验。`PlayerState` 将目录 `Rarity` 原样投影至 `StagingStackSnapshot`，UI 不由精英化等级或源文件推断稀有度。v2 能合法表达不攻击且不阻挡的单位，但旧扁平目录无法表达该组合，生成器会显式拒绝投影而不是强制改写。
+
+`UnitFactory` 与 `UnitJsonBake` 已迁移为 v2 消费者，不保留双格式源读取。legacy v1 目录投影映射的 Skeleton Type 2 与空 Hit 名称仅是旧表现接口的临时传输值，不是人工维护单位事实；源直读 `UnitFactory` 适配器在正式运行数据路径不再需要后销毁。旧 Hit/presentation 链在旧目录和播放接口退役后销毁，完整清单维护于 `docs/bonds/UnitAnimation.md`。
+
+`MappedBattlePresentationViewFactory` 现优先从冻结目录按真实 Core type ID 自动解析 `Prefabs/DefaultUnit`、SkeletonDataAsset、legacy ID、`unitskeltype` 和动画名；既有 Inspector Binding 仍是显式覆盖。新创建的 `UnitSkelBase` 在 `Start` 前由目录注入只读表现速度/间隔，避免依赖旧 `UnitFactory.SpawnAll` 的模板缓存。`UnitSkelPresentationView` 使用目录动画；空 Hit 为兼容期无操作降级，缺 Death 仍沿用隐藏已死亡视图的策略。整个桥接仍只从结果事件流向 Unity，绝不反向写入 Core。
 
 ## 14. TASK-005 固定真实对战 Demo（2026-07-18）
 
@@ -308,7 +312,7 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 ## 24. Mainline 果冻召唤数据流与生命周期（2026-07-26）
 
-- 权威数据流为 `Units/Json + optional Units/EliteVariants/Json + Abilities/Json → UnitEliteVariantResolver(target elite 0) + UnitCatalogGenerator/AbilityCatalogGenerator → unit-catalog-v1 + ability-catalog-v1 → BattleInputFactory → BattleRunner`。解析器和两个生成器只读源数据并执行 schema、继承、引用、数值及稳定顺序验证；不会从资源或目录反向改写源 JSON。
+- 权威数据流为 `Units/EliteVariants/Json(v2) + Abilities/Json → UnitEliteVariantResolver(target elite 0) + UnitCatalogGenerator/AbilityCatalogGenerator → frozen unit-catalog-v1 + ability-catalog-v1 → BattleInputFactory → BattleRunner`。解析器和两个生成器只读源数据并执行 schema、继承、引用、数值及稳定顺序验证；不会从资源或目录反向改写源 JSON。
 - `LocalBattleLoader`、准备阶段封存器和 `PreparationBattleLoopController` 会把已验证的 ability definitions 与单位定义一起封存。`BattleInputFactory` 验证单位固有能力 ID 与 summon type 均可解析，遗漏目录或未知 ID 会结构化失败。
 - 全局自动恢复为 `2 SP/s`，在 20 TPS 下每 10 Tick 增加一点；每个 `RuntimeAbilityState` 私有保存 SP 和施放次数。`SUMMON_JELLY_MINIONS` 在 Tick 100/250 施放，每次在施法者中心 100cm × 100cm 方形中确定性生成三个 5504，并分配递减负数 ID。
 - Tick 在处理本 Tick 伤害、Death、阻挡解除和目标清理后判定终局；终局 Tick 不恢复 SP、不施放技能。非终局 Spawn 只创建无路径、无目标、无阻挡继承的新实例，`ActivationTick = SpawnTick + 1`，之后按普通单位规则重新索敌。
