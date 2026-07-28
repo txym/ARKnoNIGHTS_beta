@@ -1051,6 +1051,113 @@ namespace ArknoNights.Battle.Tests
             Assert.That(centre.EffectiveMagicResistance, Is.EqualTo(70));
         }
 
+        [Test]
+        public void Evasion_AvoidsPhysicalAndMagicAttacksButNotTrueDamage()
+        {
+            Assert.That(
+                RunEvasionDamage(
+                    DamageType.Physical,
+                    physicalChancePermille: 1000,
+                    magicChancePermille: 0),
+                Is.EqualTo(0));
+            Assert.That(
+                RunEvasionDamage(
+                    DamageType.Magic,
+                    physicalChancePermille: 0,
+                    magicChancePermille: 1000),
+                Is.EqualTo(0));
+            Assert.That(
+                RunEvasionDamage(
+                    DamageType.True,
+                    physicalChancePermille: 1000,
+                    magicChancePermille: 1000),
+                Is.EqualTo(100));
+        }
+
+        [Test]
+        public void Evasion_EightyPercentRollIsDeterministic()
+        {
+            var input = CreateInput(
+                41,
+                new[]
+                {
+                    Attacker(
+                        "attacker",
+                        2000,
+                        0,
+                        damageType: DamageType.Physical,
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    NonAttacker("target", 100000, "EVADE_80")
+                },
+                new[]
+                {
+                    PassiveEvasion(
+                        physicalChancePermille: 800,
+                        magicChancePermille: 800)
+                },
+                new[] { Unit("attacker", "attacker", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+
+            var first = new BattleRunner(input)
+                .RunToCompletion()
+                .Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "attacker")
+                .Select(item => item.DamageAmount)
+                .ToArray();
+            var second = new BattleRunner(input)
+                .RunToCompletion()
+                .Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "attacker")
+                .Select(item => item.DamageAmount)
+                .ToArray();
+
+            Assert.That(second, Is.EqualTo(first));
+            Assert.That(first, Has.Some.EqualTo(0));
+            Assert.That(first, Has.Some.EqualTo(100));
+            Assert.That(input.CanonicalSummary, Does.Contain("|V:800,800"));
+        }
+
+        private static int RunEvasionDamage(
+            DamageType damageType,
+            int physicalChancePermille,
+            int magicChancePermille)
+        {
+            var input = CreateInput(
+                3,
+                new[]
+                {
+                    Attacker(
+                        "attacker",
+                        2000,
+                        0,
+                        damageType: damageType,
+                        attackIntervalTicks: 100,
+                        attack: 100),
+                    NonAttacker("target", 1000, "EVADE_80")
+                },
+                new[]
+                {
+                    PassiveEvasion(
+                        physicalChancePermille,
+                        magicChancePermille)
+                },
+                new[] { Unit("attacker", "attacker", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+
+            return new BattleRunner(input)
+                .RunToCompletion()
+                .Events
+                .Single(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "attacker")
+                .DamageAmount;
+        }
+
         private static int[] RunAttackSequence(
             int firstEnhancedAttackOrdinal,
             int repeatInterval,
@@ -1548,6 +1655,39 @@ namespace ArknoNights.Battle.Tests
                 new NearbySameTypeSelfModifierDefinition(
                     radiusCentimetres,
                     defenseAdditivePerUnit),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveEvasion(
+            int physicalChancePermille,
+            int magicChancePermille)
+        {
+            return new AbilityDefinition(
+                "EVADE_80",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new EvasionModifierDefinition(
+                    physicalChancePermille,
+                    magicChancePermille),
                 string.Empty,
                 0);
         }

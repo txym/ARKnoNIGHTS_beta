@@ -288,6 +288,10 @@ namespace ArknoNights.Battle.Core
                     builder.Append("|N:")
                         .Append(ability.NearbySameTypeSelfModifier.RadiusCentimetres).Append(',')
                         .Append(ability.NearbySameTypeSelfModifier.DefenseAdditive);
+                if (ability.EvasionModifier != null)
+                    builder.Append("|V:")
+                        .Append(ability.EvasionModifier.PhysicalChancePermille).Append(',')
+                        .Append(ability.EvasionModifier.MagicChancePermille);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -365,6 +369,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.AuraCombatModifier != null) validationErrors.Add(new ValidationError("ability.aura.unexpected", "Timed ability cannot define an aura modifier: " + ability.AbilityId));
                     if (ability.BlockedCounterpartCombatModifier != null) validationErrors.Add(new ValidationError("ability.blockedCounterpart.unexpected", "Timed ability cannot define a blocked-counterpart modifier: " + ability.AbilityId));
                     if (ability.NearbySameTypeSelfModifier != null) validationErrors.Add(new ValidationError("ability.nearbySameType.unexpected", "Timed ability cannot define a nearby-same-type modifier: " + ability.AbilityId));
+                    if (ability.EvasionModifier != null) validationErrors.Add(new ValidationError("ability.evasion.unexpected", "Timed ability cannot define an evasion modifier: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -395,7 +400,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.DeathSpawnEffect == null ? 0 : 1)
                         + (ability.AuraCombatModifier == null ? 0 : 1)
                         + (ability.BlockedCounterpartCombatModifier == null ? 0 : 1)
-                        + (ability.NearbySameTypeSelfModifier == null ? 0 : 1);
+                        + (ability.NearbySameTypeSelfModifier == null ? 0 : 1)
+                        + (ability.EvasionModifier == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -506,6 +512,13 @@ namespace ArknoNights.Battle.Core
                         && (ability.NearbySameTypeSelfModifier.RadiusCentimetres <= 0
                             || ability.NearbySameTypeSelfModifier.DefenseAdditive <= 0))
                         validationErrors.Add(new ValidationError("ability.nearbySameType.invalid", "Nearby-same-type modifier is invalid: " + ability.AbilityId));
+                    if (ability.EvasionModifier != null
+                        && (ability.EvasionModifier.IsNeutral
+                            || ability.EvasionModifier.PhysicalChancePermille < 0
+                            || ability.EvasionModifier.PhysicalChancePermille > 1000
+                            || ability.EvasionModifier.MagicChancePermille < 0
+                            || ability.EvasionModifier.MagicChancePermille > 1000))
+                        validationErrors.Add(new ValidationError("ability.evasion.invalid", "Evasion modifier is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

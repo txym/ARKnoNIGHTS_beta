@@ -487,6 +487,15 @@ namespace ArknoNights.Battle.Core
                         item.Definition.AbilityId,
                         item.Definition
                             .NearbySameTypeSelfModifier));
+        internal IEnumerable<KeyValuePair<string, EvasionModifierDefinition>>
+            EvasionModifiers =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.EvasionModifier != null)
+                .Select(item =>
+                    new KeyValuePair<string, EvasionModifierDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.EvasionModifier));
         internal void SetAuraCombatModifiers(
             IEnumerable<IExternalCombatModifierDefinition> modifiers)
         {
@@ -847,7 +856,7 @@ namespace ArknoNights.Battle.Core
                         ? int.MaxValue
                         : CurrentTick + attackIntervalTicks;
                 unit.AttackAnimationLockUntilTick = Math.Max(unit.AttackAnimationLockUntilTick, damageTick);
-                pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.EffectiveTargetDefenseMultiplierPermille, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
+                pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.EffectiveTargetDefenseMultiplierPermille, unit.StartedAttackCount, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
                 Emit(BattleEventType.Attack, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, unit.Definition.AttackAnimationDurationTicks, effectiveTicks, null, BattleStopReason.None);
             }
         }
@@ -1452,8 +1461,10 @@ namespace ArknoNights.Battle.Core
         private static FixedPosition OpposingGatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.RedGate : BattlefieldRules.BlueGate);
         private static long DistanceSquared(FixedPosition first, FixedPosition second) { var x = (long)first.XUnits - second.XUnits; var y = (long)first.YUnits - second.YUnits; return x * x + y * y; }
         private static bool IsInAttackRange(FixedPosition first, FixedPosition second) => DistanceSquared(first, second) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre;
-        private static int CalculateDamage(PendingAttack attack, RuntimeUnitState target)
+        private int CalculateDamage(PendingAttack attack, RuntimeUnitState target)
         {
+            if (IsAttackEvaded(attack, target))
+                return 0;
             var damage = DamageCalculator.Calculate(
                 attack.DamageType,
                 attack.Attack,
@@ -1464,6 +1475,45 @@ namespace ArknoNights.Battle.Core
             return target.ApplyDamageTakenModifiers(
                 attack.DamageType,
                 damage);
+        }
+
+        private bool IsAttackEvaded(
+            PendingAttack attack,
+            RuntimeUnitState target)
+        {
+            if (attack.DamageType != DamageType.Physical
+                && attack.DamageType != DamageType.Magic)
+                return false;
+            foreach (var ability in target.EvasionModifiers
+                         .OrderBy(
+                             item => item.Key,
+                             StringComparer.Ordinal))
+            {
+                var chance = attack.DamageType
+                    == DamageType.Physical
+                        ? ability.Value.PhysicalChancePermille
+                        : ability.Value.MagicChancePermille;
+                if (chance <= 0)
+                    continue;
+                if (chance >= 1000)
+                    return true;
+                var hash = 14695981039346656037UL;
+                hash = AppendStableHash(hash, Input.BattleId);
+                hash = AppendStableHash(
+                    hash,
+                    attack.AttackerUnitId);
+                hash = AppendStableHash(
+                    hash,
+                    attack.TargetUnitId);
+                hash = AppendStableHash(hash, ability.Key);
+                hash = AppendStableHash(hash, attack.DamageTick);
+                hash = AppendStableHash(
+                    hash,
+                    attack.AttackOrdinal);
+                if ((int)(hash % 1000UL) < chance)
+                    return true;
+            }
+            return false;
         }
 
         private static int CalculateReactionDamage(
@@ -1547,7 +1597,7 @@ namespace ArknoNights.Battle.Core
 
         private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to, string relatedUnitId) { Unit = unit; From = from; To = to; RelatedUnitId = relatedUnitId; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } public string RelatedUnitId { get; } }
         private readonly struct BlockProposal { public BlockProposal(RuntimeUnitState actor, RuntimeUnitState target) { Actor = actor; Target = target; } public RuntimeUnitState Actor { get; } public RuntimeUnitState Target { get; } }
-        private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int targetDefenseMultiplierPermille, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; TargetDefenseMultiplierPermille = targetDefenseMultiplierPermille; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int TargetDefenseMultiplierPermille { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
+        private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int targetDefenseMultiplierPermille, int attackOrdinal, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; TargetDefenseMultiplierPermille = targetDefenseMultiplierPermille; AttackOrdinal = attackOrdinal; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int TargetDefenseMultiplierPermille { get; } public int AttackOrdinal { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
         private readonly struct DamageReaction { public DamageReaction(string ownerUnitId, string targetUnitId, OnDamageReactionEffectDefinition effect) { OwnerUnitId = ownerUnitId; TargetUnitId = targetUnitId; Effect = effect; } public string OwnerUnitId { get; } public string TargetUnitId { get; } public OnDamageReactionEffectDefinition Effect { get; } }
         private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
