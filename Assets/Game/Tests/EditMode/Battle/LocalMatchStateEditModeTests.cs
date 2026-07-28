@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Player;
@@ -26,15 +29,58 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.AllItemsAreUnique(first.State.Snapshot.Players.Select(player => player.PlayerId));
             CollectionAssert.AllItemsAreUnique(first.State.Snapshot.Players.SelectMany(player => player.PlayerState.Units).Select(unit => unit.UnitId));
 
-            var local = first.State.Snapshot.LocalPlayer;
-            Assert.AreEqual(1, local.Level);
-            Assert.AreEqual(7, local.Gold);
-            Assert.AreEqual(400, local.Life);
-            Assert.IsFalse(local.IsReady);
-            Assert.AreEqual(6, local.ShopSlots.Count);
-            CollectionAssert.AreEqual(new[] { "1000", "1000", "1000", "1000", "1000", "1000" }, local.ShopSlots.Select(slot => slot.UnitTypeId));
-            CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 1, 1 }, local.ShopSlots.Select(slot => slot.Price));
+            Assert.IsTrue(first.State.Snapshot.Players.All(player => player.ShopSlots.Count == LocalMatchState.ShopSlotCount));
+            Assert.IsTrue(first.State.Snapshot.Players.All(player =>
+                player.ShopSlots.Select(slot => slot.UnitTypeId).SequenceEqual(
+                    new[] { "1000", "1000", "1000", "1000", "1000", "1000" })));
+            Assert.AreEqual(1, first.State.Snapshot.LocalPlayer.Level);
+            Assert.AreEqual(7, first.State.Snapshot.LocalPlayer.Gold);
+            Assert.AreEqual(400, first.State.Snapshot.LocalPlayer.Life);
+            Assert.IsFalse(first.State.Snapshot.LocalPlayer.IsReady);
             Assert.AreEqual(first.State.Snapshot.CanonicalSummary, second.State.Snapshot.CanonicalSummary);
+        }
+
+        [Test]
+        public void InitialShop_KeepsConfiguredGenerationOrderForEveryPlayer()
+        {
+            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
+            var source = Resources.Load<TextAsset>(MatchPath).text.Replace(
+                "\"typeIds\": [\"1000\", \"1000\", \"1000\", \"1000\", \"1000\", \"1000\"]",
+                "\"typeIds\": [\"5503\", \"1000\", \"5503\", \"1000\", \"5503\", \"1000\"]");
+            var loaded = LocalMatchStateLoader.LoadFromJson(catalog, source);
+
+            Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
+            foreach (var player in loaded.State.Snapshot.Players)
+                CollectionAssert.AreEqual(
+                    new[] { "5503", "1000", "5503", "1000", "5503", "1000" },
+                    player.ShopSlots.Select(slot => slot.UnitTypeId));
+        }
+
+        [Test]
+        public void OfferOrdering_SortsByRarityThenNumericTypeIdAndKeepsGenerationOrderForEqualKeys()
+        {
+            var orderingType = typeof(LocalMatchState).Assembly.GetType("ArknoNights.Player.ShopOfferOrdering");
+            Assert.NotNull(orderingType, "The domain ordering helper is missing.");
+            var sort = orderingType.GetMethod("Sort", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(sort);
+            var rarities = new Dictionary<string, int>
+            {
+                ["9"] = 2,
+                ["09"] = 2,
+                ["10"] = 2,
+                ["11"] = 2,
+                ["100"] = 1
+            };
+
+            var actual = (string[])sort.Invoke(
+                null,
+                new object[]
+                {
+                    new[] { "10", "09", "100", "9", "11" },
+                    new Func<string, int>(typeId => rarities[typeId])
+                });
+
+            CollectionAssert.AreEqual(new[] { "100", "09", "9", "10", "11" }, actual);
         }
 
         [Test]
@@ -93,20 +139,33 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void Refresh_PreservesFrozenItemsAndReplacesOtherSlotsFromTheNextFixedPage()
+        public void ActiveRefresh_ReplacesFrozenLocalOffersClearsFreezeAndSortsWithoutChangingRemoteShops()
         {
             var state = Load();
+            var remoteBefore = state.Snapshot.Players
+                .Where(player => player.PlayerId != state.LocalPlayerId)
+                .ToDictionary(
+                    player => player.PlayerId,
+                    player => player.ShopSlots.Select(slot => slot.UnitTypeId).ToArray());
             Assert.IsTrue(state.TryToggleFrozen(0).Success);
 
-            var result = state.TryRefresh();
+            var first = state.TryRefresh();
 
-            Assert.IsTrue(result.Success);
-            Assert.AreEqual(6, result.Snapshot.LocalPlayer.Gold);
-            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[0].IsFrozen);
-            CollectionAssert.AreEqual(new[] { "1000", "5503", "5503", "5503", "5503", "5503" }, result.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
-            Assert.IsTrue(state.TryPurchase(0).Success);
-            Assert.IsTrue(state.Snapshot.LocalPlayer.ShopSlots[0].IsEmpty);
-            Assert.IsFalse(state.Snapshot.LocalPlayer.ShopSlots[0].IsFrozen);
+            Assert.IsTrue(first.Success);
+            Assert.AreEqual(6, first.Snapshot.LocalPlayer.Gold);
+            Assert.IsTrue(first.Snapshot.LocalPlayer.ShopSlots.All(slot => !slot.IsFrozen));
+            CollectionAssert.AreEqual(
+                new[] { "5503", "5503", "5503", "5503", "5503", "5503" },
+                first.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
+            foreach (var remote in first.Snapshot.Players.Where(player => player.PlayerId != state.LocalPlayerId))
+                CollectionAssert.AreEqual(remoteBefore[remote.PlayerId], remote.ShopSlots.Select(slot => slot.UnitTypeId));
+
+            var second = state.TryRefresh();
+
+            Assert.IsTrue(second.Success);
+            CollectionAssert.AreEqual(
+                new[] { "1000", "1000", "1000", "5503", "5503", "5503" },
+                second.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
         }
 
         [Test]

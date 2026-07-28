@@ -161,7 +161,6 @@ namespace ArknoNights.Player
         private readonly ReadOnlyCollection<string> orderedPlayerIds;
         private readonly HashSet<string> knownUnitIds;
         private readonly string[][] shopPages;
-        private readonly ShopSlotData[] shopSlots;
         private readonly string localPlayerId;
         private string observedPlayerId;
         private int level;
@@ -180,7 +179,8 @@ namespace ArknoNights.Player
             orderedPlayerIds = new ReadOnlyCollection<string>(orderedPlayers.Select(player => player.PlayerId).ToArray());
             knownUnitIds = new HashSet<string>(playersById.Values.SelectMany(player => player.PlayerState.Snapshot.Units).Select(unit => unit.UnitId), StringComparer.Ordinal);
             this.shopPages = shopPages.Select(page => page.ToArray()).ToArray();
-            shopSlots = this.shopPages[0].Select((typeId, index) => new ShopSlotData(index, typeId, false)).ToArray();
+            foreach (var player in orderedPlayers)
+                player.InitializeShop(this.shopPages[0]);
             observedPlayerId = localPlayerId;
             level = initialLevel;
             gold = initialGold;
@@ -192,6 +192,7 @@ namespace ArknoNights.Player
         /// <summary>Stable fixture order used for the confirmed Player1-vs-2 / Player3-vs-4 battle pairing.</summary>
         public IReadOnlyList<string> OrderedPlayerIds => orderedPlayerIds;
         public LocalMatchSnapshot Snapshot => CreateSnapshot();
+        private ShopSlotData[] LocalShopSlots => playersById[localPlayerId].ShopSlots;
 
         /// <summary>Returns the persistent state belonging to one fixture player without changing command ownership.</summary>
         public bool TryGetPlayerState(string playerId, out PlayerState state)
@@ -237,11 +238,12 @@ namespace ArknoNights.Player
         {
             if (gold < RefreshCost) return Result(LocalMatchOperationCode.InsufficientGold);
             var nextPage = (currentShopPage + 1) % shopPages.Length;
-            for (var index = 0; index < shopSlots.Length; index++)
+            var sortedOffers = SortShopOffers(shopPages[nextPage]);
+            var localSlots = LocalShopSlots.OrderBy(slot => slot.ShopSlotId).ToArray();
+            for (var index = 0; index < localSlots.Length; index++)
             {
-                if (shopSlots[index].IsFrozen && !shopSlots[index].IsEmpty) continue;
-                shopSlots[index].UnitTypeId = shopPages[nextPage][index];
-                shopSlots[index].IsFrozen = false;
+                localSlots[index].UnitTypeId = sortedOffers[index];
+                localSlots[index].IsFrozen = false;
             }
 
             currentShopPage = nextPage;
@@ -262,7 +264,7 @@ namespace ArknoNights.Player
         public LocalMatchOperationResult TrySetOccupiedShopSlotsFrozen(bool frozen)
         {
             var changed = false;
-            foreach (var slot in shopSlots)
+            foreach (var slot in LocalShopSlots)
             {
                 if (slot.IsEmpty || slot.IsFrozen == frozen) continue;
                 slot.IsFrozen = frozen;
@@ -317,9 +319,19 @@ namespace ArknoNights.Player
 
         private bool TryGetShopSlot(int shopSlotId, out ShopSlotData slot)
         {
-            if (shopSlotId >= 0 && shopSlotId < shopSlots.Length) { slot = shopSlots[shopSlotId]; return true; }
+            if (shopSlotId >= 0 && shopSlotId < LocalShopSlots.Length) { slot = LocalShopSlots[shopSlotId]; return true; }
             slot = null;
             return false;
+        }
+
+        private string[] SortShopOffers(IEnumerable<string> generatedTypeIds)
+        {
+            return ShopOfferOrdering.Sort(generatedTypeIds, typeId =>
+            {
+                if (!catalog.TryGet(typeId, out var entry))
+                    throw new InvalidOperationException("Validated shop offer is missing from the unit catalog: " + typeId);
+                return entry.Rarity;
+            });
         }
 
         private LocalMatchOperationResult Result(LocalMatchOperationCode code) => new LocalMatchOperationResult(code, CreateSnapshot());
@@ -335,7 +347,7 @@ namespace ArknoNights.Player
             var players = orderedPlayerIds.Select(playerId => playersById[playerId]).Select(player =>
             {
                 var local = string.Equals(player.PlayerId, localPlayerId, StringComparison.Ordinal);
-                var slots = local ? shopSlots.Select(slot => new LocalMatchShopSlotSnapshot(slot.ShopSlotId, slot.UnitTypeId, slot.IsFrozen, catalog)) : Enumerable.Empty<LocalMatchShopSlotSnapshot>();
+                var slots = player.ShopSlots.Select(slot => new LocalMatchShopSlotSnapshot(slot.ShopSlotId, slot.UnitTypeId, slot.IsFrozen, catalog));
                 return new LocalMatchPlayerSnapshot(player.PlayerId, player.DisplayName, player.AvatarResourcePath, player.Life, player.IsConnected, player.HasExited, player.PlayerState.Snapshot, local ? level : 0, local ? gold : 0, local && isReady, slots);
             });
             return new LocalMatchSnapshot(localPlayerId, observedPlayerId, version, players);
@@ -441,6 +453,14 @@ namespace ArknoNights.Player
         public bool IsConnected { get; }
         public bool HasExited { get; }
         public PlayerState PlayerState { get; }
+        public ShopSlotData[] ShopSlots { get; private set; } = Array.Empty<ShopSlotData>();
+
+        public void InitializeShop(IEnumerable<string> initialTypeIds)
+        {
+            ShopSlots = (initialTypeIds ?? Enumerable.Empty<string>())
+                .Select((typeId, index) => new ShopSlotData(index, typeId, false))
+                .ToArray();
+        }
     }
 
     internal sealed class ShopSlotData
