@@ -96,6 +96,14 @@ try {
     $validPath = Join-Path $temporaryRoot 'valid.json'
     Write-AuditFixture -Document (New-ValidAuditFixture) -Path $validPath
     Test-BondsUnitAnimationAuditOutput -Path $validPath
+    $validSnapshot = Get-BondsUnitAnimationAuditSnapshot -Path $validPath
+    $validText = [System.IO.File]::ReadAllText($validPath, $strictUtf8)
+    if ($validSnapshot -cne $validText) {
+        throw 'The validated snapshot did not preserve the exact JSON text.'
+    }
+    [System.IO.File]::Delete($validPath)
+    [System.IO.File]::WriteAllText($validPath, $validSnapshot, $strictUtf8)
+    Test-BondsUnitAnimationAuditOutput -Path $validPath
 
     $invalidSchema = New-ValidAuditFixture
     $invalidSchema.schemaVersion = 'unknown'

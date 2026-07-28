@@ -91,6 +91,23 @@ function Test-BondsUnitAnimationAuditOutput {
     }
 }
 
+function Get-BondsUnitAnimationAuditSnapshot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    Test-BondsUnitAnimationAuditOutput -Path $Path
+    try {
+        return [System.IO.File]::ReadAllText(
+            [System.IO.Path]::GetFullPath($Path),
+            $script:StrictUtf8)
+    } catch {
+        throw "BONDS_ANIMATION_AUDIT_OUTPUT_INVALID snapshot read failed: $($_.Exception.Message)"
+    }
+}
+
 function ConvertTo-QuotedProcessArgument {
     param(
         [Parameter(Mandatory = $true)]
@@ -237,6 +254,7 @@ function Invoke-BondsUnitAnimationAudit {
     }
 
     $unityProcess = $null
+    $validatedOutputSnapshot = $null
     try {
         $unityProcess = Start-Process `
             -FilePath $unityFullPath `
@@ -245,7 +263,16 @@ function Invoke-BondsUnitAnimationAudit {
             -WindowStyle Hidden
         $deadline = [DateTime]::UtcNow.AddSeconds($RequestedTimeoutSeconds)
         while (-not $unityProcess.HasExited -and [DateTime]::UtcNow -lt $deadline) {
-            Start-Sleep -Milliseconds 500
+            if (($null -eq $validatedOutputSnapshot) `
+                -and [System.IO.File]::Exists($outputFullPath)) {
+                try {
+                    $validatedOutputSnapshot =
+                        Get-BondsUnitAnimationAuditSnapshot -Path $outputFullPath
+                } catch {
+                    # Unity may expose the file just before its final write completes.
+                }
+            }
+            Start-Sleep -Milliseconds 100
         }
         if (-not $unityProcess.HasExited) {
             Stop-Process -Id $unityProcess.Id -Force
@@ -262,6 +289,28 @@ function Invoke-BondsUnitAnimationAudit {
         }
     }
 
+    $remainingProjectProcesses = @()
+    do {
+        $remainingProjectProcesses = @(
+            Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" |
+                Where-Object {
+                    -not [string]::IsNullOrEmpty($_.CommandLine) `
+                        -and $_.CommandLine.IndexOf(
+                            $projectFullPath,
+                            [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+                }
+        )
+        if ($remainingProjectProcesses.Count -eq 0) {
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($remainingProjectProcesses.Count -gt 0) {
+        $processIds = ($remainingProjectProcesses |
+            ForEach-Object { $_.ProcessId }) -join ', '
+        throw "Unity project processes did not exit before the audit timeout (PID: $processIds). Log: $logFullPath"
+    }
+
     if (-not [System.IO.File]::Exists($logFullPath)) {
         throw "Unity did not produce the audit log: $logFullPath"
     }
@@ -270,6 +319,26 @@ function Invoke-BondsUnitAnimationAudit {
             'BONDS_ANIMATION_AUDIT_COMPLETE',
             [System.StringComparison]::Ordinal) -lt 0) {
         throw "Unity log is missing BONDS_ANIMATION_AUDIT_COMPLETE: $logFullPath"
+    }
+
+    if (($null -eq $validatedOutputSnapshot) `
+        -and [System.IO.File]::Exists($outputFullPath)) {
+        $validatedOutputSnapshot =
+            Get-BondsUnitAnimationAuditSnapshot -Path $outputFullPath
+    }
+    if ($null -eq $validatedOutputSnapshot) {
+        throw "BONDS_ANIMATION_AUDIT_OUTPUT_INVALID no validated output was observed before Unity exited: $outputFullPath"
+    }
+    [System.IO.Directory]::CreateDirectory(
+        [System.IO.Path]::GetDirectoryName($outputFullPath)) | Out-Null
+    if ((-not [System.IO.File]::Exists($outputFullPath)) `
+        -or [System.IO.File]::ReadAllText(
+            $outputFullPath,
+            $script:StrictUtf8) -cne $validatedOutputSnapshot) {
+        [System.IO.File]::WriteAllText(
+            $outputFullPath,
+            $validatedOutputSnapshot,
+            $script:StrictUtf8)
     }
 
     Test-BondsUnitAnimationAuditOutput -Path $outputFullPath
