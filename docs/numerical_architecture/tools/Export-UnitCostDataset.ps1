@@ -30,6 +30,22 @@ function Resolve-ExistingPath {
     return (Resolve-Path -LiteralPath $Path).Path
 }
 
+function Test-PathEqualOrUnderRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$CandidatePath,
+        [Parameter(Mandatory = $true)][string]$RootPath
+    )
+
+    $normalizedCandidate = [System.IO.Path]::GetFullPath($CandidatePath)
+    $normalizedRoot = [System.IO.Path]::GetFullPath($RootPath)
+    if ([string]::Equals($normalizedCandidate, $normalizedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+    $trimCharacters = [char[]]@([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $rootWithSeparator = $normalizedRoot.TrimEnd($trimCharacters) + [System.IO.Path]::DirectorySeparatorChar
+    return $normalizedCandidate.StartsWith($rootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-TypeIdsFromCodeBlock {
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines,
@@ -1300,7 +1316,7 @@ function Get-AuraPowerPerTarget {
         [Parameter(Mandatory = $true)][hashtable]$Parameters
     )
 
-    $supportedAuraParameters = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $supportedAuraParameters = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($parameterName in @(
             'AuraAttackSpeedAdditive', 'AuraAttackMultiplier',
             'AuraDefenseBonus', 'AuraMagicResistanceBonus', 'AuraRegenPerSecond',
@@ -1309,7 +1325,7 @@ function Get-AuraPowerPerTarget {
         [void]$supportedAuraParameters.Add($parameterName)
     }
     foreach ($parameterName in $Parameters.Keys) {
-        if ([string]$parameterName -clike 'Aura*') {
+        if ([string]$parameterName -like 'Aura*') {
             Assert-Condition ($supportedAuraParameters.Contains([string]$parameterName)) "Unsupported aura parameter '$parameterName'."
         }
     }
@@ -1412,14 +1428,18 @@ try {
     }
     $AbilityInputPath = Resolve-ExistingPath $AbilityInputPath
     Assert-Condition ([System.IO.Path]::GetExtension($AbilityInputPath) -ieq '.psd1') "AbilityInputPath '$AbilityInputPath' must use the .psd1 extension."
+    $OutputCsvPath = [System.IO.Path]::GetFullPath($OutputCsvPath)
+    $AnalysisOutputPath = [System.IO.Path]::GetFullPath($AnalysisOutputPath)
+    Assert-Condition (-not [string]::Equals($OutputCsvPath, $AnalysisOutputPath, [System.StringComparison]::OrdinalIgnoreCase)) 'OutputCsvPath and AnalysisOutputPath must be different files.'
+    Assert-Condition (-not [string]::Equals($OutputCsvPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'OutputCsvPath must not overwrite BondSpecPath.'
+    Assert-Condition (-not [string]::Equals($AnalysisOutputPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'AnalysisOutputPath must not overwrite BondSpecPath.'
+    Assert-Condition (-not [string]::Equals($OutputCsvPath, $AbilityInputPath, [System.StringComparison]::OrdinalIgnoreCase)) 'OutputCsvPath must not overwrite AbilityInputPath.'
+    Assert-Condition (-not [string]::Equals($AnalysisOutputPath, $AbilityInputPath, [System.StringComparison]::OrdinalIgnoreCase)) 'AnalysisOutputPath must not overwrite AbilityInputPath.'
+    Assert-Condition (-not (Test-PathEqualOrUnderRoot -CandidatePath $OutputCsvPath -RootPath $StagingRoot)) 'OutputCsvPath must not equal or be contained by StagingRoot.'
+    Assert-Condition (-not (Test-PathEqualOrUnderRoot -CandidatePath $AnalysisOutputPath -RootPath $StagingRoot)) 'AnalysisOutputPath must not equal or be contained by StagingRoot.'
     $abilityInput = Import-PowerShellDataFile -LiteralPath $AbilityInputPath
     Assert-Condition ($null -ne $abilityInput) "Ability input '$AbilityInputPath' is empty."
     Assert-Condition ((@($abilityInput.Keys | Sort-Object) -join '/') -ceq 'DamageTypeOverrides/ExplicitRiskOnly/UnitScenarios') "Ability input must contain exactly DamageTypeOverrides, UnitScenarios and ExplicitRiskOnly."
-    $OutputCsvPath = [System.IO.Path]::GetFullPath($OutputCsvPath)
-    $AnalysisOutputPath = [System.IO.Path]::GetFullPath($AnalysisOutputPath)
-    Assert-Condition ($OutputCsvPath -cne $AnalysisOutputPath) 'OutputCsvPath and AnalysisOutputPath must be different files.'
-    Assert-Condition (-not [string]::Equals($OutputCsvPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'OutputCsvPath must not overwrite BondSpecPath.'
-    Assert-Condition (-not [string]::Equals($AnalysisOutputPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'AnalysisOutputPath must not overwrite BondSpecPath.'
 
     $shopHeader = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '94', [char]0xFF09)
     $nonShopHeader = [string]::Concat('## ', [char]0x975E, [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '5', [char]0xFF09)
