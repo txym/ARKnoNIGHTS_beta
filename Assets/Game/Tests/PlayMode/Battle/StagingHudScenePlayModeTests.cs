@@ -55,7 +55,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(24, information.Find("HealthValue/Text").GetComponent<Text>().fontSize);
             Assert.That(information.Find("HealthValue/Text").GetComponent<RectTransform>().offsetMax.y, Is.EqualTo(-5f).Within(0.01f));
             Assert.IsFalse(information.Find("HealthValue/Text").GetComponent<Text>().text.Contains(" "));
-            Assert.AreEqual("狂暴的猎狗pro", information.Find("UnitName").GetComponent<Text>().text, "The configured Chinese display name must reach the selected unit information panel.");
+            Assert.AreEqual("猎狗", information.Find("UnitName").GetComponent<Text>().text, "The configured Chinese display name must reach the selected unit information panel.");
             Assert.NotNull(information.Find("Portrait/Rarity").GetComponent<Image>().sprite);
             Assert.NotNull(information.Find("Portrait/Elite").GetComponent<Image>().sprite);
             Assert.That(information.Find("Portrait/Rarity").GetComponent<RectTransform>().anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
