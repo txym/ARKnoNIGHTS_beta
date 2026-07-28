@@ -670,6 +670,178 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(260));
         }
 
+        [Test]
+        public void DeathSpawn_DelaysSplitAndPreventsPrematureVictory()
+        {
+            var input = CreateInput(
+                12,
+                new[]
+                {
+                    Attacker(
+                        "killer",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        attack: 1000),
+                    NonAttacker("parent", 100, "DEATH_SPLIT"),
+                    NonAttacker("child", 1000)
+                },
+                new[]
+                {
+                    PassiveDeathSpawn(
+                        "DEATH_SPLIT",
+                        count: 2,
+                        delayTicks: 4,
+                        sideLengthCentimetres: 40,
+                        snapToNearestPassableCell: true,
+                        summonedMoveSpeedMultiplierPermille: 1000,
+                        options: new[]
+                        {
+                            new DeathSpawnOptionDefinition("child", 1)
+                        })
+                },
+                new[] { Unit("killer", "killer", 5, 4) },
+                new[] { Unit("parent", "parent", 5, 4) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var death = result.Events.Single(item =>
+                item.Type == BattleEventType.Death
+                && item.UnitId == "parent");
+            var spawns = result.Events.Where(item =>
+                    item.Type == BattleEventType.Spawn
+                    && item.UnitTypeId == "child")
+                .ToArray();
+
+            Assert.That(spawns.Length, Is.EqualTo(2));
+            Assert.That(
+                spawns.Select(item => item.Tick).Distinct().Single(),
+                Is.EqualTo(death.Tick + 4));
+            Assert.That(
+                result.Events.Any(item =>
+                    item.Type == BattleEventType.BattleEnded
+                    && item.Tick < death.Tick + 4),
+                Is.False);
+            Assert.That(
+                spawns.All(item =>
+                    Math.Abs(item.ToPosition.Value.XUnits - 500) <= 20
+                    && Math.Abs(item.ToPosition.Value.YUnits - 500) <= 20),
+                Is.True);
+        }
+
+        [Test]
+        public void DeathSpawn_EmitsThreeCentredSuccessorsOnDeathTick()
+        {
+            var input = CreateInput(
+                6,
+                new[]
+                {
+                    Attacker(
+                        "killer",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        attack: 1000),
+                    NonAttacker("parent", 100, "DEATH_UNLOAD"),
+                    NonAttacker("soldier", 1000)
+                },
+                new[]
+                {
+                    PassiveDeathSpawn(
+                        "DEATH_UNLOAD",
+                        count: 3,
+                        delayTicks: 0,
+                        sideLengthCentimetres: 0,
+                        snapToNearestPassableCell: false,
+                        summonedMoveSpeedMultiplierPermille: 1000,
+                        options: new[]
+                        {
+                            new DeathSpawnOptionDefinition("soldier", 1)
+                        })
+                },
+                new[] { Unit("killer", "killer", 5, 4) },
+                new[] { Unit("parent", "parent", 5, 4) });
+            var result = new BattleRunner(input).RunToCompletion();
+            var death = result.Events.Single(item =>
+                item.Type == BattleEventType.Death
+                && item.UnitId == "parent");
+            var spawns = result.Events.Where(item =>
+                    item.Type == BattleEventType.Spawn
+                    && item.UnitTypeId == "soldier")
+                .ToArray();
+
+            Assert.That(spawns.Length, Is.EqualTo(3));
+            Assert.That(spawns, Has.All.Matches<BattleEvent>(item =>
+                item.Tick == death.Tick
+                && item.ToPosition.Value.XUnits == 500
+                && item.ToPosition.Value.YUnits == 500));
+        }
+
+        [Test]
+        public void DeathSpawn_WeightedChoiceAndInstanceSpeedAreDeterministic()
+        {
+            var input = CreateInput(
+                5,
+                new[]
+                {
+                    Attacker(
+                        "killer",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        attack: 1000),
+                    NonAttacker("parent", 100, "DEATH_WEIGHTED"),
+                    MovingNonAttacker("option-a", 100),
+                    MovingNonAttacker("option-b", 100)
+                },
+                new[]
+                {
+                    PassiveDeathSpawn(
+                        "DEATH_WEIGHTED",
+                        count: 1,
+                        delayTicks: 0,
+                        sideLengthCentimetres: 0,
+                        snapToNearestPassableCell: false,
+                        summonedMoveSpeedMultiplierPermille: 3000,
+                        options: new[]
+                        {
+                            new DeathSpawnOptionDefinition("option-a", 40),
+                            new DeathSpawnOptionDefinition("option-b", 60)
+                        })
+                },
+                new[] { Unit("killer", "killer", 5, 4) },
+                new[] { Unit("parent", "parent", 5, 4) });
+
+            var first = new BattleRunner(input);
+            var second = new BattleRunner(input);
+            var firstResult = first.RunToCompletion();
+            var secondResult = second.RunToCompletion();
+            var firstSpawn = firstResult.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.Tick > 0);
+            var secondSpawn = secondResult.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.Tick > 0);
+            var firstUnit = first.RuntimeUnits.Single(item =>
+                item.UnitId == firstSpawn.UnitId);
+
+            Assert.That(
+                firstSpawn.UnitTypeId,
+                Is.EqualTo("option-a").Or.EqualTo("option-b"));
+            Assert.That(
+                secondSpawn.UnitTypeId,
+                Is.EqualTo(firstSpawn.UnitTypeId));
+            Assert.That(
+                secondSpawn.ToPosition,
+                Is.EqualTo(firstSpawn.ToPosition));
+            Assert.That(
+                firstUnit.EffectiveMoveSpeedCentimetresPerSecond,
+                Is.EqualTo(300));
+            Assert.That(
+                firstSpawn.SpawnSnapshot
+                    .MoveSpeedCentimetresPerSecond,
+                Is.EqualTo(300));
+        }
+
         private static int[] RunAttackSequence(
             int firstEnhancedAttackOrdinal,
             int repeatInterval,
@@ -1015,6 +1187,44 @@ namespace ArknoNights.Battle.Tests
                 0);
         }
 
+        private static AbilityDefinition PassiveDeathSpawn(
+            string abilityId,
+            int count,
+            int delayTicks,
+            int sideLengthCentimetres,
+            bool snapToNearestPassableCell,
+            int summonedMoveSpeedMultiplierPermille,
+            params DeathSpawnOptionDefinition[] options)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new DeathSpawnEffectDefinition(
+                    options,
+                    count,
+                    delayTicks,
+                    sideLengthCentimetres,
+                    snapToNearestPassableCell,
+                    summonedMoveSpeedMultiplierPermille),
+                string.Empty,
+                0);
+        }
+
         private static UnitDefinition Attacker(
             string typeId,
             int speed,
@@ -1069,6 +1279,27 @@ namespace ArknoNights.Battle.Tests
                     ? Array.Empty<string>()
                     : new[] { abilityId },
                 4);
+        }
+
+        private static UnitDefinition MovingNonAttacker(
+            string typeId,
+            int moveSpeedCentimetresPerSecond)
+        {
+            return new UnitDefinition(
+                typeId,
+                1000,
+                0,
+                0,
+                0,
+                moveSpeedCentimetresPerSecond,
+                0,
+                0,
+                DamageType.None,
+                AttackMethod.None,
+                0,
+                0,
+                true,
+                Array.Empty<string>());
         }
 
         private static UnitSnapshot Unit(

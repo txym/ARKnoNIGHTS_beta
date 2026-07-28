@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace ArknoNights.Battle.Core
 {
@@ -236,6 +239,57 @@ namespace ArknoNights.Battle.Core
                 == NeutralMultiplierPermille;
     }
 
+    public sealed class DeathSpawnOptionDefinition
+    {
+        public DeathSpawnOptionDefinition(
+            string summonTypeId,
+            int weight)
+        {
+            SummonTypeId = summonTypeId;
+            Weight = weight;
+        }
+
+        public string SummonTypeId { get; }
+        public int Weight { get; }
+    }
+
+    public sealed class DeathSpawnEffectDefinition
+    {
+        public const int NeutralMoveSpeedMultiplierPermille = 1000;
+
+        public DeathSpawnEffectDefinition(
+            IEnumerable<DeathSpawnOptionDefinition> options,
+            int count,
+            int delayTicks,
+            int sideLengthCentimetres,
+            bool snapToNearestPassableCell,
+            int summonedMoveSpeedMultiplierPermille)
+        {
+            Options =
+                new ReadOnlyCollection<DeathSpawnOptionDefinition>(
+                    (options
+                     ?? Enumerable.Empty<DeathSpawnOptionDefinition>())
+                    .ToArray());
+            Count = count;
+            DelayTicks = delayTicks;
+            SideLengthCentimetres = sideLengthCentimetres;
+            SnapToNearestPassableCell =
+                snapToNearestPassableCell;
+            SummonedMoveSpeedMultiplierPermille =
+                summonedMoveSpeedMultiplierPermille;
+        }
+
+        public IReadOnlyList<DeathSpawnOptionDefinition> Options
+        {
+            get;
+        }
+        public int Count { get; }
+        public int DelayTicks { get; }
+        public int SideLengthCentimetres { get; }
+        public bool SnapToNearestPassableCell { get; }
+        public int SummonedMoveSpeedMultiplierPermille { get; }
+    }
+
     public sealed class SummonEffectDefinition
     {
         public SummonEffectDefinition(string summonTypeId, int count, int sideLengthCentimetres, bool inheritPathFromCaster)
@@ -451,6 +505,31 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, string animationKey, int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                passiveCombatModifier,
+                passiveLifecycleEffect,
+                onDamageReactionEffect,
+                healthThresholdCombatModifier,
+                unblockedDamageTakenModifier,
+                attackSequenceModifier,
+                attackCountStateModifier,
+                null,
+                animationKey,
+                skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -472,6 +551,7 @@ namespace ArknoNights.Battle.Core
             AttackSequenceModifier = attackSequenceModifier;
             AttackCountStateModifier =
                 attackCountStateModifier;
+            DeathSpawnEffect = deathSpawnEffect;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -497,6 +577,7 @@ namespace ArknoNights.Battle.Core
             AttackSequenceModifier { get; }
         public AttackCountStateModifierDefinition
             AttackCountStateModifier { get; }
+        public DeathSpawnEffectDefinition DeathSpawnEffect { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

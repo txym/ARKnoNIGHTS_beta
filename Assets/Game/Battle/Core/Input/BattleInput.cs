@@ -248,6 +248,25 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.AttackCountStateModifier.UnlockedMagicResistanceAdditive).Append(',')
                         .Append(ability.AttackCountStateModifier.UnlockedHitPointsPerSecond).Append(',')
                         .Append(ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille);
+                if (ability.DeathSpawnEffect != null)
+                {
+                    builder.Append("|X:")
+                        .Append(ability.DeathSpawnEffect.Count).Append(',')
+                        .Append(ability.DeathSpawnEffect.DelayTicks).Append(',')
+                        .Append(ability.DeathSpawnEffect.SideLengthCentimetres).Append(',')
+                        .Append(ability.DeathSpawnEffect.SnapToNearestPassableCell ? 1 : 0).Append(',')
+                        .Append(ability.DeathSpawnEffect.SummonedMoveSpeedMultiplierPermille);
+                    foreach (var option in
+                             ability.DeathSpawnEffect.Options)
+                        builder.Append(',')
+                            .Append(option == null
+                                ? string.Empty
+                                : option.SummonTypeId)
+                            .Append(':')
+                            .Append(option == null
+                                ? 0
+                                : option.Weight);
+                }
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -321,6 +340,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.UnblockedDamageTakenModifier != null) validationErrors.Add(new ValidationError("ability.unblockedDamageTaken.unexpected", "Timed ability cannot define an unblocked damage-taken modifier: " + ability.AbilityId));
                     if (ability.AttackSequenceModifier != null) validationErrors.Add(new ValidationError("ability.attackSequence.unexpected", "Timed ability cannot define an attack-sequence modifier: " + ability.AbilityId));
                     if (ability.AttackCountStateModifier != null) validationErrors.Add(new ValidationError("ability.attackCountState.unexpected", "Timed ability cannot define an attack-count state modifier: " + ability.AbilityId));
+                    if (ability.DeathSpawnEffect != null) validationErrors.Add(new ValidationError("ability.deathSpawn.unexpected", "Timed ability cannot define a death-spawn effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -347,7 +367,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.HealthThresholdCombatModifier == null ? 0 : 1)
                         + (ability.UnblockedDamageTakenModifier == null ? 0 : 1)
                         + (ability.AttackSequenceModifier == null ? 0 : 1)
-                        + (ability.AttackCountStateModifier == null ? 0 : 1);
+                        + (ability.AttackCountStateModifier == null ? 0 : 1)
+                        + (ability.DeathSpawnEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -412,6 +433,31 @@ namespace ArknoNights.Battle.Core
                             || ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille <= 0
                             || ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille > 1000))
                         validationErrors.Add(new ValidationError("ability.attackCountState.invalid", "Attack-count state modifier is invalid: " + ability.AbilityId));
+                    if (ability.DeathSpawnEffect != null)
+                    {
+                        var options =
+                            ability.DeathSpawnEffect.Options;
+                        if (ability.DeathSpawnEffect.Count <= 0
+                            || ability.DeathSpawnEffect.DelayTicks < 0
+                            || ability.DeathSpawnEffect.SideLengthCentimetres < 0
+                            || ability.DeathSpawnEffect.SummonedMoveSpeedMultiplierPermille <= 0
+                            || options.Count == 0
+                            || options.Any(item =>
+                                item == null
+                                || string.IsNullOrWhiteSpace(item.SummonTypeId)
+                                || item.Weight <= 0)
+                            || options.Where(item => item != null).Sum(item =>
+                                (long)item.Weight) > int.MaxValue)
+                            validationErrors.Add(new ValidationError("ability.deathSpawn.invalid", "Death-spawn effect is invalid: " + ability.AbilityId));
+                        foreach (var option in options.Where(item =>
+                                     item != null
+                                     && !string.IsNullOrWhiteSpace(
+                                         item.SummonTypeId)))
+                        {
+                            if (!typeIds.Contains(option.SummonTypeId))
+                                validationErrors.Add(new ValidationError("ability.deathSpawn.type.unknown", "Death-spawn type is unknown: " + option.SummonTypeId));
+                        }
+                    }
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

@@ -148,6 +148,32 @@ namespace ArknoNights.Battle.Core
             IEnumerable<BuffPlaceholder> buffs,
             int activationTick,
             IEnumerable<RuntimeAbilityState> abilities)
+            : this(
+                unitId,
+                playerId,
+                side,
+                definition,
+                position,
+                eliteLevel,
+                buffs,
+                activationTick,
+                abilities,
+                DeathSpawnEffectDefinition
+                    .NeutralMoveSpeedMultiplierPermille)
+        {
+        }
+
+        internal RuntimeUnitState(
+            string unitId,
+            string playerId,
+            BattleSide side,
+            UnitDefinition definition,
+            FixedPosition position,
+            int eliteLevel,
+            IEnumerable<BuffPlaceholder> buffs,
+            int activationTick,
+            IEnumerable<RuntimeAbilityState> abilities,
+            int instanceMoveSpeedMultiplierPermille)
         {
             UnitId = unitId;
             PlayerId = playerId;
@@ -159,6 +185,8 @@ namespace ArknoNights.Battle.Core
             EliteLevel = eliteLevel;
             Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
             ActivationTick = activationTick;
+            InstanceMoveSpeedMultiplierPermille =
+                instanceMoveSpeedMultiplierPermille;
             abilityStates = (abilities ?? Enumerable.Empty<RuntimeAbilityState>()).OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal).ToList();
             AbilityStates = new ReadOnlyCollection<RuntimeAbilityState>(abilityStates);
             BlockedUnitIds = new ReadOnlyCollection<string>(blockedUnitIds);
@@ -186,6 +214,10 @@ namespace ArknoNights.Battle.Core
         internal int MoveYNumeratorRemainder { get; set; }
         internal int PassiveHealthRemainder { get; set; }
         internal int StartedAttackCount { get; private set; }
+        internal int InstanceMoveSpeedMultiplierPermille
+        {
+            get;
+        }
         internal UnitDefinition Definition { get; }
         internal IReadOnlyList<RuntimeAbilityState> AbilityStates { get; }
         internal bool IsTargetable => abilityStates.All(item =>
@@ -263,7 +295,9 @@ namespace ArknoNights.Battle.Core
             item => item.DefenseMultiplierPermille);
         public int EffectiveMoveSpeedCentimetresPerSecond =>
             ApplyThresholdMultiplier(
-                Definition.MoveSpeedCentimetresPerSecond,
+                ApplyMultiplier(
+                    Definition.MoveSpeedCentimetresPerSecond,
+                    InstanceMoveSpeedMultiplierPermille),
                 item => item.MoveSpeedMultiplierPermille);
         internal int BeginAttackAndGetEffectiveAttack()
         {
@@ -384,6 +418,15 @@ namespace ArknoNights.Battle.Core
                 .Select(item =>
                     item.Definition.OnDamageReactionEffect)
                 .Where(item => item != null);
+        internal IEnumerable<KeyValuePair<string, DeathSpawnEffectDefinition>>
+            DeathSpawnEffects =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.DeathSpawnEffect != null)
+                .Select(item =>
+                    new KeyValuePair<string, DeathSpawnEffectDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.DeathSpawnEffect));
 
         private int ApplyThresholdMultiplier(
             int value,
@@ -525,6 +568,8 @@ namespace ArknoNights.Battle.Core
         private readonly List<BattleStepTrace> trace = new List<BattleStepTrace>();
         private readonly List<BattleEvent> events = new List<BattleEvent>();
         private readonly List<PendingAttack> pendingAttacks = new List<PendingAttack>();
+        private readonly List<PendingDeathSpawn>
+            pendingDeathSpawns = new List<PendingDeathSpawn>();
         private readonly Dictionary<string, UnitDefinition> unitDefinitions;
         private readonly Dictionary<string, AbilityDefinition> abilityDefinitions;
         private readonly Dictionary<string, BattleUnitInstanceSnapshot> unitSnapshots = new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal);
@@ -597,6 +642,7 @@ namespace ArknoNights.Battle.Core
 
         private void RunAuthoritativeTick()
         {
+            ResolveDueDeathSpawns();
             UpdateHealthThresholdStates();
             RemoveInvalidPendingAttacks();
             AcquireTargets();
@@ -607,9 +653,11 @@ namespace ArknoNights.Battle.Core
             ResolveDueDamage();
             UpdateHealthThresholdStates();
             ResolveDeathsAndCleanup();
+            ResolveDueDeathSpawns();
             ApplyPassiveLifecycleEffects();
             UpdateHealthThresholdStates();
             ResolveDeathsAndCleanup();
+            ResolveDueDeathSpawns();
             EvaluateBattleEnd();
             if (Status == BattleRunnerStatus.Stopped) return;
             RecoverAutomaticSkillPointsAndCast();
@@ -798,6 +846,15 @@ namespace ArknoNights.Battle.Core
             {
                 unit.IsAlive = false;
                 Emit(BattleEventType.Death, unit.UnitId, null, null, null, null, null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None);
+                foreach (var effect in unit.DeathSpawnEffects)
+                    pendingDeathSpawns.Add(new PendingDeathSpawn(
+                        CurrentTick + effect.Value.DelayTicks,
+                        unit.UnitId,
+                        unit.PlayerId,
+                        unit.Side,
+                        unit.Position,
+                        effect.Key,
+                        effect.Value));
             }
             foreach (var unit in runtimeUnits.Where(item => !item.IsAlive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
@@ -805,6 +862,70 @@ namespace ArknoNights.Battle.Core
                 foreach (var other in runtimeUnits.Where(item => item.IsAlive && item.TargetUnitId == unit.UnitId).OrderBy(item => item.UnitId, StringComparer.Ordinal)) SetTarget(other, null);
             }
             pendingAttacks.RemoveAll(item => !FindUnit(item.AttackerUnitId).IsAlive);
+        }
+
+        private void ResolveDueDeathSpawns()
+        {
+            var due = pendingDeathSpawns
+                .Where(item => item.DueTick <= CurrentTick)
+                .OrderBy(item => item.DueTick)
+                .ThenBy(item => item.OwnerUnitId, StringComparer.Ordinal)
+                .ThenBy(item => item.AbilityId, StringComparer.Ordinal)
+                .ToArray();
+            pendingDeathSpawns.RemoveAll(item =>
+                item.DueTick <= CurrentTick);
+            foreach (var pending in due)
+            {
+                var origin = pending.Effect.SnapToNearestPassableCell
+                    ? NearestPassableCellCentre(pending.Position)
+                    : pending.Position;
+                for (var spawnOrdinal = 1;
+                     spawnOrdinal <= pending.Effect.Count;
+                     spawnOrdinal++)
+                {
+                    var typeId = SelectDeathSpawnType(
+                        pending,
+                        spawnOrdinal);
+                    var definition = unitDefinitions[typeId];
+                    var offsetX = StableSpawnOffset(
+                        Input.BattleId,
+                        pending.OwnerUnitId,
+                        pending.AbilityId,
+                        pending.DueTick,
+                        spawnOrdinal,
+                        0,
+                        pending.Effect.SideLengthCentimetres);
+                    var offsetY = StableSpawnOffset(
+                        Input.BattleId,
+                        pending.OwnerUnitId,
+                        pending.AbilityId,
+                        pending.DueTick,
+                        spawnOrdinal,
+                        1,
+                        pending.Effect.SideLengthCentimetres);
+                    var summoned = new RuntimeUnitState(
+                        dynamicUnitIdAllocator.Allocate(),
+                        pending.PlayerId,
+                        pending.Side,
+                        definition,
+                        new FixedPosition(
+                            origin.XUnits + offsetX,
+                            origin.YUnits + offsetY),
+                        0,
+                        Array.Empty<BuffPlaceholder>(),
+                        CurrentTick + 1,
+                        CreateAbilityStates(
+                            definition,
+                            abilityDefinitions),
+                        pending.Effect
+                            .SummonedMoveSpeedMultiplierPermille);
+                    runtimeUnits.Add(summoned);
+                    var snapshot =
+                        CreateSpawnSnapshot(summoned, true);
+                    unitSnapshots.Add(summoned.UnitId, snapshot);
+                    EmitSpawn(summoned, snapshot);
+                }
+            }
         }
 
         private void UpdateHealthThresholdStates()
@@ -890,8 +1011,16 @@ namespace ArknoNights.Battle.Core
 
         private void EvaluateBattleEnd()
         {
-            var homeAlive = runtimeUnits.Any(item => item.IsAlive && item.Side == BattleSide.Home);
-            var awayAlive = runtimeUnits.Any(item => item.IsAlive && item.Side == BattleSide.Away);
+            var homeAlive = runtimeUnits.Any(item =>
+                                item.IsAlive
+                                && item.Side == BattleSide.Home)
+                            || pendingDeathSpawns.Any(item =>
+                                item.Side == BattleSide.Home);
+            var awayAlive = runtimeUnits.Any(item =>
+                                item.IsAlive
+                                && item.Side == BattleSide.Away)
+                            || pendingDeathSpawns.Any(item =>
+                                item.Side == BattleSide.Away);
             if (homeAlive == awayAlive) { if (!homeAlive) EndBattle(BattleStopReason.MutualAnnihilation, null); return; }
             EndBattle(BattleStopReason.Victory, homeAlive ? BattleSide.Home : BattleSide.Away);
         }
@@ -1006,6 +1135,47 @@ namespace ArknoNights.Battle.Core
             hash = AppendStableHash(hash, axis);
             var minimum = -(sideLengthCentimetres / 2);
             return minimum + (int)(hash % ((ulong)sideLengthCentimetres + 1UL));
+        }
+
+        private string SelectDeathSpawnType(
+            PendingDeathSpawn pending,
+            int spawnOrdinal)
+        {
+            var totalWeight = pending.Effect.Options.Sum(item =>
+                item.Weight);
+            var hash = 14695981039346656037UL;
+            hash = AppendStableHash(hash, Input.BattleId);
+            hash = AppendStableHash(hash, pending.OwnerUnitId);
+            hash = AppendStableHash(hash, pending.AbilityId);
+            hash = AppendStableHash(hash, pending.DueTick);
+            hash = AppendStableHash(hash, spawnOrdinal);
+            hash = AppendStableHash(hash, 2);
+            var selected = (int)(hash % (ulong)totalWeight);
+            foreach (var option in pending.Effect.Options)
+            {
+                if (selected < option.Weight)
+                    return option.SummonTypeId;
+                selected -= option.Weight;
+            }
+            throw new InvalidOperationException(
+                "Death-spawn weighted selection exhausted options.");
+        }
+
+        private static FixedPosition NearestPassableCellCentre(
+            FixedPosition position)
+        {
+            return Enumerable
+                .Range(1, BattlefieldCoordinate.Width)
+                .SelectMany(x => Enumerable
+                    .Range(1, BattlefieldCoordinate.Height)
+                    .Select(y =>
+                        new BattlefieldCoordinate(x, y)))
+                .Where(item => BattlefieldRules.IsDeployable(item))
+                .Select(item => FixedPosition.FromCell(item))
+                .OrderBy(item => DistanceSquared(item, position))
+                .ThenBy(item => item.XUnits)
+                .ThenBy(item => item.YUnits)
+                .First();
         }
 
         private static ulong AppendStableHash(ulong hash, string value)
@@ -1197,6 +1367,34 @@ namespace ArknoNights.Battle.Core
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
         private readonly struct DamageReaction { public DamageReaction(string ownerUnitId, string targetUnitId, OnDamageReactionEffectDefinition effect) { OwnerUnitId = ownerUnitId; TargetUnitId = targetUnitId; Effect = effect; } public string OwnerUnitId { get; } public string TargetUnitId { get; } public OnDamageReactionEffectDefinition Effect { get; } }
         private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
+        private readonly struct PendingDeathSpawn
+        {
+            public PendingDeathSpawn(
+                int dueTick,
+                string ownerUnitId,
+                string playerId,
+                BattleSide side,
+                FixedPosition position,
+                string abilityId,
+                DeathSpawnEffectDefinition effect)
+            {
+                DueTick = dueTick;
+                OwnerUnitId = ownerUnitId;
+                PlayerId = playerId;
+                Side = side;
+                Position = position;
+                AbilityId = abilityId;
+                Effect = effect;
+            }
+
+            public int DueTick { get; }
+            public string OwnerUnitId { get; }
+            public string PlayerId { get; }
+            public BattleSide Side { get; }
+            public FixedPosition Position { get; }
+            public string AbilityId { get; }
+            public DeathSpawnEffectDefinition Effect { get; }
+        }
 
         private static List<RuntimeUnitState> BuildInitialUnits(
             BattleInput input,
@@ -1249,7 +1447,7 @@ namespace ArknoNights.Battle.Core
                 definition.Attack,
                 definition.Defense,
                 definition.MagicResistance,
-                definition.MoveSpeedCentimetresPerSecond,
+                unit.EffectiveMoveSpeedCentimetresPerSecond,
                 definition.AttackIntervalTicks,
                 definition.AttackAnimationDurationTicks,
                 definition.DamageType,
@@ -1267,6 +1465,12 @@ namespace ArknoNights.Battle.Core
             foreach (var unit in runtimeUnits.OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 builder.Append("|R:").Append(unit.UnitId).Append(',').Append(unit.PlayerId).Append(',').Append((int)unit.Side).Append(',').Append(unit.TypeId).Append(',').Append(unit.CurrentHitPoints).Append(',').Append(unit.Position.XUnits).Append(',').Append(unit.Position.YUnits).Append(',').Append(unit.ActivationTick);
+                if (unit.InstanceMoveSpeedMultiplierPermille
+                    != DeathSpawnEffectDefinition
+                        .NeutralMoveSpeedMultiplierPermille)
+                    builder.Append(",move:")
+                        .Append(
+                            unit.InstanceMoveSpeedMultiplierPermille);
                 if (unit.AbilityStates.Any(item =>
                         item.Definition.AttackSequenceModifier != null
                         || item.Definition.AttackCountStateModifier != null))
@@ -1274,6 +1478,14 @@ namespace ArknoNights.Battle.Core
                         .Append(unit.StartedAttackCount);
                 foreach (var ability in unit.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal)) ability.AppendStableSummary(builder);
             }
+            foreach (var pending in pendingDeathSpawns
+                         .OrderBy(item => item.DueTick)
+                         .ThenBy(item => item.OwnerUnitId, StringComparer.Ordinal)
+                         .ThenBy(item => item.AbilityId, StringComparer.Ordinal))
+                builder.Append("|X:")
+                    .Append(pending.DueTick).Append(',')
+                    .Append(pending.OwnerUnitId).Append(',')
+                    .Append(pending.AbilityId);
             foreach (var item in trace) builder.Append("|S:").Append(item.Tick).Append(',').Append((int)item.Status).Append(',').Append((int)item.StopReason);
             return builder.ToString();
         }
