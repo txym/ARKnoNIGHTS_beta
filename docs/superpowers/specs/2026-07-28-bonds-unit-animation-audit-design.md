@@ -133,9 +133,13 @@ PowerShell 入口负责：
 
 1. 检查同一项目没有其他 Unity Editor 或 batchmode 进程；
 2. 串行调用 Unity `-executeMethod`；
-3. 等待进程结束；
-4. 检查日志标记与输出 schema；
-5. 拒绝 0 个变体或缺少诊断的半成品输出。
+3. 在 launcher 及其项目 handoff 进程存活期间捕获已经完整校验的输出；
+4. 等待所有使用该项目的 Unity 进程结束；
+5. 检查日志标记与完整输出 schema；
+6. 拒绝缺字段、计数不一致或缺少诊断的半成品输出。
+
+Editor 与 PowerShell 两层都必须拒绝经 junction/symlink 跳出项目 `Temp`
+物理边界的输出路径；只允许普通的 `Temp` 路径段。
 
 审计器不得引用项目外 staging 文件来读取动画；staging 仅由既有清单逻辑提供
 `sourceUnitKey` 身份证据。实际动画事实必须来自项目内 Unity 已导入资源。
@@ -145,6 +149,7 @@ PowerShell 入口负责：
 以下任一情况使审计失败，不输出“成功”摘要：
 
 - BONDS TypeId 数不是 93；
+- 172 个项目变体实际覆盖的 TypeId 集合不等于 BONDS 的 93 个 TypeId 集合；
 - 目标变体数不是 172；
 - `unitKey` 或 Resources 路径重复；
 - `SkeletonDataAsset` 缺失；

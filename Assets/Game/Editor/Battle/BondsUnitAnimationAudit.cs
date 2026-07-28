@@ -170,7 +170,52 @@ internal static class BondsUnitAnimationAudit
                 + " unique=" + uniqueUnitKeys.Count);
         }
 
+        ValidateVariantTypeIdCoverage(typeIds, unitKeys);
         return unitKeys.Select(ReadVariant).ToArray();
+    }
+
+    internal static void ValidateVariantTypeIdCoverage(
+        HashSet<int> expectedTypeIds,
+        string[] unitKeys)
+    {
+        if (expectedTypeIds == null)
+        {
+            throw new ArgumentNullException(nameof(expectedTypeIds));
+        }
+        if (unitKeys == null)
+        {
+            throw new ArgumentNullException(nameof(unitKeys));
+        }
+
+        var actualTypeIds = new HashSet<int>();
+        foreach (var unitKey in unitKeys)
+        {
+            if (!TryReadTypeId(unitKey, out var typeId))
+            {
+                throw new InvalidOperationException(
+                    "BONDS_ANIMATION_AUDIT_TYPE_ID_COVERAGE invalidUnitKey="
+                    + unitKey);
+            }
+            actualTypeIds.Add(typeId);
+        }
+
+        if (actualTypeIds.SetEquals(expectedTypeIds))
+        {
+            return;
+        }
+
+        var missing = expectedTypeIds
+            .Except(actualTypeIds)
+            .OrderBy(typeId => typeId)
+            .Select(typeId => typeId.ToString(CultureInfo.InvariantCulture));
+        var unexpected = actualTypeIds
+            .Except(expectedTypeIds)
+            .OrderBy(typeId => typeId)
+            .Select(typeId => typeId.ToString(CultureInfo.InvariantCulture));
+        throw new InvalidOperationException(
+            "BONDS_ANIMATION_AUDIT_TYPE_ID_COVERAGE missing="
+            + string.Join(",", missing)
+            + " unexpected=" + string.Join(",", unexpected));
     }
 
     private static BondsUnitAnimationAuditVariant ReadVariant(string unitKey)
@@ -478,7 +523,57 @@ internal static class BondsUnitAnimationAudit
                 "BONDS_ANIMATION_AUDIT_OUTPUT_OUTSIDE_TEMP path=" + outputPath);
         }
 
+        AssertNoReparsePoint(outputPath, tempRoot);
         return outputPath;
+    }
+
+    private static void AssertNoReparsePoint(string path, string boundary)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var fullBoundary = Path.GetFullPath(boundary).TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        var boundaryPrefix = fullBoundary + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(
+                boundaryPrefix,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "BONDS_ANIMATION_AUDIT_REPARSE_POINT_OUTSIDE_BOUNDARY path="
+                + fullPath);
+        }
+
+        var currentPath = fullPath;
+        while (currentPath != null
+               && (string.Equals(
+                       currentPath,
+                       fullBoundary,
+                       StringComparison.OrdinalIgnoreCase)
+                   || currentPath.StartsWith(
+                       boundaryPrefix,
+                       StringComparison.OrdinalIgnoreCase)))
+        {
+            if ((File.Exists(currentPath) || Directory.Exists(currentPath))
+                && (File.GetAttributes(currentPath) & FileAttributes.ReparsePoint)
+                != 0)
+            {
+                throw new InvalidOperationException(
+                    "BONDS_ANIMATION_AUDIT_REPARSE_POINT path=" + currentPath);
+            }
+
+            if (string.Equals(
+                    currentPath,
+                    fullBoundary,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            currentPath = Path.GetDirectoryName(currentPath);
+        }
+
+        throw new InvalidOperationException(
+            "BONDS_ANIMATION_AUDIT_REPARSE_POINT_BOUNDARY_UNREACHABLE path="
+            + fullPath);
     }
 
     private static string RepositoryRoot()

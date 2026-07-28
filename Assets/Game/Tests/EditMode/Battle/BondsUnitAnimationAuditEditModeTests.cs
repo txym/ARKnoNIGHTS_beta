@@ -24,6 +24,13 @@ namespace ArknoNights.Battle.Tests
 
             var variants = GetArrayField(document, "variants");
             Assert.That(variants.Length, Is.EqualTo(172));
+            Assert.That(
+                variants
+                    .Cast<object>()
+                    .Select(variant => GetField<int>(variant, "typeId"))
+                    .Distinct()
+                    .Count(),
+                Is.EqualTo(93));
 
             var unitKeys = variants
                 .Cast<object>()
@@ -56,10 +63,15 @@ namespace ArknoNights.Battle.Tests
         public void Serialize_RoundTripsAllDurationsAndStableOrdering()
         {
             var document = BuildDocument();
+            var independentlyBuiltDocument = BuildDocument();
             SetField(document, "generatedAtUtc", "2026-07-28T00:00:00.0000000Z");
+            SetField(
+                independentlyBuiltDocument,
+                "generatedAtUtc",
+                "2026-07-28T00:00:00.0000000Z");
 
             var first = Serialize(document);
-            var second = Serialize(document);
+            var second = Serialize(independentlyBuiltDocument);
             Assert.That(second, Is.EqualTo(first));
 
             var roundTripped = JsonUtility.FromJson(first, document.GetType());
@@ -139,6 +151,30 @@ namespace ArknoNights.Battle.Tests
                 "caseFoldedTokenSummary");
             Assert.That(trailingStateTokens, Does.Contain("a"));
             Assert.That(trailingStateTokens, Does.Contain("b"));
+        }
+
+        [Test]
+        public void ValidateVariantTypeIdCoverage_RejectsMissingExpectedTypeId()
+        {
+            var auditType = Type.GetType("BondsUnitAnimationAudit, Assembly-CSharp-Editor");
+            Assert.That(auditType, Is.Not.Null);
+            var method = auditType.GetMethod(
+                "ValidateVariantTypeIdCoverage",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, "TypeId coverage validation must exist.");
+
+            var exception = Assert.Throws<TargetInvocationException>(() =>
+                method.Invoke(
+                    null,
+                    new object[]
+                    {
+                        new HashSet<int> { 1000, 1001 },
+                        new[] { "1000_alpha", "1000_beta" }
+                    }));
+            Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(
+                exception.InnerException.Message,
+                Does.StartWith("BONDS_ANIMATION_AUDIT_TYPE_ID_COVERAGE"));
         }
 
         private static object BuildDocument()

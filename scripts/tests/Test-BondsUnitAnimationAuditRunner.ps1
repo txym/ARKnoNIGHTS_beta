@@ -19,6 +19,7 @@ if (-not $temporaryRoot.StartsWith(
 }
 
 $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+$junctionPath = $null
 
 function New-ValidAuditFixture {
     $variants = @(
@@ -47,8 +48,19 @@ function New-ValidAuditFixture {
         typeIdCount = 93
         variantCount = 172
         variants = $variants
-        signatures = @()
-        tokenSummary = @()
+        signatures = @(
+            [pscustomobject]@{
+                exactNameSignature = 'Idle'
+                unitKeys = @('fixture_000')
+            }
+        )
+        tokenSummary = @(
+            [pscustomobject]@{
+                token = 'idle'
+                variantCount = 172
+                animationCount = 172
+            }
+        )
         diagnostics = @()
     }
 }
@@ -123,8 +135,62 @@ try {
     Write-AuditFixture -Document $duplicateUnitKey -Path $duplicateUnitKeyPath
     Assert-AuditFixtureRejected -Path $duplicateUnitKeyPath -CaseName 'duplicate unitKey'
 
+    $missingDuration = New-ValidAuditFixture
+    $missingDuration.variants[0].animations[0].PSObject.Properties.Remove(
+        'durationSeconds')
+    $missingDurationPath = Join-Path $temporaryRoot 'missing-duration.json'
+    Write-AuditFixture -Document $missingDuration -Path $missingDurationPath
+    Assert-AuditFixtureRejected -Path $missingDurationPath -CaseName 'missing durationSeconds'
+
+    $missingDiagnostics = New-ValidAuditFixture
+    $missingDiagnostics.PSObject.Properties.Remove('diagnostics')
+    $missingDiagnosticsPath = Join-Path $temporaryRoot 'missing-diagnostics.json'
+    Write-AuditFixture -Document $missingDiagnostics -Path $missingDiagnosticsPath
+    Assert-AuditFixtureRejected -Path $missingDiagnosticsPath -CaseName 'missing diagnostics'
+
+    $animationCountMismatch = New-ValidAuditFixture
+    $animationCountMismatch.variants[0].animationCount = 2
+    $animationCountMismatchPath = Join-Path $temporaryRoot 'animation-count-mismatch.json'
+    Write-AuditFixture `
+        -Document $animationCountMismatch `
+        -Path $animationCountMismatchPath
+    Assert-AuditFixtureRejected `
+        -Path $animationCountMismatchPath `
+        -CaseName 'animationCount mismatch'
+
+    $junctionTarget = Join-Path $temporaryRoot 'junction-target'
+    $junctionPath = Join-Path $temporaryRoot 'junction'
+    [System.IO.Directory]::CreateDirectory($junctionTarget) | Out-Null
+    New-Item `
+        -ItemType Junction `
+        -Path $junctionPath `
+        -Target $junctionTarget | Out-Null
+    $reparsePointRejected = $false
+    try {
+        Assert-BondsAuditPathHasNoReparsePoint `
+            -Path (Join-Path $junctionPath 'output.json') `
+            -Boundary $temporaryRoot `
+            -Label 'FixturePath'
+    } catch {
+        if (-not $_.Exception.Message.StartsWith(
+                'BONDS_ANIMATION_AUDIT_REPARSE_POINT',
+                [System.StringComparison]::Ordinal)) {
+            throw
+        }
+        $reparsePointRejected = $true
+    }
+    if (-not $reparsePointRejected) {
+        throw 'A path beneath a junction was accepted.'
+    }
+    Remove-Item -LiteralPath $junctionPath -Force
+    $junctionPath = $null
+
     Write-Output 'BONDS_ANIMATION_AUDIT_RUNNER_VALID'
 } finally {
+    if ((-not [string]::IsNullOrEmpty($junctionPath)) `
+        -and [System.IO.Directory]::Exists($junctionPath)) {
+        Remove-Item -LiteralPath $junctionPath -Force
+    }
     if ([System.IO.Directory]::Exists($temporaryRoot)) {
         [System.IO.Directory]::Delete($temporaryRoot, $true)
     }

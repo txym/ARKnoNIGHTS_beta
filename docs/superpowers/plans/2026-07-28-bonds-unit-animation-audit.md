@@ -166,7 +166,8 @@ public static void Run()
 4. Enumerate only top-level directories under `CharacterAssetRoot` whose
    leading decimal ID belongs to the BONDS set.
 5. Sort `unitKey` values with `StringComparer.Ordinal`, reject duplicates,
-   and require exactly 172.
+   require exactly 172, and require their actual TypeId set to equal all 93
+   BONDS TypeIds.
 6. Derive `sourceUnitKey` using:
 
 ```csharp
@@ -396,9 +397,11 @@ function Test-BondsUnitAnimationAuditOutput {
 ```
 
 Implement the function by reading strict UTF-8 JSON, requiring schema
-`bonds-unit-animation-audit-v1`, counts 93/172, exactly 172 unique non-empty
-`unitKey` values, and at least one animation with a non-empty name and
-non-negative finite duration for every variant. Throw a message prefixed
+`bonds-unit-animation-audit-v1`, every required root/variant/animation field,
+counts 93/172, actual coverage of 93 TypeIds, exactly 172 unique non-empty
+`unitKey` values, matching `animationCount`, non-empty signature/token arrays,
+and at least one animation with a non-empty name and non-negative finite
+duration for every variant. Throw a message prefixed
 `BONDS_ANIMATION_AUDIT_OUTPUT_INVALID` for every invalid fixture.
 
 When the script is dot-sourced, define functions without invoking Unity.
@@ -407,8 +410,8 @@ When executed normally:
 1. Require a non-empty `UnityPath`, then default `ProjectPath` to the
    repository root.
 2. Default output/log to the exact two `Temp` paths named above.
-3. Resolve all paths and require output/log to remain beneath project
-   `Temp`.
+3. Resolve all paths, require output/log to remain beneath project `Temp`,
+   and reject reparse points from `Temp` through either target.
 4. Check `Unity.exe`, `Assets`, `Packages`, and `ProjectSettings`.
 5. Query `Win32_Process` and reject an existing Unity command line that
    contains the exact project path.
@@ -417,7 +420,6 @@ When executed normally:
 
 ```text
 -batchmode
--accept-apiupdate
 -projectPath <project>
 -executeMethod BondsUnitAnimationAudit.Run
 -bondsAnimationAuditOutput <output>
@@ -427,9 +429,11 @@ When executed normally:
 
 Append `-nographics` when requested.
 
-8. Use `Start-Process -PassThru`, poll at 500 ms, enforce the timeout, and
-   terminate only the process started by this script if it times out.
-9. Require a normal exit code, the
+8. Use `Start-Process -PassThru`, poll for a fully valid snapshot while the
+   launcher or any project handoff `Unity.exe` remains alive, enforce the
+   timeout, and terminate only the process started by this script if it times
+   out.
+9. Require normal observed exit codes, the
    `BONDS_ANIMATION_AUDIT_COMPLETE` log marker, and a valid output.
 10. Print one concise summary and return exit code 0.
 
