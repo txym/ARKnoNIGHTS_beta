@@ -283,6 +283,322 @@ function Get-GeometricCombinedValue {
     return [decimal][Math]::Sqrt([double]($Output * $Defense))
 }
 
+function Get-IsotonicNondecreasingValues {
+    param([Parameter(Mandatory = $true)][decimal[]]$Values)
+
+    Assert-Condition ($Values.Count -gt 0) 'Cannot fit isotonic values from an empty sample.'
+    $blocks = [System.Collections.Generic.List[object]]::new()
+    for ($index = 0; $index -lt $Values.Count; $index++) {
+        Assert-Condition ($Values[$index] -gt 0) "Isotonic input at index $index must be positive."
+        $blocks.Add([pscustomobject]@{
+                Start = $index
+                End = $index
+                Weight = [decimal]1
+                Value = [decimal]$Values[$index]
+            })
+        while ($blocks.Count -ge 2 -and $blocks[$blocks.Count - 2].Value -gt $blocks[$blocks.Count - 1].Value) {
+            $left = $blocks[$blocks.Count - 2]
+            $right = $blocks[$blocks.Count - 1]
+            $merged = [pscustomobject]@{
+                Start = $left.Start
+                End = $right.End
+                Weight = [decimal]$left.Weight + [decimal]$right.Weight
+                Value = (([decimal]$left.Value * [decimal]$left.Weight) + ([decimal]$right.Value * [decimal]$right.Weight)) /
+                    ([decimal]$left.Weight + [decimal]$right.Weight)
+            }
+            $blocks.RemoveAt($blocks.Count - 1)
+            $blocks.RemoveAt($blocks.Count - 1)
+            $blocks.Add($merged)
+        }
+    }
+
+    $result = [decimal[]]::new($Values.Count)
+    foreach ($block in $blocks) {
+        for ($index = $block.Start; $index -le $block.End; $index++) {
+            $result[$index] = [decimal]$block.Value
+        }
+    }
+    return $result
+}
+
+function Get-CompressionAlpha {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$Rarity2Power,
+        [Parameter(Mandatory = $true)][decimal]$Rarity6Power
+    )
+
+    Assert-Condition ($Rarity2Power -gt 0) "R2 isotonic median power '$Rarity2Power' must be positive."
+    Assert-Condition ($Rarity6Power -gt $Rarity2Power) "R6 isotonic median power '$Rarity6Power' must exceed R2 '$Rarity2Power'."
+    $powerRatio = [double]($Rarity6Power / $Rarity2Power)
+    return [decimal][Math]::Min([double]1, [Math]::Log(4) / [Math]::Log($powerRatio))
+}
+
+function Get-RarityBaseCosts {
+    param(
+        [Parameter(Mandatory = $true)][decimal[]]$IsotonicRarityMedians,
+        [Parameter(Mandatory = $true)][decimal]$CompressionAlpha,
+        [Parameter(Mandatory = $true)][decimal]$Rarity6Anchor
+    )
+
+    Assert-Condition ($IsotonicRarityMedians.Count -eq 6) "Expected six isotonic rarity medians; found $($IsotonicRarityMedians.Count)."
+    Assert-Condition ($CompressionAlpha -gt 0 -and $CompressionAlpha -le 1) "Compression alpha '$CompressionAlpha' must be in (0, 1]."
+    Assert-Condition ($Rarity6Anchor -gt 0) "R6 anchor '$Rarity6Anchor' must be positive."
+    for ($index = 0; $index -lt $IsotonicRarityMedians.Count; $index++) {
+        Assert-Condition ($IsotonicRarityMedians[$index] -gt 0) "Isotonic rarity median at index $index must be positive."
+        if ($index -gt 0) {
+            Assert-Condition ($IsotonicRarityMedians[$index] -ge $IsotonicRarityMedians[$index - 1]) 'Isotonic rarity medians must be nondecreasing.'
+        }
+    }
+
+    $baseCosts = [decimal[]]::new(6)
+    for ($index = 0; $index -lt $baseCosts.Count; $index++) {
+        $baseCosts[$index] = [decimal](
+            [double]$Rarity6Anchor *
+            [Math]::Pow(
+                [double]($IsotonicRarityMedians[$index] / $IsotonicRarityMedians[5]),
+                [double]$CompressionAlpha
+            )
+        )
+    }
+    return $baseCosts
+}
+
+function Get-WithinTierFactor {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$Power,
+        [Parameter(Mandatory = $true)][decimal]$IsotonicRarityMedianPower,
+        [decimal]$Exponent = [decimal]0.6,
+        [decimal]$MinimumFactor = [decimal]0.75,
+        [decimal]$MaximumFactor = [decimal]1.35
+    )
+
+    Assert-Condition ($Power -gt 0 -and $IsotonicRarityMedianPower -gt 0) 'Within-tier power inputs must be positive.'
+    Assert-Condition ($Exponent -gt 0) "Within-tier exponent '$Exponent' must be positive."
+    Assert-Condition ($MinimumFactor -gt 0 -and $MaximumFactor -ge $MinimumFactor) "Invalid within-tier factor bounds '$MinimumFactor..$MaximumFactor'."
+    $unclamped = [Math]::Pow([double]($Power / $IsotonicRarityMedianPower), [double]$Exponent)
+    return [decimal][Math]::Min([double]$MaximumFactor, [Math]::Max([double]$MinimumFactor, $unclamped))
+}
+
+function ConvertTo-FinalBaseCost {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$RawCost,
+        [int]$MinimumCost = 5,
+        [int]$MaximumCost = 40
+    )
+
+    Assert-Condition ($RawCost -ge 0) "Raw Cost '$RawCost' must not be negative."
+    Assert-Condition ($MinimumCost -ge 0 -and $MaximumCost -ge $MinimumCost) "Invalid final Cost bounds '$MinimumCost..$MaximumCost'."
+    $rounded = [int][Math]::Round($RawCost, 0, [System.MidpointRounding]::AwayFromZero)
+    return [int][Math]::Max($MinimumCost, [Math]::Min($MaximumCost, $rounded))
+}
+
+function Get-CostCurveCandidate {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][decimal[]]$RarityMedians,
+        [Parameter(Mandatory = $true)][decimal[]]$IsotonicRarityMedians,
+        [Parameter(Mandatory = $true)][decimal]$CompressionAlpha,
+        [Parameter(Mandatory = $true)][decimal]$Rarity6Anchor,
+        [Parameter(Mandatory = $true)][decimal]$MaximumWithinTierFactor,
+        [decimal]$WithinTierExponent = [decimal]0.6,
+        [decimal]$MinimumWithinTierFactor = [decimal]0.75,
+        [int]$MinimumCost = 5,
+        [int]$MaximumCost = 40,
+        [int]$MaximumHighCostCount = 8
+    )
+
+    $baseCosts = @(Get-RarityBaseCosts -IsotonicRarityMedians $IsotonicRarityMedians -CompressionAlpha $CompressionAlpha -Rarity6Anchor $Rarity6Anchor)
+    $candidateRows = foreach ($row in $Rows) {
+        $rarity = [int]$row.Rarity
+        Assert-Condition ($rarity -ge 1 -and $rarity -le 6) "Type ID $($row.TypeId) has invalid rarity '$rarity' for Cost."
+        $power = [decimal]$row.ContinuousPower
+        $factor = Get-WithinTierFactor `
+            -Power $power `
+            -IsotonicRarityMedianPower $IsotonicRarityMedians[$rarity - 1] `
+            -Exponent $WithinTierExponent `
+            -MinimumFactor $MinimumWithinTierFactor `
+            -MaximumFactor $MaximumWithinTierFactor
+        $rawCost = [decimal]$baseCosts[$rarity - 1] * $factor
+        $properties = [ordered]@{}
+        foreach ($property in $row.PSObject.Properties) {
+            $properties[$property.Name] = $property.Value
+        }
+        $properties.RarityMedianPower = $RarityMedians[$rarity - 1]
+        $properties.IsotonicRarityMedianPower = $IsotonicRarityMedians[$rarity - 1]
+        $properties.CompressionAlpha = $CompressionAlpha
+        $properties.RarityBaseCost = $baseCosts[$rarity - 1]
+        $properties.WithinTierFactor = $factor
+        $properties.RawCostBeforeRounding = $rawCost
+        $properties.FinalBaseCost = ConvertTo-FinalBaseCost -RawCost $rawCost -MinimumCost $MinimumCost -MaximumCost $MaximumCost
+        [pscustomobject]$properties
+    }
+    $candidateRows = @($candidateRows)
+
+    $medianCosts = [decimal[]]::new(5)
+    for ($rarity = 2; $rarity -le 6; $rarity++) {
+        $medianCosts[$rarity - 2] = Get-Median -Values ([decimal[]]@(
+                $candidateRows |
+                    Where-Object { [int]$_.Rarity -eq $rarity } |
+                    ForEach-Object { [decimal]$_.FinalBaseCost }
+            ))
+    }
+    $failures = [System.Collections.Generic.List[string]]::new()
+    for ($index = 1; $index -lt $medianCosts.Count; $index++) {
+        if ($medianCosts[$index] -lt $medianCosts[$index - 1]) {
+            $failures.Add('R2-R6 median Cost is not nondecreasing.')
+            break
+        }
+    }
+    $rarityCostRatio = $medianCosts[4] / $medianCosts[0]
+    if ($rarityCostRatio -gt 4) {
+        $failures.Add("R6/R2 median Cost ratio '$rarityCostRatio' exceeds 4.")
+    }
+    foreach ($row in $candidateRows | Where-Object { [int]$_.Rarity -ge 2 }) {
+        $cost = [decimal]$row.FinalBaseCost
+        if ($cost -ne [decimal][int]$cost -or $cost -lt $MinimumCost -or $cost -gt $MaximumCost) {
+            $failures.Add("Type ID $($row.TypeId) has invalid R2-R6 final Cost '$cost'.")
+            break
+        }
+    }
+    foreach ($rarity in 1..6) {
+        $orderedRows = @(
+            $candidateRows |
+                Where-Object { [int]$_.Rarity -eq $rarity } |
+                Sort-Object { [decimal]$_.ContinuousPower }, { [int]$_.TypeId }
+        )
+        for ($index = 1; $index -lt $orderedRows.Count; $index++) {
+            if ([int]$orderedRows[$index].FinalBaseCost -lt [int]$orderedRows[$index - 1].FinalBaseCost) {
+                $failures.Add("Rarity $rarity final Cost decreases as ContinuousPower increases.")
+                break
+            }
+        }
+    }
+    $highCostCount = @($candidateRows | Where-Object { [int]$_.FinalBaseCost -gt 30 }).Count
+    if ($highCostCount -gt $MaximumHighCostCount) {
+        $failures.Add("Final Cost >30 count '$highCostCount' exceeds '$MaximumHighCostCount'.")
+    }
+
+    return [pscustomobject]@{
+        Rows = $candidateRows
+        Rarity6Anchor = $Rarity6Anchor
+        MaximumWithinTierFactor = $MaximumWithinTierFactor
+        ParameterDistance = (($Rarity6Anchor - [decimal]28) * ($Rarity6Anchor - [decimal]28)) +
+            (($MaximumWithinTierFactor - [decimal]1.35) * ($MaximumWithinTierFactor - [decimal]1.35))
+        HighCostCount = $highCostCount
+        Rarity2To6MedianCosts = $medianCosts
+        Rarity6ToRarity2MedianCostRatio = $rarityCostRatio
+        ConstraintFailures = $failures.ToArray()
+        IsValid = ($failures.Count -eq 0)
+    }
+}
+
+function Get-CostCurveModel {
+    param([Parameter(Mandatory = $true)][object[]]$Rows)
+
+    Assert-Condition ($Rows.Count -gt 0) 'Cannot build a Cost curve from no rows.'
+    $rarityMedians = [decimal[]]::new(6)
+    foreach ($rarity in 1..6) {
+        $rarityRows = @($Rows | Where-Object { [int]$_.Rarity -eq $rarity })
+        Assert-Condition ($rarityRows.Count -gt 0) "Cost curve has no R$rarity rows."
+        $rarityMedians[$rarity - 1] = Get-Median -Values ([decimal[]]@($rarityRows | ForEach-Object { [decimal]$_.ContinuousPower }))
+        Assert-Condition ($rarityMedians[$rarity - 1] -gt 0) "R$rarity median ContinuousPower must be positive."
+    }
+    $isotonicMedians = [decimal[]]@(Get-IsotonicNondecreasingValues -Values $rarityMedians)
+    $compressionAlpha = Get-CompressionAlpha -Rarity2Power $isotonicMedians[1] -Rarity6Power $isotonicMedians[5]
+
+    $evaluated = [System.Collections.Generic.List[object]]::new()
+    $defaultCandidate = Get-CostCurveCandidate `
+        -Rows $Rows `
+        -RarityMedians $rarityMedians `
+        -IsotonicRarityMedians $isotonicMedians `
+        -CompressionAlpha $compressionAlpha `
+        -Rarity6Anchor 28 `
+        -MaximumWithinTierFactor 1.35
+    $evaluated.Add($defaultCandidate)
+    $selected = if ($defaultCandidate.IsValid) { $defaultCandidate } else { $null }
+    $scanTriggered = $defaultCandidate.HighCostCount -gt 8
+    if ($null -eq $selected -and -not $scanTriggered) {
+        throw "Default Cost model violates a non-sparsity invariant: $($defaultCandidate.ConstraintFailures -join ' | ')"
+    }
+
+    if ($null -eq $selected) {
+        $factorCandidates = [System.Collections.Generic.List[object]]::new()
+        for ($hundredths = 134; $hundredths -ge 115; $hundredths--) {
+            $candidate = Get-CostCurveCandidate `
+                -Rows $Rows `
+                -RarityMedians $rarityMedians `
+                -IsotonicRarityMedians $isotonicMedians `
+                -CompressionAlpha $compressionAlpha `
+                -Rarity6Anchor 28 `
+                -MaximumWithinTierFactor ([decimal]$hundredths / [decimal]100)
+            $evaluated.Add($candidate)
+            if ($candidate.IsValid) {
+                $factorCandidates.Add($candidate)
+            }
+        }
+        if ($factorCandidates.Count -gt 0) {
+            $selected = @($factorCandidates | Sort-Object ParameterDistance, @{ Expression = 'MaximumWithinTierFactor'; Descending = $true })[0]
+        }
+    }
+
+    if ($null -eq $selected) {
+        $expandedCandidates = [System.Collections.Generic.List[object]]::new()
+        for ($quarters = 111; $quarters -ge 104; $quarters--) {
+            $anchor = [decimal]$quarters / [decimal]4
+            for ($hundredths = 135; $hundredths -ge 115; $hundredths--) {
+                $candidate = Get-CostCurveCandidate `
+                    -Rows $Rows `
+                    -RarityMedians $rarityMedians `
+                    -IsotonicRarityMedians $isotonicMedians `
+                    -CompressionAlpha $compressionAlpha `
+                    -Rarity6Anchor $anchor `
+                    -MaximumWithinTierFactor ([decimal]$hundredths / [decimal]100)
+                $evaluated.Add($candidate)
+                if ($candidate.IsValid) {
+                    $expandedCandidates.Add($candidate)
+                }
+            }
+        }
+        if ($expandedCandidates.Count -gt 0) {
+            $selected = @(
+                $expandedCandidates |
+                    Sort-Object ParameterDistance,
+                        @{ Expression = 'Rarity6Anchor'; Descending = $true },
+                        @{ Expression = 'MaximumWithinTierFactor'; Descending = $true }
+            )[0]
+        }
+    }
+
+    if ($null -eq $selected) {
+        throw 'No unified Cost parameter candidate satisfies the model invariants and top-sparsity limit.'
+    }
+    $candidateAudit = @($evaluated | ForEach-Object {
+            [pscustomobject][ordered]@{
+                Rarity6Anchor = $_.Rarity6Anchor
+                MaximumWithinTierFactor = $_.MaximumWithinTierFactor
+                ParameterDistance = $_.ParameterDistance
+                HighCostCount = $_.HighCostCount
+                Rarity2To6MedianCosts = $_.Rarity2To6MedianCosts
+                Rarity6ToRarity2MedianCostRatio = $_.Rarity6ToRarity2MedianCostRatio
+                ConstraintFailures = $_.ConstraintFailures
+                IsValid = $_.IsValid
+            }
+        })
+    return [pscustomobject]@{
+        Rows = $selected.Rows
+        RarityMedians = $rarityMedians
+        IsotonicRarityMedians = $isotonicMedians
+        CompressionAlpha = $compressionAlpha
+        SelectedRarity6Anchor = $selected.Rarity6Anchor
+        SelectedMaxWithinTierFactor = $selected.MaximumWithinTierFactor
+        HighCostCount = $selected.HighCostCount
+        Rarity2To6MedianCosts = $selected.Rarity2To6MedianCosts
+        Rarity6ToRarity2MedianCostRatio = $selected.Rarity6ToRarity2MedianCostRatio
+        ParameterScanTriggered = $scanTriggered
+        CandidateAudit = $candidateAudit
+    }
+}
+
 function Test-MapKey {
     param(
         [Parameter(Mandatory = $true)][hashtable]$Map,
@@ -1138,10 +1454,21 @@ try {
         $properties.ScenarioSpecialAttackCount = $scenarioSpecialAttackCount
         [pscustomobject]$properties
     }
-    $rows = @($abilityRows)
+    $costCurveModel = Get-CostCurveModel -Rows @($abilityRows)
+    $rows = @($costCurveModel.Rows)
+
+    $rawRarityMedianPower = [ordered]@{}
+    $isotonicRarityMedianPower = [ordered]@{}
+    $rarityBaseCosts = [ordered]@{}
+    foreach ($rarity in 1..6) {
+        $rarityKey = "R$rarity"
+        $rawRarityMedianPower[$rarityKey] = $costCurveModel.RarityMedians[$rarity - 1]
+        $isotonicRarityMedianPower[$rarityKey] = $costCurveModel.IsotonicRarityMedians[$rarity - 1]
+        $rarityBaseCosts[$rarityKey] = [decimal]@($rows | Where-Object { [int]$_.Rarity -eq $rarity })[0].RarityBaseCost
+    }
 
     $analysis = [ordered]@{
-        SchemaVersion = 'unit-cost-analysis-v3'
+        SchemaVersion = 'unit-cost-analysis-v4'
         ShopRowCount = $rows.Count
         RarityDistribution = [ordered]@{ R1 = 9; R2 = 18; R3 = 12; R4 = 23; R5 = 20; R6 = 6 }
         EliteEvidence = @($eliteEvidence)
@@ -1162,6 +1489,26 @@ try {
             AuraTargets = @(1, 3, 5)
             ScenarioCount = $abilityInput.UnitScenarios.Count
             ExplicitRiskTypeIdCount = $abilityInput.ExplicitRiskOnly.Count
+        }
+        CostModel = [ordered]@{
+            RawRarityMedianPower = $rawRarityMedianPower
+            IsotonicRarityMedianPower = $isotonicRarityMedianPower
+            CompressionAlpha = $costCurveModel.CompressionAlpha
+            RarityBaseCosts = $rarityBaseCosts
+            DefaultRarity6Anchor = [decimal]28
+            SelectedRarity6Anchor = $costCurveModel.SelectedRarity6Anchor
+            WithinTierExponent = [decimal]0.6
+            MinimumWithinTierFactor = [decimal]0.75
+            DefaultMaximumWithinTierFactor = [decimal]1.35
+            SelectedMaximumWithinTierFactor = $costCurveModel.SelectedMaxWithinTierFactor
+            FinalCostRange = @(5, 40)
+            MaximumHighCostCount = 8
+            HighCostCount = $costCurveModel.HighCostCount
+            ParameterScanTriggered = $costCurveModel.ParameterScanTriggered
+            Rarity2To6MedianCosts = $costCurveModel.Rarity2To6MedianCosts
+            Rarity6ToRarity2MedianCostRatio = $costCurveModel.Rarity6ToRarity2MedianCostRatio
+            R1CalibrationStatus = 'PendingTask5'
+            CandidateAudit = $costCurveModel.CandidateAudit
         }
         RiskAudit = @($rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.RiskFlags) } | ForEach-Object {
                 [ordered]@{ TypeId = $_.TypeId; RiskFlags = $_.RiskFlags }

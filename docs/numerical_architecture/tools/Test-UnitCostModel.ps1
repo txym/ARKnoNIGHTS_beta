@@ -46,6 +46,18 @@ function Assert-Throws {
     throw "${Name}: expected an explicit failure."
 }
 
+function Get-TestMedian {
+    param([Parameter(Mandatory = $true)][decimal[]]$Values)
+
+    Assert-Condition ($Values.Count -gt 0) 'Test median sample is empty.'
+    $sorted = @($Values | Sort-Object)
+    $middle = [int][Math]::Floor($sorted.Count / 2)
+    if (($sorted.Count % 2) -eq 1) {
+        return [decimal]$sorted[$middle]
+    }
+    return ([decimal]$sorted[$middle - 1] + [decimal]$sorted[$middle]) / [decimal]2
+}
+
 function Get-UnitCostHelperScript {
     param([Parameter(Mandatory = $true)][string]$ExporterPath)
 
@@ -101,6 +113,73 @@ function Test-CombatMetricHelpers {
     Assert-Throws { Get-PhysicalDamage -Attack -1 -Defense 0 } 'negative attack'
     Assert-Throws { Get-EffectiveAttackInterval -Attacker ([pscustomobject]@{ TypeId = 1; EffectiveAttackIntervalSeconds = 0 }) } 'nonpositive attack interval'
     Assert-Throws { Get-OrdinaryAttackDamage -Attacker ([pscustomobject]@{ TypeId = 1; DamageType = 'Unknown'; Attack = 100; EffectiveAttackIntervalSeconds = 1 }) -Defender ([pscustomobject]@{ Defense = 0; MagicResistance = 0 }) } 'unknown damage type'
+}
+
+function Test-CostCurveHelpers {
+    param([Parameter(Mandatory = $true)][string]$ExporterPath)
+
+    $helperScript = Get-UnitCostHelperScript -ExporterPath $ExporterPath
+    . $helperScript `
+        -BondSpecPath 'test-only' `
+        -StagingRoot 'test-only' `
+        -OutputCsvPath 'test-only.csv' `
+        -AnalysisOutputPath 'test-only.json'
+
+    $isotonic = @(Get-IsotonicNondecreasingValues -Values ([decimal[]]@(1, 3, 2, 5, 4, 6)))
+    $expectedIsotonic = [decimal[]]@(1, 2.5, 2.5, 4.5, 4.5, 6)
+    Assert-Equal $expectedIsotonic.Count $isotonic.Count 'synthetic PAVA output count'
+    for ($index = 0; $index -lt $expectedIsotonic.Count; $index++) {
+        Assert-Equal $expectedIsotonic[$index] ([decimal]$isotonic[$index]) "synthetic PAVA value $index"
+    }
+
+    $compressedAlpha = Get-CompressionAlpha -Rarity2Power 1 -Rarity6Power 8
+    Assert-Condition ([Math]::Abs([double]$compressedAlpha - ([Math]::Log(4) / [Math]::Log(8))) -lt 0.000000000001) 'compression alpha does not apply ln(4)/ln(M6/M2) above ratio 4.'
+    Assert-Equal ([decimal]1) (Get-CompressionAlpha -Rarity2Power 2 -Rarity6Power 8) 'compression alpha at ratio 4'
+    Assert-Throws { Get-CompressionAlpha -Rarity2Power 4 -Rarity6Power 4 } 'compression alpha rejects M6 <= M2'
+
+    $baseCosts = @(Get-RarityBaseCosts -IsotonicRarityMedians ([decimal[]]@(0.5, 1, 2, 4, 6, 8)) -CompressionAlpha $compressedAlpha -Rarity6Anchor 28)
+    Assert-Equal ([decimal]28) ([decimal]$baseCosts[5]) 'R6 anchor'
+    Assert-Condition (([decimal]$baseCosts[5] / [decimal]$baseCosts[1]) -le 4) 'synthetic B6/B2 exceeds 4.'
+
+    Assert-Condition ([Math]::Abs([double](Get-WithinTierFactor -Power 1.5 -IsotonicRarityMedianPower 1) - 1.2754245006257907) -lt 0.000000000001) 'within-tier factor does not use exponent 0.6.'
+    Assert-Equal ([decimal]0.75) (Get-WithinTierFactor -Power 0.01 -IsotonicRarityMedianPower 1) 'within-tier lower clamp'
+    Assert-Equal ([decimal]1.35) (Get-WithinTierFactor -Power 10 -IsotonicRarityMedianPower 1) 'within-tier upper clamp'
+    Assert-Equal 11 (ConvertTo-FinalBaseCost -RawCost 10.5) 'away-from-zero midpoint rounding'
+    Assert-Equal 5 (ConvertTo-FinalBaseCost -RawCost 4.4) 'final Cost lower clamp'
+    Assert-Equal 40 (ConvertTo-FinalBaseCost -RawCost 40.5) 'final Cost upper clamp'
+
+    $syntheticRows = [System.Collections.Generic.List[object]]::new()
+    foreach ($rarity in 1..4) {
+        $syntheticRows.Add([pscustomobject]@{ TypeId = 9000 + $rarity; Rarity = $rarity; ContinuousPower = [decimal]@(1, 7, 12, 18)[$rarity - 1] })
+    }
+    for ($index = 0; $index -lt 12; $index++) {
+        $syntheticRows.Add([pscustomobject]@{ TypeId = 9100 + $index; Rarity = 5; ContinuousPower = [decimal]23 })
+    }
+    for ($index = 0; $index -lt 9; $index++) {
+        $syntheticRows.Add([pscustomobject]@{ TypeId = 9200 + $index; Rarity = 5; ContinuousPower = [decimal]230 })
+    }
+    $syntheticRows.Add([pscustomobject]@{ TypeId = 9300; Rarity = 6; ContinuousPower = [decimal]28 })
+    $syntheticModel = Get-CostCurveModel -Rows $syntheticRows.ToArray()
+    Assert-Condition $syntheticModel.ParameterScanTriggered 'synthetic top-sparsity scan did not trigger.'
+    Assert-Equal ([decimal]28) ([decimal]$syntheticModel.SelectedRarity6Anchor) 'synthetic scan preserves default anchor when factor adjustment is sufficient'
+    Assert-Equal ([decimal]1.32) ([decimal]$syntheticModel.SelectedMaxWithinTierFactor) 'synthetic scan chooses nearest valid factor cap'
+    Assert-Condition ($syntheticModel.HighCostCount -le 8) 'synthetic scan did not enforce top sparsity.'
+
+    $anchorScanRows = [System.Collections.Generic.List[object]]::new()
+    foreach ($rarity in 1..5) {
+        $anchorScanRows.Add([pscustomobject]@{ TypeId = 9400 + $rarity; Rarity = $rarity; ContinuousPower = [decimal](@(1, 7, 12, 18, 23)[$rarity - 1]) })
+    }
+    for ($index = 0; $index -lt 12; $index++) {
+        $anchorScanRows.Add([pscustomobject]@{ TypeId = 9500 + $index; Rarity = 6; ContinuousPower = [decimal]28 })
+    }
+    for ($index = 0; $index -lt 9; $index++) {
+        $anchorScanRows.Add([pscustomobject]@{ TypeId = 9600 + $index; Rarity = 6; ContinuousPower = [decimal]280 })
+    }
+    $anchorScanModel = Get-CostCurveModel -Rows $anchorScanRows.ToArray()
+    Assert-Condition $anchorScanModel.ParameterScanTriggered 'synthetic anchor scan did not trigger.'
+    Assert-Equal ([decimal]26.5) ([decimal]$anchorScanModel.SelectedRarity6Anchor) 'synthetic scan chooses nearest valid reduced anchor'
+    Assert-Equal ([decimal]1.15) ([decimal]$anchorScanModel.SelectedMaxWithinTierFactor) 'synthetic anchor scan preserves the required factor reduction'
+    Assert-Condition ($anchorScanModel.HighCostCount -le 8) 'synthetic anchor scan did not enforce top sparsity.'
 }
 
 function Get-ShopFixtureResourceDirectories {
@@ -402,6 +481,7 @@ try {
     $abilityInputPath = Join-Path $PSScriptRoot 'UnitCostAbilityInputs.psd1'
     $powershellPath = Join-Path $PSHOME 'powershell.exe'
     Test-CombatMetricHelpers -ExporterPath $exporterPath
+    Test-CostCurveHelpers -ExporterPath $exporterPath
     $fixtureResourceDirectories = Get-ShopFixtureResourceDirectories -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot
     $externalSnapshotBeforeWorkflow = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $fixtureResourceDirectories
     Assert-Equal 178 $externalSnapshotBeforeWorkflow.Count 'external staging workflow snapshot JSON file count'
@@ -435,7 +515,9 @@ try {
             'AbilityModelKind', 'OutputScenarioLow', 'OutputScenarioMain', 'OutputScenarioHigh',
             'DefenseScenarioMain', 'EquivalentEntityContribution', 'AbilityPowerMultiplier',
             'ContinuousPower', 'AbilityEvidence', 'RiskFlags', 'ScenarioEventCount',
-            'ScenarioEventTimesSeconds', 'ScenarioAttackCount', 'ScenarioSpecialAttackCount'
+            'ScenarioEventTimesSeconds', 'ScenarioAttackCount', 'ScenarioSpecialAttackCount',
+            'RarityMedianPower', 'IsotonicRarityMedianPower', 'CompressionAlpha',
+            'RarityBaseCost', 'WithinTierFactor', 'RawCostBeforeRounding', 'FinalBaseCost'
         )) {
         Assert-Condition ($rows[0].PSObject.Properties.Name -contains $property) "CSV is missing combat metric column '$property'."
     }
@@ -472,6 +554,69 @@ try {
         }
         Assert-Condition ([Math]::Abs([double]($continuousPower - $expectedContinuousPower)) -lt 0.000000001) "Type ID $($row.TypeId) ContinuousPower is not reproducible from exported components."
     }
+
+    $rarityAudit = @{}
+    foreach ($rarity in 1..6) {
+        $rarityRows = @($rows | Where-Object { [int]$_.Rarity -eq $rarity })
+        $rawMedianPower = Get-TestMedian -Values ([decimal[]]@($rarityRows | ForEach-Object { [decimal]$_.ContinuousPower }))
+        $exportedRawMedians = @($rarityRows.RarityMedianPower | ForEach-Object { [decimal]$_ } | Sort-Object -Unique)
+        $exportedIsotonicMedians = @($rarityRows.IsotonicRarityMedianPower | ForEach-Object { [decimal]$_ } | Sort-Object -Unique)
+        $exportedBaseCosts = @($rarityRows.RarityBaseCost | ForEach-Object { [decimal]$_ } | Sort-Object -Unique)
+        Assert-Equal 1 $exportedRawMedians.Count "R$rarity exported raw median count"
+        Assert-Condition ([Math]::Abs([double]($rawMedianPower - $exportedRawMedians[0])) -lt 0.000000000001) "R$rarity raw median power is not reproducible."
+        Assert-Equal 1 $exportedIsotonicMedians.Count "R$rarity exported isotonic median count"
+        Assert-Equal 1 $exportedBaseCosts.Count "R$rarity exported base Cost count"
+        $rarityAudit[$rarity] = [pscustomobject]@{
+            IsotonicMedian = $exportedIsotonicMedians[0]
+            BaseCost = $exportedBaseCosts[0]
+            MedianFinalCost = Get-TestMedian -Values ([decimal[]]@($rarityRows | ForEach-Object { [decimal]$_.FinalBaseCost }))
+        }
+    }
+    for ($rarity = 2; $rarity -le 6; $rarity++) {
+        Assert-Condition ($rarityAudit[$rarity].IsotonicMedian -ge $rarityAudit[$rarity - 1].IsotonicMedian) "PAVA output decreases from R$($rarity - 1) to R$rarity."
+    }
+    $exportedAlphas = @($rows.CompressionAlpha | ForEach-Object { [decimal]$_ } | Sort-Object -Unique)
+    Assert-Equal 1 $exportedAlphas.Count 'exported compression alpha count'
+    $compressionAlpha = $exportedAlphas[0]
+    $isotonicRatio = [decimal]$rarityAudit[6].IsotonicMedian / [decimal]$rarityAudit[2].IsotonicMedian
+    $expectedAlpha = [decimal][Math]::Min([double]1, [Math]::Log(4) / [Math]::Log([double]$isotonicRatio))
+    Assert-Condition ([Math]::Abs([double]($compressionAlpha - $expectedAlpha)) -lt 0.000000000001) 'exported compression alpha is not reproducible from isotonic R2/R6 medians.'
+    Assert-Condition ([Math]::Abs([double]([decimal]$rarityAudit[6].BaseCost - 28)) -lt 0.000000000001) 'actual data should retain the default R6 anchor 28.'
+    Assert-Condition (([decimal]$rarityAudit[6].BaseCost / [decimal]$rarityAudit[2].BaseCost) -le 4) 'exported B6/B2 exceeds 4.'
+    $expectedR1Base = [decimal]$rarityAudit[2].BaseCost * [decimal][Math]::Pow(
+        [double]([decimal]$rarityAudit[1].IsotonicMedian / [decimal]$rarityAudit[2].IsotonicMedian),
+        [double]$compressionAlpha
+    )
+    Assert-Condition ([Math]::Abs([double]([decimal]$rarityAudit[1].BaseCost - $expectedR1Base)) -lt 0.000000000001) 'R1 initial base Cost does not follow B2 * (M1/M2)^alpha.'
+
+    foreach ($row in $rows) {
+        $expectedFactor = [decimal][Math]::Pow(
+            [double]([decimal]$row.ContinuousPower / [decimal]$row.IsotonicRarityMedianPower),
+            [double][decimal]0.6
+        )
+        $expectedFactor = [decimal][Math]::Min([double]1.35, [Math]::Max([double]0.75, [double]$expectedFactor))
+        Assert-Condition ([Math]::Abs([double]([decimal]$row.WithinTierFactor - $expectedFactor)) -lt 0.000000000001) "Type ID $($row.TypeId) within-tier factor is not reproducible."
+        $expectedRawCost = [decimal]$row.RarityBaseCost * [decimal]$row.WithinTierFactor
+        Assert-Condition ([Math]::Abs([double]([decimal]$row.RawCostBeforeRounding - $expectedRawCost)) -lt 0.000000000001) "Type ID $($row.TypeId) raw Cost is not reproducible."
+        $expectedFinalCost = [int][Math]::Max(
+            5,
+            [Math]::Min(40, [int][Math]::Round($expectedRawCost, 0, [System.MidpointRounding]::AwayFromZero))
+        )
+        Assert-Equal $expectedFinalCost ([int]$row.FinalBaseCost) "Type ID $($row.TypeId) final base Cost"
+        Assert-Condition ([decimal]$row.FinalBaseCost -eq [decimal][int]$row.FinalBaseCost -and [int]$row.FinalBaseCost -ge 5 -and [int]$row.FinalBaseCost -le 40) "Type ID $($row.TypeId) has invalid integer Cost."
+    }
+    for ($rarity = 3; $rarity -le 6; $rarity++) {
+        Assert-Condition ($rarityAudit[$rarity].MedianFinalCost -ge $rarityAudit[$rarity - 1].MedianFinalCost) "Median final Cost decreases from R$($rarity - 1) to R$rarity."
+    }
+    Assert-Condition (($rarityAudit[6].MedianFinalCost / $rarityAudit[2].MedianFinalCost) -le 4) 'R6/R2 median final Cost exceeds 4.'
+    foreach ($rarity in 1..6) {
+        $orderedRows = @($rows | Where-Object { [int]$_.Rarity -eq $rarity } | Sort-Object { [decimal]$_.ContinuousPower }, { [int]$_.TypeId })
+        for ($index = 1; $index -lt $orderedRows.Count; $index++) {
+            Assert-Condition ([int]$orderedRows[$index].FinalBaseCost -ge [int]$orderedRows[$index - 1].FinalBaseCost) "Rarity $rarity Cost decreases as ContinuousPower increases."
+        }
+    }
+    Assert-Condition (@($rows | Where-Object { [int]$_.FinalBaseCost -gt 30 }).Count -le 8) 'More than eight units have FinalBaseCost > 30.'
+
     foreach ($typeId in @('10031', '1238', '1243')) {
         $row = @($rows | Where-Object TypeId -eq $typeId)[0]
         Assert-Condition ([string]$row.AbilityEvidence -notmatch '\u9690\u533f|Stealth|\u9644\u52a0\u6cd5\u672f|\u591a\u65b9\u5411') "Type ID $typeId contains a forbidden unsupported modifier in exported scoring evidence."
@@ -543,6 +688,13 @@ try {
 
     Assert-Condition (Test-Path -LiteralPath $analysisOutput -PathType Leaf) "Missing analysis output '$analysisOutput'."
     $analysis = Get-Content -LiteralPath $analysisOutput -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-Equal 'unit-cost-analysis-v4' ([string]$analysis.SchemaVersion) 'analysis schema version'
+    Assert-Equal ([decimal]28) ([decimal]$analysis.CostModel.SelectedRarity6Anchor) 'analysis selected R6 anchor'
+    Assert-Equal ([decimal]1.35) ([decimal]$analysis.CostModel.SelectedMaximumWithinTierFactor) 'analysis selected maximum within-tier factor'
+    Assert-Condition (-not [bool]$analysis.CostModel.ParameterScanTriggered) 'actual data unexpectedly triggered the top-sparsity scan.'
+    Assert-Equal 8 ([int]$analysis.CostModel.HighCostCount) 'analysis high-Cost count'
+    Assert-Equal 'PendingTask5' ([string]$analysis.CostModel.R1CalibrationStatus) 'R1 calibration status'
+    Assert-Condition (@($analysis.CostModel.CandidateAudit).Count -ge 1) 'Cost model candidate audit is empty.'
     $riskAuditTypeIds = @($analysis.RiskAudit | ForEach-Object { [string]$_.TypeId })
     foreach ($row in $rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.RiskFlags) }) {
         Assert-Condition ([string]$row.TypeId -in $riskAuditTypeIds) "Risk-bearing TypeId $($row.TypeId) is absent from the analysis RiskAudit."
