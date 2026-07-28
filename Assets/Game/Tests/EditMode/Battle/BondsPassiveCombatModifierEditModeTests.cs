@@ -950,6 +950,107 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(40));
         }
 
+        [Test]
+        public void BlockedCounterpartSlow_DoesNotStackByAbilityId()
+        {
+            var input = CreateInput(
+                4,
+                new[]
+                {
+                    Attacker(
+                        "blocker",
+                        2000,
+                        2,
+                        attackIntervalTicks: 10),
+                    Attacker(
+                        "tumour",
+                        2000,
+                        1,
+                        "BLOCK_SLOW",
+                        attackIntervalTicks: 100)
+                },
+                new[]
+                {
+                    PassiveBlockedCounterpartSlow(
+                        attackSpeedMultiplierPermille: 200)
+                },
+                new[] { Unit("blocker", "blocker", 5, 4) },
+                new[]
+                {
+                    Unit("tumour-a", "tumour", 5, 4),
+                    Unit("tumour-b", "tumour", 4, 4)
+                });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 3)
+                runner.Step();
+
+            var blocker = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "blocker");
+            Assert.That(blocker.BlockedUnitIds.Count, Is.EqualTo(2));
+            Assert.That(
+                blocker.EffectiveAttackIntervalTicks,
+                Is.EqualTo(50));
+        }
+
+        [Test]
+        public void NearbySameTypeDefense_StacksPerFriendlyNeighbour()
+        {
+            var phalanx = new UnitDefinition(
+                "phalanx",
+                1000,
+                0,
+                100,
+                0,
+                0,
+                0,
+                0,
+                DamageType.None,
+                AttackMethod.None,
+                0,
+                0,
+                true,
+                new[] { "MR_70", "NEARBY_DEFENSE" },
+                4);
+            var input = CreateInput(
+                2,
+                new[]
+                {
+                    phalanx,
+                    NonAttacker("dummy", 100000)
+                },
+                new[]
+                {
+                    Passive(
+                        "MR_70",
+                        Modifier(magicResistanceAdditive: 70)),
+                    PassiveNearbySameTypeDefense(
+                        radiusCentimetres: 150,
+                        defenseAdditivePerUnit: 200)
+                },
+                new[]
+                {
+                    Unit("left", "phalanx", 4, 4),
+                    Unit("centre", "phalanx", 5, 4),
+                    Unit("right", "phalanx", 6, 4)
+                },
+                new[] { Unit("dummy", "dummy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+
+            var left = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "left");
+            var centre = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "centre");
+            var right = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "right");
+            Assert.That(left.EffectiveDefense, Is.EqualTo(300));
+            Assert.That(centre.EffectiveDefense, Is.EqualTo(500));
+            Assert.That(right.EffectiveDefense, Is.EqualTo(300));
+            Assert.That(centre.EffectiveMagicResistance, Is.EqualTo(70));
+        }
+
         private static int[] RunAttackSequence(
             int firstEnhancedAttackOrdinal,
             int repeatInterval,
@@ -1384,6 +1485,69 @@ namespace ArknoNights.Battle.Tests
                     attackSpeedMultiplierPermille,
                     moveSpeedMultiplierPermille,
                     hitPointsPerSecond),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveBlockedCounterpartSlow(
+            int attackSpeedMultiplierPermille)
+        {
+            return new AbilityDefinition(
+                "BLOCK_SLOW",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new BlockedCounterpartCombatModifierDefinition(
+                    true,
+                    attackSpeedMultiplierPermille),
+                null,
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveNearbySameTypeDefense(
+            int radiusCentimetres,
+            int defenseAdditivePerUnit)
+        {
+            return new AbilityDefinition(
+                "NEARBY_DEFENSE",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new NearbySameTypeSelfModifierDefinition(
+                    radiusCentimetres,
+                    defenseAdditivePerUnit),
                 string.Empty,
                 0);
         }

@@ -280,6 +280,14 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.AuraCombatModifier.AttackSpeedMultiplierPermille).Append(',')
                         .Append(ability.AuraCombatModifier.MoveSpeedMultiplierPermille).Append(',')
                         .Append(ability.AuraCombatModifier.HitPointsPerSecond);
+                if (ability.BlockedCounterpartCombatModifier != null)
+                    builder.Append("|J:")
+                        .Append(ability.BlockedCounterpartCombatModifier.NonStackingByAbilityId ? 1 : 0).Append(',')
+                        .Append(ability.BlockedCounterpartCombatModifier.AttackSpeedMultiplierPermille);
+                if (ability.NearbySameTypeSelfModifier != null)
+                    builder.Append("|N:")
+                        .Append(ability.NearbySameTypeSelfModifier.RadiusCentimetres).Append(',')
+                        .Append(ability.NearbySameTypeSelfModifier.DefenseAdditive);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -355,6 +363,8 @@ namespace ArknoNights.Battle.Core
                     if (ability.AttackCountStateModifier != null) validationErrors.Add(new ValidationError("ability.attackCountState.unexpected", "Timed ability cannot define an attack-count state modifier: " + ability.AbilityId));
                     if (ability.DeathSpawnEffect != null) validationErrors.Add(new ValidationError("ability.deathSpawn.unexpected", "Timed ability cannot define a death-spawn effect: " + ability.AbilityId));
                     if (ability.AuraCombatModifier != null) validationErrors.Add(new ValidationError("ability.aura.unexpected", "Timed ability cannot define an aura modifier: " + ability.AbilityId));
+                    if (ability.BlockedCounterpartCombatModifier != null) validationErrors.Add(new ValidationError("ability.blockedCounterpart.unexpected", "Timed ability cannot define a blocked-counterpart modifier: " + ability.AbilityId));
+                    if (ability.NearbySameTypeSelfModifier != null) validationErrors.Add(new ValidationError("ability.nearbySameType.unexpected", "Timed ability cannot define a nearby-same-type modifier: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -383,7 +393,9 @@ namespace ArknoNights.Battle.Core
                         + (ability.AttackSequenceModifier == null ? 0 : 1)
                         + (ability.AttackCountStateModifier == null ? 0 : 1)
                         + (ability.DeathSpawnEffect == null ? 0 : 1)
-                        + (ability.AuraCombatModifier == null ? 0 : 1);
+                        + (ability.AuraCombatModifier == null ? 0 : 1)
+                        + (ability.BlockedCounterpartCombatModifier == null ? 0 : 1)
+                        + (ability.NearbySameTypeSelfModifier == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -487,6 +499,13 @@ namespace ArknoNights.Battle.Core
                             || ability.AuraCombatModifier.AttackSpeedMultiplierPermille <= 0
                             || ability.AuraCombatModifier.MoveSpeedMultiplierPermille <= 0))
                         validationErrors.Add(new ValidationError("ability.aura.invalid", "Aura combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.BlockedCounterpartCombatModifier != null
+                        && ability.BlockedCounterpartCombatModifier.AttackSpeedMultiplierPermille <= 0)
+                        validationErrors.Add(new ValidationError("ability.blockedCounterpart.invalid", "Blocked-counterpart modifier is invalid: " + ability.AbilityId));
+                    if (ability.NearbySameTypeSelfModifier != null
+                        && (ability.NearbySameTypeSelfModifier.RadiusCentimetres <= 0
+                            || ability.NearbySameTypeSelfModifier.DefenseAdditive <= 0))
+                        validationErrors.Add(new ValidationError("ability.nearbySameType.invalid", "Nearby-same-type modifier is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

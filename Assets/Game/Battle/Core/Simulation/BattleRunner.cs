@@ -105,9 +105,9 @@ namespace ArknoNights.Battle.Core
     {
         private readonly List<string> blockedUnitIds = new List<string>();
         private readonly List<RuntimeAbilityState> abilityStates;
-        private readonly List<AuraCombatModifierDefinition>
+        private readonly List<IExternalCombatModifierDefinition>
             auraCombatModifiers =
-                new List<AuraCombatModifierDefinition>();
+                new List<IExternalCombatModifierDefinition>();
 
         internal RuntimeUnitState(
             string unitId,
@@ -465,13 +465,35 @@ namespace ArknoNights.Battle.Core
                     new KeyValuePair<string, AuraCombatModifierDefinition>(
                         item.Definition.AbilityId,
                         item.Definition.AuraCombatModifier));
+        internal IEnumerable<KeyValuePair<string, BlockedCounterpartCombatModifierDefinition>>
+            BlockedCounterpartCombatModifiers =>
+            abilityStates
+                .Where(item =>
+                    item.Definition
+                        .BlockedCounterpartCombatModifier != null)
+                .Select(item =>
+                    new KeyValuePair<string, BlockedCounterpartCombatModifierDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition
+                            .BlockedCounterpartCombatModifier));
+        internal IEnumerable<KeyValuePair<string, NearbySameTypeSelfModifierDefinition>>
+            NearbySameTypeSelfModifiers =>
+            abilityStates
+                .Where(item =>
+                    item.Definition
+                        .NearbySameTypeSelfModifier != null)
+                .Select(item =>
+                    new KeyValuePair<string, NearbySameTypeSelfModifierDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition
+                            .NearbySameTypeSelfModifier));
         internal void SetAuraCombatModifiers(
-            IEnumerable<AuraCombatModifierDefinition> modifiers)
+            IEnumerable<IExternalCombatModifierDefinition> modifiers)
         {
             auraCombatModifiers.Clear();
             auraCombatModifiers.AddRange(
                 modifiers
-                ?? Enumerable.Empty<AuraCombatModifierDefinition>());
+                ?? Enumerable.Empty<IExternalCombatModifierDefinition>());
         }
 
         private int ApplyThresholdMultiplier(
@@ -696,6 +718,7 @@ namespace ArknoNights.Battle.Core
             ApplyMovement();
             RefreshAuraCombatModifiers();
             EvaluateBlocking();
+            RefreshAuraCombatModifiers();
             CastReadyAbilities();
             StartAttacks();
             ResolveDueDamage();
@@ -1011,10 +1034,58 @@ namespace ArknoNights.Battle.Core
                     ability.Key,
                     modifier));
             }
+            foreach (var source in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var ability in source
+                         .BlockedCounterpartCombatModifiers
+                         .OrderBy(item => item.Key, StringComparer.Ordinal))
+            foreach (var counterpartId in source.BlockedUnitIds
+                         .OrderBy(item => item, StringComparer.Ordinal))
+            {
+                var counterpart = FindUnit(counterpartId);
+                if (counterpart == null
+                    || !IsActive(counterpart)
+                    || counterpart.Side == source.Side)
+                    continue;
+                contributions.Add(new AuraContribution(
+                    source.UnitId,
+                    counterpart.UnitId,
+                    ability.Key,
+                    ability.Value));
+            }
+            foreach (var source in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var ability in source
+                         .NearbySameTypeSelfModifiers
+                         .OrderBy(item => item.Key, StringComparer.Ordinal))
+            foreach (var neighbour in runtimeUnits
+                         .Where(item =>
+                             IsActive(item)
+                             && !ReferenceEquals(item, source)
+                             && item.Side == source.Side
+                             && string.Equals(
+                                 item.TypeId,
+                                 source.TypeId,
+                                 StringComparison.Ordinal))
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            {
+                if (DistanceSquared(source.Position, neighbour.Position)
+                    > (long)ability.Value.RadiusCentimetres
+                    * ability.Value.RadiusCentimetres)
+                    continue;
+                contributions.Add(new AuraContribution(
+                    source.UnitId,
+                    source.UnitId,
+                    ability.Key,
+                    ability.Value));
+            }
 
             foreach (var target in runtimeUnits)
             {
-                var accepted = new List<AuraCombatModifierDefinition>();
+                var accepted =
+                    new List<IExternalCombatModifierDefinition>();
                 var nonStackingAbilityIds =
                     new HashSet<string>(StringComparer.Ordinal);
                 foreach (var contribution in contributions
@@ -1514,7 +1585,7 @@ namespace ArknoNights.Battle.Core
                 string sourceUnitId,
                 string targetUnitId,
                 string abilityId,
-                AuraCombatModifierDefinition modifier)
+                IExternalCombatModifierDefinition modifier)
             {
                 SourceUnitId = sourceUnitId;
                 TargetUnitId = targetUnitId;
@@ -1525,7 +1596,7 @@ namespace ArknoNights.Battle.Core
             public string SourceUnitId { get; }
             public string TargetUnitId { get; }
             public string AbilityId { get; }
-            public AuraCombatModifierDefinition Modifier { get; }
+            public IExternalCombatModifierDefinition Modifier { get; }
         }
 
         private static List<RuntimeUnitState> BuildInitialUnits(

@@ -296,7 +296,19 @@ namespace ArknoNights.Battle.Core
         Enemies
     }
 
+    public interface IExternalCombatModifierDefinition
+    {
+        bool NonStackingByAbilityId { get; }
+        int AttackMultiplierPermille { get; }
+        int DefenseAdditive { get; }
+        int MagicResistanceAdditive { get; }
+        int AttackSpeedMultiplierPermille { get; }
+        int MoveSpeedMultiplierPermille { get; }
+        int HitPointsPerSecond { get; }
+    }
+
     public sealed class AuraCombatModifierDefinition
+        : IExternalCombatModifierDefinition
     {
         public const int NeutralMultiplierPermille = 1000;
 
@@ -352,6 +364,59 @@ namespace ArknoNights.Battle.Core
             && MoveSpeedMultiplierPermille
                 == NeutralMultiplierPermille
             && HitPointsPerSecond == 0;
+    }
+
+    public sealed class BlockedCounterpartCombatModifierDefinition
+        : IExternalCombatModifierDefinition
+    {
+        public BlockedCounterpartCombatModifierDefinition(
+            bool nonStackingByAbilityId,
+            int attackSpeedMultiplierPermille)
+        {
+            NonStackingByAbilityId =
+                nonStackingByAbilityId;
+            AttackSpeedMultiplierPermille =
+                attackSpeedMultiplierPermille;
+        }
+
+        public bool NonStackingByAbilityId { get; }
+        public int AttackMultiplierPermille =>
+            AuraCombatModifierDefinition
+                .NeutralMultiplierPermille;
+        public int DefenseAdditive => 0;
+        public int MagicResistanceAdditive => 0;
+        public int AttackSpeedMultiplierPermille { get; }
+        public int MoveSpeedMultiplierPermille =>
+            AuraCombatModifierDefinition
+                .NeutralMultiplierPermille;
+        public int HitPointsPerSecond => 0;
+    }
+
+    public sealed class NearbySameTypeSelfModifierDefinition
+        : IExternalCombatModifierDefinition
+    {
+        public NearbySameTypeSelfModifierDefinition(
+            int radiusCentimetres,
+            int defenseAdditivePerUnit)
+        {
+            RadiusCentimetres = radiusCentimetres;
+            DefenseAdditive = defenseAdditivePerUnit;
+        }
+
+        public int RadiusCentimetres { get; }
+        public bool NonStackingByAbilityId => false;
+        public int AttackMultiplierPermille =>
+            AuraCombatModifierDefinition
+                .NeutralMultiplierPermille;
+        public int DefenseAdditive { get; }
+        public int MagicResistanceAdditive => 0;
+        public int AttackSpeedMultiplierPermille =>
+            AuraCombatModifierDefinition
+                .NeutralMultiplierPermille;
+        public int MoveSpeedMultiplierPermille =>
+            AuraCombatModifierDefinition
+                .NeutralMultiplierPermille;
+        public int HitPointsPerSecond => 0;
     }
 
     public sealed class SummonEffectDefinition
@@ -620,6 +685,34 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, string animationKey, int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                passiveCombatModifier,
+                passiveLifecycleEffect,
+                onDamageReactionEffect,
+                healthThresholdCombatModifier,
+                unblockedDamageTakenModifier,
+                attackSequenceModifier,
+                attackCountStateModifier,
+                deathSpawnEffect,
+                auraCombatModifier,
+                null,
+                null,
+                animationKey,
+                skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -643,6 +736,10 @@ namespace ArknoNights.Battle.Core
                 attackCountStateModifier;
             DeathSpawnEffect = deathSpawnEffect;
             AuraCombatModifier = auraCombatModifier;
+            BlockedCounterpartCombatModifier =
+                blockedCounterpartCombatModifier;
+            NearbySameTypeSelfModifier =
+                nearbySameTypeSelfModifier;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -673,6 +770,10 @@ namespace ArknoNights.Battle.Core
         {
             get;
         }
+        public BlockedCounterpartCombatModifierDefinition
+            BlockedCounterpartCombatModifier { get; }
+        public NearbySameTypeSelfModifierDefinition
+            NearbySameTypeSelfModifier { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>
