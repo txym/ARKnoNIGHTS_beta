@@ -795,10 +795,11 @@ Windows 与 Android 实机连接到同一 Wi-Fi 后的发现、房间号预填�
 
 PortraitFrame 阻塞式比较使用成对的左右可见 side pixels，并把每个已解码像素恰好映射一次到该条记录自身锚点定义的 `257×513` 网格：
 
-- 水平锚点是自身已解码 `TopBar` 左右可见边；
+- 每个已解码 `(leftX,y,rightX,y)` 观测对直接映射为 canonical `x=0/256`；不得按 TopBar 宽度把语义 side pixel 分散到中间列；
 - 纵向锚点是自身已解码 `TopBar` 下沿和 `LowerDecoration` 上沿；
 - eligible contributor 恰好为 10 条：图 11 槽 1–4、图 12 槽 1–3、图 13 槽 1–3；
 - 每个网格 cell 至少由 `6/10` 个贡献者观察到才进入确定性 target；
+- target 必须 fail-closed 地证明左右均非空、只含 `x=0/256`、数量相等且逐行集合一致；单边 target 必须失败，合法配对 fixture 必须通过；
 - 不填充 bounds、线段、内部区域、源 aperture、manifest backing 或 ROI。
 
 阻塞阈值保持：中心每轴 `<=2 px`、可见宽度 `<=3 px`、每边 `<=4 px`、实际像素 Jaccard `>=0.95`、backing/下横条重叠 `>=60 px`、连续背景缝隙 `<=1 px`，并同时要求共享几何和精确 `card_bg` 素材关联通过。绝对屏幕坐标只作诊断。
@@ -834,7 +835,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTe
 | `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests` | 5/5 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Capture` |
 | `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests` | 4/4 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Controller` |
 
-合计 `82/82`。前两个 `forced-stop-after-results` 都是在完整可读、非零、全绿 XML 写出后的有界清理路径，不是 timeout 或跳过。
+合计 `82/82`。前两个 `forced-stop-after-results` 都是在完整可读、非零、全绿 XML 写出后的有界清理路径，不是 timeout 或跳过。这是 Task 6 保留的最终 Unity 证据；本次 final-review 修复波只改离线脚本/文档，没有重跑 Unity、构建或 Player，不得把 `82/82` 记成本波新执行。
 
 三项 smoke 的实际命令与结果：
 
@@ -844,15 +845,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestExportLanL
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyEvidenceCommonSmoke.ps1
 ```
 
-- VisualDiff：`48 fixtures / 2019 assertions`，PASS；
+- VisualDiff：`48 fixtures / 2043 assertions`，PASS；
 - Evidence exporter：`5 / 15`，PASS；
 - Evidence common：`13 / 53`，PASS。
 
 ### Player 周期、最终证据与真实失败
 
-本任务最多允许三次新的可见 Windows Player 校准。Cycle 1、2、3 已分别消耗第 1/3、2/3、3/3 次；三轮在实际像素重导出后均为 `0/10` PortraitFrame 通过。不得创建 Cycle 4。
+本任务最多允许三次新的可见 Windows Player 校准。Cycle 1、2、3 已分别消耗第 1/3、2/3、3/3 次；最终成对 side-pixel 重导出后 Cycle 1 为 `0/10`、Cycle 2 为 `0/10`、Cycle 3 为 `8/10` PortraitFrame 通过。三轮视觉验收均仍失败；不得创建 Cycle 4。
 
-Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可解码、非黑、非单色的 `1920×1080` PNG 和 UTF-8 五记录 manifest。`24f1280` 只修改离线 evidence exporter/smoke，并从既有 Cycle 1/2/3 PNG 重导出 canonical Evidence/VisualDiff；它没有修改 runtime、layout、capture 或这些 PNG。因此一般计划中的“detector 后再跑一次 fresh Player”条件因三周期硬停止而**未执行**，不得记作通过。
+Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可解码、非黑、非单色的 `1920×1080` PNG 和 UTF-8 五记录 manifest。`24f1280` 与本次 final-review paired-side 修复都只修改离线 evidence exporter/smoke，并从既有 Cycle 1/2/3 PNG 重导出 canonical Evidence/VisualDiff；它们没有修改 runtime、layout、capture 或这些 PNG。因此一般计划中的“detector 后再跑一次 fresh Player”条件因三周期硬停止而**未执行**，不得记作通过。
 
 最终路径：
 
@@ -862,4 +863,4 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
 - `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\WindowsStandaloneBuild.log`
 - `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\PlayerCapture.log`
 
-当前 10 个门的 target 为 `488` 个共识像素，actual normalized set 为 `1004..1026`，intersection 为 `479..488`，union 为 `1013..1026`，Jaccard 为 `0.472853..0.480315 < 0.95`，所以视觉验收是 **FAILED**。`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 还各有 `4 px > 3 px` 的宽度差；`RoomReady.Slot2.ReadyTopBar` 和 `RoomHost.Slot2To3.VisibleContourSpacing` 是 Cycle 3 命名回归。图 12/13 第四槽继续为 `ExcludedByReferencePopup` 且 `passed=false`。
+当前 Cycle 3 target 为 `1020` 个共识像素：canonical-left/right 各 `510`，逐行完全配对且中间列为 `0`。actual normalized set 为 `1004..1026`，intersection 为 `1000..1020`，union 为 `1024..1026`，Jaccard 为 `0.976562..0.994152 >= 0.95`。10 个 PortraitFrame 中 `8/10` 通过；`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 的像素 Jaccard 均通过，但各有 `4 px > 3 px` 的宽度差，所以视觉验收仍是 **FAILED**。`RoomReady.Slot2.ReadyTopBar` 和 `RoomHost.Slot2To3.VisibleContourSpacing` 仍是 Cycle 3 命名回归。图 12/13 第四槽继续为 `ExcludedByReferencePopup` 且 `passed=false`。

@@ -515,10 +515,10 @@ Cycle 3 报告中的 8 行 code-native geometry 与 bitmap 来源表分开记录
 
 本次最终 focused Unity 测试、三项 evidence smoke、Cycle 3 截图/manifest、素材来源、构建与 Player 日志核查为 **verification PASS**；图 11–13 的统一 PortraitFrame 实际像素验收为 **FAIL**。统一几何是已确认的玩家可见要求，不能把“共享 backing 已实现”写成“参考图已经通过”。
 
-`24f1280` 的纠正导出报告共有 62 个命名房间门：
+final-review paired-side 纠正后的 canonical Cycle 3 导出报告共有 62 个命名房间门：
 
-- `Passed`: 22
-- `Failed`: 38
+- `Passed`: 30
+- `Failed`: 30
 - `ExcludedByReferencePopup`: 2，且两项均为 `passed=false`
 - PortraitFrame 素材/来源失败：0
 
@@ -569,12 +569,13 @@ failed、fatal 或 missing Sprite。五张 canonical PNG 都能解码，且抽�
 
 Capture manifest 是严格 UTF-8 JSON，恰好含上述五条记录；Capture 与 Evidence manifest 的 SHA-256 同为 `16126A6DDCC8B1E5E1BC90AD8ED2666CD86AF45B02951FA364D5AF920A4CFD15`。
 
-提交 `24f1280` 只纠正 `scripts/ExportLanLobbyVisualDiff.ps1` 与
-`scripts/TestLanLobbyVisualDiffSmoke.ps1` 的离线实际像素证据；它没有
-修改 runtime、layout、capture 或 Cycle 3 PNG。该提交从既有 Cycle
-1/2/3 captures 重导出 Evidence/VisualDiff，没有重新构建、没有启动
-Player、没有创建 Cycle 4。计划中的“detector 后 fresh Player”条件因
-三次校准硬停止而未执行，不能记为通过。
+提交 `24f1280` 与本次 final-review paired-side 修复都只纠正
+`scripts/ExportLanLobbyVisualDiff.ps1` 与
+`scripts/TestLanLobbyVisualDiffSmoke.ps1` 的离线实际像素证据；它们
+没有修改 runtime、layout、capture 或 Cycle 3 PNG。本次仍只从既有
+Cycle 1/2/3 captures 重导出 canonical Evidence/VisualDiff，没有重新
+构建、没有启动 Player、没有创建 Cycle 4。计划中的“detector 后 fresh
+Player”条件因三次校准硬停止而未执行，不能记为通过。
 
 最终绝对路径：
 
@@ -587,29 +588,35 @@ Player、没有创建 Cycle 4。计划中的“detector 后 fresh Player”条�
 ### 最终实际像素结果与所有新增阻塞
 
 共识网格是 `257×513`，eligible contributor 恰好 10 条，投票规则是
-`6/10`；确定性 target 含 `488` 个实际参考轮廓像素。每个 actual
-pixel 只按自身 `TopBar`/`LowerDecoration` 锚点映射一次；没有填充
-bounds、线段、内部区域、源 aperture、manifest backing 或 ROI。
+`6/10`；确定性 target 含 `1020` 个实际参考轮廓像素。探测器保留每个
+可见行的 `(leftX,y,rightX,y)` 实际观测对：左像素直接映射到 canonical
+`x=0`，右像素直接映射到 `x=256`，Y 只按自身 `TopBar` 下沿到
+`LowerDecoration` 上沿做最近整数归一化。target 的 fail-closed audit
+为 left `510`、right `510`、paired rows `510`、interior `0`。TopBar
+水平 center/width 仍由独立阻塞 relation 验收；没有填充 bounds、线段、
+内部区域、源 aperture、manifest backing 或 ROI。
 
 | Gate | decoded | normalized | intersection | union | Jaccard | TopBar width delta |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `RoomHost.Slot1.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
-| `RoomHost.Slot2.PortraitFrame` | 1036 | 1026 | 488 | 1026 | 0.475634 | **4** |
-| `RoomHost.Slot3.PortraitFrame` | 1016 | 1004 | 479 | 1013 | 0.472853 | 3 |
-| `RoomHost.Slot4.PortraitFrame` | 1034 | 1022 | 486 | 1024 | 0.474609 | 1 |
-| `RoomReady.Slot1.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
-| `RoomReady.Slot2.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
-| `RoomReady.Slot3.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
-| `RoomFull.Slot1.PortraitFrame` | 1034 | 1016 | 488 | 1016 | 0.480315 | 2 |
-| `RoomFull.Slot2.PortraitFrame` | 1036 | 1026 | 488 | 1026 | 0.475634 | **4** |
-| `RoomFull.Slot3.PortraitFrame` | 1018 | 1006 | 480 | 1014 | 0.473373 | 3 |
+| `RoomHost.Slot1.PortraitFrame` | 1034 | 1016 | 1012 | 1024 | 0.988281 | 2 |
+| `RoomHost.Slot2.PortraitFrame` | 1036 | 1026 | 1020 | 1026 | 0.994152 | **4** |
+| `RoomHost.Slot3.PortraitFrame` | 1016 | 1004 | 1000 | 1024 | 0.976562 | 3 |
+| `RoomHost.Slot4.PortraitFrame` | 1034 | 1022 | 1016 | 1026 | 0.990253 | 1 |
+| `RoomReady.Slot1.PortraitFrame` | 1034 | 1016 | 1012 | 1024 | 0.988281 | 2 |
+| `RoomReady.Slot2.PortraitFrame` | 1034 | 1016 | 1012 | 1024 | 0.988281 | 2 |
+| `RoomReady.Slot3.PortraitFrame` | 1034 | 1016 | 1012 | 1024 | 0.988281 | 2 |
+| `RoomFull.Slot1.PortraitFrame` | 1034 | 1016 | 1012 | 1024 | 0.988281 | 2 |
+| `RoomFull.Slot2.PortraitFrame` | 1036 | 1026 | 1020 | 1026 | 0.994152 | **4** |
+| `RoomFull.Slot3.PortraitFrame` | 1018 | 1006 | 1002 | 1024 | 0.978516 | 3 |
 
-结果为 `0/10`：normalized set `1004..1026`、intersection `479..488`、
-union `1013..1026`、Jaccard `0.472853..0.480315`，全部低于未修改的
-`0.95`。所有十条的 shared geometry 与 material evidence 通过，
-raw overlap 都是 `92.5 px`、连续背景缝隙都是 `0 px`。
-`RoomHost.Slot2.PortraitFrame` 和 `RoomFull.Slot2.PortraitFrame` 还因
-上横条可见宽度差 `4 px > 3 px` 失败。
+结果为 `8/10`：normalized set `1004..1026`、intersection
+`1000..1020`、union `1024..1026`、Jaccard `0.976562..0.994152`，
+十条实际像素门都达到未修改的 `0.95`。所有十条的 shared geometry 与
+material evidence 通过，raw overlap 都是 `92.5 px`、连续背景缝隙都是
+`0 px`。`RoomHost.Slot2.PortraitFrame` 和
+`RoomFull.Slot2.PortraitFrame` 仍因独立的自身 TopBar 可见宽度差
+`4 px > 3 px` 失败，因此 PortraitFrame 与整体视觉验收都仍为
+**FAILED**。
 
 另有两个 Cycle 2 到 Cycle 3 的命名回归：
 
@@ -635,13 +642,23 @@ PortraitFrame 唯一 bitmap 素材：
 只读复核的文件长度为 `14479` 字节，SHA 与上表一致。素材根目录只读
 审计为 `2310` 个文件、`40486009` 字节、0 个 reparse point。
 
+本次 paired-side 重导出只读取
+`G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud`。前后审计均为
+14 个文件、0 个 reparse point；必需图 9/11/12/13 均存在且 SHA-256
+分别保持 `B5EFA6DB86285C9306F27C963F1DD5CFF82135B34FD80A3937682298EA3E596E`、
+`CFC2822EB87DA9D38F034DCBA5746FC9009494064A18CDDA99E3215919D7A971`、
+`28103BE8A167769E01C53CB878E46BABC79B570579A0375F31D805DCFAF42219`、
+`DA782E04618C673D170F15BD8D1B47E939B72F1F355EB91BC4778A367303EF00`。
+
 从本计划基线 `7b5d092` 到 detector 提交 `24f1280`，没有新增或修改
 bitmap、参考图、Package、Unity 版本、场景、Prefab、ScriptableObject
 或 `.meta`；也没有在外部素材目录写入、移动或删除文件。
 
 ### 最终自动验证
 
-所有测试使用 `D:\2022.3.62f1c1\Editor\Unity.exe`、工作区
+以下 Unity 测试是 Task 6 已保留并经最终审查核对的证据，不是本次
+paired-side 修复波的新重跑。本波没有启动 Unity、构建或 Player。保留
+证据使用 `D:\2022.3.62f1c1\Editor\Unity.exe`、工作区
 `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`、`900` 秒超时串行执行：
 
 | 过滤器 | 结果 | fail/skip/inconclusive/notRun | shutdown | 目录 |
@@ -659,7 +676,7 @@ NullReferenceException、missing Sprite 或 fatal。前两个 forced-stop 是
 
 三项 smoke：
 
-- VisualDiff：`48 fixtures / 2019 assertions`，PASS（本次 wall-clock 约 `122.06 s`；未预先采集进程 CPU，故不猜测 CPU 时间）；
+- VisualDiff：`48 fixtures / 2043 assertions`，PASS（最终 wall-clock `303.02 s`；未预先采集子进程 CPU，故不猜测 CPU 时间）；
 - Evidence exporter：`5 / 15`，PASS；
 - Evidence common：`13 / 53`，PASS。
 
@@ -667,7 +684,7 @@ NullReferenceException、missing Sprite 或 fatal。前两个 forced-stop 是
 
 ### 未验证与已知阻断
 
-- PortraitFrame 参考图验收未通过：10 个 actual-pixel Jaccard 门全部失败，两条 Slot 2 宽度门失败，并保留两条普通 gate 回归。
+- PortraitFrame 参考图验收未通过：actual-pixel Jaccard 已为 10/10 达标，但两条 Slot 2 宽度门仍失败，所以完整 PortraitFrame 仅 `8/10`；两条普通 gate 回归也仍保留。
 - 三次可见 Player 配额已经耗尽；未运行 detector 后的新 Player，也未创建 Cycle 4。
 - stale-after-start snapshot 仍可能覆盖 `HasStarted`。
 - accept/stop 生命周期竞态仍未修复。
