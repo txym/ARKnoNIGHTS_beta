@@ -230,6 +230,174 @@ function Shift-LanLobbyFixtureRegion(
     }
 }
 
+function Remove-LanLobbyPortraitContourPixelsPreservingBounds(
+    [string] $Path,
+    $Bounds)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try
+    {
+        $left = [int]$Bounds.x
+        $right = $left + [int]$Bounds.width - 1
+        $top = [int]$Bounds.y
+        $bottom = $top + [int]$Bounds.height - 1
+
+        # Keep the decoded extrema and enough of both dominant sides that the
+        # same pair still wins selection, but remove a 100-row observed gap.
+        # The old bounds-rectangle IoU cannot see this loss.
+        $eraseTop = $top + 190
+        $eraseBottom = [Math]::Min($bottom - 2, $eraseTop + 99)
+        if ($eraseBottom -gt $eraseTop)
+        {
+            $graphics.FillRectangle([Drawing.Brushes]::Black, $left, $eraseTop, 10, $eraseBottom - $eraseTop + 1)
+            $graphics.FillRectangle([Drawing.Brushes]::Black, $right - 9, $eraseTop, 10, $eraseBottom - $eraseTop + 1)
+        }
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
+function Shift-LanLobbyPortraitContourVerticallyWithoutBars(
+    [string] $Path,
+    $Bounds,
+    [int] $DeltaY,
+    [Drawing.Color] $ContourColor)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $pen = New-Object Drawing.Pen $ContourColor
+    try
+    {
+        $left = [int]$Bounds.x
+        $right = $left + [int]$Bounds.width - 1
+        $top = [int]$Bounds.y
+        $bottom = $top + [int]$Bounds.height - 1
+
+        # Remove the original long sides only between the own TopBar and
+        # LowerDecoration. Their decoded anchor pixels remain untouched.
+        $graphics.FillRectangle([Drawing.Brushes]::Black, $left, 221, 10, 500)
+        $graphics.FillRectangle([Drawing.Brushes]::Black, $right - 9, 221, 10, 500)
+
+        # One pixel outside each original side separates the shifted frame
+        # contour from the unchanged TopBar edge while remaining within all
+        # horizontal frame thresholds.
+        $graphics.DrawLine($pen, $left - 1, $top + $DeltaY, $left - 1, $bottom + $DeltaY)
+        $graphics.DrawLine($pen, $right + 1, $top + $DeltaY, $right + 1, $bottom + $DeltaY)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $pen.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
+function Draw-LanLobbyJointTranslatedPortraitAnchors(
+    [string] $Path,
+    $FrameBounds,
+    $NormalizedTargetBounds,
+    [int] $TopBarTop,
+    [int] $TopBarBottom,
+    [int] $LowerDecorationTop,
+    [int] $DeltaY,
+    [Drawing.Color] $ContourColor)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $pen = New-Object Drawing.Pen $ContourColor
+    try
+    {
+        $frameLeft = [int]$FrameBounds.x
+        $frameRight = $frameLeft + [int]$FrameBounds.width - 1
+        $frameTop = [int]$FrameBounds.y
+        $frameBottom = $frameTop + [int]$FrameBounds.height - 1
+        $topBarLeft = [int]$NormalizedTargetBounds.x
+        $topBarRight = $topBarLeft + [int]$NormalizedTargetBounds.width - 1
+
+        # Isolate the three decoded anchors from unrelated synthetic card
+        # artwork, then rebuild only their observable contrast pixels. This
+        # makes the test exercise a real joint translation rather than a crop
+        # whose source and destination can leave duplicate detector edges.
+        $clearLeft = [Math]::Min($frameLeft, $topBarLeft) - 8
+        $clearRight = [Math]::Max($frameRight, $topBarRight) + 8
+        $clearTop = $TopBarTop - 8
+        $clearBottom = $LowerDecorationTop + 16
+        $graphics.FillRectangle(
+            [Drawing.Brushes]::Black,
+            $clearLeft,
+            $clearTop,
+            $clearRight - $clearLeft + 1,
+            $clearBottom - $clearTop + 1)
+
+        $graphics.DrawLine(
+            $pen,
+            $topBarLeft,
+            $TopBarTop + $DeltaY,
+            $topBarLeft,
+            $TopBarBottom - 1 + $DeltaY)
+        $graphics.DrawLine(
+            $pen,
+            $topBarRight,
+            $TopBarTop + $DeltaY,
+            $topBarRight,
+            $TopBarBottom - 1 + $DeltaY)
+        # Preserve the same three-row natural contour gap after the TopBar in
+        # both states. It keeps the independently decoded TopBar boundary
+        # unambiguous while the whole observable shape translates together.
+        $frameGapTop = $TopBarBottom + $DeltaY
+        foreach ($frameX in @($frameLeft, $frameRight))
+        {
+            $graphics.DrawLine(
+                $pen,
+                $frameX,
+                $frameTop + $DeltaY,
+                $frameX,
+                $frameGapTop - 1)
+            $graphics.DrawLine(
+                $pen,
+                $frameX,
+                $frameGapTop + 3,
+                $frameX,
+                $frameBottom + $DeltaY)
+        }
+
+        # Keep several seam rows observable without extending the dominant
+        # frame sides: the inset decoration edges are short and cannot win
+        # the long paired-side detector.
+        $decorationBrush = New-Object Drawing.SolidBrush $ContourColor
+        try
+        {
+            $graphics.FillRectangle(
+                $decorationBrush,
+                $frameLeft + 40,
+                $LowerDecorationTop + $DeltaY,
+                [int]$FrameBounds.width - 80,
+                24)
+        }
+        finally { $decorationBrush.Dispose() }
+
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $pen.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
 function Assert-LanLobbyFailedRoiDrawn(
     [string] $OutputDirectory,
     [string] $CaptureName,
@@ -1432,6 +1600,21 @@ try
     Assert-True ($report.portraitFrameConsensus.coordinateSpace -ceq 'frame-relative-to-own-decoded-topbar-and-lower-decoration') 'portrait-frame consensus must use decoded per-sample anchors'
     Assert-True ($report.portraitFrameConsensus.calculationRule -ceq 'median-of-eligible-reference-relative-offsets-even-mean-middle-two') 'portrait-frame consensus must name its deterministic median rule'
     Assert-True (@($report.portraitFrameConsensus.contributors).Count -eq 10) 'portrait-frame consensus must contain all ten eligible unoccluded reference contributors'
+    Assert-True (
+        $report.portraitFrameConsensus.pixelConsensus.pixelSource -ceq 'decoded-paired-side-local-rgb-contrast-pixels-only' -and
+        $report.portraitFrameConsensus.pixelConsensus.canonicalGrid.width -eq 257 -and
+        $report.portraitFrameConsensus.pixelConsensus.canonicalGrid.height -eq 513 -and
+        $report.portraitFrameConsensus.pixelConsensus.voteThreshold -eq 6 -and
+        @($report.portraitFrameConsensus.pixelConsensus.targetPixelKeys).Count -eq
+            $report.portraitFrameConsensus.pixelConsensus.targetPixelCount
+    ) 'portrait-frame consensus must publish its decoded-pixel grid, vote threshold, and exact deterministic target set'
+    foreach ($contributor in @($report.portraitFrameConsensus.contributors))
+    {
+        Assert-True (
+            $contributor.decodedContourPixelCount -gt 0 -and
+            $contributor.normalizedContourPixelCount -gt 0
+        ) "$($contributor.gateName) must report observed and normalized reference contour pixel counts"
+    }
     Assert-True (($report.portraitFrameConsensus.target.topBarHorizontalCenterDeltaPx -eq 0) -and
         ($report.portraitFrameConsensus.target.topBarWidthDeltaPx -eq 0)) 'portrait-frame horizontal consensus target must normalize to each sample top bar'
     foreach ($portraitFrameGate in $portraitFrameGates)
@@ -1440,6 +1623,17 @@ try
         Assert-True ($portraitFrameGate.passed) "$($portraitFrameGate.name) unchanged fixture must pass; actual=$($portraitFrameGate.actualVisibleBounds | ConvertTo-Json -Compress), reference=$($portraitFrameGate.referenceVisibleBounds | ConvertTo-Json -Compress), relation=$($portraitFrameGate.portraitFrameRelation | ConvertTo-Json -Compress)"
         Assert-True (($portraitFrameGate.absolutePlacement.acceptanceRole -ceq 'diagnostic-only') -and
             $portraitFrameGate.relativePlacement.passed) "$($portraitFrameGate.name) must block on relative placement while retaining absolute diagnostics"
+        Assert-True (
+            $null -ne $portraitFrameGate.relativePlacement.topBarVisibleBounds -and
+            [int]$portraitFrameGate.relativePlacement.topBarVisibleBounds.width -gt 0 -and
+            [int]$portraitFrameGate.relativePlacement.topBarVisibleBounds.height -gt 0
+        ) "$($portraitFrameGate.name) must report the decoded own-TopBar bounds used by relative placement"
+        Assert-True (
+            $portraitFrameGate.relativePlacement.contour.pixelKind -ceq 'decoded-normalized-paired-side-contour' -and
+            $portraitFrameGate.relativePlacement.contour.actualDecodedPixelCount -gt 0 -and
+            $portraitFrameGate.relativePlacement.contour.targetConsensusPixelCount -eq
+                $report.portraitFrameConsensus.pixelConsensus.targetPixelCount
+        ) "$($portraitFrameGate.name) Jaccard must use decoded normalized contour pixels and the published consensus target"
         Assert-True ($portraitFrameGate.portraitFrameRelation.passed) "$($portraitFrameGate.name) relation must pass"
         Assert-True ($portraitFrameGate.sharedGeometryPassed) "$($portraitFrameGate.name) shared geometry must pass"
         Assert-True (($portraitFrameGate.portraitFrameRelation.thresholds.maximumHorizontalCenterDeltaPx -eq 2) -and
@@ -1467,6 +1661,7 @@ try
     $baselineRoomFailures = @($report.roomGates | Where-Object { $_.status -eq 'Failed' } | ForEach-Object { "$($_.name):$($_.reason):j=$($_.contour.jaccard):edges=$($_.edgeDeltaPx.left)/$($_.edgeDeltaPx.top)/$($_.edgeDeltaPx.right)/$($_.edgeDeltaPx.bottom)" })
     Assert-True ($baselineRoomFailures.Count -eq 0) "baseline room visible-pixel gates must pass; failed: $($baselineRoomFailures -join ' | ')"
 
+    $translationBaselinePortraitGate = @($report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
     $translatedPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-with-bars-horizontal-translation' {
         param($manifest, $caseCaptureDirectory)
         Shift-LanLobbyFixtureRegion (Join-Path $caseCaptureDirectory 'room-host.png') (New-Object Drawing.Rectangle 225,170,322,561) 5 0
@@ -1477,6 +1672,93 @@ try
         $translatedPortraitGate.relativePlacement.passed -and
         ([Math]::Abs([double]$translatedPortraitGate.absolutePlacement.centerDeltaPx.deltaX) -gt 2)
     ) 'translating a decoded frame together with its own bars must preserve blocking relative placement while absolute diagnostics move'
+
+    $verticalFixtureSourceGate = @($report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    $verticalTranslationTopBarBottom = [int]$verticalFixtureSourceGate.relativePlacement.normalizedTargetBounds.y -
+        [int]$verticalFixtureSourceGate.relativePlacement.targetMetrics.frameTopFromTopBarBottomPx - 3
+    $verticalTranslationBaselineResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-with-bars-vertical-baseline' {
+        param($manifest, $caseCaptureDirectory)
+        Draw-LanLobbyJointTranslatedPortraitAnchors `
+            (Join-Path $caseCaptureDirectory 'room-host.png') `
+            $verticalFixtureSourceGate.actualVisibleBounds `
+            $verticalFixtureSourceGate.relativePlacement.normalizedTargetBounds `
+            170 `
+            $verticalTranslationTopBarBottom `
+            ([int]$verticalFixtureSourceGate.relativePlacement.lowerDecorationTop.y) `
+            0 `
+            ([Drawing.Color]::FromArgb(255, 105, 105, 105))
+    }
+    $verticalTranslationBaseline = @($verticalTranslationBaselineResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    Assert-True (
+        $verticalTranslationBaseline.passed -and
+        $verticalTranslationBaseline.relativePlacement.passed -and
+        [double]$verticalTranslationBaseline.relativePlacement.contour.jaccard -ge 0.95
+    ) "the pre-positioned joint vertical baseline must pass the unchanged production thresholds; gate=$($verticalTranslationBaseline | ConvertTo-Json -Depth 8 -Compress)"
+    $verticalTranslatedPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-with-bars-vertical-translation' {
+        param($manifest, $caseCaptureDirectory)
+        Draw-LanLobbyJointTranslatedPortraitAnchors `
+            (Join-Path $caseCaptureDirectory 'room-host.png') `
+            $verticalFixtureSourceGate.actualVisibleBounds `
+            $verticalFixtureSourceGate.relativePlacement.normalizedTargetBounds `
+            170 `
+            $verticalTranslationTopBarBottom `
+            ([int]$verticalFixtureSourceGate.relativePlacement.lowerDecorationTop.y) `
+            3 `
+            ([Drawing.Color]::FromArgb(255, 105, 105, 105))
+    }
+    $verticalTranslatedPortraitGate = @($verticalTranslatedPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    Assert-True (
+        $verticalTranslatedPortraitGate.passed -and
+        $verticalTranslatedPortraitGate.relativePlacement.passed -and
+        ([double]$verticalTranslatedPortraitGate.absolutePlacement.centerDeltaPx.deltaY -
+            [double]$verticalTranslationBaseline.absolutePlacement.centerDeltaPx.deltaY -eq 3) -and
+        ([double]$verticalTranslatedPortraitGate.relativePlacement.contour.jaccard -ge 0.95)
+    ) "vertically translating a decoded frame with its own TopBar and LowerDecoration must preserve relative placement and actual-pixel Jaccard while absolute Y diagnostics move; baselineAbsolute=$($verticalTranslationBaseline.absolutePlacement.centerDeltaPx | ConvertTo-Json -Compress), translatedAbsolute=$($verticalTranslatedPortraitGate.absolutePlacement.centerDeltaPx | ConvertTo-Json -Compress), baselineJaccard=$($verticalTranslationBaseline.relativePlacement.contour.jaccard), translatedJaccard=$($verticalTranslatedPortraitGate.relativePlacement.contour.jaccard), status=$($verticalTranslatedPortraitGate.status), relative=$($verticalTranslatedPortraitGate.relativePlacement | ConvertTo-Json -Depth 8 -Compress), relation=$($verticalTranslatedPortraitGate.portraitFrameRelation | ConvertTo-Json -Compress)"
+    Assert-True (
+        [int]$verticalTranslatedPortraitGate.actualVisibleBounds.y -
+            [int]$verticalTranslationBaseline.actualVisibleBounds.y -eq 3 -and
+        ([int]$verticalTranslatedPortraitGate.actualVisibleBounds.y +
+            [int]$verticalTranslatedPortraitGate.actualVisibleBounds.height) -
+            ([int]$verticalTranslationBaseline.actualVisibleBounds.y +
+                [int]$verticalTranslationBaseline.actualVisibleBounds.height) -eq 3 -and
+        [int]$verticalTranslatedPortraitGate.relativePlacement.topBarVisibleBounds.y -
+            [int]$verticalTranslationBaseline.relativePlacement.topBarVisibleBounds.y -eq 3 -and
+        ([int]$verticalTranslatedPortraitGate.relativePlacement.topBarVisibleBounds.y +
+            [int]$verticalTranslatedPortraitGate.relativePlacement.topBarVisibleBounds.height) -
+            ([int]$verticalTranslationBaseline.relativePlacement.topBarVisibleBounds.y +
+                [int]$verticalTranslationBaseline.relativePlacement.topBarVisibleBounds.height) -eq 3 -and
+        [int]$verticalTranslatedPortraitGate.relativePlacement.normalizedTargetBounds.y -
+            [int]$verticalTranslationBaseline.relativePlacement.normalizedTargetBounds.y -eq 3 -and
+        [int]$verticalTranslatedPortraitGate.relativePlacement.lowerDecorationTop.y -
+            [int]$verticalTranslationBaseline.relativePlacement.lowerDecorationTop.y -eq 3
+    ) "joint vertical fixture must move the decoded frame top/bottom, TopBar-derived target, and LowerDecoration anchor by exactly 3 px; baselineFrame=$($verticalTranslationBaseline.actualVisibleBounds | ConvertTo-Json -Compress), translatedFrame=$($verticalTranslatedPortraitGate.actualVisibleBounds | ConvertTo-Json -Compress), baselineTopBar=$($verticalTranslationBaseline.relativePlacement.topBarVisibleBounds | ConvertTo-Json -Compress), translatedTopBar=$($verticalTranslatedPortraitGate.relativePlacement.topBarVisibleBounds | ConvertTo-Json -Compress), baselineTargetY=$($verticalTranslationBaseline.relativePlacement.normalizedTargetBounds.y), translatedTargetY=$($verticalTranslatedPortraitGate.relativePlacement.normalizedTargetBounds.y), baselineLowerY=$($verticalTranslationBaseline.relativePlacement.lowerDecorationTop.y), translatedLowerY=$($verticalTranslatedPortraitGate.relativePlacement.lowerDecorationTop.y)"
+
+    $frameOnlyVerticalResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-only-vertical-translation' {
+        param($manifest, $caseCaptureDirectory)
+        Shift-LanLobbyPortraitContourVerticallyWithoutBars `
+            (Join-Path $caseCaptureDirectory 'room-host.png') `
+            $translationBaselinePortraitGate.actualVisibleBounds `
+            3 `
+            ([Drawing.Color]::FromArgb(255, 0, 220, 220))
+    }
+    $frameOnlyVerticalGate = @($frameOnlyVerticalResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
+    Assert-True (
+        $frameOnlyVerticalGate.relativePlacement.topBarVisibleBounds.y -eq
+            $translationBaselinePortraitGate.relativePlacement.topBarVisibleBounds.y -and
+        $frameOnlyVerticalGate.relativePlacement.topBarVisibleBounds.height -eq
+            $translationBaselinePortraitGate.relativePlacement.topBarVisibleBounds.height -and
+        $frameOnlyVerticalGate.relativePlacement.lowerDecorationTop.y -eq
+            $translationBaselinePortraitGate.relativePlacement.lowerDecorationTop.y -and
+        $frameOnlyVerticalGate.relativePlacement.normalizedTargetBounds.y -eq
+            $translationBaselinePortraitGate.relativePlacement.normalizedTargetBounds.y
+    ) 'frame-only vertical mutation must leave decoded TopBar and LowerDecoration anchors fixed'
+    Assert-True (
+        ($frameOnlyVerticalGate.status -ceq 'Failed') -and
+        (-not $frameOnlyVerticalGate.relativePlacement.passed) -and
+        $frameOnlyVerticalGate.relativePlacement.edgeDeltaPx.top -eq 3 -and
+        $frameOnlyVerticalGate.relativePlacement.edgeDeltaPx.bottom -eq 3 -and
+        ([Math]::Abs([double]$frameOnlyVerticalGate.relativePlacement.centerDeltaPx.deltaY) -gt 2)
+    ) 'moving only the decoded frame contour by 3 px vertically must fail unchanged center threshold while own anchors stay fixed'
 
     $tintNormalizedResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-tint-normalized-silhouette' {
         param($manifest, $caseCaptureDirectory)
@@ -1508,6 +1790,26 @@ try
         $interiorPortraitGate.actualVisibleBounds.width -eq $baselinePortraitGate.actualVisibleBounds.width -and
         $interiorPortraitGate.actualVisibleBounds.height -eq $baselinePortraitGate.actualVisibleBounds.height
     ) 'interior state/profile pixels must not change the accepted portrait-frame edge geometry'
+
+    $sparsePortraitBaseline = @($report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    $sparsePortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-same-bounds-sparse-contour' {
+        param($manifest, $caseCaptureDirectory)
+        Remove-LanLobbyPortraitContourPixelsPreservingBounds `
+            (Join-Path $caseCaptureDirectory 'room-host.png') `
+            $sparsePortraitBaseline.actualVisibleBounds
+    }
+    $sparsePortraitGate = @($sparsePortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    Assert-True (
+        $sparsePortraitGate.actualVisibleBounds.x -eq $sparsePortraitBaseline.actualVisibleBounds.x -and
+        $sparsePortraitGate.actualVisibleBounds.y -eq $sparsePortraitBaseline.actualVisibleBounds.y -and
+        $sparsePortraitGate.actualVisibleBounds.width -eq $sparsePortraitBaseline.actualVisibleBounds.width -and
+        $sparsePortraitGate.actualVisibleBounds.height -eq $sparsePortraitBaseline.actualVisibleBounds.height
+    ) "removing observed contour pixels must preserve the dedicated sparse-contour fixture extrema; baseline=$($sparsePortraitBaseline.actualVisibleBounds | ConvertTo-Json -Compress), sparse=$($sparsePortraitGate.actualVisibleBounds | ConvertTo-Json -Compress)"
+    Assert-True (
+        ($sparsePortraitGate.status -ceq 'Failed') -and
+        (-not $sparsePortraitGate.relativePlacement.passed) -and
+        ([double]$sparsePortraitGate.relativePlacement.contour.jaccard -lt 0.95)
+    ) 'same portrait-frame bounds with a sparse decoded contour must fail the actual-pixel Jaccard gate'
 
     $shiftedPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-horizontal-shift' {
         param($manifest, $caseCaptureDirectory)

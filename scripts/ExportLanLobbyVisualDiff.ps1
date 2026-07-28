@@ -26,6 +26,7 @@ public sealed class LanLobbyBoundsMeasurement
     public bool Available { get; set; }
     public LanLobbyVisualBounds Bounds { get; set; }
     public int PixelCount { get; set; }
+    public int[] ContourCoordinates { get; set; }
     public string FailureReason { get; set; }
 }
 public sealed class LanLobbyMaskComparison
@@ -80,14 +81,20 @@ public static class LanLobbyVisualDiff {
             : sorted[middle];
     }
     static LanLobbyBoundsMeasurement Unavailable(string failureReason) {
-        return new LanLobbyBoundsMeasurement { Available=false, Bounds=null, PixelCount=0, FailureReason=failureReason };
+        return new LanLobbyBoundsMeasurement {
+            Available=false, Bounds=null, PixelCount=0,
+            ContourCoordinates=new int[0], FailureReason=failureReason
+        };
     }
-    static LanLobbyBoundsMeasurement AvailableBounds(int minX, int minY, int maxX, int maxY, int pixelCount=0) {
+    static LanLobbyBoundsMeasurement AvailableBounds(
+        int minX, int minY, int maxX, int maxY, int pixelCount=0,
+        int[] contourCoordinates=null) {
         if (maxX < minX || maxY < minY) return Unavailable("No qualifying decoded pixels found.");
         return new LanLobbyBoundsMeasurement {
             Available=true,
             Bounds=new LanLobbyVisualBounds { X=minX, Y=minY, Width=maxX-minX+1, Height=maxY-minY+1 },
             PixelCount=pixelCount,
+            ContourCoordinates=contourCoordinates ?? new int[0],
             FailureReason=null
         };
     }
@@ -210,6 +217,7 @@ public static class LanLobbyVisualDiff {
         if(leftX<0 || rightX<0 || rightX<=leftX)
             return Unavailable("No dominant decoded portrait-frame side-edge pair found.");
         int minY=search.Bottom,maxY=-1,pairedRows=0;
+        var contourCoordinates=new List<int>();
         for(int y=search.Y;y<search.Bottom;y++) {
             bool leftEdge=NormalizedHorizontalContrast(
                 bitmap,search,exclusions,leftX,y,-1)>=minimumNormalizedContrast;
@@ -219,10 +227,16 @@ public static class LanLobbyVisualDiff {
             pairedRows++;
             minY=Math.Min(minY,y);
             maxY=Math.Max(maxY,y);
+            contourCoordinates.Add(leftX);
+            contourCoordinates.Add(y);
+            contourCoordinates.Add(rightX);
+            contourCoordinates.Add(y);
         }
         return pairedRows==0
             ? Unavailable("Dominant portrait-frame sides have no paired decoded vertical continuity.")
-            : AvailableBounds(leftX,minY,rightX,maxY,leftCount+rightCount+pairedRows*2);
+            : AvailableBounds(
+                leftX,minY,rightX,maxY,pairedRows*2,
+                contourCoordinates.ToArray());
     }
     static double NormalizedHorizontalContrast(
         Bitmap bitmap, Rectangle search, Rectangle[] exclusions,
@@ -1326,6 +1340,7 @@ function Get-LanLobbyVisibleBounds
             bounds=$null
             center=$null
             pixelCount=0
+            contourCoordinates=@()
         }
     }
     $bounds = $measurement.Bounds
@@ -1338,6 +1353,7 @@ function Get-LanLobbyVisibleBounds
             y=$bounds.Y + ($bounds.Height - 1) / 2.0
         }
         pixelCount=[int]$measurement.PixelCount
+        contourCoordinates=@([int[]]$measurement.ContourCoordinates)
     }
 }
 
@@ -1365,6 +1381,7 @@ function Get-LanLobbyPortraitFrameEdgeBounds
             bounds=$null
             center=$null
             pixelCount=0
+            contourCoordinates=@()
         }
     }
     $bounds = $measurement.Bounds
@@ -1377,6 +1394,7 @@ function Get-LanLobbyPortraitFrameEdgeBounds
             y=$bounds.Y + ($bounds.Height - 1) / 2.0
         }
         pixelCount=[int]$measurement.PixelCount
+        contourCoordinates=@([int[]]$measurement.ContourCoordinates)
     }
 }
 
@@ -1411,6 +1429,110 @@ function Get-LanLobbyDeterministicMedian([double[]] $Values)
     $middle = [int][Math]::Floor($sorted.Count / 2.0)
     if ($sorted.Count % 2 -eq 1) { return [double]$sorted[$middle] }
     return ([double]$sorted[$middle-1]+[double]$sorted[$middle])/2.0
+}
+
+function ConvertTo-LanLobbyNormalizedPortraitContour
+{
+    param(
+        [Parameter(Mandatory)] $FramePlacement,
+        [Parameter(Mandatory)] $TopBarPlacement,
+        [Parameter(Mandatory)] $LowerDecorationTop,
+        [Parameter(Mandatory)] $TargetMetrics
+    )
+
+    if (-not $FramePlacement.available -or -not $TopBarPlacement.available -or -not $LowerDecorationTop.available)
+    {
+        throw 'Portrait contour normalization requires decoded frame, TopBar, and LowerDecoration pixels.'
+    }
+    [int[]]$coordinates = @($FramePlacement.contourCoordinates)
+    if ($coordinates.Count -eq 0 -or $coordinates.Count % 2 -ne 0)
+    {
+        throw "Portrait contour normalization requires nonempty decoded x/y pairs; found $($coordinates.Count) integers."
+    }
+
+    # The canonical grid is a relative coordinate space, not an inferred
+    # rectangle. Each observed decoded contour pixel maps to exactly one cell.
+    # No line, bounds interior, source aperture, ROI, or manifest pixel is added.
+    $gridWidth = 257
+    $gridHeight = 513
+    $topBarBottomCell = [int][Math]::Round(
+        -[double]$TargetMetrics.frameTopFromTopBarBottomPx,
+        [MidpointRounding]::AwayFromZero)
+    $lowerDecorationTopCell = ($gridHeight-1)-[int][Math]::Round(
+        [double]$TargetMetrics.frameBottomFromLowerDecorationTopPx,
+        [MidpointRounding]::AwayFromZero)
+    if ($topBarBottomCell -lt 0 -or $lowerDecorationTopCell -ge $gridHeight -or
+        $lowerDecorationTopCell -le $topBarBottomCell)
+    {
+        throw "Portrait contour target anchors do not fit the ${gridWidth}x${gridHeight} canonical grid."
+    }
+
+    $topBarLeft = [double]$TopBarPlacement.bounds.x
+    $topBarRight = $topBarLeft+[double]$TopBarPlacement.bounds.width-1.0
+    $topBarWidth = $topBarRight-$topBarLeft
+    $topBarBottom = [double]$TopBarPlacement.bounds.y+[double]$TopBarPlacement.bounds.height
+    $lowerTop = [double]$LowerDecorationTop.y
+    $anchorSpan = $lowerTop-$topBarBottom
+    if ($topBarWidth -le 0 -or $anchorSpan -le 0)
+    {
+        throw "Portrait contour normalization requires positive own-anchor spans; width=$topBarWidth, vertical=$anchorSpan."
+    }
+
+    $keys = New-Object 'System.Collections.Generic.HashSet[int]'
+    for ($index=0; $index -lt $coordinates.Count; $index+=2)
+    {
+        $pixelX = [double]$coordinates[$index]
+        $pixelY = [double]$coordinates[$index+1]
+        $normalizedX = [int][Math]::Round(
+            ($pixelX-$topBarLeft)*($gridWidth-1)/$topBarWidth,
+            [MidpointRounding]::AwayFromZero)
+        $normalizedY = if ($pixelY -lt $topBarBottom) {
+            $topBarBottomCell+[int][Math]::Round(
+                $pixelY-$topBarBottom,
+                [MidpointRounding]::AwayFromZero)
+        } elseif ($pixelY -gt $lowerTop) {
+            $lowerDecorationTopCell+[int][Math]::Round(
+                $pixelY-$lowerTop,
+                [MidpointRounding]::AwayFromZero)
+        } else {
+            $topBarBottomCell+[int][Math]::Round(
+                ($pixelY-$topBarBottom)*
+                ($lowerDecorationTopCell-$topBarBottomCell)/$anchorSpan,
+                [MidpointRounding]::AwayFromZero)
+        }
+        $normalizedX = [Math]::Max(0,[Math]::Min($gridWidth-1,$normalizedX))
+        $normalizedY = [Math]::Max(0,[Math]::Min($gridHeight-1,$normalizedY))
+        [void]$keys.Add($normalizedY*$gridWidth+$normalizedX)
+    }
+    return [pscustomobject][ordered]@{
+        keys=[int[]]@($keys | Sort-Object)
+        decodedPixelCount=[int]($coordinates.Count/2)
+        normalizedPixelCount=[int]$keys.Count
+        gridWidth=$gridWidth
+        gridHeight=$gridHeight
+        topBarBottomCell=$topBarBottomCell
+        lowerDecorationTopCell=$lowerDecorationTopCell
+    }
+}
+
+function Measure-LanLobbyPortraitContourJaccard
+{
+    param(
+        [Parameter(Mandatory)] [int[]] $ActualKeys,
+        [Parameter(Mandatory)] [int[]] $TargetKeys
+    )
+    $actual = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($key in $ActualKeys) { [void]$actual.Add([int]$key) }
+    $target = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($key in $TargetKeys) { [void]$target.Add([int]$key) }
+    $intersection = 0
+    foreach ($key in $actual) { if ($target.Contains($key)) { $intersection++ } }
+    $union = $actual.Count+$target.Count-$intersection
+    return [pscustomobject][ordered]@{
+        intersectionPixels=[int]$intersection
+        unionPixels=[int]$union
+        jaccard=$(if ($union -eq 0) { 0.0 } else { [Math]::Round($intersection/[double]$union,6) })
+    }
 }
 
 function Get-LanLobbyPortraitRelativeMetrics
@@ -1448,6 +1570,7 @@ function Get-LanLobbyPortraitFrameConsensus
     )
 
     $contributors = @()
+    $contourSamples = @{}
     foreach ($capture in @($RoomCaptures | Sort-Object name))
     {
         $captureName = [string]$capture.name
@@ -1484,6 +1607,11 @@ function Get-LanLobbyPortraitFrameConsensus
                     lowerDecorationTopY=[int]$lowerTop.y
                     relativeMetrics=$metrics
                 }
+                $contourSamples[[string]$gate.name] = [pscustomobject]@{
+                    frame=$frame
+                    topBar=$topBar
+                    lowerTop=$lowerTop
+                }
             }
         }
         finally
@@ -1502,17 +1630,60 @@ function Get-LanLobbyPortraitFrameConsensus
     $bottomMedian = Get-LanLobbyDeterministicMedian ([double[]]@(
         $contributors | ForEach-Object { [double]$_.relativeMetrics.frameBottomFromLowerDecorationTopPx }
     ))
+    $targetMetrics = [pscustomobject][ordered]@{
+        topBarHorizontalCenterDeltaPx=0.0
+        topBarWidthDeltaPx=0.0
+        frameTopFromTopBarBottomPx=[double]$topMedian
+        frameBottomFromLowerDecorationTopPx=[double]$bottomMedian
+    }
+    $voteThreshold = 6
+    $gridWidth = 257
+    $gridHeight = 513
+    [int[]]$pixelVotes = New-Object int[] ($gridWidth*$gridHeight)
+    foreach ($contributor in $contributors)
+    {
+        $sample = $contourSamples[[string]$contributor.gateName]
+        $normalized = ConvertTo-LanLobbyNormalizedPortraitContour `
+            -FramePlacement $sample.frame `
+            -TopBarPlacement $sample.topBar `
+            -LowerDecorationTop $sample.lowerTop `
+            -TargetMetrics $targetMetrics
+        $contributor | Add-Member -NotePropertyName decodedContourPixelCount -NotePropertyValue ([int]$normalized.decodedPixelCount)
+        $contributor | Add-Member -NotePropertyName normalizedContourPixelCount -NotePropertyValue ([int]$normalized.normalizedPixelCount)
+        foreach ($key in [int[]]$normalized.keys) { $pixelVotes[$key]++ }
+    }
+    $targetPixelKeys = New-Object 'System.Collections.Generic.List[int]'
+    for ($key=0; $key -lt $pixelVotes.Length; $key++)
+    {
+        if ($pixelVotes[$key] -ge $voteThreshold) { $targetPixelKeys.Add($key) }
+    }
+    if ($targetPixelKeys.Count -eq 0)
+    {
+        throw 'Portrait-frame decoded-pixel consensus produced zero target contour pixels.'
+    }
     return [pscustomobject][ordered]@{
         acceptanceRole='blocking'
         coordinateSpace='frame-relative-to-own-decoded-topbar-and-lower-decoration'
         calculationRule='median-of-eligible-reference-relative-offsets-even-mean-middle-two'
         contributorCount=$contributors.Count
         contributors=@($contributors)
-        target=[pscustomobject][ordered]@{
-            topBarHorizontalCenterDeltaPx=0.0
-            topBarWidthDeltaPx=0.0
-            frameTopFromTopBarBottomPx=[double]$topMedian
-            frameBottomFromLowerDecorationTopPx=[double]$bottomMedian
+        target=$targetMetrics
+        pixelConsensus=[pscustomobject][ordered]@{
+            pixelSource='decoded-paired-side-local-rgb-contrast-pixels-only'
+            canonicalGrid=[pscustomobject][ordered]@{
+                width=$gridWidth
+                height=$gridHeight
+                topBarLeftCell=0
+                topBarRightCell=$gridWidth-1
+                topBarBottomCell=[int][Math]::Round(-$topMedian,[MidpointRounding]::AwayFromZero)
+                lowerDecorationTopCell=($gridHeight-1)-[int][Math]::Round($bottomMedian,[MidpointRounding]::AwayFromZero)
+            }
+            alignmentRule='nearest-integer-map-of-each-observed-pixel-by-own-decoded-topbar-horizontal-span-and-own-topbar-bottom-to-lower-decoration-top-vertical-anchors-no-fill'
+            aggregationRule='include-canonical-pixel-observed-by-at-least-six-of-ten-eligible-reference-contributors'
+            voteThreshold=$voteThreshold
+            contributorCount=$contributors.Count
+            targetPixelCount=$targetPixelKeys.Count
+            targetPixelKeys=[int[]]$targetPixelKeys.ToArray()
         }
     }
 }
@@ -1544,12 +1715,14 @@ function Measure-LanLobbyPortraitRelativePlacement
     {
         throw "Portrait-frame relative consensus produced a non-positive target size: ${targetWidth}x${targetHeight}."
     }
-    $intersectionWidth = [Math]::Max(0.0,[Math]::Min($actualRight,$targetRight)-[Math]::Max($actualLeft,$targetLeft))
-    $intersectionHeight = [Math]::Max(0.0,[Math]::Min($actualBottom,$targetBottom)-[Math]::Max($actualTop,$targetTop))
-    $intersection = $intersectionWidth*$intersectionHeight
-    $union = ([double]$FramePlacement.bounds.width*[double]$FramePlacement.bounds.height)+
-        ($targetWidth*$targetHeight)-$intersection
-    $jaccard = if ($union -le 0) { 0.0 } else { $intersection/$union }
+    $normalizedActualContour = ConvertTo-LanLobbyNormalizedPortraitContour `
+        -FramePlacement $FramePlacement `
+        -TopBarPlacement $TopBarPlacement `
+        -LowerDecorationTop $LowerDecorationTop `
+        -TargetMetrics $Consensus.target
+    $pixelJaccard = Measure-LanLobbyPortraitContourJaccard `
+        -ActualKeys ([int[]]$normalizedActualContour.keys) `
+        -TargetKeys ([int[]]$Consensus.pixelConsensus.targetPixelKeys)
     $edgeDelta = [pscustomobject][ordered]@{
         unit='px'
         left=[double]$actualMetrics.frameLeftFromTopBarLeftPx
@@ -1568,9 +1741,17 @@ function Measure-LanLobbyPortraitRelativePlacement
         deltaHeight=[double]$FramePlacement.bounds.height-$targetHeight
     }
     $contour = [pscustomobject][ordered]@{
-        intersectionPixels=[Math]::Round($intersection,3)
-        unionPixels=[Math]::Round($union,3)
-        jaccard=[Math]::Round($jaccard,6)
+        pixelKind='decoded-normalized-paired-side-contour'
+        intersectionPixels=[int]$pixelJaccard.intersectionPixels
+        unionPixels=[int]$pixelJaccard.unionPixels
+        jaccard=[double]$pixelJaccard.jaccard
+        actualDecodedPixelCount=[int]$normalizedActualContour.decodedPixelCount
+        actualNormalizedPixelCount=[int]$normalizedActualContour.normalizedPixelCount
+        targetConsensusPixelCount=[int]$Consensus.pixelConsensus.targetPixelCount
+        canonicalGrid=$Consensus.pixelConsensus.canonicalGrid
+        alignmentRule=[string]$Consensus.pixelConsensus.alignmentRule
+        aggregationRule=[string]$Consensus.pixelConsensus.aggregationRule
+        voteThreshold=[int]$Consensus.pixelConsensus.voteThreshold
     }
     $passed =
         [Math]::Abs([double]$edgeDelta.left) -le [double]$Thresholds.maximumEdgeErrorPx -and
@@ -1585,6 +1766,7 @@ function Measure-LanLobbyPortraitRelativePlacement
         coordinateSpace=[string]$Consensus.coordinateSpace
         actualMetrics=$actualMetrics
         targetMetrics=$Consensus.target
+        topBarVisibleBounds=[pscustomobject]$TopBarPlacement.bounds
         lowerDecorationTop=[pscustomobject]$LowerDecorationTop
         normalizedTargetBounds=[pscustomobject][ordered]@{
             x=$targetLeft;y=$targetTop;width=$targetWidth;height=$targetHeight
@@ -3761,13 +3943,14 @@ try
         '',
         "portraitFrameConsensus: acceptanceRole=$($portraitFrameConsensus.acceptanceRole); coordinateSpace=$($portraitFrameConsensus.coordinateSpace); calculationRule=$($portraitFrameConsensus.calculationRule); contributors=$($portraitFrameConsensus.contributorCount).",
         "Target: centerFromOwnTopBar=$($portraitFrameConsensus.target.topBarHorizontalCenterDeltaPx) px; widthFromOwnTopBar=$($portraitFrameConsensus.target.topBarWidthDeltaPx) px; topFromOwnTopBarBottom=$($portraitFrameConsensus.target.frameTopFromTopBarBottomPx) px; bottomFromOwnLowerDecorationTop=$($portraitFrameConsensus.target.frameBottomFromLowerDecorationTopPx) px.",
+        "Pixel consensus: source=$($portraitFrameConsensus.pixelConsensus.pixelSource); grid=$($portraitFrameConsensus.pixelConsensus.canonicalGrid.width)x$($portraitFrameConsensus.pixelConsensus.canonicalGrid.height); alignment=$($portraitFrameConsensus.pixelConsensus.alignmentRule); aggregation=$($portraitFrameConsensus.pixelConsensus.aggregationRule); voteThreshold=$($portraitFrameConsensus.pixelConsensus.voteThreshold)/$($portraitFrameConsensus.pixelConsensus.contributorCount); targetPixels=$($portraitFrameConsensus.pixelConsensus.targetPixelCount).",
         '',
-        '| Gate | Capture | Slot | Figure | Reference frame | Reference top bar | Lower top Y | Relative metrics |',
-        '| --- | --- | ---: | --- | --- | --- | ---: | --- |'
+        '| Gate | Capture | Slot | Figure | Reference frame | Reference top bar | Lower top Y | Relative metrics | Decoded/normalized contour pixels |',
+        '| --- | --- | ---: | --- | --- | --- | ---: | --- | --- |'
     )
     foreach ($contributor in @($portraitFrameConsensus.contributors))
     {
-        $markdown += "| $($contributor.gateName) | $($contributor.capture) | $($contributor.slotNumber) | $($contributor.referenceFigure) | $($contributor.frameVisibleBounds | ConvertTo-Json -Compress) | $($contributor.topBarVisibleBounds | ConvertTo-Json -Compress) | $($contributor.lowerDecorationTopY) | $($contributor.relativeMetrics | ConvertTo-Json -Compress) |"
+        $markdown += "| $($contributor.gateName) | $($contributor.capture) | $($contributor.slotNumber) | $($contributor.referenceFigure) | $($contributor.frameVisibleBounds | ConvertTo-Json -Compress) | $($contributor.topBarVisibleBounds | ConvertTo-Json -Compress) | $($contributor.lowerDecorationTopY) | $($contributor.relativeMetrics | ConvertTo-Json -Compress) | $($contributor.decodedContourPixelCount)/$($contributor.normalizedContourPixelCount) |"
     }
     $markdown += @(
         '',
