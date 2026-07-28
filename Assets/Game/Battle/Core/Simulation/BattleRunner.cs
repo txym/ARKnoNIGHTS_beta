@@ -101,6 +101,31 @@ namespace ArknoNights.Battle.Core
         }
     }
 
+    internal sealed class RuntimeDamageOverTimeState
+    {
+        internal RuntimeDamageOverTimeState(
+            string abilityId,
+            int damagePerSecond,
+            int expiresAtTick)
+        {
+            AbilityId = abilityId;
+            DamagePerSecond = damagePerSecond;
+            ExpiresAtTick = expiresAtTick;
+        }
+
+        internal string AbilityId { get; }
+        internal int DamagePerSecond { get; private set; }
+        internal int ExpiresAtTick { get; private set; }
+
+        internal void Refresh(
+            int damagePerSecond,
+            int expiresAtTick)
+        {
+            DamagePerSecond = damagePerSecond;
+            ExpiresAtTick = expiresAtTick;
+        }
+    }
+
     public sealed class RuntimeUnitState
     {
         private readonly List<string> blockedUnitIds = new List<string>();
@@ -108,6 +133,9 @@ namespace ArknoNights.Battle.Core
         private readonly List<IExternalCombatModifierDefinition>
             auraCombatModifiers =
                 new List<IExternalCombatModifierDefinition>();
+        private readonly List<RuntimeDamageOverTimeState>
+            damageOverTimeStates =
+                new List<RuntimeDamageOverTimeState>();
 
         internal RuntimeUnitState(
             string unitId,
@@ -514,6 +542,67 @@ namespace ArknoNights.Battle.Core
                     new KeyValuePair<string, AttackAreaDamageModifierDefinition>(
                         item.Definition.AbilityId,
                         item.Definition.AttackAreaDamageModifier));
+        internal IEnumerable<KeyValuePair<string, OnHitDamageOverTimeEffectDefinition>>
+            OnHitDamageOverTimeEffects =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.OnHitDamageOverTimeEffect != null)
+                .Select(item =>
+                    new KeyValuePair<string, OnHitDamageOverTimeEffectDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.OnHitDamageOverTimeEffect));
+        internal void ApplyOrRefreshDamageOverTime(
+            string abilityId,
+            int damagePerSecond,
+            int expiresAtTick)
+        {
+            var existing = damageOverTimeStates.FirstOrDefault(item =>
+                string.Equals(
+                    item.AbilityId,
+                    abilityId,
+                    StringComparison.Ordinal));
+            if (existing != null)
+            {
+                existing.Refresh(
+                    damagePerSecond,
+                    expiresAtTick);
+                return;
+            }
+            damageOverTimeStates.Add(
+                new RuntimeDamageOverTimeState(
+                    abilityId,
+                    damagePerSecond,
+                    expiresAtTick));
+            damageOverTimeStates.Sort((left, right) =>
+                StringComparer.Ordinal.Compare(
+                    left.AbilityId,
+                    right.AbilityId));
+        }
+        internal void ExpireDamageOverTime(int currentTick)
+        {
+            damageOverTimeStates.RemoveAll(item =>
+                currentTick >= item.ExpiresAtTick);
+        }
+        internal int ActiveDamageOverTimePerSecond
+        {
+            get
+            {
+                var total = damageOverTimeStates.Sum(item =>
+                    (long)item.DamagePerSecond);
+                return total >= int.MaxValue
+                    ? int.MaxValue
+                    : (int)total;
+            }
+        }
+        internal void AppendDamageOverTimeSummary(
+            StringBuilder builder)
+        {
+            foreach (var item in damageOverTimeStates)
+                builder.Append(",dot:")
+                    .Append(item.AbilityId).Append(':')
+                    .Append(item.DamagePerSecond).Append(':')
+                    .Append(item.ExpiresAtTick);
+        }
         internal void SetAuraCombatModifiers(
             IEnumerable<IExternalCombatModifierDefinition> modifiers)
         {
@@ -905,11 +994,28 @@ namespace ArknoNights.Battle.Core
                 target.CurrentHitPoints = Math.Max(0, before - total);
                 foreach (var hit in hits) Emit(BattleEventType.Damage, hit.Attack.AttackerUnitId, null, hit.Attack.TargetUnitId, null, null, hit.Attack.DamageType, hit.Amount, before, target.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None);
                 foreach (var hit in hits.Where(item => item.Amount > 0))
-                foreach (var reaction in target.OnDamageReactions)
-                    reactions.Add(new DamageReaction(
-                        target.UnitId,
-                        hit.Attack.AttackerUnitId,
-                        reaction));
+                {
+                    var attacker =
+                        FindUnit(hit.Attack.AttackerUnitId);
+                    if (target.CurrentHitPoints > 0)
+                    {
+                        foreach (var effect in attacker
+                                     .OnHitDamageOverTimeEffects
+                                     .OrderBy(
+                                         item => item.Key,
+                                         StringComparer.Ordinal))
+                            target.ApplyOrRefreshDamageOverTime(
+                                effect.Key,
+                                effect.Value.DamagePerSecond,
+                                CurrentTick
+                                + effect.Value.DurationTicks);
+                    }
+                    foreach (var reaction in target.OnDamageReactions)
+                        reactions.Add(new DamageReaction(
+                            target.UnitId,
+                            hit.Attack.AttackerUnitId,
+                            reaction));
+                }
             }
 
             foreach (var reactionGroup in reactions
@@ -1338,6 +1444,7 @@ namespace ArknoNights.Battle.Core
                          .Where(IsActive)
                          .OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
+                unit.ExpireDamageOverTime(CurrentTick);
                 var lifetimeTicks = unit.PassiveLifetimeTicks;
                 if (lifetimeTicks > 0
                     && CurrentTick - unit.ActivationTick >= lifetimeTicks)
@@ -1363,7 +1470,10 @@ namespace ArknoNights.Battle.Core
                     continue;
                 }
 
-                var rate = unit.PassiveHitPointsPerSecond;
+                var rate = (int)Math.Max(
+                    int.MinValue + 1L,
+                    (long)unit.PassiveHitPointsPerSecond
+                    - unit.ActiveDamageOverTimePerSecond);
                 if (rate == 0)
                     continue;
                 unit.PassiveHealthRemainder += Math.Abs(rate);
@@ -1952,6 +2062,7 @@ namespace ArknoNights.Battle.Core
                     builder.Append(",attacks:")
                         .Append(unit.StartedAttackCount);
                 foreach (var ability in unit.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal)) ability.AppendStableSummary(builder);
+                unit.AppendDamageOverTimeSummary(builder);
             }
             foreach (var pending in pendingDeathSpawns
                          .OrderBy(item => item.DueTick)

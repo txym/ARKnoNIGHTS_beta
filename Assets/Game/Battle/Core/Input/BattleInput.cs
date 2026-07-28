@@ -306,6 +306,10 @@ namespace ArknoNights.Battle.Core
                         .Append((int)ability.AttackAreaDamageModifier.DamageType).Append(',')
                         .Append(ability.AttackAreaDamageModifier.AttackMultiplierPermille).Append(',')
                         .Append(ability.AttackAreaDamageModifier.RadiusCentimetres);
+                if (ability.OnHitDamageOverTimeEffect != null)
+                    builder.Append("|D:")
+                        .Append(ability.OnHitDamageOverTimeEffect.DamagePerSecond).Append(',')
+                        .Append(ability.OnHitDamageOverTimeEffect.DurationTicks);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -386,6 +390,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.EvasionModifier != null) validationErrors.Add(new ValidationError("ability.evasion.unexpected", "Timed ability cannot define an evasion modifier: " + ability.AbilityId));
                     if (ability.DeathAreaDamageEffect != null) validationErrors.Add(new ValidationError("ability.deathAreaDamage.unexpected", "Timed ability cannot define a death-area damage effect: " + ability.AbilityId));
                     if (ability.AttackAreaDamageModifier != null) validationErrors.Add(new ValidationError("ability.attackAreaDamage.unexpected", "Timed ability cannot define an attack-area damage modifier: " + ability.AbilityId));
+                    if (ability.OnHitDamageOverTimeEffect != null) validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.unexpected", "Timed ability cannot define an on-hit damage-over-time effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -419,7 +424,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.NearbySameTypeSelfModifier == null ? 0 : 1)
                         + (ability.EvasionModifier == null ? 0 : 1)
                         + (ability.DeathAreaDamageEffect == null ? 0 : 1)
-                        + (ability.AttackAreaDamageModifier == null ? 0 : 1);
+                        + (ability.AttackAreaDamageModifier == null ? 0 : 1)
+                        + (ability.OnHitDamageOverTimeEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -556,6 +562,10 @@ namespace ArknoNights.Battle.Core
                             || (ability.AttackAreaDamageModifier.Shape == AttackAreaShape.OrthogonalAdjacentCells
                                 && ability.AttackAreaDamageModifier.RadiusCentimetres != 0)))
                         validationErrors.Add(new ValidationError("ability.attackAreaDamage.invalid", "Attack-area damage modifier is invalid: " + ability.AbilityId));
+                    if (ability.OnHitDamageOverTimeEffect != null
+                        && (ability.OnHitDamageOverTimeEffect.DamagePerSecond <= 0
+                            || ability.OnHitDamageOverTimeEffect.DurationTicks <= 0))
+                        validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.invalid", "On-hit damage-over-time effect is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

@@ -1038,6 +1038,56 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void OnHitDamageOverTime_RefreshesSameNameWithoutStacking()
+        {
+            var input = CreateInput(
+                150,
+                new[]
+                {
+                    Attacker(
+                        "bleeder",
+                        2000,
+                        0,
+                        "BLEED",
+                        attackIntervalTicks: 80,
+                        attack: 10),
+                    NonAttacker("target", 10000)
+                },
+                new[]
+                {
+                    PassiveOnHitDamageOverTime(
+                        damagePerSecond: 20,
+                        durationTicks: 100)
+                },
+                new[]
+                {
+                    Unit("bleeder-a", "bleeder", 5, 4),
+                    Unit("bleeder-b", "bleeder", 5, 4)
+                },
+                new[] { Unit("target", "target", 5, 4) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var directDamage = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.RelatedUnitId == "target")
+                .Sum(item => item.DamageAmount);
+            var bleedDamage = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.HealthChanged
+                    && item.UnitId == "target"
+                    && item.DamageType == DamageType.True)
+                .Sum(item => item.DamageAmount);
+
+            Assert.That(directDamage, Is.EqualTo(40));
+            Assert.That(bleedDamage, Is.EqualTo(149));
+            Assert.That(
+                result.FinalUnits.Single(item =>
+                    item.UnitId == "target").HitPoints,
+                Is.EqualTo(9811));
+        }
+
+        [Test]
         public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -1814,6 +1864,42 @@ namespace ArknoNights.Battle.Tests
                     damageType,
                     attackMultiplierPermille,
                     radiusCentimetres),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveOnHitDamageOverTime(
+            int damagePerSecond,
+            int durationTicks)
+        {
+            return new AbilityDefinition(
+                "BLEED",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new OnHitDamageOverTimeEffectDefinition(
+                    damagePerSecond,
+                    durationTicks),
                 string.Empty,
                 0);
         }

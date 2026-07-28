@@ -499,6 +499,20 @@ namespace ArknoNights.Battle.Core
         }
     }
 
+    public sealed class OnHitDamageOverTimeEffectDefinition
+    {
+        public OnHitDamageOverTimeEffectDefinition(
+            int damagePerSecond,
+            int durationTicks)
+        {
+            DamagePerSecond = damagePerSecond;
+            DurationTicks = durationTicks;
+        }
+
+        public int DamagePerSecond { get; }
+        public int DurationTicks { get; }
+    }
+
     public sealed class SummonEffectDefinition
     {
         public SummonEffectDefinition(string summonTypeId, int count, int sideLengthCentimetres, bool inheritPathFromCaster)
@@ -883,6 +897,38 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, string animationKey, int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                passiveCombatModifier,
+                passiveLifecycleEffect,
+                onDamageReactionEffect,
+                healthThresholdCombatModifier,
+                unblockedDamageTakenModifier,
+                attackSequenceModifier,
+                attackCountStateModifier,
+                deathSpawnEffect,
+                auraCombatModifier,
+                blockedCounterpartCombatModifier,
+                nearbySameTypeSelfModifier,
+                evasionModifier,
+                deathAreaDamageEffect,
+                attackAreaDamageModifier,
+                null,
+                animationKey,
+                skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -914,6 +960,8 @@ namespace ArknoNights.Battle.Core
             DeathAreaDamageEffect = deathAreaDamageEffect;
             AttackAreaDamageModifier =
                 attackAreaDamageModifier;
+            OnHitDamageOverTimeEffect =
+                onHitDamageOverTimeEffect;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -953,6 +1001,8 @@ namespace ArknoNights.Battle.Core
             DeathAreaDamageEffect { get; }
         public AttackAreaDamageModifierDefinition
             AttackAreaDamageModifier { get; }
+        public OnHitDamageOverTimeEffectDefinition
+            OnHitDamageOverTimeEffect { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>
