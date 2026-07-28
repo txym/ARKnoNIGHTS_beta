@@ -599,6 +599,504 @@ function Get-CostCurveModel {
     }
 }
 
+function New-StableBudgetFormation {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Candidates,
+        [Parameter(Mandatory = $true)][int]$Budget,
+        [Parameter(Mandatory = $true)][string]$Kind
+    )
+
+    Assert-Condition ($Candidates.Count -gt 0) "Cannot build a $Kind formation from no candidates."
+    Assert-Condition ($Budget -ge 0) "Formation budget '$Budget' must not be negative."
+    $minimumCandidateCost = [int](@($Candidates | ForEach-Object { [int]$_.FinalBaseCost } | Measure-Object -Minimum).Minimum)
+    Assert-Condition ($minimumCandidateCost -gt 0) "$Kind formation contains a nonpositive Cost."
+    $selectedRows = [System.Collections.Generic.List[object]]::new()
+    $remainingBudget = $Budget
+    $candidateIndex = 0
+    while ($remainingBudget -ge $minimumCandidateCost) {
+        $selectedIndex = -1
+        for ($offset = 0; $offset -lt $Candidates.Count; $offset++) {
+            $index = ($candidateIndex + $offset) % $Candidates.Count
+            if ([int]$Candidates[$index].FinalBaseCost -le $remainingBudget) {
+                $selectedIndex = $index
+                break
+            }
+        }
+        Assert-Condition ($selectedIndex -ge 0) "$Kind formation could not select an affordable candidate despite remaining budget '$remainingBudget'."
+        $selected = $Candidates[$selectedIndex]
+        $selectedRows.Add($selected)
+        $remainingBudget -= [int]$selected.FinalBaseCost
+        $candidateIndex = ($selectedIndex + 1) % $Candidates.Count
+    }
+
+    return [pscustomobject][ordered]@{
+        Kind = $Kind
+        Budget = $Budget
+        SpentCost = $Budget - $remainingBudget
+        RemainingBudget = $remainingBudget
+        Rows = $selectedRows.ToArray()
+        TypeIds = @($selectedRows | ForEach-Object { [int]$_.TypeId })
+    }
+}
+
+function Get-TierFormationSet {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][int]$Budget
+    )
+
+    Assert-Condition ($Rows.Count -gt 0) 'Cannot build tier formations from no rows.'
+    foreach ($row in $Rows) {
+        Assert-Condition ([int]$row.FinalBaseCost -gt 0) "Type ID $($row.TypeId) has nonpositive formation Cost '$($row.FinalBaseCost)'."
+    }
+    $tierMedian = Get-Median -Values ([decimal[]]@($Rows | ForEach-Object { [decimal]$_.FinalBaseCost }))
+    $halfCount = [int][Math]::Ceiling([double]$Rows.Count / 2)
+    $lowCandidates = @(
+        $Rows |
+            Sort-Object { [int]$_.FinalBaseCost }, { [int]$_.TypeId } |
+            Select-Object -First $halfCount
+    )
+    $medianCandidates = @(
+        $Rows |
+            Sort-Object { [Math]::Abs([double]([decimal]$_.FinalBaseCost - $tierMedian)) }, { [int]$_.TypeId }
+    )
+    $highCandidates = @(
+        $Rows |
+            Sort-Object @{ Expression = { [int]$_.FinalBaseCost }; Descending = $true }, { [int]$_.TypeId } |
+            Select-Object -First $halfCount
+    )
+    return @(
+        New-StableBudgetFormation -Candidates $lowCandidates -Budget $Budget -Kind 'Low'
+        New-StableBudgetFormation -Candidates $medianCandidates -Budget $Budget -Kind 'Median'
+        New-StableBudgetFormation -Candidates $highCandidates -Budget $Budget -Kind 'High'
+    )
+}
+
+function Get-CalibrationMatchDefinitions {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rarity1Rows,
+        [Parameter(Mandatory = $true)][object[]]$Rarity2Rows,
+        [Parameter(Mandatory = $true)][int[]]$Budgets
+    )
+
+    $matches = [System.Collections.Generic.List[object]]::new()
+    foreach ($budget in $Budgets) {
+        $rarity1Formations = @(Get-TierFormationSet -Rows $Rarity1Rows -Budget $budget)
+        $rarity2Formations = @(Get-TierFormationSet -Rows $Rarity2Rows -Budget $budget)
+        Assert-Condition ($rarity1Formations.Count -eq 3 -and $rarity2Formations.Count -eq 3) "Budget $budget did not produce three formations per rarity."
+        foreach ($rarity1Formation in $rarity1Formations) {
+            foreach ($rarity2Formation in $rarity2Formations) {
+                foreach ($direction in @('HighValueFirst', 'LowValueFirst')) {
+                    $matches.Add([pscustomobject][ordered]@{
+                            Budget = $budget
+                            Rarity1FormationKind = $rarity1Formation.Kind
+                            Rarity2FormationKind = $rarity2Formation.Kind
+                            Direction = $direction
+                            Rarity1Rows = $rarity1Formation.Rows
+                            Rarity2Rows = $rarity2Formation.Rows
+                            Rarity1SpentCost = $rarity1Formation.SpentCost
+                            Rarity2SpentCost = $rarity2Formation.SpentCost
+                        })
+                }
+            }
+        }
+    }
+    return $matches.ToArray()
+}
+
+function New-CalibrationBattleEntity {
+    param([Parameter(Mandatory = $true)]$Row)
+
+    $continuousPower = [decimal]$Row.ContinuousPower
+    Assert-Condition ($continuousPower -gt 0) "Type ID $($Row.TypeId) has nonpositive ContinuousPower for calibration."
+    $hasPanelPower = $null -ne $Row.PanelPower
+    $equivalentEntityCount = [decimal]1
+    if ($hasPanelPower) {
+        $baseAdjustedPower = [decimal]$Row.PanelPower * [decimal]$Row.AbilityPowerMultiplier
+        Assert-Condition ($baseAdjustedPower -gt 0) "Type ID $($Row.TypeId) has nonpositive base-adjusted power for calibration."
+        $equivalentEntityCount += [decimal]$Row.EquivalentEntityContribution / $baseAdjustedPower
+    }
+    $effectiveHitPoints = [decimal]$Row.MaxHitPoints * [decimal]$Row.DefenseScenarioMain
+    if ($hasPanelPower) {
+        $effectiveHitPoints *= $equivalentEntityCount
+    }
+    Assert-Condition ($effectiveHitPoints -gt 0) "Type ID $($Row.TypeId) has nonpositive effective HP for calibration."
+    Assert-Condition ($equivalentEntityCount -gt 0) "Type ID $($Row.TypeId) has nonpositive equivalent entity count for calibration."
+
+    return [pscustomobject]@{
+        TypeId = [int]$Row.TypeId
+        Attack = [decimal]$Row.Attack
+        DamageType = [string]$Row.DamageType
+        EffectiveAttackIntervalSeconds = [decimal]$Row.EffectiveAttackIntervalSeconds
+        OutputScenarioMain = [decimal]$Row.OutputScenarioMain
+        Defense = [decimal]$Row.Defense
+        MagicResistance = [decimal]$Row.MagicResistance
+        RemainingHitPoints = $effectiveHitPoints
+        EquivalentEntityCount = $equivalentEntityCount
+        BlockCapacity = [decimal]1
+        TargetValue = [decimal]$Row.LifeDeduct * $equivalentEntityCount
+    }
+}
+
+function Get-CalibrationTeamDps {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Attackers,
+        [Parameter(Mandatory = $true)]$Target
+    )
+
+    $dps = [decimal]0
+    foreach ($attacker in $Attackers) {
+        if ($attacker.DamageType -ceq 'None' -or [decimal]$attacker.Attack -le 0) {
+            continue
+        }
+        $attack = [decimal]$attacker.Attack
+        $damagePerHit = switch ([string]$attacker.DamageType) {
+            'Physical' {
+                [decimal][Math]::Max(
+                    [double]($attack - [decimal]$Target.Defense),
+                    [Math]::Floor([double]($attack * [decimal]0.05))
+                )
+                break
+            }
+            'Magic' {
+                [decimal][Math]::Max(
+                    [Math]::Floor([double]($attack * ([decimal]100 - [decimal]$Target.MagicResistance) / [decimal]100)),
+                    [Math]::Floor([double]($attack * [decimal]0.05))
+                )
+                break
+            }
+            'True' { $attack; break }
+            default { throw "Cannot calculate calibration DPS for Type ID $($attacker.TypeId) with damage type '$($attacker.DamageType)'." }
+        }
+        $interval = [decimal]$attacker.EffectiveAttackIntervalSeconds
+        Assert-Condition ($interval -gt 0) "Type ID $($attacker.TypeId) has nonpositive calibration attack interval '$interval'."
+        $dps += ($damagePerHit / $interval) *
+            [decimal]$attacker.OutputScenarioMain *
+            [decimal]$attacker.EquivalentEntityCount
+    }
+    return $dps
+}
+
+function Get-CalibrationTarget {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Entities,
+        [Parameter(Mandatory = $true)][ValidateSet('HighValueFirst', 'LowValueFirst')][string]$Direction
+    )
+
+    if ($Direction -ceq 'HighValueFirst') {
+        return @(
+            $Entities |
+                Sort-Object @{ Expression = { [decimal]$_.TargetValue }; Descending = $true },
+                    @{ Expression = { [int]$_.TypeId }; Descending = $false }
+        )[0]
+    }
+    return @(
+        $Entities |
+            Sort-Object @{ Expression = { [decimal]$_.TargetValue }; Descending = $false },
+                @{ Expression = { [int]$_.TypeId }; Descending = $true }
+    )[0]
+}
+
+function Get-CalibrationRemainingSummary {
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Entities)
+
+    $equivalentEntityCount = [decimal]0
+    $targetValue = [decimal]0
+    $blockCapacity = [decimal]0
+    foreach ($entity in $Entities) {
+        $equivalentEntityCount += [decimal]$entity.EquivalentEntityCount
+        $targetValue += [decimal]$entity.TargetValue
+        $blockCapacity += [decimal]$entity.BlockCapacity
+    }
+    return [pscustomobject]@{
+        EntityCount = $Entities.Count
+        EquivalentEntityCount = $equivalentEntityCount
+        TargetValue = $targetValue
+        BlockCapacity = $blockCapacity
+    }
+}
+
+function Invoke-FocusFireMatch {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Rarity1Rows,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Rarity2Rows,
+        [Parameter(Mandatory = $true)][ValidateSet('HighValueFirst', 'LowValueFirst')][string]$Direction,
+        [int]$EventLimit = 1024,
+        [switch]$IncludeEventTrace
+    )
+
+    Assert-Condition ($EventLimit -gt 0) "Match event limit '$EventLimit' must be positive."
+    $rarity1Unordered = @($Rarity1Rows | ForEach-Object { New-CalibrationBattleEntity -Row $_ })
+    $rarity2Unordered = @($Rarity2Rows | ForEach-Object { New-CalibrationBattleEntity -Row $_ })
+    $rarity1Ordered = if ($Direction -ceq 'HighValueFirst') {
+        @($rarity1Unordered | Sort-Object @{ Expression = { [decimal]$_.TargetValue }; Descending = $true }, @{ Expression = { [int]$_.TypeId }; Descending = $false })
+    }
+    else {
+        @($rarity1Unordered | Sort-Object @{ Expression = { [decimal]$_.TargetValue }; Descending = $false }, @{ Expression = { [int]$_.TypeId }; Descending = $true })
+    }
+    $rarity2Ordered = if ($Direction -ceq 'HighValueFirst') {
+        @($rarity2Unordered | Sort-Object @{ Expression = { [decimal]$_.TargetValue }; Descending = $true }, @{ Expression = { [int]$_.TypeId }; Descending = $false })
+    }
+    else {
+        @($rarity2Unordered | Sort-Object @{ Expression = { [decimal]$_.TargetValue }; Descending = $false }, @{ Expression = { [int]$_.TypeId }; Descending = $true })
+    }
+    $rarity1Entities = [System.Collections.Generic.List[object]]::new()
+    foreach ($entity in $rarity1Ordered) { $rarity1Entities.Add($entity) }
+    $rarity2Entities = [System.Collections.Generic.List[object]]::new()
+    foreach ($entity in $rarity2Ordered) { $rarity2Entities.Add($entity) }
+    $eventCount = 0
+    $resolution = 'Elimination'
+    $eventTrace = [System.Collections.Generic.List[object]]::new()
+
+    while ($rarity1Entities.Count -gt 0 -and $rarity2Entities.Count -gt 0) {
+        Assert-Condition ($eventCount -lt $EventLimit) "Focus-fire match exceeded fixed event limit '$EventLimit'."
+        $rarity1Target = $rarity1Entities[0]
+        $rarity2Target = $rarity2Entities[0]
+        $rarity1Dps = Get-CalibrationTeamDps -Attackers $rarity1Entities.ToArray() -Target $rarity2Target
+        $rarity2Dps = Get-CalibrationTeamDps -Attackers $rarity2Entities.ToArray() -Target $rarity1Target
+        if ($rarity1Dps -le 0 -and $rarity2Dps -le 0) {
+            $resolution = 'NoDamageTiebreak'
+            break
+        }
+        $rarity1KillTime = if ($rarity1Dps -gt 0) { [decimal]$rarity2Target.RemainingHitPoints / $rarity1Dps } else { [decimal]::MaxValue }
+        $rarity2KillTime = if ($rarity2Dps -gt 0) { [decimal]$rarity1Target.RemainingHitPoints / $rarity2Dps } else { [decimal]::MaxValue }
+        $rarity2TargetDies = $rarity1KillTime -le $rarity2KillTime
+        $rarity1TargetDies = $rarity2KillTime -le $rarity1KillTime
+        $eventTime = if ($rarity1KillTime -le $rarity2KillTime) { $rarity1KillTime } else { $rarity2KillTime }
+        Assert-Condition ($eventTime -gt 0 -and -not [double]::IsInfinity([double]$eventTime)) "Focus-fire match produced invalid event time '$eventTime'."
+        $rarity1HitPointsBefore = [decimal]$rarity1Target.RemainingHitPoints
+        $rarity2HitPointsBefore = [decimal]$rarity2Target.RemainingHitPoints
+        if ($rarity1Dps -gt 0) { $rarity2Target.RemainingHitPoints = [decimal]$rarity2Target.RemainingHitPoints - ($rarity1Dps * $eventTime) }
+        if ($rarity2Dps -gt 0) { $rarity1Target.RemainingHitPoints = [decimal]$rarity1Target.RemainingHitPoints - ($rarity2Dps * $eventTime) }
+        if ($IncludeEventTrace) {
+            $eventTrace.Add([pscustomobject][ordered]@{
+                    EventIndex = $eventCount + 1
+                    EventTime = $eventTime
+                    R1TargetTypeId = $rarity1Target.TypeId
+                    R2TargetTypeId = $rarity2Target.TypeId
+                    R1TargetHitPointsBefore = $rarity1HitPointsBefore
+                    R2TargetHitPointsBefore = $rarity2HitPointsBefore
+                    R1TeamDps = $rarity1Dps
+                    R2TeamDps = $rarity2Dps
+                    R1TargetHitPointsAfter = $rarity1Target.RemainingHitPoints
+                    R2TargetHitPointsAfter = $rarity2Target.RemainingHitPoints
+                    R1TargetDies = $rarity1TargetDies
+                    R2TargetDies = $rarity2TargetDies
+                })
+        }
+        if ($rarity1TargetDies) { $rarity1Entities.RemoveAt(0) }
+        if ($rarity2TargetDies) { $rarity2Entities.RemoveAt(0) }
+        $eventCount++
+    }
+
+    $rarity1Summary = Get-CalibrationRemainingSummary -Entities $rarity1Entities.ToArray()
+    $rarity2Summary = Get-CalibrationRemainingSummary -Entities $rarity2Entities.ToArray()
+    $winner = if ($rarity1Summary.EntityCount -gt 0 -and $rarity2Summary.EntityCount -eq 0) {
+        'R1'
+    }
+    elseif ($rarity2Summary.EntityCount -gt 0 -and $rarity1Summary.EntityCount -eq 0) {
+        'R2'
+    }
+    else {
+        $comparison = 0
+        foreach ($property in @('EquivalentEntityCount', 'TargetValue', 'BlockCapacity')) {
+            if ([decimal]$rarity1Summary.$property -gt [decimal]$rarity2Summary.$property) { $comparison = 1; break }
+            if ([decimal]$rarity1Summary.$property -lt [decimal]$rarity2Summary.$property) { $comparison = -1; break }
+        }
+        if ($comparison -gt 0) { 'R1' } elseif ($comparison -lt 0) { 'R2' } else { 'Draw' }
+    }
+
+    return [pscustomobject][ordered]@{
+        Winner = $winner
+        Resolution = $resolution
+        EventCount = $eventCount
+        R1RemainingEntityCount = $rarity1Summary.EntityCount
+        R2RemainingEntityCount = $rarity2Summary.EntityCount
+        R1RemainingEquivalentEntities = $rarity1Summary.EquivalentEntityCount
+        R2RemainingEquivalentEntities = $rarity2Summary.EquivalentEntityCount
+        R1RemainingTargetValue = $rarity1Summary.TargetValue
+        R2RemainingTargetValue = $rarity2Summary.TargetValue
+        R1RemainingBlockCapacity = $rarity1Summary.BlockCapacity
+        R2RemainingBlockCapacity = $rarity2Summary.BlockCapacity
+        EventTrace = $eventTrace.ToArray()
+    }
+}
+
+function Select-R1CalibrationCandidate {
+    param([Parameter(Mandatory = $true)][object[]]$Candidates)
+
+    $eligible = @($Candidates | Where-Object {
+            [decimal]$_.Rarity1WinRate -ge [decimal]0.4 -and
+            [decimal]$_.Rarity1WinRate -le [decimal]0.6
+        })
+    if ($eligible.Count -eq 0) {
+        return $null
+    }
+    return @(
+        $eligible |
+            Sort-Object { [Math]::Abs([double]([decimal]$_.Rarity1WinRate - [decimal]0.5)) },
+                { [Math]::Abs([double]([decimal]$_.Kappa - [decimal]1)) },
+                { [decimal]$_.Kappa }
+    )[0]
+}
+
+function Get-R1CalibrationKappaCandidates {
+    return [decimal[]]@(for ($hundredths = 1; $hundredths -le 150; $hundredths++) {
+            [decimal]$hundredths / [decimal]100
+        })
+}
+
+function Get-R1CalibratedRows {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][decimal]$Kappa
+    )
+
+    Assert-Condition ($Kappa -ge [decimal]0.01 -and $Kappa -le [decimal]1.5) "R1 calibration kappa '$Kappa' is outside 0.01..1.50."
+    return @($Rows | ForEach-Object {
+            $row = $_
+            $properties = [ordered]@{}
+            foreach ($property in $row.PSObject.Properties) {
+                $properties[$property.Name] = $property.Value
+            }
+            if ([int]$row.Rarity -eq 1) {
+                $initialCost = [int]$row.FinalBaseCost
+                $calibratedRawCost = $Kappa * [decimal]$initialCost
+                $properties.FinalBaseCost = ConvertTo-FinalBaseCost -RawCost $calibratedRawCost -MinimumCost 2
+                $properties.R1InitialCost = $initialCost
+                $properties.R1CalibrationKappa = $Kappa
+                $properties.R1CalibratedRawCost = $calibratedRawCost
+            }
+            else {
+                $properties.R1InitialCost = $null
+                $properties.R1CalibrationKappa = $null
+                $properties.R1CalibratedRawCost = $null
+            }
+            [pscustomobject]$properties
+        })
+}
+
+function Get-R1CalibrationModel {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [int[]]$Budgets = @(54, 99, 126, 195),
+        [int]$MatchEventLimit = 1024
+    )
+
+    Assert-Condition ((@($Budgets) -join '/') -ceq '54/99/126/195') "R1 calibration budgets must be exactly 54/99/126/195; found '$(@($Budgets) -join '/')'."
+    Assert-Condition ($MatchEventLimit -gt 0) "R1 calibration match event limit '$MatchEventLimit' must be positive."
+    Assert-Condition (@($Rows | Where-Object { [int]$_.Rarity -eq 1 }).Count -gt 0) 'R1 calibration has no R1 rows.'
+    Assert-Condition (@($Rows | Where-Object { [int]$_.Rarity -eq 2 }).Count -gt 0) 'R1 calibration has no R2 rows.'
+    $evaluatedCandidates = [System.Collections.Generic.List[object]]::new()
+    $matchResultCache = @{}
+
+    foreach ($kappa in @(Get-R1CalibrationKappaCandidates)) {
+        $candidateRows = @(Get-R1CalibratedRows -Rows $Rows -Kappa $kappa)
+        $rarity1Rows = @($candidateRows | Where-Object { [int]$_.Rarity -eq 1 })
+        $rarity2Rows = @($candidateRows | Where-Object { [int]$_.Rarity -eq 2 })
+        $matchDefinitions = @(Get-CalibrationMatchDefinitions -Rarity1Rows $rarity1Rows -Rarity2Rows $rarity2Rows -Budgets $Budgets)
+        Assert-Condition ($matchDefinitions.Count -eq 72) "R1 calibration kappa '$kappa' produced $($matchDefinitions.Count) matches instead of 72."
+        $matchAudit = [System.Collections.Generic.List[object]]::new()
+        $rarity1Wins = 0
+        $rarity2Wins = 0
+        $draws = 0
+        $simulatedMatchCount = 0
+        $reusedMatchCount = 0
+        foreach ($definition in $matchDefinitions) {
+            $matchKey = '{0}|{1}|{2}' -f `
+                $definition.Direction, `
+                (@($definition.Rarity1Rows | ForEach-Object { [int]$_.TypeId }) -join ','), `
+                (@($definition.Rarity2Rows | ForEach-Object { [int]$_.TypeId }) -join ',')
+            $cacheHit = $matchResultCache.ContainsKey($matchKey)
+            if ($cacheHit) {
+                $result = $matchResultCache[$matchKey]
+                $reusedMatchCount++
+            }
+            else {
+                $result = Invoke-FocusFireMatch `
+                    -Rarity1Rows $definition.Rarity1Rows `
+                    -Rarity2Rows $definition.Rarity2Rows `
+                    -Direction $definition.Direction `
+                    -EventLimit $MatchEventLimit
+                $matchResultCache[$matchKey] = $result
+                $simulatedMatchCount++
+            }
+            switch ([string]$result.Winner) {
+                'R1' { $rarity1Wins++ }
+                'R2' { $rarity2Wins++ }
+                'Draw' { $draws++ }
+                default { throw "R1 calibration produced invalid winner '$($result.Winner)'." }
+            }
+            $matchAudit.Add([pscustomobject][ordered]@{
+                    Budget = $definition.Budget
+                    Rarity1FormationKind = $definition.Rarity1FormationKind
+                    Rarity2FormationKind = $definition.Rarity2FormationKind
+                    Direction = $definition.Direction
+                    Rarity1SpentCost = $definition.Rarity1SpentCost
+                    Rarity2SpentCost = $definition.Rarity2SpentCost
+                    Winner = $result.Winner
+                    Resolution = $result.Resolution
+                    SimulationCacheHit = $cacheHit
+                    EventCount = $result.EventCount
+                    R1RemainingEntityCount = $result.R1RemainingEntityCount
+                    R2RemainingEntityCount = $result.R2RemainingEntityCount
+                    R1RemainingEquivalentEntities = $result.R1RemainingEquivalentEntities
+                    R2RemainingEquivalentEntities = $result.R2RemainingEquivalentEntities
+                    R1RemainingTargetValue = $result.R1RemainingTargetValue
+                    R2RemainingTargetValue = $result.R2RemainingTargetValue
+                    R1RemainingBlockCapacity = $result.R1RemainingBlockCapacity
+                    R2RemainingBlockCapacity = $result.R2RemainingBlockCapacity
+                })
+        }
+        $rarity1WinRate = ([decimal]$rarity1Wins + ([decimal]$draws / [decimal]2)) / [decimal]$matchDefinitions.Count
+        $evaluatedCandidates.Add([pscustomobject]@{
+                Kappa = $kappa
+                Rows = $candidateRows
+                Matches = $matchAudit.ToArray()
+                MatchCount = $matchDefinitions.Count
+                Rarity1Wins = $rarity1Wins
+                Rarity2Wins = $rarity2Wins
+                Draws = $draws
+                Rarity1WinRate = $rarity1WinRate
+                SimulatedMatchCount = $simulatedMatchCount
+                ReusedMatchCount = $reusedMatchCount
+            })
+    }
+
+    $candidateAudit = @($evaluatedCandidates | ForEach-Object {
+            [pscustomobject][ordered]@{
+                Kappa = $_.Kappa
+                MatchCount = $_.MatchCount
+                Rarity1Wins = $_.Rarity1Wins
+                Rarity2Wins = $_.Rarity2Wins
+                Draws = $_.Draws
+                Rarity1WinRate = $_.Rarity1WinRate
+                SimulatedMatchCount = $_.SimulatedMatchCount
+                ReusedMatchCount = $_.ReusedMatchCount
+                IsEligible = ([decimal]$_.Rarity1WinRate -ge [decimal]0.4 -and [decimal]$_.Rarity1WinRate -le [decimal]0.6)
+            }
+        })
+    $selected = Select-R1CalibrationCandidate -Candidates $evaluatedCandidates.ToArray()
+    if ($null -eq $selected) {
+        $summary = $candidateAudit | ConvertTo-Json -Depth 3 -Compress
+        throw "No uniform R1 calibration candidate achieved a 40%-60% win rate. Complete candidate summary: $summary"
+    }
+
+    return [pscustomobject]@{
+        Rows = $selected.Rows
+        Kappa = $selected.Kappa
+        MatchCount = $selected.MatchCount
+        Rarity1Wins = $selected.Rarity1Wins
+        Rarity2Wins = $selected.Rarity2Wins
+        Draws = $selected.Draws
+        Rarity1WinRate = $selected.Rarity1WinRate
+        MatchEventLimit = $MatchEventLimit
+        Budgets = $Budgets
+        CandidateAudit = $candidateAudit
+        SelectedMatches = $selected.Matches
+    }
+}
+
 function Test-MapKey {
     param(
         [Parameter(Mandatory = $true)][hashtable]$Map,
@@ -802,7 +1300,24 @@ function Get-AuraPowerPerTarget {
         [Parameter(Mandatory = $true)][hashtable]$Parameters
     )
 
+    $supportedAuraParameters = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($parameterName in @(
+            'AuraAttackSpeedAdditive', 'AuraAttackMultiplier',
+            'AuraDefenseBonus', 'AuraMagicResistanceBonus', 'AuraRegenPerSecond',
+            'AuraTargetsLow', 'AuraTargetsMain', 'AuraTargetsHigh'
+        )) {
+        [void]$supportedAuraParameters.Add($parameterName)
+    }
+    foreach ($parameterName in $Parameters.Keys) {
+        if ([string]$parameterName -clike 'Aura*') {
+            Assert-Condition ($supportedAuraParameters.Contains([string]$parameterName)) "Unsupported aura parameter '$parameterName'."
+        }
+    }
+
     if (Test-MapKey -Map $Parameters -Key 'AuraAttackSpeedAdditive') {
+        foreach ($incompatibleParameterName in @('AuraAttackMultiplier', 'AuraDefenseBonus', 'AuraMagicResistanceBonus', 'AuraRegenPerSecond')) {
+            Assert-Condition (-not (Test-MapKey -Map $Parameters -Key $incompatibleParameterName)) "AuraAttackSpeedAdditive cannot silently bypass '$incompatibleParameterName'."
+        }
         $incomingRate = Get-AttackRateFactor -AttackSpeedAdditive ([decimal]$Parameters.AuraAttackSpeedAdditive) -FinalAttackSpeedMultiplier 1
         Assert-Condition ($incomingRate -gt 0) 'An aura that reduces final attack speed to zero needs a separate finite survival-window model.'
         return [decimal][Math]::Sqrt([double]([decimal]1 / $incomingRate)) - [decimal]1
@@ -821,10 +1336,41 @@ function Get-AuraPowerPerTarget {
         $recipientAttackers = @($Attackers | Where-Object DamageType -eq 'Physical')
     }
     if (Test-MapKey -Map $Parameters -Key 'AuraRegenPerSecond') { $recipientParameters.RegenPerSecond = [decimal]$Parameters.AuraRegenPerSecond }
-    Assert-Condition ($recipientAttackers.Count -gt 0) 'Aura recipient attacker sample is empty.'
+    $hasDefenseEffect = @(
+        @('AuraDefenseBonus', 'AuraMagicResistanceBonus', 'AuraRegenPerSecond') |
+            Where-Object { Test-MapKey -Map $Parameters -Key $_ }
+    ).Count -gt 0
+    if ($hasDefenseEffect) {
+        Assert-Condition ($recipientAttackers.Count -gt 0) 'Aura recipient attacker sample is empty.'
+    }
+    $hasAttackEffect = Test-MapKey -Map $Parameters -Key 'AuraAttackMultiplier'
+    $auraAttackMultiplier = if ($hasAttackEffect) { [decimal]$Parameters.AuraAttackMultiplier } else { [decimal]1 }
+    Assert-Condition ($auraAttackMultiplier -gt 0) 'AuraAttackMultiplier must be positive.'
     $powerGains = foreach ($recipient in $Recipients) {
-        $defenseRatio = Get-DefenseScenarioRatio -Row $recipient -Attackers $recipientAttackers -Parameters $recipientParameters
-        [decimal][Math]::Max([double]0, [Math]::Sqrt([double]$defenseRatio) - 1)
+        $outputRatio = [decimal]1
+        if ($hasAttackEffect) {
+            $scenarioAttacker = [pscustomobject]@{
+                TypeId = $recipient.TypeId
+                DamageType = $recipient.DamageType
+                Attack = [decimal]$recipient.Attack * $auraAttackMultiplier
+                EffectiveAttackIntervalSeconds = Get-EffectiveAttackInterval -Attacker $recipient
+            }
+            $baselineDps = Get-Median -Values ([decimal[]]@($Recipients | ForEach-Object {
+                        (Get-OrdinaryAttackDamage -Attacker $recipient -Defender $_) / (Get-EffectiveAttackInterval -Attacker $recipient)
+                    }))
+            $scenarioDps = Get-Median -Values ([decimal[]]@($Recipients | ForEach-Object {
+                        (Get-OrdinaryAttackDamage -Attacker $scenarioAttacker -Defender $_) / (Get-EffectiveAttackInterval -Attacker $scenarioAttacker)
+                    }))
+            Assert-Condition ($baselineDps -gt 0 -and $scenarioDps -gt 0) "Aura recipient Type ID $($recipient.TypeId) produced nonpositive output power."
+            $outputRatio = $scenarioDps / $baselineDps
+        }
+        $defenseRatio = if ($hasDefenseEffect) {
+            Get-DefenseScenarioRatio -Row $recipient -Attackers $recipientAttackers -Parameters $recipientParameters
+        }
+        else {
+            [decimal]1
+        }
+        [decimal][Math]::Max([double]0, [Math]::Sqrt([double]($outputRatio * $defenseRatio)) - 1)
     }
     return Get-Median -Values ([decimal[]]$powerGains)
 }
@@ -875,13 +1421,13 @@ try {
     Assert-Condition (-not [string]::Equals($OutputCsvPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'OutputCsvPath must not overwrite BondSpecPath.'
     Assert-Condition (-not [string]::Equals($AnalysisOutputPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'AnalysisOutputPath must not overwrite BondSpecPath.'
 
-    $shopHeader = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '88', [char]0xFF09)
+    $shopHeader = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '94', [char]0xFF09)
     $nonShopHeader = [string]::Concat('## ', [char]0x975E, [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '5', [char]0xFF09)
     $rarityLabel = [string]::Concat([char]0x7A00, [char]0x6709)
     $specLines = @(Get-Content -LiteralPath $BondSpecPath -Encoding UTF8)
     $shopTypeIds = @(Get-TypeIdsFromCodeBlock -Lines $specLines -Header $shopHeader -Label 'shop')
     $nonShopTypeIds = @(Get-TypeIdsFromCodeBlock -Lines $specLines -Header $nonShopHeader -Label 'non-shop')
-    Assert-Condition ($shopTypeIds.Count -eq 88) "Expected 88 shop TypeIds; found $($shopTypeIds.Count)."
+    Assert-Condition ($shopTypeIds.Count -eq 94) "Expected 94 shop TypeIds; found $($shopTypeIds.Count)."
     Assert-Condition (($nonShopTypeIds -join '/') -ceq '1137/1138/2033/5504/10002') "Non-shop TypeIds must be 1137/1138/2033/5504/10002; found '$($nonShopTypeIds -join '/')'."
 
     $shopSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
@@ -897,7 +1443,7 @@ try {
     foreach ($typeId in @($shopTypeIds + $nonShopTypeIds)) {
         [void]$validAbilityTypeIds.Add($typeId)
     }
-    Assert-Condition ($validAbilityTypeIds.Count -eq 93) "Expected 93 valid shop/non-shop ability TypeIds; found $($validAbilityTypeIds.Count)."
+    Assert-Condition ($validAbilityTypeIds.Count -eq 99) "Expected 99 valid shop/non-shop ability TypeIds; found $($validAbilityTypeIds.Count)."
     $scenarioTypeIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($scenarioKey in $abilityInput.UnitScenarios.Keys) {
         $typeId = [string]$scenarioKey
@@ -932,12 +1478,12 @@ try {
             Assert-Condition ($scenarioTypeIds.Contains($Matches.TypeId) -or $riskTypeIds.Contains($Matches.TypeId)) "BONDS ability TypeId '$($Matches.TypeId)' is absent from UnitScenarios and ExplicitRiskOnly."
         }
     }
-    foreach ($typeId in @('1058', '1095', '1281')) {
+    foreach ($typeId in @('1058', '1078', '1080', '1081', '1083', '1095', '1281', '1502')) {
         Assert-Condition ($shopSet.Contains($typeId)) "Required unmarked ability TypeId '$typeId' is not a shop unit."
         Assert-Condition ($scenarioTypeIds.Contains($typeId) -or $riskTypeIds.Contains($typeId)) "Required unmarked ability TypeId '$typeId' is absent from UnitScenarios and ExplicitRiskOnly."
     }
 
-    $unitPattern = '^(?<TypeId>\d+)\s+(?<DisplayName>.+?)\s+' + $rarityLabel + '(?<Rarity>[1-6])(?:\s|$)'
+    $unitPattern = '^(?<TypeId>\d+)\s+(?<DisplayName>.+?)\s+' + $rarityLabel + '(?<Rarity>[1-6])(?:[。\.\s]|$)'
     $definitions = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::Ordinal)
     foreach ($line in $specLines) {
         if ($line -notmatch $unitPattern) {
@@ -964,7 +1510,7 @@ try {
         Assert-Condition ($definitions.ContainsKey($typeId)) "Shop TypeId '$typeId' has no unit definition."
     }
 
-    $expectedRarityCounts = @{ 1 = 9; 2 = 18; 3 = 12; 4 = 23; 5 = 20; 6 = 6 }
+    $expectedRarityCounts = @{ 1 = 9; 2 = 20; 3 = 14; 4 = 24; 5 = 21; 6 = 6 }
     foreach ($rarity in 1..6) {
         $count = @($definitions.Values | Where-Object { $_.Rarity -eq $rarity }).Count
         Assert-Condition ($count -eq $expectedRarityCounts[$rarity]) "Expected R$rarity=$($expectedRarityCounts[$rarity]); found $count."
@@ -1037,7 +1583,7 @@ try {
     }
 
     $rows = @($rows)
-    Assert-Condition ($rows.Count -eq 88) "Expected 88 exported rows; found $($rows.Count)."
+    Assert-Condition ($rows.Count -eq 94) "Expected 94 exported rows; found $($rows.Count)."
     foreach ($row in $rows) {
         Assert-Condition ($row.TypeId -notin @(1137, 1138, 2033, 5504, 10002)) "Non-shop TypeId '$($row.TypeId)' was exported."
     }
@@ -1455,7 +2001,8 @@ try {
         [pscustomobject]$properties
     }
     $costCurveModel = Get-CostCurveModel -Rows @($abilityRows)
-    $rows = @($costCurveModel.Rows)
+    $r1CalibrationModel = Get-R1CalibrationModel -Rows @($costCurveModel.Rows)
+    $rows = @($r1CalibrationModel.Rows)
 
     $rawRarityMedianPower = [ordered]@{}
     $isotonicRarityMedianPower = [ordered]@{}
@@ -1468,9 +2015,9 @@ try {
     }
 
     $analysis = [ordered]@{
-        SchemaVersion = 'unit-cost-analysis-v4'
+        SchemaVersion = 'unit-cost-analysis-v5'
         ShopRowCount = $rows.Count
-        RarityDistribution = [ordered]@{ R1 = 9; R2 = 18; R3 = 12; R4 = 23; R5 = 20; R6 = 6 }
+        RarityDistribution = [ordered]@{ R1 = 9; R2 = 20; R3 = 14; R4 = 24; R5 = 21; R6 = 6 }
         EliteEvidence = @($eliteEvidence)
         CombatModel = [ordered]@{
             DefenderCount = $defenderRows.Count
@@ -1507,7 +2054,31 @@ try {
             ParameterScanTriggered = $costCurveModel.ParameterScanTriggered
             Rarity2To6MedianCosts = $costCurveModel.Rarity2To6MedianCosts
             Rarity6ToRarity2MedianCostRatio = $costCurveModel.Rarity6ToRarity2MedianCostRatio
-            R1CalibrationStatus = 'PendingTask5'
+            R1CalibrationStatus = 'Calibrated'
+            R1Calibration = [ordered]@{
+                Kappa = $r1CalibrationModel.Kappa
+                CandidateRange = @([decimal]0.01, [decimal]1.5)
+                CandidateStep = [decimal]0.01
+                Budgets = $r1CalibrationModel.Budgets
+                FormationKinds = @('Low', 'Median', 'High')
+                MatchEventLimit = $r1CalibrationModel.MatchEventLimit
+                MatchCount = $r1CalibrationModel.MatchCount
+                Rarity1Wins = $r1CalibrationModel.Rarity1Wins
+                Rarity2Wins = $r1CalibrationModel.Rarity2Wins
+                Draws = $r1CalibrationModel.Draws
+                Rarity1WinRate = $r1CalibrationModel.Rarity1WinRate
+                WinRateFormula = '(R1 wins + 0.5 * draws) / 72'
+                CombatMapping = [ordered]@{
+                    BaseAdjustedPower = 'PanelPower * AbilityPowerMultiplier'
+                    EquivalentEntityFactor = 'Ordinary unit: 1 + EquivalentEntityContribution / BaseAdjustedPower; no-PanelPower unit: 1'
+                    ActualDps = 'Recomputed ordinary damage against current target / EffectiveAttackIntervalSeconds * OutputScenarioMain * EquivalentEntityFactor; no-attack rows remain 0'
+                    EffectiveHitPoints = 'Ordinary unit: MaxHitPoints * DefenseScenarioMain * EquivalentEntityFactor; no-PanelPower unit omits the entity factor'
+                    TargetValue = 'LifeDeduct * EquivalentEntityFactor'
+                    BlockCapacity = '1 per E0 deployed copy; unquantified unit-specific modifiers remain RiskFlags'
+                }
+                CandidateAudit = $r1CalibrationModel.CandidateAudit
+                SelectedMatches = $r1CalibrationModel.SelectedMatches
+            }
             CandidateAudit = $costCurveModel.CandidateAudit
         }
         RiskAudit = @($rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.RiskFlags) } | ForEach-Object {

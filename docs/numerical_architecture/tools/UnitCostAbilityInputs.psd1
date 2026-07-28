@@ -20,13 +20,6 @@
             Evidence = @('BONDS: other allies within radius 2.5 gain DEF +300. Design 5.2: aura sensitivity uses 1/3/5 effective targets; main uses 3.')
             UnquantifiedRisk = @('Actual route, recipients, uptime, stacking and silence timing are not confirmed.')
         }
-        '1021' = @{
-            TypeId = 1021
-            ModelKind = 'DeathBurst20Seconds'
-            Parameters = @{ WindowSeconds = 20; DeathAtSeconds = 10; BurstDelaySeconds = 1; BurstAttackMultiplier = 4.0; BurstTargetsLow = 1; BurstTargetsMain = 2; BurstTargetsHigh = 3 }
-            Evidence = @('BONDS: death burst is 400% ATK physical splash, radius 1.25, delay 1 second. Scenario convention: death at 10 seconds and burst resolution at 11 seconds; AoE sensitivity 1/2/3.')
-            UnquantifiedRisk = @('Actual death time, air-target mix and affected target count are not confirmed.')
-        }
         '1025' = @{
             TypeId = 1025
             ModelKind = 'ThresholdOutput20Seconds'
@@ -40,6 +33,13 @@
             Parameters = @{ WindowSeconds = 20 }
             Evidence = @('BONDS: no ordinary attack, moves directly toward the opposing home, unblockable. Formula: normalized LifeDeduct * normalized move speed * 20-second survival fraction.')
             UnquantifiedRisk = @('Route length and contact timing are not confirmed.')
+        }
+        '1080' = @{
+            TypeId = 1080
+            ModelKind = 'GlobalSupportAura20Seconds'
+            Parameters = @{ WindowSeconds = 20; AuraAttackMultiplier = 1.10; AuraDefenseBonus = 100; AuraTargetsLow = 1; AuraTargetsMain = 3; AuraTargetsHigh = 5 }
+            Evidence = @('BONDS: while present, all allied units globally gain ATK +10%, DEF +100 and tactical command. The approved sensitivity uses 1/3/5 effective recipients; main uses 3.')
+            UnquantifiedRisk = @('Self-inclusion, actual recipients and uptime, stacking from multiple 1080 or elite entities, and the tactical-command conditional bonuses of 1078/1083 are not confirmed; the conditional bonuses are not priced a second time.')
         }
         '1042' = @{
             TypeId = 1042
@@ -353,11 +353,15 @@
 
     ExplicitRiskOnly = @{
         '1058'  = @('BONDS confirms block count +2, but the approved 20-second model has no confirmed conversion from added block slots to continuous power; numeric contribution is zero.')
+        '1078'  = @('BONDS confirms tactical command grants move speed +30%, but route length and tactical-command uptime are not confirmed; numeric contribution is zero.')
+        '1080'  = @('BONDS tactical command conditionally activates the separate 1078 move-speed and 1083 ATK bonuses, but self-inclusion, actual uptime, formation membership, and stacking from multiple 1080 or elite entities are not confirmed; this synergy is risk-only and is not double-priced.')
+        '1081'  = @('BONDS confirms block count +2, but blocked-target demand and uptime are not confirmed; numeric contribution is zero.')
+        '1083'  = @('BONDS confirms tactical command grants ATK +50%, but tactical-command uptime is not confirmed; numeric contribution is zero.')
         '1095'  = @('BONDS confirms each attack reduces the current target DEF by 10 with unlimited stacking, but target switching and stack persistence scenarios are not confirmed; numeric contribution is zero.')
         '1281'  = @('BONDS confirms three 1277 successors are unloaded on defeat, but the parent death time is not confirmed; numeric contribution is zero.')
+        '1502'  = @('BONDS confirms a blocked-trigger blink of 1.5 tiles with initial 15 and requirement 15, but route geometry and blocked uptime are not confirmed; numeric contribution is zero.')
         '10001' = @('Unblockable and move speed +150% last 1.5 seconds after the first below-50% trigger; route length and trigger time are not confirmed, so numeric contribution is zero.')
         '1017'  = @('Actual route, recipients, uptime, stacking and silence timing are not confirmed.')
-        '1021'  = @('Actual death time, air-target mix and affected target count are not confirmed.')
         '1042'  = @('Actual route, affected enemies, uptime, stacking and silence timing are not confirmed.')
         '1089'  = @('External damage/healing can change death time and whether the burst occurs in-window.')
         '1119'  = @('Actual release time changes defense-effect uptime.')
