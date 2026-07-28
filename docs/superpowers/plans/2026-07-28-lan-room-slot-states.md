@@ -215,7 +215,7 @@ Do not stage `LanRoomHost.cs` unless the socket test required and verified a cha
   - `Assets/Resources/UI/Lobby/card_deco_self.png`
   - `Assets/Resources/UI/Lobby/bg_plus.png`
   - `Assets/Resources/UI/Lobby/btn_match_normal.png`
-  - `Assets/Resources/UI/Lobby/btn_topmenu_back.png`
+  - `Assets/Resources/UI/Lobby/img_return.png`
   - `Assets/Resources/UI/Lobby/host_top_tag.png`
 
 **Step 1: Resolve source files without copying**
@@ -224,7 +224,7 @@ From the approved normal Unpacked tree, use `rg --files` and reject `$0`/`#0` na
 
 ```powershell
 $sourceRoot = 'G:\素材\11.14\Unpacked_1763129662\Android\ui\autochess'
-rg --files $sourceRoot | rg '(^|[\\/])(card_bg|bg_top_normal|bg_top_ready|card_empty|card_deco_self|bg_plus|btn_match_normal|btn_topmenu_back|host_top_tag)\.png$'
+rg --files $sourceRoot | rg '(^|[\\/])(card_bg|bg_top_normal|bg_top_ready|card_empty|card_deco_self|bg_plus|btn_match_normal|img_return|host_top_tag)\.png$'
 ```
 
 Verify the implementation machine still matches this read-only baseline:
@@ -238,7 +238,7 @@ Verify the implementation machine still matches this read-only baseline:
 | `card_deco_self` | `[uc]autochessouter/card_deco_self.png` | `A3217A0EE5C8B1D7325758162C9859BEC765C7B63331881C90CDA4804A93F661` |
 | `bg_plus` | `[uc]autochessouter/bg_plus.png` | `E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D` |
 | `btn_match_normal` | `[uc]autochessouter/btn_match_normal.png` | `62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD` |
-| `btn_topmenu_back` | `[uc]autochessouter/btn_topmenu_back.png` | `BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303` |
+| `img_return` | `[uc]autochessouter/img_return.png` | `3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09` (54x56; calibrated room-only Leave) |
 | `host_top_tag` | `[uc]autochessouter/host_top_tag.png` | `861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009` |
 
 If a hash differs, a name becomes ambiguous, or only a forbidden `$0`/`#0` file is available, stop Task 2 and report it; do not silently use a similarly named bitmap.
@@ -577,7 +577,7 @@ Add:
 [UnityTest]
 public IEnumerator RoomLeave_IsTopLeft_UsesApprovedSprite_AndHasUnobstructedHitTarget()
 {
-    // btn_topmenu_back, exact layout rect, one LeaveRequested event.
+    // img_return, exact layout rect, one LeaveRequested event.
     // Raycast from its visible center and require the Button target.
 }
 

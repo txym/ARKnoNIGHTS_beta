@@ -189,8 +189,13 @@ visible-contour Jaccard score of at least `0.95` within their named ROI.
 
 ### Leave and room dissolution
 
-`btn_topmenu_back` provides the room-only top-left Leave action. Local latency
-remains visible to its right without overlapping the button.
+`img_return` provides the calibrated room-only top-left Leave action. It is the
+54x56 normal Unpacked asset at `[uc]autochessouter/img_return.png`, imported as
+`UI/Lobby/img_return`, with SHA-256
+`3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09`.
+Calibration retained this square return mark because its current visible Leave
+gate passes; `btn_topmenu_back` is not the Leave presentation for this screen.
+Local latency remains visible to its right without overlapping the button.
 
 - A guest leaving removes only that guest and restores the corresponding slot
   to `Empty`.
