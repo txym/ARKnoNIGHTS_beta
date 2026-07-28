@@ -159,6 +159,117 @@ public static class LanLobbyVisualDiff {
             ? Unavailable("No visible color/contrast mask pixels found.")
             : AvailableBounds(minX,minY,maxX,maxY,pixelCount);
     }
+    public static LanLobbyBoundsMeasurement FindLongVerticalMaskEdgeBounds(
+        Bitmap bitmap, Rectangle search, string maskKind, Rectangle[] exclusions)
+    {
+        ValidateSearch(bitmap,search);
+        const double minimumNormalizedContrast=20.0;
+        int[][] rowBands;
+        if(search.Height>=400) {
+            rowBands=new int[][] {
+                new int[] { search.Y+142, Math.Min(search.Bottom,search.Y+183) },
+                new int[] { search.Y+311, Math.Min(search.Bottom,search.Y+387) }
+            };
+        } else {
+            rowBands=new int[][] { new int[] { search.Y,search.Bottom } };
+        }
+        int bandRows=0;
+        foreach(int[] band in rowBands) bandRows+=Math.Max(0,band[1]-band[0]);
+        int minimumRun=Math.Max(3,(int)Math.Ceiling(bandRows*0.25));
+        int middleX=search.X+search.Width/2;
+        int leftX=-1,rightX=-1,leftCount=-1,rightCount=-1;
+        double leftScore=-1.0,rightScore=-1.0;
+        for(int x=search.X;x<search.Right;x++) {
+            int count=0;
+            double scoreSum=0.0;
+            foreach(int[] band in rowBands) {
+                for(int y=band[0];y<band[1];y++) {
+                    double score=NormalizedHorizontalContrast(
+                        bitmap,search,exclusions,x,y,x<middleX ? -1 : 1);
+                    if(score<minimumNormalizedContrast) continue;
+                    count++;
+                    scoreSum+=score;
+                }
+            }
+            if(count<minimumRun) continue;
+            if(x<middleX && (count>leftCount ||
+                (count==leftCount && (scoreSum>leftScore+0.001 ||
+                (Math.Abs(scoreSum-leftScore)<=0.001 && (leftX<0 || x<leftX)))))) {
+                leftX=x;
+                leftCount=count;
+                leftScore=scoreSum;
+            }
+            if(x>=middleX && (count>rightCount ||
+                (count==rightCount && (scoreSum>rightScore+0.001 ||
+                (Math.Abs(scoreSum-rightScore)<=0.001 && x>rightX))))) {
+                rightX=x;
+                rightCount=count;
+                rightScore=scoreSum;
+            }
+        }
+        if(leftX<0 || rightX<0 || rightX<=leftX)
+            return Unavailable("No dominant decoded portrait-frame side-edge pair found.");
+        int minY=search.Bottom,maxY=-1,pairedRows=0;
+        for(int y=search.Y;y<search.Bottom;y++) {
+            bool leftEdge=NormalizedHorizontalContrast(
+                bitmap,search,exclusions,leftX,y,-1)>=minimumNormalizedContrast;
+            bool rightEdge=NormalizedHorizontalContrast(
+                bitmap,search,exclusions,rightX,y,1)>=minimumNormalizedContrast;
+            if(!leftEdge || !rightEdge) continue;
+            pairedRows++;
+            minY=Math.Min(minY,y);
+            maxY=Math.Max(maxY,y);
+        }
+        return pairedRows==0
+            ? Unavailable("Dominant portrait-frame sides have no paired decoded vertical continuity.")
+            : AvailableBounds(leftX,minY,rightX,maxY,leftCount+rightCount+pairedRows*2);
+    }
+    static double NormalizedHorizontalContrast(
+        Bitmap bitmap, Rectangle search, Rectangle[] exclusions,
+        int x, int y, int direction)
+    {
+        if(IsExcluded(exclusions,x,y)) return 0.0;
+        Color origin=bitmap.GetPixel(x,y);
+        double maximum=0.0;
+        int firstDirection=direction==0 ? -1 : direction;
+        int lastDirection=direction==0 ? 1 : direction;
+        for(int candidateDirection=firstDirection;
+            candidateDirection<=lastDirection;
+            candidateDirection+=2) {
+            for(int distance=1;distance<=3;distance++) {
+                int neighborX=x+candidateDirection*distance;
+                if(neighborX<search.X || neighborX>=search.Right ||
+                    IsExcluded(exclusions,neighborX,y)) continue;
+                Color neighbor=bitmap.GetPixel(neighborX,y);
+                int difference=Math.Abs(origin.R-neighbor.R)+
+                    Math.Abs(origin.G-neighbor.G)+Math.Abs(origin.B-neighbor.B);
+                int denominator=Math.Max(origin.R,neighbor.R)+
+                    Math.Max(origin.G,neighbor.G)+Math.Max(origin.B,neighbor.B);
+                denominator=Math.Max(12,denominator);
+                maximum=Math.Max(maximum,255.0*difference/denominator);
+            }
+        }
+        return maximum;
+    }
+    public static LanLobbyMaskComparison CompareBounds(
+        LanLobbyVisualBounds actual, LanLobbyVisualBounds reference)
+    {
+        if(actual==null) throw new ArgumentNullException("actual");
+        if(reference==null) throw new ArgumentNullException("reference");
+        int left=Math.Max(actual.X,reference.X);
+        int top=Math.Max(actual.Y,reference.Y);
+        int right=Math.Min(actual.X+actual.Width,reference.X+reference.Width);
+        int bottom=Math.Min(actual.Y+actual.Height,reference.Y+reference.Height);
+        long intersection=(long)Math.Max(0,right-left)*Math.Max(0,bottom-top);
+        long actualArea=(long)actual.Width*actual.Height;
+        long referenceArea=(long)reference.Width*reference.Height;
+        long union=actualArea+referenceArea-intersection;
+        return new LanLobbyMaskComparison {
+            IntersectionPixels=intersection,
+            UnionPixels=union,
+            Jaccard=union==0 ? 0.0 : (double)intersection/union
+        };
+    }
     public static int MaximumContinuousEmptyMaskRows(
         Bitmap bitmap, Rectangle search, string maskKind)
     {
@@ -1174,6 +1285,45 @@ function Get-LanLobbyVisibleBounds
     }
 }
 
+function Get-LanLobbyPortraitFrameEdgeBounds
+{
+    param(
+        [Parameter(Mandatory)] [Drawing.Bitmap] $Image,
+        [Parameter(Mandatory)] $Roi,
+        [Parameter(Mandatory)] [ValidateSet('Cyan','Gray')] [string] $MaskKind,
+        $Exclusions = @()
+    )
+
+    $roiRectangle = ConvertTo-LanLobbyRectangle $Roi
+    [Drawing.Rectangle[]]$exclusionRectangles = @($Exclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
+    $measurement = [LanLobbyVisualDiff]::FindLongVerticalMaskEdgeBounds(
+        $Image,
+        $roiRectangle,
+        $MaskKind,
+        $exclusionRectangles)
+    if (-not $measurement.Available)
+    {
+        return [pscustomobject][ordered]@{
+            available=$false
+            failureReason=$measurement.FailureReason
+            bounds=$null
+            center=$null
+            pixelCount=0
+        }
+    }
+    $bounds = $measurement.Bounds
+    return [pscustomobject][ordered]@{
+        available=$true
+        failureReason=$null
+        bounds=[pscustomobject](ConvertTo-LanLobbyBoundsObject $bounds)
+        center=[pscustomobject][ordered]@{
+            x=$bounds.X + ($bounds.Width - 1) / 2.0
+            y=$bounds.Y + ($bounds.Height - 1) / 2.0
+        }
+        pixelCount=[int]$measurement.PixelCount
+    }
+}
+
 function Measure-LanLobbyVisiblePlacement
 {
     param(
@@ -1182,8 +1332,17 @@ function Measure-LanLobbyVisiblePlacement
         [Parameter(Mandatory)] $Gate
     )
 
-    $actual = Get-LanLobbyVisibleBounds -Image $ActualImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
-    $reference = Get-LanLobbyVisibleBounds -Image $ReferenceImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    $isPortraitFrame = [string]$Gate.gateKind -ceq 'PortraitFrame'
+    $actual = if ($isPortraitFrame) {
+        Get-LanLobbyPortraitFrameEdgeBounds -Image $ActualImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    } else {
+        Get-LanLobbyVisibleBounds -Image $ActualImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    }
+    $reference = if ($isPortraitFrame) {
+        Get-LanLobbyPortraitFrameEdgeBounds -Image $ReferenceImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    } else {
+        Get-LanLobbyVisibleBounds -Image $ReferenceImage -Roi $Gate.roi -MaskKind $Gate.maskKind -Exclusions $Gate.exclusions
+    }
     $thresholds = [pscustomobject]$Gate.thresholds
     if (-not $actual.available -or -not $reference.available)
     {
@@ -1223,12 +1382,22 @@ function Measure-LanLobbyVisiblePlacement
         deltaHeight=$actual.bounds.height - $reference.bounds.height
     }
     [Drawing.Rectangle[]]$exclusionRectangles = @($Gate.exclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
-    $comparison = [LanLobbyVisualDiff]::CompareVisibleMasks(
-        $ActualImage,
-        $ReferenceImage,
-        (ConvertTo-LanLobbyRectangle $Gate.roi),
-        [string]$Gate.maskKind,
-        $exclusionRectangles)
+    $comparison = if ($isPortraitFrame) {
+        [LanLobbyVisualDiff]::CompareBounds(
+            (New-Object LanLobbyVisualBounds -Property @{
+                X=[int]$actual.bounds.x;Y=[int]$actual.bounds.y;Width=[int]$actual.bounds.width;Height=[int]$actual.bounds.height
+            }),
+            (New-Object LanLobbyVisualBounds -Property @{
+                X=[int]$reference.bounds.x;Y=[int]$reference.bounds.y;Width=[int]$reference.bounds.width;Height=[int]$reference.bounds.height
+            }))
+    } else {
+        [LanLobbyVisualDiff]::CompareVisibleMasks(
+            $ActualImage,
+            $ReferenceImage,
+            (ConvertTo-LanLobbyRectangle $Gate.roi),
+            [string]$Gate.maskKind,
+            $exclusionRectangles)
+    }
     $contour = [pscustomobject][ordered]@{
         intersectionPixels=[long]$comparison.IntersectionPixels
         unionPixels=[long]$comparison.UnionPixels
@@ -2487,7 +2656,7 @@ try
                             width=[int][Math]::Ceiling([double]$frameRect.width)
                             height=5
                         }
-                        $topBarPlacement = Get-LanLobbyVisibleBounds -Image $actual -Roi $gateSpec.topBarRoi -MaskKind $gateSpec.maskKind -Exclusions $gateSpec.exclusions
+                        $topBarPlacement = Get-LanLobbyPortraitFrameEdgeBounds -Image $actual -Roi $gateSpec.topBarRoi -MaskKind $gateSpec.maskKind -Exclusions $gateSpec.exclusions
                         $portraitFrameRelation = Measure-LanLobbyPortraitFrameRelation `
                             -FramePlacement $measurement.actual `
                             -TopBarPlacement $topBarPlacement `
@@ -2524,7 +2693,11 @@ try
                             [pscustomobject][ordered]@{ name=$_.name;reason=$_.reason;x=$_.x;y=$_.y;width=$_.width;height=$_.height }
                         })
                         maskKind=$gateSpec.maskKind
-                        maskDescription='Decoded opaque screenshot color/contrast mask measured directly from rendered RGB values.'
+                        maskDescription=$(if ([string]$gateSpec.gateKind -ceq 'PortraitFrame') {
+                            'Decoded screenshot silhouette measured from tint/luminance-normalized local horizontal RGB contrast.'
+                        } else {
+                            'Decoded opaque screenshot color/contrast mask measured directly from rendered RGB values.'
+                        })
                         diagnosticRectTransform=$gateSpec.diagnosticRectTransform
                         actualVisibleBounds=$measurement.actual.bounds
                         referenceVisibleBounds=$measurement.reference.bounds

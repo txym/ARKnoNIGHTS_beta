@@ -151,6 +151,60 @@ function Add-LanLobbyFixturePixels(
     }
 }
 
+function Draw-LanLobbyTintNormalizedPortraitFixture(
+    [string] $Path,
+    [Drawing.Rectangle] $Roi,
+    [Drawing.Rectangle] $Frame,
+    [ValidateSet('Gray','Cyan')] [string] $Tint,
+    [bool] $FlipVertically)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try
+    {
+        $graphics.FillRectangle([Drawing.Brushes]::Black, $Roi)
+        for ($row = 0; $row -lt $Frame.Height; $row++)
+        {
+            $normalized = $row / [Math]::Max(1.0, $Frame.Height - 1.0)
+            if (-not $FlipVertically) { $normalized = 1.0 - $normalized }
+            $intensity = 50 + [int][Math]::Round(150.0 * $normalized)
+            $color = if ($Tint -ceq 'Cyan') {
+                [Drawing.Color]::FromArgb(255, [int][Math]::Round($intensity / 10.0), $intensity, $intensity)
+            } else {
+                [Drawing.Color]::FromArgb(255, $intensity, $intensity, $intensity)
+            }
+            $pen = New-Object Drawing.Pen $color
+            try
+            {
+                $y = $Frame.Y + $row
+                $graphics.DrawLine($pen, $Frame.X, $y, $Frame.X + 23, $y)
+                $graphics.DrawLine($pen, $Frame.Right - 24, $y, $Frame.Right - 1, $y)
+            }
+            finally { $pen.Dispose() }
+        }
+        $decorationColor = if ($Tint -ceq 'Cyan') {
+            [Drawing.Color]::FromArgb(255, 12, 120, 120)
+        } else {
+            [Drawing.Color]::FromArgb(255, 120, 120, 120)
+        }
+        $decorationBrush = New-Object Drawing.SolidBrush $decorationColor
+        try
+        {
+            $graphics.FillRectangle($decorationBrush, $Frame.X + 80, $Frame.Y + 130, 18, 160)
+            $graphics.FillRectangle($decorationBrush, $Frame.Right - 98, $Frame.Y + 130, 18, 160)
+        }
+        finally { $decorationBrush.Dispose() }
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
 function Shift-LanLobbyFixtureRegion(
     [string] $Path,
     [Drawing.Rectangle] $Region,
@@ -1376,7 +1430,7 @@ try
     foreach ($portraitFrameGate in $portraitFrameGates)
     {
         Assert-True ($portraitFrameGate.gateKind -ceq 'PortraitFrame') "$($portraitFrameGate.name) must use its dedicated gate kind"
-        Assert-True ($portraitFrameGate.passed) "$($portraitFrameGate.name) unchanged fixture must pass"
+        Assert-True ($portraitFrameGate.passed) "$($portraitFrameGate.name) unchanged fixture must pass; actual=$($portraitFrameGate.actualVisibleBounds | ConvertTo-Json -Compress), reference=$($portraitFrameGate.referenceVisibleBounds | ConvertTo-Json -Compress), relation=$($portraitFrameGate.portraitFrameRelation | ConvertTo-Json -Compress)"
         Assert-True ($portraitFrameGate.portraitFrameRelation.passed) "$($portraitFrameGate.name) relation must pass"
         Assert-True ($portraitFrameGate.sharedGeometryPassed) "$($portraitFrameGate.name) shared geometry must pass"
         Assert-True (($portraitFrameGate.portraitFrameRelation.thresholds.maximumHorizontalCenterDeltaPx -eq 2) -and
@@ -1404,6 +1458,37 @@ try
     $baselineRoomFailures = @($report.roomGates | Where-Object { $_.status -eq 'Failed' } | ForEach-Object { "$($_.name):$($_.reason):j=$($_.contour.jaccard):edges=$($_.edgeDeltaPx.left)/$($_.edgeDeltaPx.top)/$($_.edgeDeltaPx.right)/$($_.edgeDeltaPx.bottom)" })
     Assert-True ($baselineRoomFailures.Count -eq 0) "baseline room visible-pixel gates must pass; failed: $($baselineRoomFailures -join ' | ')"
 
+    $tintNormalizedResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-tint-normalized-silhouette' {
+        param($manifest, $caseCaptureDirectory)
+        $roi = New-Object Drawing.Rectangle 607,208,337,523
+        $frame = New-Object Drawing.Rectangle 625,220,300,480
+        Draw-LanLobbyTintNormalizedPortraitFixture (Join-Path $caseCaptureDirectory 'room-full.png') $roi $frame 'Gray' $false
+        Draw-LanLobbyTintNormalizedPortraitFixture (Join-Path $caseCaptureDirectory 'room-ready.png') $roi $frame 'Cyan' $true
+    }
+    $grayTintGate = @($tintNormalizedResult.report.roomGates | Where-Object name -ceq 'RoomFull.Slot2.PortraitFrame')[0]
+    $cyanTintGate = @($tintNormalizedResult.report.roomGates | Where-Object name -ceq 'RoomReady.Slot2.PortraitFrame')[0]
+    Assert-True (
+        $grayTintGate.actualVisibleBounds.x -eq $cyanTintGate.actualVisibleBounds.x -and
+        $grayTintGate.actualVisibleBounds.y -eq $cyanTintGate.actualVisibleBounds.y -and
+        $grayTintGate.actualVisibleBounds.width -eq $cyanTintGate.actualVisibleBounds.width -and
+        $grayTintGate.actualVisibleBounds.height -eq $cyanTintGate.actualVisibleBounds.height
+    ) 'the same visible portrait silhouette must decode identically after gray/cyan tinting and vertical luminance flip'
+
+    $interiorPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-interior-state-content' {
+        param($manifest, $caseCaptureDirectory)
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-host.png') ([Drawing.Color]::FromArgb(255, 0, 220, 220)) 300 300 140 200
+    }
+    $baselinePortraitGate = @($report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
+    $interiorPortraitGate = @($interiorPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
+    Assert-True ($interiorPortraitGate.passed -and
+        $interiorPortraitGate.portraitFrameRelation.passed -and
+        $interiorPortraitGate.sharedGeometryPassed -and
+        $interiorPortraitGate.actualVisibleBounds.x -eq $baselinePortraitGate.actualVisibleBounds.x -and
+        $interiorPortraitGate.actualVisibleBounds.y -eq $baselinePortraitGate.actualVisibleBounds.y -and
+        $interiorPortraitGate.actualVisibleBounds.width -eq $baselinePortraitGate.actualVisibleBounds.width -and
+        $interiorPortraitGate.actualVisibleBounds.height -eq $baselinePortraitGate.actualVisibleBounds.height
+    ) 'interior state/profile pixels must not change the accepted portrait-frame edge geometry'
+
     $shiftedPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-horizontal-shift' {
         param($manifest, $caseCaptureDirectory)
         Shift-LanLobbyFixtureRegion (Join-Path $caseCaptureDirectory 'room-host.png') (New-Object Drawing.Rectangle 218,208,337,523) 5 0
@@ -1416,11 +1501,15 @@ try
 
     $narrowPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-width-change' {
         param($manifest, $caseCaptureDirectory)
-        Narrow-LanLobbyPortraitFrameFixture (Join-Path $caseCaptureDirectory 'room-host.png') 935 208 523 4
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-host.png') ([Drawing.Color]::FromArgb(255, 105, 105, 105)) 936 208 4 523
     }
+    $baselineWidthGate = @($report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
     $narrowPortraitGate = @($narrowPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
     Assert-True (($narrowPortraitGate.status -ceq 'Failed') -and
-        ([Math]::Abs([double]$narrowPortraitGate.portraitFrameRelation.topBarWidthDeltaPx) -eq 4)) 'a 4 px decoded frame width change must fail its width relation'
+        ([Math]::Abs(
+            [double]$narrowPortraitGate.portraitFrameRelation.topBarWidthDeltaPx -
+            [double]$baselineWidthGate.portraitFrameRelation.topBarWidthDeltaPx) -eq 4)
+    ) "a 4 px decoded frame width change must fail its width relation; baseline=$($baselineWidthGate.portraitFrameRelation.topBarWidthDeltaPx), mutation=$($narrowPortraitGate.portraitFrameRelation.topBarWidthDeltaPx), actual=$($narrowPortraitGate.actualVisibleBounds | ConvertTo-Json -Compress), status=$($narrowPortraitGate.status)"
 
     $seamPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-seam-gap' {
         param($manifest, $caseCaptureDirectory)
@@ -1495,7 +1584,14 @@ try
         Assert-True ($null -ne $visibleGate.referenceVisibleBounds) "$($visibleGate.name) reference visible bounds"
         Assert-True ($null -ne $visibleGate.actualVisibleCenter) "$($visibleGate.name) actual visible center"
         Assert-True ($null -ne $visibleGate.referenceVisibleCenter) "$($visibleGate.name) reference visible center"
-        Assert-True ([string]$visibleGate.maskDescription -like '*color/contrast*') "$($visibleGate.name) must describe opaque screenshots as color/contrast masks"
+        if ([string]$visibleGate.gateKind -ceq 'PortraitFrame')
+        {
+            Assert-True ([string]$visibleGate.maskDescription -like '*tint/luminance-normalized*') "$($visibleGate.name) must describe its dedicated normalized-contrast silhouette"
+        }
+        else
+        {
+            Assert-True ([string]$visibleGate.maskDescription -like '*color/contrast*') "$($visibleGate.name) must describe opaque screenshots as color/contrast masks"
+        }
     }
     $joinDecoration = $report.joinDecoration
     Assert-True ($null -ne $joinDecoration) 'Join decoration report must exist'
