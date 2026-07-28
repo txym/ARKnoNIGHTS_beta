@@ -252,6 +252,32 @@ namespace ArknoNights.Player
             return Result(LocalMatchOperationCode.Success);
         }
 
+        public LocalMatchOperationResult RefreshAllShopsAfterBattle()
+        {
+            var nextPage = (currentShopPage + 1) % shopPages.Length;
+            foreach (var playerId in orderedPlayerIds)
+            {
+                var refreshableSlots = playersById[playerId].ShopSlots
+                    .Where(slot => slot.IsEmpty || !slot.IsFrozen)
+                    .OrderBy(slot => slot.ShopSlotId)
+                    .ToArray();
+                var generatedOffers = refreshableSlots
+                    .Select(slot => shopPages[nextPage][slot.ShopSlotId])
+                    .ToArray();
+                var sortedOffers = SortShopOffers(generatedOffers);
+
+                for (var index = 0; index < refreshableSlots.Length; index++)
+                {
+                    refreshableSlots[index].UnitTypeId = sortedOffers[index];
+                    refreshableSlots[index].IsFrozen = false;
+                }
+            }
+
+            currentShopPage = nextPage;
+            NotifyChanged();
+            return Result(LocalMatchOperationCode.Success);
+        }
+
         public LocalMatchOperationResult TryToggleFrozen(int shopSlotId)
         {
             if (!TryGetShopSlot(shopSlotId, out var slot)) return Result(LocalMatchOperationCode.ShopSlotNotFound);

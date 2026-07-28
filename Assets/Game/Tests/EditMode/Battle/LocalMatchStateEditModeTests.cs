@@ -169,6 +169,38 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void PassiveRefresh_RefreshesAllPlayersForFreeWhileFrozenSlotsStayAndOnlyOpenSlotsSort()
+        {
+            var state = Load();
+            Assert.IsTrue(state.TryRefresh().Success);
+            Assert.IsTrue(state.TryPurchase(4).Success);
+            Assert.IsTrue(state.TryToggleFrozen(0).Success);
+            Assert.IsTrue(state.TryToggleFrozen(5).Success);
+            var before = state.Snapshot;
+            var changes = 0;
+            state.Changed += _ => changes++;
+
+            var result = state.RefreshAllShopsAfterBattle();
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(before.LocalPlayer.Gold, result.Snapshot.LocalPlayer.Gold);
+            Assert.AreEqual(before.Version + 1, result.Snapshot.Version);
+            Assert.AreEqual(1, changes);
+            CollectionAssert.AreEqual(
+                new[] { "5503", "1000", "1000", "5503", "5503", "5503" },
+                result.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[0].IsFrozen);
+            Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[5].IsFrozen);
+            foreach (var remote in result.Snapshot.Players.Where(player => player.PlayerId != state.LocalPlayerId))
+            {
+                CollectionAssert.AreEqual(
+                    new[] { "1000", "1000", "1000", "5503", "5503", "5503" },
+                    remote.ShopSlots.Select(slot => slot.UnitTypeId));
+                Assert.IsTrue(remote.ShopSlots.All(slot => !slot.IsFrozen));
+            }
+        }
+
+        [Test]
         public void BulkFreeze_MixedOccupiedSlotsChangeAtomicallyAndEmptySlotsStayUnfrozen()
         {
             var state = Load();
