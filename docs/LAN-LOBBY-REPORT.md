@@ -354,3 +354,157 @@ The retained binary operationally corresponds to commit `b645e5b`: current runti
 - accepted final JSON: `B1D09C0D5599ECB4508BA5EB139B31EEC204ADFC4E6F6DC93449C6F474900F7E`.
 
 The same-Wi-Fi Windows/Android two-device flow remains manually unverified as recorded above. The final Player evidence proves the production UI/capture/build path and preserved LAN-facing events, but it does not substitute for the physical-device discovery/join/readiness/start/disconnect procedure.
+
+## LAN 房间槽位状态——最终有界证据（2026-07-28，当前权威）
+
+### 结论
+
+LAN 房间槽位实现、Windows 构建、自动测试、截图生成和素材来源核查已验证；图11–13视觉验收仍为 **FAILED**，不是“最终成功视觉周期”。
+
+最终 Cycle 3 的 52 个命名房间门结果为：
+
+- `Passed`: 24
+- `Failed`: 26
+- `ExcludedByReferencePopup`: 2，且两项均为 `passed=false`
+- 素材/来源失败：0
+
+三次可见 Windows Player 校准启动已经全部用完：Cycle 1、2、3 分别为第 1/3、2/3、3/3 次；没有发生第四次 Player 启动，也没有在最后截图之后提交未经 Player 验证的视觉改动。
+
+### 权威房间行为
+
+- 创建房间时，房主初始为已准备。
+- 新加入的成员初始为未准备。
+- 开始游戏只要求当前房间内所有成员已准备；空槽位不参与判断，也不要求满四人。
+- 仅房主一人的房间可以立即开始游戏。
+- 成员操作标签为“准备就绪”与“取消准备”。
+- 房主操作标签为“协议启动”。
+- 非房主离开只移除该成员并恢复空槽。
+- 房主离开会解散房间并停止权威房间服务。
+- 不支持房主迁移或将其他成员晋升为房主。
+
+### 图11–13边界与最终证据
+
+`room-host` 对应图11，`room-full` 对应图12，`room-ready` 对应图13。上方滚动弹幕、图12/13右侧弹窗像素、角色立绘和资料卡内容不属于视觉验收。图11是第四个空槽的唯一无遮挡参考。
+
+图12与图13因右侧弹窗遮挡而排除完整的第四个玩家槽，且排除项不记为通过。
+
+视觉验收以实际渲染的可见图形为准，而不是纹理矩形或RectTransform中心。
+
+阻塞阈值未降低：`1920×1080` 下图标/标签的可见中心每轴误差上限为 `2 px`，可见宽高误差上限为 `3 px`；长轮廓/组合槽每条可见边误差上限为 `4 px`，命名 ROI 内可见轮廓 Jaccard 下限为 `0.95`。
+
+最终证据的绝对路径：
+
+- 截图：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Captures`
+- 并排证据：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Evidence`
+- 阻塞报告与叠图：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\VisualDiff`
+- 构建日志：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Build.log`
+- Player 日志：`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Player.log`
+
+26 个失败门按捕获精确分组如下；逐门可见 bounds、边差和 Jaccard 的权威明细在 `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\VisualDiff\visual-diff-report.json`，同一张 26 行人工可读表保留在 `.superpowers/sdd/2026-07-28-lan-room-slot-states/task-8-report.md`：
+
+- `room-host`（8）：`RoomHost.Slot1.ReadyTopBar`、`RoomHost.Slot1.ReadyContour`、`RoomHost.Slot1.ReadyCheck`、`RoomHost.Slot1.ReadyLabel`、`RoomHost.Slot1.CreatorTag`、`RoomHost.Slot2.EmptyComposition`、`RoomHost.Slot3.EmptyComposition`、`RoomHost.Slot4.EmptyComposition`。
+- `room-ready`（10）：`RoomReady.Slot1.ReadyContour`、`RoomReady.Slot1.ReadyCheck`、`RoomReady.Slot1.ReadyLabel`、`RoomReady.Slot2.ReadyContour`、`RoomReady.Slot2.ReadyCheck`、`RoomReady.Slot2.ReadyLabel`、`RoomReady.Slot3.ReadyContour`、`RoomReady.Slot3.ReadyCheck`、`RoomReady.Slot3.ReadyLabel`、`RoomReady.PrimaryAction.LabelCenter`。
+- `room-full`（8）：`RoomFull.Slot1.ReadyContour`、`RoomFull.Slot1.ReadyCheck`、`RoomFull.Slot1.ReadyLabel`、`RoomFull.Slot2.WaitingTopBar`、`RoomFull.Slot2.WaitingContour`、`RoomFull.Slot3.WaitingTopBar`、`RoomFull.Slot3.WaitingContour`、`RoomFull.PrimaryAction.Gray`。
+
+两个排除门是 `RoomReady.Slot4.ReferencePopupExclusion` 和 `RoomFull.Slot4.ReferencePopupExclusion`；它们不是通过项。
+
+### 构建、测试与日志
+
+Cycle 3 Windows x64 构建结果为 `Succeeded`，错误 `0`，警告 `2`（均为既有 `TagRegistry.freezeAppend` CS0414），大小 `185519546` 字节，耗时 `00:00:04.2621446`。Player 以可见 D3D11 窗口、`1920×1080` 运行并正常退出；五张 PNG 均可解码且尺寸正确，UTF-8 manifest 有五条记录，Player 日志包含 `[LanLobby][capture.completed] count=5`，未发现与本任务相关的新错误。
+
+最终串行 Unity 测试：
+
+| 套件/过滤器 | 结果 | 日志目录 |
+| --- | ---: | --- |
+| `LobbyRoomStateEditModeTests` | 15/15 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Domain` |
+| `LanSocketIntegrationEditModeTests` | 8/8 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Socket` |
+| `LobbyAssetMapEditModeTests` | 30/30 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Assets` |
+| `LanLobbyRoomLayoutEditModeTests` | 12/12 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Layout` |
+| `LanLobbyViewPlayModeTests` | 27/27 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/View` |
+| `LanLobbyCaptureSuitePlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Capture` |
+| `LanLobbyControllerPlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Controller` |
+
+总计 100/100 通过，0 失败、0 跳过。每个目录保留 XML、日志和 `summary.txt`。本节提交前的串行复跑确认 Task 9 文档/证据 smoke 为 VisualDiff `36 fixtures / 1633 assertions`、Evidence exporter `5 / 15`、Evidence common `5 / 39`。
+
+Windows 与 Android 同一 Wi-Fi 下的两台物理设备发现、房间号预填、加入、准备切换、开始广播、离开与房主解散流程仍未人工执行，不能由上述单机证据推断为通过。
+
+### Cycle 3 manifest 派生的完整 bitmap 使用表
+
+以下 46 行直接来自最终 `visual-diff-report.json` 的 `materialUsage.bitmapSprites`；捕获名即该素材的实际状态使用范围。
+
+| Sprite | Resources path | Approved source | Imported SHA-256 | Capture/state usage | Occurrences |
+| --- | --- | --- | --- | --- | ---: |
+| `bg_plus` | `UI/Lobby/bg_plus` | `[uc]autochessouter/bg_plus.png` | `E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D` | `room-host` | 3 |
+| `bg_terrain` | `UI/Lobby/bg_terrain` | `[uc]autochessouter/bg_terrain.png` | `ECE7B6159268276287C20E3B3A82A5165BCC1D344EDFA6DE3B88EE24A76F988C` | `discovered-prefill, home, room-full, room-host, room-ready` | 5 |
+| `bg_top_normal` | `UI/Lobby/bg_top_normal` | `[uc]autochessouter/bg_top_normal.png` | `5A9479B9AFDD4FC3F597CCBF4A1A0D92C1BB1B5053D716E8C20267E6B2C77C4F` | `room-full, room-host` | 6 |
+| `bg_top_ready` | `UI/Lobby/bg_top_ready` | `[uc]autochessouter/bg_top_ready.png` | `EFAA99906A087AAF5AD631E4DF8CFCD7E90C4F463621779A13447675F221482D` | `room-full, room-host, room-ready` | 6 |
+| `btn_match_grey` | `UI/Lobby/btn_match_grey` | `[uc]autochessouter/btn_match_grey.png` | `E774CB0533EB67BD2FE45F50339E36D0A6221BAF594E6AEE5E5C256469A4BA78` | `discovered-prefill, home, room-full` | 5 |
+| `btn_match_host_grey` | `UI/Lobby/btn_match_host_grey` | `[uc]autochessouter/btn_match_host_grey.png` | `C4CD3326EA4D04777AAA540525405DF8AA217D2E972443FDE95C202333F93614` | `room-full` | 1 |
+| `btn_match_host_normal` | `UI/Lobby/btn_match_host_normal` | `[uc]autochessouter/btn_match_host_normal.png` | `9D36CBDA42FC64CEB7590CBEDF5E49176BFA90E63A8B263FD3C87EE08C3BF3DF` | `room-host, room-ready` | 2 |
+| `btn_match_normal` | `UI/Lobby/btn_match_normal` | `[uc]autochessouter/btn_match_normal.png` | `62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD` | `room-host, room-ready` | 2 |
+| `card_bg` | `UI/Lobby/card_bg` | `[uc]autochessouter/card_bg.png` | `050B347451BBEBC74F5E3B09A2470931D9B2A85DEF707A4AAC42B5CE1B0BCEE2` | `room-full, room-host, room-ready` | 12 |
+| `card_deco_bg` | `UI/Lobby/card_deco_bg` | `[uc]autochessouter/card_deco_bg.png` | `C907B3527747B947ECCA08757DD6601BCA46B8EC5AF835F61F226BBBF8E1EBF1` | `room-full, room-host` | 6 |
+| `card_deco_self` | `UI/Lobby/card_deco_self` | `[uc]autochessouter/card_deco_self.png` | `A3217A0EE5C8B1D7325758162C9859BEC765C7B63331881C90CDA4804A93F661` | `room-full, room-host, room-ready` | 6 |
+| `card_empty` | `UI/Lobby/card_empty` | `[uc]autochessouter/card_empty.png` | `4DD34E0B5BE318770082B14F245591D80F6ABFF00451744C4BEF3459798DCE31` | `room-host` | 3 |
+| `create_icon` | `UI/Lobby/create_icon` | `[uc]autochessouter/create_icon.png` | `AE047958EE4E7D43F368D3205110307200D30F79BCF393B36CBBDE37A8A00BA7` | `discovered-prefill, home` | 2 |
+| `doc_frame_line` | `UI/Lobby/Home/doc_frame_line` | `[uc]autochessouter/doc_frame_line.png` | `4E4D96093514340112A0799D61611A65DA41153ACBD21F271184E0C0BB311C97` | `discovered-prefill, home` | 14 |
+| `host_top_tag` | `UI/Lobby/host_top_tag` | `[uc]autochessouter/host_top_tag.png` | `861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009` | `room-full, room-host, room-ready` | 3 |
+| `icon_amiy` | `UI/Lobby/Home/icon_amiy` | `Combined/[uc]autochesscommon/icon_amiy.png` | `14D5F8D3A8026751B511942517B9815BA3E04438857FEA649EF8A8A02B64868B` | `discovered-prefill, home` | 2 |
+| `img_player_bkg` | `UI/Lobby/img_player_bkg` | `[uc]autochessouter/img_player_bkg.png` | `CB940ECA5FE84527D9AD4546C617120A90F94CD88663F98C66261EE60D45185A` | `discovered-prefill, home` | 4 |
+| `img_pointer` | `UI/Lobby/Home/img_pointer` | `[uc]autochessouter/img_pointer.png` | `3CD944DC7F0F3B7DE675E8BBE23EEA9640D95DE65B4B2E91F14648385284F697` | `discovered-prefill, home` | 8 |
+| `img_return` | `UI/Lobby/img_return` | `[uc]autochessouter/img_return.png` | `3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09` | `room-full, room-host, room-ready` | 3 |
+| `join_icon` | `UI/Lobby/join_icon` | `[uc]autochessouter/join_icon.png` | `6DE45E7D0AF9FFAE47D271E6A719FE008412FF62704154D277788EA094381C09` | `discovered-prefill, home` | 2 |
+| `player_card_ready` | `UI/Lobby/player_card_ready` | `[uc]autochessouter/player_card_ready.png` | `F34786A3E832E97121EB03614B6D584C871B78E4C5CDD1FA6C5F9CB7D191A4C0` | `room-full, room-host, room-ready` | 6 |
+| `player_card_self_frame` | `UI/Lobby/player_card_self_frame` | `[uc]autochessouter/player_card_self_frame.png` | `19F0D43B704F9CB92EE3BE11D9C64879D1BA9B542EDFF90E9DBDF7FCE381C3A3` | `room-full, room-host, room-ready` | 6 |
+| `player_card_waiting` | `UI/Lobby/player_card_waiting` | `[uc]autochessouter/player_card_waiting.png` | `3B87EBB1DD62B7A8BD4D525F7F2E7E4358F2F1C0B04A65997BA34E79E97F0C8C` | `discovered-prefill` | 1 |
+| `room_create_btn_bg` | `UI/Lobby/room_create_btn_bg` | `[uc]autochessouter/room_create_btn_bg.png` | `2782FDCBE671CDD760FF46FD2B3A83CEB3F6396BC44FF48673220C8B21521606` | `discovered-prefill, home` | 2 |
+| `room_select_create_btn_bg_down` | `UI/Lobby/Home/room_select_create_btn_bg_down` | `[uc]autochessouter/room_select_create_btn_bg_down.png` | `8709B2C46A88AD6CDA15F0F7E78C02AD78CDB09D3FA2D99F045BC556028CD149` | `discovered-prefill, home` | 2 |
+| `room_select_create_left_line` | `UI/Lobby/Home/room_select_create_left_line` | `[uc]autochessouter/room_select_create_left_line.png` | `4893EDC89BF8D9DFE3914673B0446D764D0663327579DAE19744E17C74296CA4` | `discovered-prefill, home` | 4 |
+| `room_select_create_middleicon` | `UI/Lobby/Home/room_select_create_middleicon` | `[uc]autochessouter/room_select_create_middleicon.png` | `F728D411AA11A67775AA2A3CBBB1CBED665B914E1BE645DCCDB6BD34BCE288C2` | `discovered-prefill, home` | 2 |
+| `room_select_create_text_01` | `UI/Lobby/Home/room_select_create_text_01` | `[uc]autochessouter/room_select_create_text_01.png` | `52DC9A7C8E48DEC53AAF69D91A6FD0E0AA60483C1EE1412E32A007B8DF2E2D72` | `discovered-prefill, home` | 2 |
+| `room_select_create_text_02` | `UI/Lobby/Home/room_select_create_text_02` | `[uc]autochessouter/room_select_create_text_02.png` | `9C87A8FE6DFB72362BA8A84B089B66BC80F01822E2E3C0713396499D93F2CE33` | `discovered-prefill, home` | 2 |
+| `room_select_dot` | `UI/Lobby/Home/room_select_dot` | `[uc]autochessouter/room_select_dot.png` | `056E14212EA8E02D175D03582C4726FABA09AD518E89DB318CD3EF793E996DB0` | `discovered-prefill, home` | 10 |
+| `room_select_img_startroom` | `UI/Lobby/Home/room_select_img_startroom` | `[uc]autochessouter/room_select_img_startroom.png` | `495AA8F2BD5CD97EE12192DACC2CFD8A15731F0E131F9CD74F936B92A49E7E02` | `discovered-prefill, home` | 2 |
+| `room_select_join_ban` | `UI/Lobby/Home/room_select_join_ban` | `[uc]autochessouter/room_select_join_ban.png` | `F1ACA192CCCD6399884810A52CDC15E733C415E83579325779E67EB700EB052E` | `discovered-prefill, home` | 8 |
+| `room_select_join_blank` | `UI/Lobby/Home/room_select_join_blank` | `[uc]autochessouter/room_select_join_blank.png` | `099A060B78BCA5E39CA82E9747C94BFBC011868DE4AC18CB11C9149BC99AA2CD` | `discovered-prefill, home` | 2 |
+| `room_select_join_btn_bg_down` | `UI/Lobby/Home/room_select_join_btn_bg_down` | `[uc]autochessouter/room_select_join_btn_bg_down.png` | `71AE8387746003F1BF0DA72A3E92A7AACDB8A908B63FC6B26C553FC779D77468` | `discovered-prefill, home` | 2 |
+| `room_select_join_left_block` | `UI/Lobby/Home/room_select_join_left_block` | `[uc]autochessouter/room_select_join_left_block.png` | `1D10B384025DCF05972D7AEAFDF438FD88DB9B3B9B829DFD541E15103F100D10` | `discovered-prefill, home` | 4 |
+| `room_select_join_logo` | `UI/Lobby/Home/room_select_join_logo` | `[uc]autochessouter/room_select_join_logo.png` | `85FB957F0BC4A5172B0F454F77F6195068484B6DEBBD6DFCEE2A2AD1D5D93B59` | `discovered-prefill, home` | 2 |
+| `room_select_join_middle_block` | `UI/Lobby/Home/room_select_join_middle_block` | `[uc]autochessouter/room_select_join_middle_block.png` | `997CF5A781848535654D21D9B97D6105DA07F959AECB134DF1FB2F570E9861CA` | `discovered-prefill, home` | 8 |
+| `room_select_join_middle_block_mask` | `UI/Lobby/Home/room_select_join_middle_block_mask` | `[uc]autochessouter/room_select_join_middle_block_mask.png` | `95D0FAAF36EEF6681486944D95AB3F453DB0D9B70F23CD2E0DE12F57E2609EC5` | `discovered-prefill, home` | 2 |
+| `room_select_join_right_block` | `UI/Lobby/Home/room_select_join_right_block` | `[uc]autochessouter/room_select_join_right_block.png` | `11C872C6DE561E4409085E958D1CDEFA7647E9EEC5883ED91E45162B2B9FE6B8` | `discovered-prefill, home` | 4 |
+| `room_select_join_text_01` | `UI/Lobby/Home/room_select_join_text_01` | `[uc]autochessouter/room_select_join_text_01.png` | `F09FD74598C6EEF1066FB53CDA294681FAEA469981B6F215B7E7DD674E63CC39` | `discovered-prefill, home` | 2 |
+| `room_select_join_text_02` | `UI/Lobby/Home/room_select_join_text_02` | `[uc]autochessouter/room_select_join_text_02.png` | `F9DCC617D9BB74218E1554939A0897F39516B7965D9400EAD6CCB2DE85E19DD0` | `discovered-prefill, home` | 2 |
+| `room_select_join_text_bg` | `UI/Lobby/Home/room_select_join_text_bg` | `[uc]autochessouter/room_select_join_text_bg.png` | `36260875697359E27930467D123D2B684A2DE51D2448A5B295885D06AA518472` | `discovered-prefill, home` | 2 |
+| `room_select_join_triangle` | `UI/Lobby/Home/room_select_join_triangle` | `[uc]autochessouter/room_select_join_triangle.png` | `BA585545BC5EF8F6CC126BBFDE59F63A1C75D4B761646A22CCFEA195CB9B7FF7` | `discovered-prefill, home` | 2 |
+| `room_select_right_bg` | `UI/Lobby/Home/room_select_right_bg` | `[uc]autochessouter/room_select_right_bg.png` | `F65BE15390749F0FA175B49C310E90E9F3A29C753F2D320068B0831A5EBFDE53` | `discovered-prefill, home` | 2 |
+| `room_select_title_icon` | `UI/Lobby/Home/room_select_title_icon` | `[uc]autochessouter/room_select_title_icon.png` | `7C0E9E67D349013FC49DBAF33E1F462C0DF4171B1C6681DB50517629B4BDFF6C` | `discovered-prefill, home` | 2 |
+| `team_icon_frame` | `UI/Lobby/team_icon_frame` | `[uc]autochessouter/team_icon_frame.png` | `B05BFEAE52C1E54E9382936F653E291D118A976DA0B1AA6DE14720FC9CCC4380` | `discovered-prefill, home` | 2 |
+
+报告还包含 29 个动态 Unity Text 使用行。所有 46 个 bitmap 行都有非空 Resources 路径、批准来源、完整大写 SHA-256、捕获列表和正 occurrence；没有素材/来源失败。
+
+Task 8 新增的两个直接导入需单独保留尺寸和语义状态：
+
+| Asset | Approved source | SHA-256 | Dimensions | State usage |
+| --- | --- | --- | ---: | --- |
+| `img_return.png` | `[uc]autochessouter/img_return.png` | `3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09` | `54x56` | room-only Leave |
+| `card_deco_bg.png` | `[uc]autochessouter/card_deco_bg.png` | `C907B3527747B947ECCA08757DD6601BCA46B8EC5AF835F61F226BBBF8E1EBF1` | `322x107` | neutral Waiting/Empty lower decoration |
+
+两者都来自批准的 `G:\素材\11.14\Unpacked_1763129662\Android\ui\autochess` 根目录，均不是 `$0` 或 `#0` 变体。
+
+### Code-native geometry
+
+Cycle 3 报告中的 8 行 code-native geometry 与 bitmap 来源表分开记录：
+
+| Name | Kind | `isBitmap` | Color | Captures | Occurrences |
+| --- | --- | --- | --- | --- | ---: |
+| `LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking` | `code-native-geometry` | `false` | `#000000C7` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal` | `code-native-geometry` | `false` | `#FFA5008C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/GuideVertical` | `code-native-geometry` | `false` | `#FFA5008C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking` | `code-native-geometry` | `false` | `#000000D1` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft` | `code-native-geometry` | `false` | `#3030308C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/OutlineRight` | `code-native-geometry` | `false` | `#3030308C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/Home/RoomSelect/Join/OutlineTop` | `code-native-geometry` | `false` | `#3030308C` | `discovered-prefill, home` | 2 |
+| `LanLobbyRoot/OpaqueBlocker` | `code-native-geometry` | `false` | `#060F14FF` | `discovered-prefill, home, room-full, room-host, room-ready` | 5 |
+
+这些行的 `isBitmap=false`、无 Sprite、无自定义材质且 `raycastTarget=false`；它们不计入 bitmap 来源合规。

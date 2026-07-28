@@ -34,10 +34,42 @@ function Assert-FailsWithoutOutput([scriptblock] $Action, [string] $OutputPath, 
     Assert-True (-not (Test-Path -LiteralPath $OutputPath)) "Output must not exist after failure: $OutputPath"
 }
 
+function Convert-FromUtf8Base64([string] $Value)
+{
+    return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
+}
+
 try
 {
     . $commonScript
     New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+
+    $documentationContracts = [ordered]@{
+        HostStartsReady = Convert-FromUtf8Base64 '5Yib5bu65oi/6Ze05pe277yM5oi/5Li75Yid5aeL5Li65bey5YeG5aSH44CC'
+        GuestStartsUnready = Convert-FromUtf8Base64 '5paw5Yqg5YWl55qE5oiQ5ZGY5Yid5aeL5Li65pyq5YeG5aSH44CC'
+        PresentMembersStart = Convert-FromUtf8Base64 '5byA5aeL5ri45oiP5Y+q6KaB5rGC5b2T5YmN5oi/6Ze05YaF5omA5pyJ5oiQ5ZGY5bey5YeG5aSH77yb56m65qe95L2N5LiN5Y+C5LiO5Yik5pat77yM5Lmf5LiN6KaB5rGC5ruh5Zub5Lq644CC'
+        HostOnlyStart = Convert-FromUtf8Base64 '5LuF5oi/5Li75LiA5Lq655qE5oi/6Ze05Y+v5Lul56uL5Y2z5byA5aeL5ri45oiP44CC'
+        HostLeaveDissolves = Convert-FromUtf8Base64 '5oi/5Li756a75byA5Lya6Kej5pWj5oi/6Ze05bm25YGc5q2i5p2D5aiB5oi/6Ze05pyN5Yqh44CC'
+        NoHostMigration = Convert-FromUtf8Base64 '5LiN5pSv5oyB5oi/5Li76L+B56e75oiW5bCG5YW25LuW5oiQ5ZGY5pmL5Y2H5Li65oi/5Li744CC'
+        GuestActionLabels = Convert-FromUtf8Base64 '5oiQ5ZGY5pON5L2c5qCH562+5Li64oCc5YeG5aSH5bCx57uq4oCd5LiO4oCc5Y+W5raI5YeG5aSH4oCd44CC'
+        HostActionLabel = Convert-FromUtf8Base64 '5oi/5Li75pON5L2c5qCH562+5Li64oCc5Y2P6K6u5ZCv5Yqo4oCd44CC'
+        PopupExclusion = Convert-FromUtf8Base64 '5Zu+MTLkuI7lm74xM+WboOWPs+S+p+W8ueeql+mBruaMoeiAjOaOkumZpOWujOaVtOeahOesrOWbm+S4queOqeWutuanve+8jOS4lOaOkumZpOmhueS4jeiusOS4uumAmui/h+OAgg=='
+        VisibleArtworkAuthority = Convert-FromUtf8Base64 '6KeG6KeJ6aqM5pS25Lul5a6e6ZmF5riy5p+T55qE5Y+v6KeB5Zu+5b2i5Li65YeG77yM6ICM5LiN5piv57q555CG55+p5b2i5oiWUmVjdFRyYW5zZm9ybeS4reW/g+OAgg=='
+    }
+    foreach ($documentationPath in @(
+        (Join-Path $projectRoot 'docs/SPEC.md'),
+        (Join-Path $projectRoot 'docs/TEST_PLAN.md'),
+        (Join-Path $projectRoot 'docs/LAN-LOBBY-REPORT.md')
+    ))
+    {
+        $documentationText = [IO.File]::ReadAllText($documentationPath, [Text.Encoding]::UTF8)
+        $script:fixtureCount++
+        foreach ($contract in $documentationContracts.GetEnumerator())
+        {
+            Assert-True $documentationText.Contains([string]$contract.Value) "$([IO.Path]::GetFileName($documentationPath)) must state documentation contract '$($contract.Key)'."
+        }
+    }
+
     $captureImage = Join-Path $projectRoot 'Assets/Resources/UI/Lobby/bg_terrain.png'
     $records = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full') | ForEach-Object {
         [pscustomobject]@{

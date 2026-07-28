@@ -675,3 +675,104 @@ Binary/source correspondence is independently checkable: the current runtime and
 The final manifest/report audit must require five captures; one `join_icon` per Home state and `2` aggregate; two left/four middle/two right block instances per Home state; one mask, one blank, four bans, one triangle, one logo, two header texts, and one input background per Home state; six Join code-native, sprite-null, non-raycast geometry rows per Home state; no `SimulationInvite`, `OutlineBottom`, `$0`, `#0`, atlas, or derived source; and a Resources path, approved source, uppercase SHA-256, capture list, and positive occurrence count for every bitmap row.
 
 Final manual verification must open the two Home screenshots and all four Join crop images. It must confirm the accepted Join action remains visible/unobstructed, discovered room `654321` is prefilled without joining, the centered placeholder clears the baked icon, and the intended visual delta is confined to the input rectangle. The final Create crop may be compared to Cycle 3 to prove this Join correction did not alter Create; that invariance does **not** convert the separate historical `createFrame.passed=false` into a pass.
+
+## 33. LAN 房间槽位状态最终验证（2026-07-28，当前权威）
+
+### 行为与文档契约
+
+以下事实必须同时由 Domain、Socket、View、Controller 测试和三份 LAN 文档保持一致：
+
+- 创建房间时，房主初始为已准备。
+- 新加入的成员初始为未准备。
+- 开始游戏只要求当前房间内所有成员已准备；空槽位不参与判断，也不要求满四人。
+- 仅房主一人的房间可以立即开始游戏。
+- 房主离开会解散房间并停止权威房间服务。
+- 不支持房主迁移或将其他成员晋升为房主。
+- 成员操作标签为“准备就绪”与“取消准备”。
+- 房主操作标签为“协议启动”。
+
+非房主离开只移除该成员；房主离开后其余成员不得被晋升。房主仅在所有当前成员已准备时发出开始请求，空槽位不阻塞开始。
+
+### 串行自动测试
+
+Unity Editor 固定使用 `D:\2022.3.62f1c1\Editor\Unity.exe`，项目路径固定为 `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`。以下过滤器必须逐个串行运行，不得让两个 Editor 或 Player 同时占用项目：
+
+| 平台 | 精确过滤器 | 结果 | 保留目录 |
+| --- | --- | ---: | --- |
+| EditMode | `ArknoNights.Lobby.Tests.LobbyRoomStateEditModeTests` | 15/15 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Domain` |
+| EditMode | `ArknoNights.Lobby.Tests.LanSocketIntegrationEditModeTests` | 8/8 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Socket` |
+| EditMode | `ArknoNights.Lobby.Tests.LobbyAssetMapEditModeTests` | 30/30 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Assets` |
+| EditMode | `ArknoNights.Lobby.Tests.LanLobbyRoomLayoutEditModeTests` | 12/12 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Layout` |
+| PlayMode | `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests` | 27/27 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/View` |
+| PlayMode | `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Capture` |
+| PlayMode | `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Controller` |
+
+每个过滤器用以下命令形态运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\Invoke-UnityTests.ps1 `
+  -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' `
+  -TestPlatform <EditMode-or-PlayMode> `
+  -TestFilter '<exact-filter-above>' `
+  -OutputDirectory '<retained-directory-above>'
+```
+
+每个目录必须有完整 XML、日志和 `summary.txt`，测试数必须大于零，且失败、跳过、不确定均为零。最终串行结果是 100/100 通过、0 失败、0 跳过。
+
+### Windows 构建与可见 Player 截图
+
+每个校准周期都从源代码重新构建 Windows x64 Player；Cycle 3 实际命令形态如下：
+
+```powershell
+$env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\WindowsStandalone\ARKnoNIGHTS.exe'
+& 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -batchmode -accept-apiupdate -quit `
+  -projectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' `
+  -executeMethod Task006StandaloneBuild.BuildWindowsX64 `
+  -logFile 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Build.log'
+```
+
+构建成功后只允许以可见窗口运行 Player：
+
+```powershell
+& 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\WindowsStandalone\ARKnoNIGHTS.exe' `
+  -force-d3d11 -lanLobbyCaptureSuite `
+  -lanLobbyCaptureOutput 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Captures' `
+  -screen-width 1920 -screen-height 1080 `
+  -logFile 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Player.log'
+```
+
+本任务校准上限是三次新的可见 Windows Player 启动。Cycle 1、2、3 已分别用完第 1/3、2/3、3/3 次；没有发生第四次 Player 启动。达到 Cycle 3 后，即使仍有阻塞式差异，也必须停止并如实报告。
+
+### 图11–13映射、排除与阻塞阈值
+
+| 捕获 | 参考 | 阻塞状态 |
+| --- | --- | --- |
+| `room-host` | 图11 | 房主已准备、三个完整空槽、青色“协议启动”；第四空槽可验收 |
+| `room-full` | 图12 | 房主已准备、成员未准备、灰色“协议启动”；完整第四槽排除 |
+| `room-ready` | 图13 | 所有当前成员已准备、青色“协议启动”、左上离开；完整第四槽排除 |
+
+图12与图13因右侧弹窗遮挡而排除完整的第四个玩家槽，且排除项不记为通过。
+
+所有参考图上方滚动弹幕、图12/13右侧弹窗像素、角色立绘和资料卡内容都不进入阻塞式比较；这些 mask/exclusion 不得使其他命名门自动通过。图11是第四个空槽的唯一无遮挡权威参考。
+
+视觉验收以实际渲染的可见图形为准，而不是纹理矩形或RectTransform中心。
+
+- 图标/标签：`1920×1080` 下可见中心每轴误差 `<= 2 px`，可见宽高误差 `<= 3 px`。
+- 长轮廓/组合槽：每条可见边误差 `<= 4 px`，命名 ROI 内可见轮廓 Jaccard `>= 0.95`。
+- 结构化缺失与素材来源门必须单独通过；全图差异比例仅供诊断，不能覆盖命名门结果。
+
+最终 `Cycle-3/VisualDiff/visual-diff-report.json` 有 52 个命名房间门：24 Passed、26 Failed、2 `ExcludedByReferencePopup`，两个排除项均为 `passed=false`；素材/来源失败为 0。因此实现、构建和自动测试已验证，但图11–13视觉验收仍为 **FAILED**。
+
+### 证据与人工设备检查
+
+最终证据保留在：
+
+- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Captures`
+- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Evidence`
+- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/VisualDiff`
+- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Build.log`
+- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Player.log`
+
+Windows 与 Android 实机连接到同一 Wi-Fi 后的发现、房间号预填、加入、准备切换、开始广播、非房主离开和房主解散流程仍为人工且未验证；不得由单机 Editor、PlayMode 或 Windows 截图推断为已通过。
