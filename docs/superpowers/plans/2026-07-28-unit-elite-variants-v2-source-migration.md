@@ -1346,10 +1346,26 @@ rg -n `
   'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
   Assets `
   --glob '*.cs' `
+  --glob '*.json' `
+  --glob '!Assets/Game/Tests/**'
+```
+
+Expected: zero production matches. Generated runtime catalog files do not
+contain those strings.
+
+Then inspect the test-only matches:
+
+```powershell
+rg -n `
+  'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
+  Assets/Game/Tests `
+  --glob '*.cs' `
   --glob '*.json'
 ```
 
-Expected: zero matches. Generated runtime catalog files do not contain those strings.
+Only the explicit invalid-schema fixture, old-directory absence assertions,
+and old-root-DTO destruction message may remain. These behavior regressions
+must not be deleted or obfuscated merely to produce a zero source-text scan.
 
 - [ ] **Step 3: Update SPEC and architecture**
 
@@ -1418,6 +1434,13 @@ rg -n `
   'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
   Assets `
   --glob '*.cs' `
+  --glob '*.json' `
+  --glob '!Assets/Game/Tests/**'
+
+rg -n `
+  'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
+  Assets/Game/Tests `
+  --glob '*.cs' `
   --glob '*.json'
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 `
@@ -1430,7 +1453,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTe
   -NoGraphics
 ```
 
-Expected: the reference scan returns no active source/code match; all targeted tests pass with a non-zero count.
+Expected: the production reference scan returns no match; the test-only scan
+returns only the allowlisted negative/absence/destruction regressions; all
+targeted tests pass with a non-zero count.
 
 - [ ] **Step 6: Commit cleanup and documentation**
 
