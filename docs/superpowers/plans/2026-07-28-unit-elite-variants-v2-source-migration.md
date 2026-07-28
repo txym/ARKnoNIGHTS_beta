@@ -18,6 +18,10 @@
 - Do not modify scenes, Prefabs, ScriptableObjects, `ProjectSettings`, or generated Unity directories.
 - `Assets/GameData/Units/EliteVariants/Json` is the only authored unit source directory after this migration.
 - The source schema is exactly `unit-elite-variants-v2`; there is no v1 fallback.
+- The temporary four-argument v1 resolver bridge may exist only while Tasks 1-2
+  keep the old unit catalog generator compiling. Task 3 must remove the bridge,
+  every legacy v1 DTO used by it, and its friend-assembly access before Task 3
+  can be considered complete.
 - Phase 1 migrates only TypeIds `1000`, `5503`, and `5504`.
 - Every migrated unit has `deploymentCost = 2`, `attackRadiusMetres = 0`, and `blockRadiusMetres = 0`.
 - Do not add `unitSkeletonType`, `hitAnimation`, `attackAnimationDurationSeconds`, separate move/attack/death animation fields, `resourceFolderName`, `initialEliteLevel`, `Default` bindings, `animationBehavior`, playback speed, or target playback duration to v2.
@@ -745,15 +749,24 @@ git commit -m "data: migrate initial units to variant v2 sources"
 **Files:**
 
 - Modify: `Assets/Game/Editor/Battle/UnitCatalogGenerator.cs`
+- Modify: `Assets/GameData/Units/UnitEliteVariantResolver.cs`
+- Modify: `Assets/GameData/Units/UnitJson.cs`
 - Create: `Assets/Game/Tests/EditMode/Battle/UnitSourceConsumerEditModeTests.cs`
 - Create: `Assets/Game/Tests/EditMode/Battle/UnitSourceConsumerEditModeTests.cs.meta`
+- Modify: `Assets/Game/Tests/EditMode/Battle/UnitEliteVariantSourceEditModeTests.cs`
 
 **Interfaces:**
 
 - Consumes: `UnitEliteVariantResolver.LoadDirectory`, `Resolve(source, 0)`, and `ResolvedUnitVariant.RequireAnimation`.
 - Produces: `UnitCatalogGenerator.Generate(string sourceDirectory, string outputPath)` for isolated tests.
 
-- [ ] **Step 1: Add a path-scoped catalog projection test**
+- [ ] **Step 1: Add the no-v1-contract regression and a path-scoped catalog projection test**
+
+Add a behavior/reflection regression test named
+`Resolve_ExposesNoLegacyFourArgumentSourceContract`. It must assert that
+`UnitEliteVariantResolver` exposes no `Resolve` overload with the parameter
+types `(string, string, int, string)`. Remove the temporary friend-assembly
+access after the old generator no longer requires it.
 
 Use reflection to invoke this exact private overload:
 
@@ -812,7 +825,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTe
 
 Expected: failure because the overload does not exist and the generator still scans `Assets/GameData/Units/Json`.
 
-- [ ] **Step 3: Convert the generator to direct v2 input**
+- [ ] **Step 3: Convert the generator to direct v2 input and remove the temporary bridge**
 
 Use:
 
@@ -840,6 +853,13 @@ The overload must:
 7. Call `AssetDatabase.ImportAsset` only when `outputPath` begins with `Assets/`.
 
 Do not call the parameterless `Generate()` during this phase.
+
+After the generator compiles against direct v2 input, remove the temporary
+four-argument resolver overload, all `LegacyUnitEliteVariant*` DTOs used only
+by that overload, the obsolete flat v1 source classes in `UnitJson.cs`, and
+`InternalsVisibleTo("Assembly-CSharp-Editor")` if it is no longer required.
+No source parser or compatibility fallback for `unit-source-v1` or
+`unit-elite-variants-v1` may remain.
 
 Before converting any unit, load the complete set of authored
 `ability-source-v1` IDs from `AbilitySourceDirectory`. Validate schema, non-empty
@@ -910,8 +930,11 @@ Expected: the isolated v1 projection contains three entries, the negative source
 ```powershell
 git add -- `
   Assets/Game/Editor/Battle/UnitCatalogGenerator.cs `
+  Assets/GameData/Units/UnitEliteVariantResolver.cs `
+  Assets/GameData/Units/UnitJson.cs `
   Assets/Game/Tests/EditMode/Battle/UnitSourceConsumerEditModeTests.cs `
-  Assets/Game/Tests/EditMode/Battle/UnitSourceConsumerEditModeTests.cs.meta
+  Assets/Game/Tests/EditMode/Battle/UnitSourceConsumerEditModeTests.cs.meta `
+  Assets/Game/Tests/EditMode/Battle/UnitEliteVariantSourceEditModeTests.cs
 git diff --cached --check
 git commit -m "refactor: project unit catalog from variant v2"
 ```
