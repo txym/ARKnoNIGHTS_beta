@@ -352,7 +352,7 @@
     }
 
     ExplicitRiskOnly = @{
-        '1058'  = @('BONDS confirms block count 2, but the approved 20-second model has no confirmed conversion from block slots to continuous power; numeric contribution is zero.')
+        '1058'  = @('BONDS confirms block count +2, but the approved 20-second model has no confirmed conversion from added block slots to continuous power; numeric contribution is zero.')
         '1095'  = @('BONDS confirms each attack reduces the current target DEF by 10 with unlimited stacking, but target switching and stack persistence scenarios are not confirmed; numeric contribution is zero.')
         '1281'  = @('BONDS confirms three 1277 successors are unloaded on defeat, but the parent death time is not confirmed; numeric contribution is zero.')
         '10001' = @('Unblockable and move speed +150% last 1.5 seconds after the first below-50% trigger; route length and trigger time are not confirmed, so numeric contribution is zero.')

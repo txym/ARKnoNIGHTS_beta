@@ -358,7 +358,9 @@ function Get-DiscreteCycleOutputRatio {
     $ordinaryAttackCount = $attackCount - $specialAttackCount
     $specialMultiplier = [decimal]$AttackCycleMultipliers[-1]
     $specialTargetCount = [decimal]$AttackCycleTargetCounts[-1]
-    $ratios = foreach ($defender in $Defenders) {
+    $baselineTotals = [System.Collections.Generic.List[decimal]]::new()
+    $scenarioTotals = [System.Collections.Generic.List[decimal]]::new()
+    foreach ($defender in $Defenders) {
         $ordinaryDamage = Get-OrdinaryAttackDamage -Attacker $Row -Defender $defender
         $specialAttacker = [pscustomobject]@{
             TypeId = $Row.TypeId
@@ -367,11 +369,14 @@ function Get-DiscreteCycleOutputRatio {
             EffectiveAttackIntervalSeconds = $Row.EffectiveAttackIntervalSeconds
         }
         $specialDamage = Get-OrdinaryAttackDamage -Attacker $specialAttacker -Defender $defender
-        (($ordinaryDamage * $ordinaryAttackCount) + ($specialDamage * $specialAttackCount * $specialTargetCount)) /
-            ($ordinaryDamage * $attackCount)
+        $baselineTotals.Add($ordinaryDamage * $attackCount)
+        $scenarioTotals.Add(
+            ($ordinaryDamage * $ordinaryAttackCount) +
+            ($specialDamage * $specialAttackCount * $specialTargetCount)
+        )
     }
     return [pscustomobject]@{
-        Ratio = Get-Median -Values ([decimal[]]$ratios)
+        Ratio = (Get-Median -Values $scenarioTotals.ToArray()) / (Get-Median -Values $baselineTotals.ToArray())
         AttackCount = $attackCount
         SpecialAttackCount = $specialAttackCount
     }

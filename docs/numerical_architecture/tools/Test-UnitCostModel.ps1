@@ -498,6 +498,8 @@ try {
         Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$riskRow.RiskFlags)) "Unmarked ability TypeId $typeId has empty exported RiskFlags."
         Assert-Equal ([decimal]1) ([decimal]$riskRow.AbilityPowerMultiplier) "unmarked ability $typeId numeric contribution"
     }
+    $row1058 = @($rows | Where-Object TypeId -eq '1058')[0]
+    Assert-Condition ([string]$row1058.RiskFlags -match 'block count \+2') '1058 exported risk must describe block count +2, not total block count 2.'
 
     $row1131 = @($rows | Where-Object TypeId -eq '1131')[0]
     $row1132 = @($rows | Where-Object TypeId -eq '1132')[0]
@@ -510,6 +512,8 @@ try {
         Assert-Equal 20 ([int]$cycleRow.ScenarioAttackCount) "$typeId 20-second attack count"
         Assert-Equal 6 ([int]$cycleRow.ScenarioSpecialAttackCount) "$typeId complete three-hit cycle count"
     }
+    $row1371 = @($rows | Where-Object TypeId -eq '1371')[0]
+    Assert-Equal ([decimal]'2.0714285714285714285714285714') ([decimal]$row1371.OutputScenarioMain) '1371 ratio of median scenario total to median baseline total'
     $row1372 = @($rows | Where-Object TypeId -eq '1372')[0]
     Assert-Equal ([decimal]1) ([decimal]$row1372.OutputScenarioLow) '1372 low tail-aware output'
     Assert-Equal ([decimal]1.3) ([decimal]$row1372.OutputScenarioMain) '1372 main tail-aware output'
