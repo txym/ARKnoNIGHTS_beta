@@ -54,6 +54,7 @@ namespace ArknoNights.Battle.Tests
             Assert.That(ability.InitialSkillPoints, Is.EqualTo(5));
             Assert.That(ability.RequiredSkillPoints, Is.EqualTo(15));
             Assert.That(ability.SkillPointGeneration, Is.EqualTo(SkillPointGeneration.Automatic));
+            Assert.That(ability.AnimationKey, Is.EqualTo("skill"));
             Assert.That(ability.SummonEffect.SummonTypeId, Is.EqualTo("5504"));
             Assert.That(ability.SummonEffect.Count, Is.EqualTo(3));
             Assert.That(ability.SummonEffect.SideLengthCentimetres, Is.EqualTo(100));
@@ -137,7 +138,7 @@ namespace ArknoNights.Battle.Tests
             Directory.CreateDirectory(outputDirectory);
             var sourcePath = Path.Combine(sourceDirectory, "unknown-summon.json");
             var outputPath = Path.Combine(outputDirectory, "ability-catalog.json");
-            File.WriteAllText(sourcePath, "{\"schemaVersion\":\"ability-source-v1\",\"abilityId\":\"UNKNOWN_SUMMON\",\"displayNameZhHans\":\"\",\"descriptionZhHans\":\"\",\"activationKind\":\"Timed\",\"silencePolicy\":\"Unaffected\",\"skillPoints\":{\"initial\":0,\"required\":1,\"generation\":\"Automatic\"},\"effects\":[{\"kind\":\"Summon\",\"summonTypeId\":\"does-not-exist\",\"count\":1,\"spawnArea\":{\"shape\":\"Square\",\"center\":\"CasterPosition\",\"sideLengthMetres\":1.0},\"inheritPathFromCaster\":false}]}");
+            File.WriteAllText(sourcePath, "{\"schemaVersion\":\"ability-source-v1\",\"abilityId\":\"UNKNOWN_SUMMON\",\"displayNameZhHans\":\"\",\"descriptionZhHans\":\"\",\"activationKind\":\"Timed\",\"silencePolicy\":\"Unaffected\",\"skillPoints\":{\"initial\":0,\"required\":1,\"generation\":\"Automatic\"},\"animationKey\":\"skill\",\"effects\":[{\"kind\":\"Summon\",\"summonTypeId\":\"does-not-exist\",\"count\":1,\"spawnArea\":{\"shape\":\"Square\",\"center\":\"CasterPosition\",\"sideLengthMetres\":1.0},\"inheritPathFromCaster\":false}]}");
             File.WriteAllText(outputPath, "must-not-change");
 
             var exception = Assert.Throws<TargetInvocationException>(() => generate.Invoke(null, new object[] { sourceDirectory, outputPath }));
@@ -407,7 +408,7 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.Contains(focal.BlockedUnitIds, "away-primary");
             Assert.AreEqual("away-primary", focal.TargetUnitId);
             Assert.That(runner.Events, Has.Some.Matches<BattleEvent>(item =>
-                item.Type == BattleEventType.Attack && item.Tick == 3 &&
+                item.Type == BattleEventType.Attack && item.Tick == 2 &&
                 item.UnitId == "home-focal" &&
                 item.RelatedUnitId == "away-primary"));
         }
@@ -1068,7 +1069,7 @@ namespace ArknoNights.Battle.Tests
             var controlInput = CreateInput(
                 "nonterminal-cadence-control",
                 100,
-                new[] { caster, minion, Definition("enemy", 2000, 1000, 1, 200, 99, 1) },
+                new[] { caster, minion, Definition("enemy", 0, 1000, 1, 200, 99, 1) },
                 new[] { ability },
                 new[] { Unit("caster", "5503", 4, 4) },
                 new[] { Unit("enemy", "enemy", 6, 4) });
@@ -1111,7 +1112,23 @@ namespace ArknoNights.Battle.Tests
             => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true);
 
         private static UnitDefinition DefinitionWithAbility(string typeId, string abilityId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1)
-            => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, 0, true, new[] { abilityId });
+            => new UnitDefinition(
+                typeId,
+                hitPoints,
+                attack,
+                0,
+                0,
+                speed,
+                interval,
+                animation,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                capacity,
+                0,
+                true,
+                new[] { abilityId },
+                1,
+                new[] { new UnitSkillAnimationDefinition("skill", 30) });
 
         private static UnitSnapshot Unit(string id, string typeId, int x, int y)
             => new UnitSnapshot(id, typeId, UnitZone.Deployed, new FormationCoordinate(x, y), Array.Empty<BuffPlaceholder>());
@@ -1160,7 +1177,9 @@ namespace ArknoNights.Battle.Tests
                 item.BlockCapacity,
                 item.TauntLevel,
                 item.IsSyntheticFixtureData,
-                Array.Empty<string>())).ToArray();
+                Array.Empty<string>(),
+                item.ActionMethod,
+                item.SkillAnimations)).ToArray();
             var specification = new BattleInputSpecification(
                 source.SchemaVersion,
                 source.BattleId + "-without-abilities",

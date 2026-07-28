@@ -12,13 +12,14 @@ namespace ArknoNights.Battle.Core
         Attack,
         Damage,
         Death,
-        BattleEnded
+        BattleEnded,
+        Skill
     }
 
     /// <summary>Immutable presentation-neutral record emitted by the authoritative tick runner.</summary>
     public sealed class BattleEvent
     {
-        internal BattleEvent(BattleEventType type, int tick, int sequence, string unitId, string unitTypeId, BattleSide? unitSide, string relatedUnitId, FixedPosition? fromPosition, FixedPosition? toPosition, DamageType? damageType, int damageAmount, int hitPointsBefore, int hitPointsAfter, int plannedDamageTick, int originalAnimationTicks, int effectiveAnimationTicks, BattleSide? winner, BattleStopReason reason, BattleUnitInstanceSnapshot spawnSnapshot)
+        internal BattleEvent(BattleEventType type, int tick, int sequence, string unitId, string unitTypeId, BattleSide? unitSide, string relatedUnitId, FixedPosition? fromPosition, FixedPosition? toPosition, DamageType? damageType, int damageAmount, int hitPointsBefore, int hitPointsAfter, int plannedDamageTick, int originalAnimationTicks, int effectiveAnimationTicks, BattleSide? winner, BattleStopReason reason, BattleUnitInstanceSnapshot spawnSnapshot, string animationKey = null)
         {
             Type = type;
             Tick = tick;
@@ -39,6 +40,7 @@ namespace ArknoNights.Battle.Core
             Winner = winner;
             Reason = reason;
             SpawnSnapshot = spawnSnapshot;
+            AnimationKey = animationKey ?? string.Empty;
         }
 
         public BattleEventType Type { get; }
@@ -62,5 +64,6 @@ namespace ArknoNights.Battle.Core
         public BattleSide? Winner { get; }
         public BattleStopReason Reason { get; }
         public BattleUnitInstanceSnapshot SpawnSnapshot { get; }
+        public string AnimationKey { get; }
     }
 }

@@ -12,6 +12,21 @@ namespace ArknoNights.Battle.Core
     public enum DamageType { Physical = 0, Magic = 1, True = 2, None = 3 }
     public enum AttackMethod { Melee = 0, Ranged = 1, None = 2 }
 
+    public sealed class UnitSkillAnimationDefinition
+    {
+        public UnitSkillAnimationDefinition(string key, int originalDurationTicks)
+        {
+            Key = key;
+            OriginalDurationTicks = originalDurationTicks;
+        }
+
+        public string Key { get; }
+        public int OriginalDurationTicks { get; }
+        // Skill clips always run at 2x. Rounding upward guarantees that the
+        // final authored frame is still reached on the authoritative 20 TPS grid.
+        public int EffectiveDurationTicks => (OriginalDurationTicks + 1) / 2;
+    }
+
     public sealed class ValidationError
     {
         public ValidationError(string code, string message) { Code = code; Message = message; }
@@ -78,6 +93,27 @@ namespace ArknoNights.Battle.Core
         }
 
         public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod)
+            : this(
+                typeId,
+                maxHitPoints,
+                attack,
+                defense,
+                magicResistance,
+                moveSpeedCentimetresPerSecond,
+                attackIntervalTicks,
+                attackAnimationDurationTicks,
+                damageType,
+                attackMethod,
+                blockCapacity,
+                tauntLevel,
+                isSyntheticFixtureData,
+                innateAbilityIds,
+                actionMethod,
+                Enumerable.Empty<UnitSkillAnimationDefinition>())
+        {
+        }
+
+        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod, IEnumerable<UnitSkillAnimationDefinition> skillAnimations)
         {
             TypeId = typeId;
             MaxHitPoints = maxHitPoints;
@@ -94,6 +130,7 @@ namespace ArknoNights.Battle.Core
             IsSyntheticFixtureData = isSyntheticFixtureData;
             InnateAbilityIds = new ReadOnlyCollection<string>((innateAbilityIds ?? Enumerable.Empty<string>()).ToArray());
             ActionMethod = actionMethod;
+            SkillAnimations = new ReadOnlyCollection<UnitSkillAnimationDefinition>((skillAnimations ?? Enumerable.Empty<UnitSkillAnimationDefinition>()).ToArray());
         }
 
         public string TypeId { get; }
@@ -111,7 +148,15 @@ namespace ArknoNights.Battle.Core
         public bool IsSyntheticFixtureData { get; }
         public IReadOnlyList<string> InnateAbilityIds { get; }
         public int ActionMethod { get; }
+        public IReadOnlyList<UnitSkillAnimationDefinition> SkillAnimations { get; }
         public bool CanAttack => AttackMethod != AttackMethod.None;
+        public bool TryGetSkillAnimation(string key, out UnitSkillAnimationDefinition animation)
+        {
+            animation = SkillAnimations.FirstOrDefault(item =>
+                item != null
+                && string.Equals(item.Key, key, StringComparison.Ordinal));
+            return animation != null;
+        }
     }
 
     public readonly struct BuffPlaceholder : IEquatable<BuffPlaceholder>
@@ -197,11 +242,13 @@ namespace ArknoNights.Battle.Core
                 builder.Append("|T:").Append(definition.TypeId).Append(',').Append(definition.MaxHitPoints).Append(',').Append(definition.Attack).Append(',').Append(definition.Defense).Append(',').Append(definition.MagicResistance).Append(',').Append(definition.MoveSpeedCentimetresPerSecond).Append(',').Append(definition.AttackIntervalTicks).Append(',').Append(definition.AttackAnimationDurationTicks).Append(',').Append((int)definition.DamageType).Append(',').Append((int)definition.AttackMethod).Append(',').Append(definition.BlockCapacity).Append(',').Append(definition.TauntLevel).Append(',').Append(definition.IsSyntheticFixtureData ? 1 : 0);
                 if (definition.ActionMethod != 1)
                     builder.Append("|M:").Append(definition.ActionMethod);
+                foreach (var animation in definition.SkillAnimations.Where(item => item != null).OrderBy(item => item.Key, StringComparer.Ordinal))
+                    builder.Append("|K:").Append(animation.Key).Append(',').Append(animation.OriginalDurationTicks);
                 foreach (var innateId in definition.InnateAbilityIds.OrderBy(item => item, StringComparer.Ordinal)) builder.Append("|I:").Append(innateId);
             }
             foreach (var ability in AbilityDefinitions.OrderBy(item => item.AbilityId, StringComparer.Ordinal))
             {
-                builder.Append("|A:").Append(ability.AbilityId).Append(',').Append((int)ability.ActivationKind).Append(',').Append((int)ability.SilencePolicy).Append(',').Append(ability.InitialSkillPoints).Append(',').Append(ability.RequiredSkillPoints).Append(',').Append((int)ability.SkillPointGeneration).Append(',').Append(ability.SummonEffect == null ? string.Empty : ability.SummonEffect.SummonTypeId).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.Count).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.SideLengthCentimetres).Append(',').Append(ability.SummonEffect != null && ability.SummonEffect.InheritPathFromCaster ? 1 : 0);
+                builder.Append("|A:").Append(ability.AbilityId).Append(',').Append((int)ability.ActivationKind).Append(',').Append((int)ability.SilencePolicy).Append(',').Append(ability.InitialSkillPoints).Append(',').Append(ability.RequiredSkillPoints).Append(',').Append((int)ability.SkillPointGeneration).Append(',').Append(ability.SummonEffect == null ? string.Empty : ability.SummonEffect.SummonTypeId).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.Count).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.SideLengthCentimetres).Append(',').Append(ability.SummonEffect != null && ability.SummonEffect.InheritPathFromCaster ? 1 : 0).Append(',').Append(ability.AnimationKey);
                 if (ability.UnitTraitEffect != null)
                     builder.Append("|G:").Append((int)ability.UnitTraitEffect.Kind);
             }
@@ -255,6 +302,16 @@ namespace ArknoNights.Battle.Core
                 {
                     validationErrors.Add(new ValidationError("type.nonAttacker.values.invalid", "Non-attacking unit must use None damage, zero attack and zero attack timings: " + (definition.TypeId ?? "<missing>")));
                 }
+                var skillAnimationKeys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var animation in definition.SkillAnimations)
+                {
+                    if (animation == null
+                        || string.IsNullOrWhiteSpace(animation.Key)
+                        || animation.OriginalDurationTicks <= 0)
+                        validationErrors.Add(new ValidationError("type.skillAnimation.invalid", "Skill animation is invalid: " + (definition.TypeId ?? "<missing>")));
+                    else if (!skillAnimationKeys.Add(animation.Key))
+                        validationErrors.Add(new ValidationError("type.skillAnimation.duplicate", "Duplicate skill animation key: " + animation.Key));
+                }
             }
 
             var abilityIds = new HashSet<string>(StringComparer.Ordinal);
@@ -270,6 +327,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.InitialSkillPoints < 0) validationErrors.Add(new ValidationError("ability.skillPoints.initial.invalid", "Initial skill points cannot be negative: " + ability.AbilityId));
                     if (ability.InitialSkillPoints > ability.RequiredSkillPoints) validationErrors.Add(new ValidationError("ability.skillPoints.order.invalid", "Initial skill points cannot exceed required skill points: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null) validationErrors.Add(new ValidationError("ability.trait.unexpected", "Timed ability cannot define a unit trait: " + ability.AbilityId));
+                    if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
                     else
                     {
@@ -288,6 +346,8 @@ namespace ArknoNights.Battle.Core
                         validationErrors.Add(new ValidationError("ability.passive.summon.unexpected", "Passive ability cannot define a summon effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect == null || !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
                         validationErrors.Add(new ValidationError("ability.trait.invalid", "Passive ability requires a valid unit trait: " + ability.AbilityId));
+                    if (!string.IsNullOrEmpty(ability.AnimationKey))
+                        validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                 }
             }
             foreach (var definition in specification.UnitDefinitions.Where(item => item != null))
@@ -298,6 +358,15 @@ namespace ArknoNights.Battle.Core
                     if (string.IsNullOrWhiteSpace(innateAbilityId)) validationErrors.Add(new ValidationError("unit.innateAbility.invalid", "Unit innate ability ID is required: " + definition.TypeId));
                     else if (!innateIds.Add(innateAbilityId)) validationErrors.Add(new ValidationError("unit.innateAbility.duplicate", "Duplicate unit innate ability ID: " + innateAbilityId));
                     else if (!abilityIds.Contains(innateAbilityId)) validationErrors.Add(new ValidationError("unit.innateAbility.unknown", "Unit references an unknown innate ability ID: " + innateAbilityId));
+                    else
+                    {
+                        var ability = specification.AbilityDefinitions.First(item =>
+                            item != null
+                            && string.Equals(item.AbilityId, innateAbilityId, StringComparison.Ordinal));
+                        if (ability.ActivationKind == AbilityActivationKind.Timed
+                            && !definition.TryGetSkillAnimation(ability.AnimationKey, out _))
+                            validationErrors.Add(new ValidationError("unit.skillAnimation.missing", "Unit has no animation for timed ability " + innateAbilityId + ": " + definition.TypeId));
+                    }
                 }
             }
 

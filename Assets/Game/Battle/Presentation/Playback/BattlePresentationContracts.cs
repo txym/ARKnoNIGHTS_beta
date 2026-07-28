@@ -24,6 +24,12 @@ namespace ArknoNights.Battle.Presentation
         bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic);
     }
 
+    /// <summary>Optional capability for views backed by catalog-named Skill clips.</summary>
+    public interface IBattleSkillPresentationView
+    {
+        void PlaySkill(string animationKey, float animationSpeedMultiplier);
+    }
+
     public sealed class BattlePresentationDiagnostic
     {
         public BattlePresentationDiagnostic(string code, string message, int tick = -1, int sequence = -1)

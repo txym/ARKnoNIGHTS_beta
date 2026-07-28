@@ -214,7 +214,7 @@ namespace ArknoNights.Battle.Demo
             var builder = new StringBuilder();
             foreach (var item in events ?? Enumerable.Empty<BattleEvent>())
             {
-                builder.Append((int)item.Type).Append(',').Append(item.Tick).Append(',').Append(item.Sequence).Append(',').Append(item.UnitId).Append(',').Append(item.UnitTypeId).Append(',').Append(item.RelatedUnitId);
+                builder.Append((int)item.Type).Append(',').Append(item.Tick).Append(',').Append(item.Sequence).Append(',').Append(item.UnitId).Append(',').Append(item.UnitTypeId).Append(',').Append(item.RelatedUnitId).Append(',').Append(item.AnimationKey);
                 if (item.SpawnSnapshot != null)
                     builder.Append(",spawn=").Append(item.SpawnSnapshot.UnitId).Append(',').Append(item.SpawnSnapshot.TypeId).Append(',').Append(item.SpawnSnapshot.PlayerId).Append(',').Append(item.SpawnSnapshot.Side).Append(',').Append(item.SpawnSnapshot.MaxHitPoints).Append(',').Append(item.SpawnSnapshot.CurrentHitPoints).Append(',').Append(item.SpawnSnapshot.CurrentShield);
                 builder.Append(';');

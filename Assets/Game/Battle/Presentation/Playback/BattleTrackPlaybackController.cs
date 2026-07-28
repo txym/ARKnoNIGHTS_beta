@@ -123,6 +123,11 @@ namespace ArknoNights.Battle.Presentation
                 if (sample.Action == UnitPresentationAction.Idle) record.View.PlayIdle();
                 else if (sample.Action == UnitPresentationAction.Move) record.View.PlayMove();
                 else if (sample.Action == UnitPresentationAction.Attack) record.View.PlayAttack(sample.AttackAnimationSpeedMultiplier);
+                else if (sample.Action == UnitPresentationAction.Skill
+                    && record.View is IBattleSkillPresentationView skillView)
+                    skillView.PlaySkill(
+                        sample.AnimationKey,
+                        sample.AnimationSpeedMultiplier);
                 else if (sample.Action == UnitPresentationAction.Death) record.View.PlayDeath();
                 record.Action = sample.Action;
                 record.ActionStartTick = sample.ActionStartTick;

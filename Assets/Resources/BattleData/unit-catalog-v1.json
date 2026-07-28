@@ -68,7 +68,14 @@
             "moveAnimation": "Move",
             "attackAnimation": "Attack",
             "hitAnimation": "",
-            "deathAnimation": "Die"
+            "deathAnimation": "Die",
+            "skillAnimations": [
+                {
+                    "key": "skill",
+                    "name": "Skill",
+                    "originalAnimationTicks": 30
+                }
+            ]
         },
         {
             "typeId": "5504",

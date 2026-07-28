@@ -49,6 +49,7 @@ public static class AbilityCatalogGenerator
         if (string.Equals(source.activationKind, nameof(AbilityActivationKind.Timed), StringComparison.Ordinal))
         {
             if (!string.Equals(source.skillPoints.generation, nameof(SkillPointGeneration.Automatic), StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(source.animationKey)
                 || source.skillPoints.required <= 0
                 || source.skillPoints.initial < 0
                 || source.skillPoints.initial > source.skillPoints.required)
@@ -60,11 +61,12 @@ public static class AbilityCatalogGenerator
 
             var centimetres = Mathf.RoundToInt(effect.spawnArea.sideLengthMetres * 100f);
             if (Mathf.Abs(effect.spawnArea.sideLengthMetres * 100f - centimetres) > 0.0001f) throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_SIDE_LENGTH_NOT_EXACT path=" + sourcePath);
-            return new AbilityCatalogEntry { abilityId = source.abilityId, displayNameZhHans = source.displayNameZhHans ?? string.Empty, descriptionZhHans = source.descriptionZhHans ?? string.Empty, activationKind = source.activationKind, silencePolicy = source.silencePolicy, initialSkillPoints = source.skillPoints.initial, requiredSkillPoints = source.skillPoints.required, skillPointGeneration = source.skillPoints.generation, summonTypeId = effect.summonTypeId, count = effect.count, sideLengthCentimetres = centimetres, inheritPathFromCaster = effect.inheritPathFromCaster, unitTrait = string.Empty };
+            return new AbilityCatalogEntry { abilityId = source.abilityId, displayNameZhHans = source.displayNameZhHans ?? string.Empty, descriptionZhHans = source.descriptionZhHans ?? string.Empty, activationKind = source.activationKind, silencePolicy = source.silencePolicy, initialSkillPoints = source.skillPoints.initial, requiredSkillPoints = source.skillPoints.required, skillPointGeneration = source.skillPoints.generation, animationKey = source.animationKey, summonTypeId = effect.summonTypeId, count = effect.count, sideLengthCentimetres = centimetres, inheritPathFromCaster = effect.inheritPathFromCaster, unitTrait = string.Empty };
         }
 
         if (!string.Equals(source.activationKind, nameof(AbilityActivationKind.Passive), StringComparison.Ordinal)
             || !string.Equals(source.skillPoints.generation, nameof(SkillPointGeneration.None), StringComparison.Ordinal)
+            || !string.IsNullOrEmpty(source.animationKey)
             || source.skillPoints.initial != 0
             || source.skillPoints.required != 0)
             throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_PASSIVE_INVALID path=" + sourcePath);
@@ -72,7 +74,7 @@ public static class AbilityCatalogGenerator
         if (traitEffect == null
             || !Enum.IsDefined(typeof(UnitTraitEffectKind), traitEffect.trait))
             throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TRAIT_INVALID path=" + sourcePath);
-        return new AbilityCatalogEntry { abilityId = source.abilityId, displayNameZhHans = source.displayNameZhHans ?? string.Empty, descriptionZhHans = source.descriptionZhHans ?? string.Empty, activationKind = source.activationKind, silencePolicy = source.silencePolicy, initialSkillPoints = 0, requiredSkillPoints = 0, skillPointGeneration = source.skillPoints.generation, summonTypeId = string.Empty, count = 0, sideLengthCentimetres = 0, inheritPathFromCaster = false, unitTrait = traitEffect.trait };
+        return new AbilityCatalogEntry { abilityId = source.abilityId, displayNameZhHans = source.displayNameZhHans ?? string.Empty, descriptionZhHans = source.descriptionZhHans ?? string.Empty, activationKind = source.activationKind, silencePolicy = source.silencePolicy, initialSkillPoints = 0, requiredSkillPoints = 0, skillPointGeneration = source.skillPoints.generation, animationKey = string.Empty, summonTypeId = string.Empty, count = 0, sideLengthCentimetres = 0, inheritPathFromCaster = false, unitTrait = traitEffect.trait };
     }
 
     private static ISet<string> LoadKnownUnitTypeIds()
@@ -89,8 +91,8 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; }
-    [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public AbilityEffect[] effects; }
+    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string animationKey; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; }
+    [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public string animationKey; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
     [Serializable] private sealed class AbilityEffect { public string kind; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public string trait; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }

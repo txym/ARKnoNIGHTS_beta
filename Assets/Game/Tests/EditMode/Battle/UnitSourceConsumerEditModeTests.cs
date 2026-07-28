@@ -12,7 +12,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class UnitSourceConsumerEditModeTests
     {
         private const string ExpectedRuntimeCatalogHash =
-            "BE09A6CE835369A52040B76F967AA0D853CD481D83CE909D0DCDFD3C033C1BD8";
+            "218096EFA11080C6B383030718017E82062D772E2D39E5BEE4247E38612D1580";
 
         [Test]
         public void Generate_ProjectsResolvedEliteZeroVariantsToIsolatedV1Catalog()
@@ -60,6 +60,12 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 document.units.Single(unit => unit.typeId == "5503").hitAnimation,
                 Is.Empty);
+            var skill = document.units.Single(unit => unit.typeId == "5503")
+                .skillAnimations.Single();
+            Assert.That(skill.key, Is.EqualTo("skill"));
+            Assert.That(skill.name, Is.EqualTo("Skill"));
+            Assert.That(skill.originalAnimationTicks, Is.EqualTo(30));
+            Assert.That((skill.originalAnimationTicks + 1) / 2, Is.EqualTo(15));
             Assert.That(
                 document.units.Single(unit => unit.typeId == "5504")
                     .attackAnimationDurationTicks,
@@ -304,6 +310,7 @@ namespace ArknoNights.Battle.Tests
                     + "\"silencePolicy\":\"Unaffected\","
                     + "\"skillPoints\":{\"initial\":0,\"required\":1,"
                     + "\"generation\":\"Automatic\"},"
+                    + "\"animationKey\":\"skill\","
                     + "\"effects\":[{\"kind\":\"Summon\","
                     + "\"summonTypeId\":\"does-not-exist\",\"count\":1,"
                     + "\"spawnArea\":{\"shape\":\"Square\","
@@ -386,6 +393,15 @@ namespace ArknoNights.Battle.Tests
             public string moveAnimation;
             public string attackAnimation;
             public string hitAnimation;
+            public SkillAnimationProjection[] skillAnimations;
+        }
+
+        [Serializable]
+        private sealed class SkillAnimationProjection
+        {
+            public string key;
+            public string name;
+            public int originalAnimationTicks;
         }
     }
 }

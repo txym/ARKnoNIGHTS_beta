@@ -358,7 +358,7 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void DynamicSpawnTrack_UsesResultSnapshotIndexAndProjectsThreeTick100Arcslmi()
+        public void DynamicSpawnTrack_UsesResultSnapshotIndexAndProjectsThreeQueuedArcslmi()
         {
             var authoritative = RunSingleArcslmaSummonBattle();
             var result = WithoutDynamicEventSnapshots(authoritative);
@@ -367,7 +367,10 @@ namespace ArknoNights.Battle.Tests
             Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
             var minions = track.Units.Where(unit => unit.TypeId == "5504").ToArray();
             Assert.That(minions, Has.Length.EqualTo(3));
-            Assert.That(minions.All(unit => unit.SpawnTick == 100), Is.True);
+            var summonTick = result.Events.First(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitTypeId == "5504").Tick;
+            Assert.That(minions.All(unit => unit.SpawnTick == summonTick), Is.True);
             Assert.That(minions.All(unit => unit.MaxHitPoints == 2500), Is.True);
 
             var currentHitPoints = typeof(UnitPresentationTrack).GetProperty("CurrentHitPoints");
@@ -382,7 +385,7 @@ namespace ArknoNights.Battle.Tests
                 Assert.That(currentShield.GetValue(minion), Is.EqualTo(0), minion.UnitId);
                 var spawn = result.Events.Single(item => item.Type == BattleEventType.Spawn && item.UnitId == minion.UnitId);
                 Assert.That(initialPosition.GetValue(minion), Is.EqualTo(spawn.ToPosition.Value), minion.UnitId);
-                var sample = minion.Sample(100);
+                var sample = minion.Sample(summonTick);
                 Assert.That(sample.Position.XUnits, Is.EqualTo(spawn.ToPosition.Value.XUnits / 100d), minion.UnitId);
                 Assert.That(sample.Position.YUnits, Is.EqualTo(spawn.ToPosition.Value.YUnits / 100d), minion.UnitId);
             }
@@ -395,12 +398,15 @@ namespace ArknoNights.Battle.Tests
             var compiler = new BattlePresentationTrackCompiler();
             Assert.That(compiler.TryCompile(result, out var track, out var diagnostics), Is.True, string.Join(";", diagnostics));
             var factory = new FakeFactory();
+            var summonTick = result.Events.First(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitTypeId == "5504").Tick;
 
             using (var playback = new BattleTrackPlaybackController())
             {
                 Assert.That(playback.Bind(track, factory, BattleObserverView.Home, 0d, out var bindDiagnostics), Is.True, string.Join(";", bindDiagnostics));
                 playback.SetPlaybackSpeed(2f);
-                Assert.That(playback.RenderAt(100d, out var renderDiagnostics), Is.True, string.Join(";", renderDiagnostics));
+                Assert.That(playback.RenderAt(summonTick, out var renderDiagnostics), Is.True, string.Join(";", renderDiagnostics));
 
                 foreach (var unitId in new[] { "-1", "-2", "-3" })
                     Assert.That(factory.Get(unitId).PlaybackSpeeds.Last(), Is.EqualTo(2f), unitId);
@@ -461,21 +467,22 @@ namespace ArknoNights.Battle.Tests
         {
             var authoritative = RunSingleArcslmaSummonBattle();
             var dynamicSpawn = authoritative.Events.First(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504");
-            var events = authoritative.Events.Where(item => item.Tick < 99)
+            var probeTick = dynamicSpawn.Tick - 1;
+            var events = authoritative.Events.Where(item => item.Tick < probeTick)
                 .Concat(new[]
                 {
-                    new BattleEvent(BattleEventType.TargetChanged, 99, 1, dynamicSpawn.UnitId, null, null, null, null, null,
+                    new BattleEvent(BattleEventType.TargetChanged, probeTick, 1, dynamicSpawn.UnitId, null, null, null, null, null,
                         null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None, null)
                 })
-                .Concat(authoritative.Events.Where(item => item.Tick == 99).Select(item => CloneEvent(item, item.Sequence + 1, item.SpawnSnapshot)))
-                .Concat(authoritative.Events.Where(item => item.Tick > 99))
+                .Concat(authoritative.Events.Where(item => item.Tick == probeTick).Select(item => CloneEvent(item, item.Sequence + 1, item.SpawnSnapshot)))
+                .Concat(authoritative.Events.Where(item => item.Tick > probeTick))
                 .ToArray();
 
             AssertCompileDiagnostic(
                 CloneResult(authoritative, events, authoritative.UnitSnapshots),
                 "track.unit.beforeSpawn",
                 dynamicSpawn.UnitId,
-                99,
+                probeTick,
                 1);
         }
 
@@ -518,7 +525,7 @@ namespace ArknoNights.Battle.Tests
             var specification = new BattleInputSpecification(
                 BattleInput.SupportedSchemaVersion,
                 "presentation-single-caster",
-                101,
+                130,
                 definitions,
                 abilities.Catalog.Abilities,
                 new[]
@@ -552,7 +559,9 @@ namespace ArknoNights.Battle.Tests
                 source.BlockCapacity,
                 source.TauntLevel,
                 source.IsSyntheticFixtureData,
-                source.InnateAbilityIds);
+                source.InnateAbilityIds,
+                source.ActionMethod,
+                source.SkillAnimations);
         }
 
         private static BattleRunResult WithoutDynamicEventSnapshots(BattleRunResult source)
@@ -607,7 +616,8 @@ namespace ArknoNights.Battle.Tests
                 source.EffectiveAnimationTicks,
                 source.Winner,
                 source.Reason,
-                spawnSnapshot);
+                spawnSnapshot,
+                source.AnimationKey);
         }
 
         private static BattleUnitInstanceSnapshot CloneSnapshot(

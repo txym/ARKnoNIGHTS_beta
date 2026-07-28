@@ -46,11 +46,28 @@ namespace ArknoNights.Battle.Core
                 requiredSkillPoints,
                 skillPointGeneration,
                 summonEffect,
-                null)
+                null,
+                activationKind == AbilityActivationKind.Timed ? "skill" : string.Empty)
         {
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                activationKind == AbilityActivationKind.Timed ? "skill" : string.Empty)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, string animationKey)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -62,6 +79,7 @@ namespace ArknoNights.Battle.Core
             SkillPointGeneration = skillPointGeneration;
             SummonEffect = summonEffect;
             UnitTraitEffect = unitTraitEffect;
+            AnimationKey = animationKey ?? string.Empty;
         }
 
         public string AbilityId { get; }
@@ -74,5 +92,6 @@ namespace ArknoNights.Battle.Core
         public SkillPointGeneration SkillPointGeneration { get; }
         public SummonEffectDefinition SummonEffect { get; }
         public UnitTraitEffectDefinition UnitTraitEffect { get; }
+        public string AnimationKey { get; }
     }
 }

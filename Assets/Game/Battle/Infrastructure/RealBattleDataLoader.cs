@@ -8,9 +8,23 @@ using UnityEngine;
 
 namespace ArknoNights.Battle.Infrastructure
 {
+    public sealed class UnitSkillAnimationCatalogBinding
+    {
+        internal UnitSkillAnimationCatalogBinding(string key, string animationName, int originalDurationTicks)
+        {
+            Key = key;
+            AnimationName = animationName;
+            OriginalDurationTicks = originalDurationTicks;
+        }
+
+        public string Key { get; }
+        public string AnimationName { get; }
+        public int OriginalDurationTicks { get; }
+    }
+
     public sealed class UnitCatalogEntry
     {
-        internal UnitCatalogEntry(UnitDefinition definition, int legacyUnitTypeId, string resourceKey, string displayNameZhHans, string skillDescriptionZhHans, string sourceFile, int deploymentCost, string portraitResourcePath, int rarity, int initialEliteLevel, int lifeDeduct, string prefabResourcePath, string skeletonDataResourcePath, int unitSkelType, string moveAnimation, string attackAnimation, string hitAnimation, string deathAnimation)
+        internal UnitCatalogEntry(UnitDefinition definition, int legacyUnitTypeId, string resourceKey, string displayNameZhHans, string skillDescriptionZhHans, string sourceFile, int deploymentCost, string portraitResourcePath, int rarity, int initialEliteLevel, int lifeDeduct, string prefabResourcePath, string skeletonDataResourcePath, int unitSkelType, string moveAnimation, string attackAnimation, string hitAnimation, string deathAnimation, IEnumerable<UnitSkillAnimationCatalogBinding> skillAnimations)
         {
             Definition = definition;
             LegacyUnitTypeId = legacyUnitTypeId;
@@ -30,6 +44,7 @@ namespace ArknoNights.Battle.Infrastructure
             AttackAnimation = attackAnimation;
             HitAnimation = hitAnimation;
             DeathAnimation = deathAnimation;
+            SkillAnimations = new ReadOnlyCollection<UnitSkillAnimationCatalogBinding>((skillAnimations ?? Enumerable.Empty<UnitSkillAnimationCatalogBinding>()).ToArray());
         }
 
         public UnitDefinition Definition { get; }
@@ -53,6 +68,7 @@ namespace ArknoNights.Battle.Infrastructure
         public string AttackAnimation { get; }
         public string HitAnimation { get; }
         public string DeathAnimation { get; }
+        public IReadOnlyList<UnitSkillAnimationCatalogBinding> SkillAnimations { get; }
     }
 
     public sealed class UnitCatalog
@@ -194,11 +210,30 @@ namespace ArknoNights.Battle.Infrastructure
             }
             if (dto.unitSkelType != 1 && dto.unitSkelType != 2) { errors.Add(Error("catalog.skeletonType.invalid", schemaVersion, catalogId, null, dto.typeId)); valid = false; }
             if (string.IsNullOrWhiteSpace(dto.moveAnimation) || string.IsNullOrWhiteSpace(dto.deathAnimation) || (attackMethod != AttackMethod.None && string.IsNullOrWhiteSpace(dto.attackAnimation))) { errors.Add(Error("catalog.animation.required.missing", schemaVersion, catalogId, null, dto.typeId)); valid = false; }
+            var skillAnimations = new List<UnitSkillAnimationCatalogBinding>();
+            var skillAnimationKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var skillAnimation in dto.skillAnimations ?? Array.Empty<SkillAnimationBindingDto>())
+            {
+                if (skillAnimation == null
+                    || string.IsNullOrWhiteSpace(skillAnimation.key)
+                    || string.IsNullOrWhiteSpace(skillAnimation.name)
+                    || skillAnimation.originalAnimationTicks <= 0
+                    || !skillAnimationKeys.Add(skillAnimation.key))
+                {
+                    errors.Add(Error("catalog.skillAnimation.invalid", schemaVersion, catalogId, null, dto.typeId));
+                    valid = false;
+                    continue;
+                }
+                skillAnimations.Add(new UnitSkillAnimationCatalogBinding(
+                    skillAnimation.key,
+                    skillAnimation.name,
+                    skillAnimation.originalAnimationTicks));
+            }
             if (!valid) return null;
 
             return new UnitCatalogEntry(
-                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>(), actionMethod),
-                dto.legacyUnitTypeId, dto.resourceKey, dto.displayNameZhHans, dto.skillDescriptionZhHans, dto.sourceFile, dto.deploymentCost, dto.portraitResourcePath, dto.rarity, dto.initialEliteLevel, dto.lifeDeduct, dto.prefabResourcePath, dto.skeletonDataResourcePath, dto.unitSkelType, dto.moveAnimation, dto.attackAnimation, dto.hitAnimation ?? string.Empty, dto.deathAnimation);
+                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>(), actionMethod, skillAnimations.Select(item => new UnitSkillAnimationDefinition(item.Key, item.OriginalDurationTicks))),
+                dto.legacyUnitTypeId, dto.resourceKey, dto.displayNameZhHans, dto.skillDescriptionZhHans, dto.sourceFile, dto.deploymentCost, dto.portraitResourcePath, dto.rarity, dto.initialEliteLevel, dto.lifeDeduct, dto.prefabResourcePath, dto.skeletonDataResourcePath, dto.unitSkelType, dto.moveAnimation, dto.attackAnimation, dto.hitAnimation ?? string.Empty, dto.deathAnimation, skillAnimations);
         }
 
         private static bool TryParseEnum<T>(string value, out T parsed) where T : struct => Enum.TryParse(value, true, out parsed) && Enum.IsDefined(typeof(T), parsed);
@@ -206,7 +241,8 @@ namespace ArknoNights.Battle.Infrastructure
         internal static ValidationError Error(string code, string schema, string battleOrCatalogId, string playerId, string typeId) => new ValidationError(code, "schema=" + (schema ?? "<missing>") + "; battleId=" + (battleOrCatalogId ?? "<missing>") + "; playerId=" + (playerId ?? "<none>") + "; typeId=" + (typeId ?? "<none>"));
 
         [Serializable] private sealed class UnitCatalogDto { public string schemaVersion; public string catalogId; public UnitCatalogEntryDto[] units; }
-        [Serializable] private sealed class UnitCatalogEntryDto { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int actionMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string[] innateAbilityIds; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; }
+        [Serializable] private sealed class UnitCatalogEntryDto { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int actionMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string[] innateAbilityIds; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; public SkillAnimationBindingDto[] skillAnimations; }
+        [Serializable] private sealed class SkillAnimationBindingDto { public string key; public string name; public int originalAnimationTicks; }
     }
 
     /// <summary>Joins a local-battle-v1 player snapshot to a Player-safe unit catalog without exposing presentation data to Core.</summary>

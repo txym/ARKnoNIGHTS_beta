@@ -22,19 +22,20 @@ namespace ArknoNights.Battle.Core
 
         public AbilityDefinition Definition { get; }
 
-        internal bool RecoverAndTryCast(out int castOrdinal)
+        internal void RecoverAutomaticSkillPoint()
         {
-            currentSkillPoints++;
             if (currentSkillPoints < Definition.RequiredSkillPoints)
-            {
-                castOrdinal = 0;
-                return false;
-            }
+                currentSkillPoints++;
+        }
 
+        internal bool CanCast => currentSkillPoints >= Definition.RequiredSkillPoints;
+
+        internal int ConsumeCast()
+        {
+            if (!CanCast) throw new InvalidOperationException("Ability is not ready to cast: " + Definition.AbilityId);
             currentSkillPoints -= Definition.RequiredSkillPoints;
             castCount++;
-            castOrdinal = castCount;
-            return true;
+            return castCount;
         }
 
         internal void AppendStableSummary(StringBuilder builder)
@@ -121,6 +122,8 @@ namespace ArknoNights.Battle.Core
         public string BlockedUnitId => blockedUnitIds.Count == 0 ? null : blockedUnitIds[0];
         public IReadOnlyList<string> BlockedUnitIds { get; }
         public int NextAttackAllowedTick { get; internal set; }
+        internal int AttackAnimationLockUntilTick { get; set; } = int.MinValue;
+        internal int SkillAnimationLockUntilTick { get; set; } = int.MinValue;
         internal int MoveRemainder { get; set; }
         internal int MoveXNumeratorRemainder { get; set; }
         internal int MoveYNumeratorRemainder { get; set; }
@@ -316,6 +319,7 @@ namespace ArknoNights.Battle.Core
             AcquireTargets();
             ApplyMovement();
             EvaluateBlocking();
+            CastReadyAbilities();
             StartAttacks();
             ResolveDueDamage();
             ResolveDeathsAndCleanup();
@@ -351,7 +355,7 @@ namespace ArknoNights.Battle.Core
         private void ApplyMovement()
         {
             var intents = new List<MoveIntent>();
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.ActionMethod != 4 && !item.IsBlocked && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.ActionMethod != 4 && !item.IsBlocked && !IsSkillAnimationLocked(item) && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 if (!unit.Definition.CanAttack)
                 {
@@ -408,7 +412,7 @@ namespace ArknoNights.Battle.Core
 
         private void StartAttacks()
         {
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.CanAttack && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.CanAttack && !IsAttackAnimationLocked(item) && !IsSkillAnimationLocked(item) && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 var target = GetAttackTarget(unit);
                 if (target == null) continue;
@@ -416,6 +420,7 @@ namespace ArknoNights.Battle.Core
                 var effectiveTicks = Math.Min(unit.Definition.AttackAnimationDurationTicks, unit.Definition.AttackIntervalTicks);
                 var damageTick = CurrentTick + effectiveTicks;
                 unit.NextAttackAllowedTick = CurrentTick + unit.Definition.AttackIntervalTicks;
+                unit.AttackAnimationLockUntilTick = Math.Max(unit.AttackAnimationLockUntilTick, damageTick);
                 pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, unit.Definition.Attack, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
                 Emit(BattleEventType.Attack, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, unit.Definition.AttackAnimationDurationTicks, effectiveTicks, null, BattleStopReason.None);
             }
@@ -462,14 +467,59 @@ namespace ArknoNights.Battle.Core
 
         private void RecoverAutomaticSkillPointsAndCast()
         {
-            if (CurrentTick % AutomaticSkillPointGainIntervalTicks != 0) return;
+            if (CurrentTick % AutomaticSkillPointGainIntervalTicks == 0)
+            {
+                foreach (var caster in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray())
+                foreach (var abilityState in caster.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal))
+                {
+                    if (abilityState.Definition.ActivationKind != AbilityActivationKind.Timed) continue;
+                    if (abilityState.Definition.SkillPointGeneration != SkillPointGeneration.Automatic) continue;
+                    abilityState.RecoverAutomaticSkillPoint();
+                }
+            }
 
+            CastReadyAbilities();
+        }
+
+        private void CastReadyAbilities()
+        {
             foreach (var caster in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray())
             foreach (var abilityState in caster.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal))
             {
                 if (abilityState.Definition.ActivationKind != AbilityActivationKind.Timed) continue;
                 if (abilityState.Definition.SkillPointGeneration != SkillPointGeneration.Automatic) continue;
-                if (!abilityState.RecoverAndTryCast(out var castOrdinal)) continue;
+                if (!abilityState.CanCast
+                    || IsAttackAnimationLocked(caster)
+                    || IsSkillAnimationLocked(caster))
+                    continue;
+                if (!caster.Definition.TryGetSkillAnimation(
+                        abilityState.Definition.AnimationKey,
+                        out var animation))
+                    throw new InvalidOperationException(
+                        "Validated skill animation is missing at runtime: "
+                        + caster.TypeId
+                        + "/"
+                        + abilityState.Definition.AnimationKey);
+                var castOrdinal = abilityState.ConsumeCast();
+                caster.SkillAnimationLockUntilTick =
+                    CurrentTick + animation.EffectiveDurationTicks;
+                Emit(
+                    BattleEventType.Skill,
+                    caster.UnitId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    0,
+                    0,
+                    0,
+                    animation.OriginalDurationTicks,
+                    animation.EffectiveDurationTicks,
+                    null,
+                    BattleStopReason.None,
+                    abilityState.Definition.AnimationKey);
                 CastSummonAbility(caster, abilityState.Definition, castOrdinal);
             }
         }
@@ -618,6 +668,8 @@ namespace ArknoNights.Battle.Core
         }
         private bool HasTargetDeathAnimationLock(RuntimeUnitState unit) => pendingAttacks.Any(item => string.Equals(item.AttackerUnitId, unit.UnitId, StringComparison.Ordinal) && item.DamageTick >= CurrentTick && !FindUnit(item.TargetUnitId).IsAlive);
         private RuntimeUnitState FindUnit(string unitId) => runtimeUnits.FirstOrDefault(item => string.Equals(item.UnitId, unitId, StringComparison.Ordinal));
+        private bool IsAttackAnimationLocked(RuntimeUnitState unit) => CurrentTick <= unit.AttackAnimationLockUntilTick;
+        private bool IsSkillAnimationLocked(RuntimeUnitState unit) => CurrentTick <= unit.SkillAnimationLockUntilTick;
         private static FixedPosition GatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.BlueGate : BattlefieldRules.RedGate);
         private static FixedPosition OpposingGatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.RedGate : BattlefieldRules.BlueGate);
         private static long DistanceSquared(FixedPosition first, FixedPosition second) { var x = (long)first.XUnits - second.XUnits; var y = (long)first.YUnits - second.YUnits; return x * x + y * y; }
@@ -672,10 +724,10 @@ namespace ArknoNights.Battle.Core
             return new FixedPosition(unit.Position.XUnits + moveX, unit.Position.YUnits + moveY);
         }
 
-        private void Emit(BattleEventType type, string unitId, string unitTypeId, string relatedUnitId, FixedPosition? from, FixedPosition? to, DamageType? damageType, int amount, int hpBefore, int hpAfter, int damageTick, int originalTicks, int effectiveTicks, BattleSide? winner, BattleStopReason reason)
+        private void Emit(BattleEventType type, string unitId, string unitTypeId, string relatedUnitId, FixedPosition? from, FixedPosition? to, DamageType? damageType, int amount, int hpBefore, int hpAfter, int damageTick, int originalTicks, int effectiveTicks, BattleSide? winner, BattleStopReason reason, string animationKey = null)
         {
             if (eventTick != CurrentTick) { eventTick = CurrentTick; eventSequence = 0; }
-            events.Add(new BattleEvent(type, CurrentTick, ++eventSequence, unitId, unitTypeId, null, relatedUnitId, from, to, damageType, amount, hpBefore, hpAfter, damageTick, originalTicks, effectiveTicks, winner, reason, null));
+            events.Add(new BattleEvent(type, CurrentTick, ++eventSequence, unitId, unitTypeId, null, relatedUnitId, from, to, damageType, amount, hpBefore, hpAfter, damageTick, originalTicks, effectiveTicks, winner, reason, null, animationKey));
         }
 
         private void EmitSpawn(RuntimeUnitState unit, BattleUnitInstanceSnapshot snapshot)

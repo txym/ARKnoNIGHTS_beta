@@ -122,7 +122,7 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
         var presentationView = instance.GetComponent<UnitSkelPresentationView>() ?? instance.AddComponent<UnitSkelPresentationView>();
         if (catalogEntry != null) presentationView.ConfigureStatusBarMaximumHitPoints(catalogEntry.Definition.MaxHitPoints);
         if (catalogEntry != null)
-            presentationView.ConfigureAnimations(unitSkel, catalogEntry.MoveAnimation, catalogEntry.AttackAnimation, catalogEntry.HitAnimation, catalogEntry.DeathAnimation);
+            presentationView.ConfigureAnimations(unitSkel, catalogEntry.MoveAnimation, catalogEntry.AttackAnimation, catalogEntry.HitAnimation, catalogEntry.DeathAnimation, catalogEntry.SkillAnimations);
         instance.name = "BattleView_" + unitId;
         view = presentationView;
         return true;

@@ -13,8 +13,8 @@
 |---|---|---|
 | 独立 worktree | 已完成 | `codex/bonds-unit-abilities`，起点 `22f6e9f`。 |
 | Battle Core 基线 | 已验证 | 聚焦 EditMode `57/57` 通过。 |
-| Skill 动画 2x | 待实现 | 目标换算为 `ceil(json seconds × 0.5 × 20)`。 |
-| Skill 不打断攻击 | 待实现 | 目标动作优先级 `Death > Attack > Skill > Move > Idle`，必要时排队。 |
+| Skill 动画 2x | 已实现 | 单位 JSON 的 Skill 时长先向上取整为原始 Tick，再按 `(原始 Tick + 1) / 2` 计算 Core 占用；表现层倍率固定 `2.0`。 |
+| Skill 不打断攻击 | 已实现 | 已开始攻击优先，技能保留已满 SP 并排队到攻击动画结束后的下一 Tick；动作优先级为 `Death > Attack > Skill > Move > Idle`。 |
 | 主分支同步 | 监控中 | 当前任务每小时检查 `txym` 的新提交，共 7 次。 |
 
 ## 特殊索敌与行动
@@ -35,7 +35,11 @@
 
 | 单位 | 能力 | 状态 | 说明 |
 |---|---|---|---|
-| `5503` 果冻小子 | 定时召唤 3 个 `5504` | 主线已有，待动画升级 | 现有 Core 已支持私有 SP、确定性 Spawn、动态 Track；本任务补 Skill 动画时序。 |
+| `5503` 果冻小子 | 定时召唤 3 个 `5504` | 已实现 | `Skill=1.5s` 烘焙为原始 `30 Tick`、2x 后占用 `15 Tick`；Skill 事件先于同 Tick 的三个 Spawn，攻击中就绪时延后释放。 |
+
+Skill 定向 EditMode 验证：`BondsSkillAnimationEditModeTests` 共 `3/3` 通过，
+覆盖 2x 时长与表现倍率、奇数 Tick 向上取整，以及攻击 Tick 100 开始时技能
+延后至攻击结束后的 Tick 121。
 
 ## 后续批次
 

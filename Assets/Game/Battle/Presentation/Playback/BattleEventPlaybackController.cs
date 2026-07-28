@@ -123,7 +123,7 @@ namespace ArknoNights.Battle.Presentation
             displayTicks += unscaledDeltaSeconds * PlaybackSpeed * BattleInput.TicksPerSecond;
             if (compiledTrack != null)
             {
-                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack) && item.Tick > previousTicks && item.Tick <= displayTicks))
+                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack || item.Type == BattleEventType.Skill) && item.Tick > previousTicks && item.Tick <= displayTicks))
                     if (!trackPlayback.RenderAt(action.Tick, out var actionDiagnostics)) diagnostics.AddRange(actionDiagnostics);
                 if (!trackPlayback.RenderAt(displayTicks, out var trackDiagnostics)) diagnostics.AddRange(trackDiagnostics);
             }
@@ -241,6 +241,22 @@ namespace ArknoNights.Battle.Presentation
                     attacker.View.PlayAttack(animationMultiplier);
                     attacker.MarkAttackAnimationStarted(item.Tick, item.EffectiveAnimationTicks);
                     attacker.MarkAttackFacing(item.Tick, attacker.PositionAt(item.Tick), attackTarget.PositionAt(item.Tick));
+                    break;
+
+                case BattleEventType.Skill:
+                    if (!TryGetView(item.UnitId, item, out var caster)) return false;
+                    if (string.IsNullOrWhiteSpace(item.AnimationKey)
+                        || item.OriginalAnimationTicks <= 0
+                        || item.EffectiveAnimationTicks != (item.OriginalAnimationTicks + 1) / 2)
+                    {
+                        AddDiagnostic("skill.contract.invalid", "Skill requires a key and a rounded 2x duration.", item.Tick, item.Sequence);
+                        return false;
+                    }
+                    if (caster.View is IBattleSkillPresentationView skillView)
+                        skillView.PlaySkill(item.AnimationKey, 2f);
+                    caster.MarkAttackAnimationStarted(
+                        item.Tick,
+                        item.EffectiveAnimationTicks);
                     break;
 
                 case BattleEventType.Damage:

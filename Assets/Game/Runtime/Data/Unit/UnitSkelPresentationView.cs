@@ -1,10 +1,12 @@
+using System;
+using System.Collections.Generic;
 using ArknoNights.Battle.Presentation;
 using Spine.Unity;
 using UnityEngine;
 
 /// <summary>Assembly-CSharp bridge that lets the isolated Battle Presentation assembly drive existing Spine unit prototypes.</summary>
 [DisallowMultipleComponent]
-public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentationView
+public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentationView, IBattleSkillPresentationView
 {
     private const float DeathBlackeningSeconds = 0.5f;
 
@@ -27,6 +29,8 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     [SerializeField] private string hitAnimation = "Hit";
     [SerializeField] private string deathAnimation = "Death";
     [SerializeField] private UnitWorldStatusBar statusBar;
+    private readonly Dictionary<string, string> skillAnimations =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private float playbackSpeed = 1f;
     private bool deathFallbackApplied;
@@ -78,11 +82,35 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     /// <summary>Catalog-driven animation names for a real unit view. Empty hit animation keeps the existing warning-only fallback.</summary>
     public void ConfigureAnimations(UnitSkelBase configuredUnitSkel, string move, string attack, string hit, string death)
     {
+        ConfigureAnimations(
+            configuredUnitSkel,
+            move,
+            attack,
+            hit,
+            death,
+            null);
+    }
+
+    public void ConfigureAnimations(
+        UnitSkelBase configuredUnitSkel,
+        string move,
+        string attack,
+        string hit,
+        string death,
+        IEnumerable<ArknoNights.Battle.Infrastructure.UnitSkillAnimationCatalogBinding> skills)
+    {
         unitSkel = configuredUnitSkel ? configuredUnitSkel : unitSkel;
         moveAnimation = move ?? string.Empty;
         attackAnimation = attack ?? string.Empty;
         hitAnimation = hit ?? string.Empty;
         deathAnimation = death ?? string.Empty;
+        skillAnimations.Clear();
+        foreach (var skill in skills
+                     ?? Array.Empty<ArknoNights.Battle.Infrastructure.UnitSkillAnimationCatalogBinding>())
+        {
+            if (skill == null || string.IsNullOrWhiteSpace(skill.Key)) continue;
+            skillAnimations[skill.Key] = skill.AnimationName ?? string.Empty;
+        }
     }
 
     public void SetWorldPosition(Vector3 position) => transform.position = position;
@@ -128,6 +156,16 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     public void PlayMove() => PlayOrReport(moveAnimation, true, 1f, "move");
 
     public void PlayAttack(float animationSpeedMultiplier) => PlayOrReport(attackAnimation, false, animationSpeedMultiplier, "attack");
+
+    public void PlaySkill(string animationKey, float animationSpeedMultiplier)
+    {
+        if (!skillAnimations.TryGetValue(animationKey ?? string.Empty, out var animationName))
+        {
+            Debug.LogWarning("[BattlePresentation][skill.mapping.missing] key=" + (animationKey ?? string.Empty), this);
+            return;
+        }
+        PlayOrReport(animationName, false, animationSpeedMultiplier, "skill:" + animationKey);
+    }
 
     // Real catalog entries may intentionally omit Hit. Damage remains event-authoritative and this is a no-op presentation fallback.
     public void PlayHit()

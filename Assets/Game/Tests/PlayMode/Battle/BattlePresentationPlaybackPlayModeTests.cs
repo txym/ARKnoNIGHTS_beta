@@ -533,7 +533,8 @@ namespace ArknoNights.Battle.Tests
                 source.EffectiveAnimationTicks,
                 source.Winner,
                 source.Reason,
-                spawnSnapshot);
+                spawnSnapshot,
+                source.AnimationKey);
         }
 
         private static GameObject FindChild(Transform root, string name)

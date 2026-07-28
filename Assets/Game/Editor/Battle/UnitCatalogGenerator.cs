@@ -256,6 +256,19 @@ public static class UnitCatalogGenerator
             ? null
             : source.RequireAnimation("attack", sourcePath);
         var death = source.RequireAnimation("death", sourcePath);
+        var skillAnimations = source.animations
+            .Where(item => item != null
+                && item.key.StartsWith("skill", StringComparison.Ordinal))
+            .OrderBy(item => item.key, StringComparer.Ordinal)
+            .Select(item => new SkillAnimationBinding
+            {
+                key = item.key,
+                name = item.name,
+                originalAnimationTicks = ConvertSecondsToTicks(
+                    item.durationSeconds,
+                    sourcePath + ":" + item.key)
+            })
+            .ToArray();
         var moveSpeed = ConvertMetresPerSecondToCentimetres(
             source.moveSpeedMetresPerSecond,
             sourcePath);
@@ -328,7 +341,8 @@ public static class UnitCatalogGenerator
             moveAnimation = move.name,
             attackAnimation = attack == null ? string.Empty : attack.name,
             hitAnimation = string.Empty,
-            deathAnimation = death.name
+            deathAnimation = death.name,
+            skillAnimations = skillAnimations
         };
     }
 
@@ -472,6 +486,14 @@ public static class UnitCatalogGenerator
     }
 
     [Serializable]
+    private sealed class SkillAnimationBinding
+    {
+        public string key;
+        public string name;
+        public int originalAnimationTicks;
+    }
+
+    [Serializable]
     private sealed class UnitCatalogEntry
     {
         public string typeId;
@@ -506,5 +528,6 @@ public static class UnitCatalogGenerator
         public string attackAnimation;
         public string hitAnimation;
         public string deathAnimation;
+        public SkillAnimationBinding[] skillAnimations;
     }
 }
