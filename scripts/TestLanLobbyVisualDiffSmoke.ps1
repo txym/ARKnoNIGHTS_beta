@@ -522,6 +522,88 @@ function Fill-RoomEvidenceFixture(
     }
 }
 
+function New-DispersedPortraitConsensusReferences(
+    [string] $SourceReferenceDirectory,
+    [string] $DestinationReferenceDirectory,
+    [string] $Figure11,
+    [string] $Figure12,
+    [string] $Figure13)
+{
+    Copy-Item -LiteralPath $SourceReferenceDirectory -Destination $DestinationReferenceDirectory -Recurse
+    $cases = @(
+        [pscustomobject]@{ figure=$Figure11; state='room-host'; topBarShifts=@(8,8,8,8) },
+        [pscustomobject]@{ figure=$Figure12; state='room-full'; topBarShifts=@(8,8,8) },
+        [pscustomobject]@{ figure=$Figure13; state='room-ready'; topBarShifts=@(8,8,8) }
+    )
+    $roots = @(199.5, 588.75, 976.5, 1365.0)
+    foreach ($case in $cases)
+    {
+        $path = Join-Path $DestinationReferenceDirectory $case.figure
+        $source = [Drawing.Bitmap]::FromFile($path)
+        $bitmap = New-Object Drawing.Bitmap $source
+        $source.Dispose()
+        $graphics = [Drawing.Graphics]::FromImage($bitmap)
+        $cyan = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255,0,220,220))
+        $gray = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255,105,105,105))
+        try
+        {
+            $scaleX = $bitmap.Width / 1920.0
+            $scaleY = $bitmap.Height / 1080.0
+            for ($slot=0; $slot -lt $case.topBarShifts.Count; $slot++)
+            {
+                $bodyX = $roots[$slot]+26.25
+                $isReady = $slot -eq 0 -or $case.state -eq 'room-ready'
+                $brush = if ($isReady) { $cyan } else { $gray }
+                $topBarShift = [int]$case.topBarShifts[$slot]
+                $graphics.FillRectangle(
+                    [Drawing.Brushes]::Black,
+                    [int][Math]::Round(($bodyX-1)*$scaleX),
+                    [int][Math]::Round(177*$scaleY),
+                    [int][Math]::Round(330*$scaleX),
+                    [int][Math]::Round(32*$scaleY))
+                $graphics.FillRectangle(
+                    $brush,
+                    [int][Math]::Round(($bodyX+$topBarShift)*$scaleX),
+                    [int][Math]::Round(177.75*$scaleY),
+                    [int][Math]::Round(320.25*$scaleX),
+                    [int][Math]::Round(30*$scaleY))
+            }
+            $bitmap.Save($path,[Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally
+        {
+            $gray.Dispose()
+            $cyan.Dispose()
+            $graphics.Dispose()
+            $bitmap.Dispose()
+        }
+    }
+}
+
+function Get-LanLobbyPortraitTargetPairingAudit([int[]] $Keys, [int] $GridWidth)
+{
+    $leftRows = New-Object 'System.Collections.Generic.HashSet[int]'
+    $rightRows = New-Object 'System.Collections.Generic.HashSet[int]'
+    $interiorKeys = New-Object 'System.Collections.Generic.List[int]'
+    foreach ($key in $Keys)
+    {
+        $x = [int]$key % $GridWidth
+        $y = [int][Math]::Floor([int]$key / [double]$GridWidth)
+        if ($x -eq 0) { [void]$leftRows.Add($y) }
+        elseif ($x -eq $GridWidth-1) { [void]$rightRows.Add($y) }
+        else { $interiorKeys.Add([int]$key) }
+    }
+    $leftOnly = @($leftRows | Where-Object { -not $rightRows.Contains([int]$_) })
+    $rightOnly = @($rightRows | Where-Object { -not $leftRows.Contains([int]$_) })
+    return [pscustomobject]@{
+        leftRows=$leftRows
+        rightRows=$rightRows
+        interiorKeys=$interiorKeys
+        leftOnly=$leftOnly
+        rightOnly=$rightOnly
+    }
+}
+
 function New-RoomPortraitFrameSpriteSources(
     [ValidateSet('room-host','room-full','room-ready')] [string] $State)
 {
@@ -1608,6 +1690,85 @@ try
         @($report.portraitFrameConsensus.pixelConsensus.targetPixelKeys).Count -eq
             $report.portraitFrameConsensus.pixelConsensus.targetPixelCount
     ) 'portrait-frame consensus must publish its decoded-pixel grid, vote threshold, and exact deterministic target set'
+    $baselinePairing = Get-LanLobbyPortraitTargetPairingAudit `
+        ([int[]]$report.portraitFrameConsensus.pixelConsensus.targetPixelKeys) `
+        ([int]$report.portraitFrameConsensus.pixelConsensus.canonicalGrid.width)
+    Assert-True ($baselinePairing.leftRows.Count -gt 0) 'portrait-frame target must contain observed canonical-left pixels'
+    Assert-True ($baselinePairing.rightRows.Count -gt 0) 'portrait-frame target must contain observed canonical-right pixels'
+    Assert-True ($baselinePairing.interiorKeys.Count -eq 0) 'portrait-frame target must preserve paired side identity instead of dispersing pixels into interior columns'
+    Assert-True (
+        $baselinePairing.leftRows.Count -eq $baselinePairing.rightRows.Count -and
+        $baselinePairing.leftOnly.Count -eq 0 -and
+        $baselinePairing.rightOnly.Count -eq 0
+    ) 'every portrait-frame target row must contain both its observed left and right side pixel'
+    # Preserve a real observed side pair on every row while offsetting the
+    # decoded frame from its own TopBar. The old arbitrary-X normalization
+    # moves the semantic right side into an interior column; semantic pair
+    # normalization must retain both canonical sides. The isolated validator
+    # below separately locks the production one-sided fail-closed case.
+    $dispersedReferences = Join-Path $scratch 'portrait-consensus-dispersed-references'
+    New-DispersedPortraitConsensusReferences `
+        $referenceDirectory $dispersedReferences $figure11 $figure12 $figure13
+    $dispersedOutput = Join-Path $scratch 'portrait-consensus-dispersed-output'
+    & $exportScript `
+        -CaptureDirectory $captureDirectory `
+        -OutputDirectory $dispersedOutput `
+        -ReferenceDirectory $dispersedReferences | Out-Null
+    $dispersedReport = Get-Content -Raw -LiteralPath (
+        Join-Path $dispersedOutput 'visual-diff-report.json') | ConvertFrom-Json
+    $dispersedPairing = Get-LanLobbyPortraitTargetPairingAudit `
+        ([int[]]$dispersedReport.portraitFrameConsensus.pixelConsensus.targetPixelKeys) `
+        ([int]$dispersedReport.portraitFrameConsensus.pixelConsensus.canonicalGrid.width)
+    Assert-True ($dispersedPairing.leftRows.Count -gt 0) 'varying own-TopBar widths must retain canonical-left target pixels'
+    Assert-True ($dispersedPairing.rightRows.Count -gt 0) 'varying own-TopBar widths must retain canonical-right target pixels'
+    Assert-True ($dispersedPairing.interiorKeys.Count -eq 0) 'varying own-TopBar widths must not disperse semantic side pixels into interior columns'
+    Assert-True (
+        $dispersedPairing.leftRows.Count -eq $dispersedPairing.rightRows.Count -and
+        $dispersedPairing.leftOnly.Count -eq 0 -and
+        $dispersedPairing.rightOnly.Count -eq 0
+    ) 'varying own-TopBar widths must retain an exact observed left/right pair on every consensus row'
+    Assert-True (
+        $report.portraitFrameConsensus.pixelConsensus.pairedSideAudit.passed -and
+        $report.portraitFrameConsensus.pixelConsensus.pairedSideAudit.leftPixelCount -eq $baselinePairing.leftRows.Count -and
+        $report.portraitFrameConsensus.pixelConsensus.pairedSideAudit.rightPixelCount -eq $baselinePairing.rightRows.Count -and
+        $report.portraitFrameConsensus.pixelConsensus.pairedSideAudit.pairedRowCount -eq $baselinePairing.leftRows.Count
+    ) "portrait-frame consensus must publish its fail-closed paired-side audit; dispersedXs=$((@([int[]]$dispersedReport.portraitFrameConsensus.pixelConsensus.targetPixelKeys | ForEach-Object { [int]$_ % 257 } | Sort-Object -Unique) -join ','))"
+
+    $parseTokens = $null
+    $parseErrors = $null
+    $exportAst = [Management.Automation.Language.Parser]::ParseFile(
+        $exportScript,[ref]$parseTokens,[ref]$parseErrors)
+    Assert-True ($parseErrors.Count -eq 0) 'visual-diff exporter must parse before isolated target validation tests'
+    $targetValidatorAst = $exportAst.Find({
+        param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -ceq 'Assert-LanLobbyPairedPortraitContourTarget'
+    },$true)
+    Assert-True ($null -ne $targetValidatorAst) 'visual-diff exporter must define a fail-closed paired portrait target validator'
+    Invoke-Expression $targetValidatorAst.Extent.Text
+    $pairedAudit = Assert-LanLobbyPairedPortraitContourTarget `
+        -TargetPixelKeys ([int[]]@((11*257),(11*257+256),(12*257),(12*257+256))) `
+        -GridWidth 257 `
+        -GridHeight 513
+    Assert-True (
+        $pairedAudit.passed -and
+        $pairedAudit.leftPixelCount -eq 2 -and
+        $pairedAudit.rightPixelCount -eq 2 -and
+        $pairedAudit.pairedRowCount -eq 2
+    ) 'a valid paired observed-pixel target fixture must pass closed-form validation'
+    $oneSidedFailed = $false
+    try
+    {
+        Assert-LanLobbyPairedPortraitContourTarget `
+            -TargetPixelKeys ([int[]]@((11*257),(12*257))) `
+            -GridWidth 257 `
+            -GridHeight 513 | Out-Null
+    }
+    catch
+    {
+        $oneSidedFailed = $_.Exception.Message -like '*nonempty paired left/right*'
+    }
+    Assert-True $oneSidedFailed 'a one-sided observed-pixel target fixture must fail closed'
     foreach ($contributor in @($report.portraitFrameConsensus.contributors))
     {
         Assert-True (
@@ -1621,6 +1782,10 @@ try
     {
         Assert-True ($portraitFrameGate.gateKind -ceq 'PortraitFrame') "$($portraitFrameGate.name) must use its dedicated gate kind"
         Assert-True ($portraitFrameGate.passed) "$($portraitFrameGate.name) unchanged fixture must pass; actual=$($portraitFrameGate.actualVisibleBounds | ConvertTo-Json -Compress), reference=$($portraitFrameGate.referenceVisibleBounds | ConvertTo-Json -Compress), relation=$($portraitFrameGate.portraitFrameRelation | ConvertTo-Json -Compress)"
+        Assert-True (
+            $portraitFrameGate.reason -ceq
+                'Visible portrait-frame relative placement, relation, shared geometry, and material evidence satisfy all blocking thresholds.'
+        ) "$($portraitFrameGate.name) passed reason must describe blocking portrait-frame success instead of an absolute diagnostic failure"
         Assert-True (($portraitFrameGate.absolutePlacement.acceptanceRole -ceq 'diagnostic-only') -and
             $portraitFrameGate.relativePlacement.passed) "$($portraitFrameGate.name) must block on relative placement while retaining absolute diagnostics"
         Assert-True (
@@ -2198,6 +2363,10 @@ try
     Assert-True ($markdown.Contains('dx=7, dy=-4')) 'Markdown must contain the exact manifest-derived Create position delta'
     Assert-True ($markdown.Contains('717x99')) 'Markdown must explicitly list the locally resized reference size'
     Assert-True ($markdown.Contains('711x95')) 'Markdown must explicitly list the comparison reference size'
+    Assert-True (
+        $markdown.Contains('Pixel pairing audit: passed=True; canonicalSides=0/256;') -and
+        $markdown.Contains("leftPixels=$($baselinePairing.leftRows.Count); rightPixels=$($baselinePairing.rightRows.Count); pairedRows=$($baselinePairing.leftRows.Count).")
+    ) 'Markdown must publish the fail-closed portrait target side counts and paired-row audit'
     Assert-True ($markdown.Contains('dw=-6, dh=-4')) 'Markdown must contain the exact Create size delta'
     Assert-True ($markdown.Contains('## Home action content visible bounds')) 'Markdown must expose action-content visible bounds'
     foreach ($expected in $expectedContent) { Assert-True ($markdown.Contains("$($expected.bar)/$($expected.name)")) "Markdown missing $($expected.bar)/$($expected.name)" }
@@ -2644,7 +2813,49 @@ finally
 {
     if (Test-Path -LiteralPath $scratch)
     {
-        try { Remove-Item -LiteralPath $scratch -Force -Recurse -ErrorAction Stop }
+        try
+        {
+            $resolvedScratch = (Resolve-Path -LiteralPath $scratch).Path.TrimEnd('\')
+            $resolvedTempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'Temp')).TrimEnd('\')
+            if (-not $resolvedScratch.StartsWith(
+                $resolvedTempRoot+'\',
+                [StringComparison]::OrdinalIgnoreCase))
+            {
+                throw "Smoke scratch cleanup target escapes project Temp: $resolvedScratch"
+            }
+            $reparsePoints = @(
+                Get-ChildItem `
+                    -LiteralPath $resolvedScratch `
+                    -Attributes ReparsePoint `
+                    -Force `
+                    -Recurse `
+                    -ErrorAction Stop
+            )
+            foreach ($reparsePoint in $reparsePoints)
+            {
+                $targets = @($reparsePoint.Target)
+                if ($targets.Count -eq 0)
+                {
+                    throw "Smoke scratch cleanup found an unresolved reparse point: $($reparsePoint.FullName)"
+                }
+                foreach ($target in $targets)
+                {
+                    $resolvedTarget = if ([IO.Path]::IsPathRooted([string]$target)) {
+                        [IO.Path]::GetFullPath([string]$target)
+                    } else {
+                        [IO.Path]::GetFullPath((
+                            Join-Path (Split-Path -Parent $reparsePoint.FullName) ([string]$target)))
+                    }
+                    if (-not $resolvedTarget.StartsWith(
+                        $resolvedScratch+'\',
+                        [StringComparison]::OrdinalIgnoreCase))
+                    {
+                        throw "Smoke scratch cleanup reparse target escapes scratch: $($reparsePoint.FullName) -> $resolvedTarget"
+                    }
+                }
+            }
+            Remove-Item -LiteralPath $resolvedScratch -Force -Recurse -ErrorAction Stop
+        }
         catch { Write-Warning "Smoke fixture cleanup deferred: $scratch" }
     }
 }
