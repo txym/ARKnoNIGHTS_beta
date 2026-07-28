@@ -317,6 +317,21 @@ namespace ArknoNights.Battle.Tests
             StringAssert.Contains("field=Default", exception.InnerException.Message);
         }
 
+        [Test]
+        public void Resolve_RejectsLegacyDefaultAnimationName()
+        {
+            var invalid = NormalizeLineEndings(ValidStationaryNonAttackerFixture).Replace(
+                "{ \"key\": \"idle\", \"name\": \"Idle\" }",
+                "{ \"key\": \"idle\", \"name\": \"Default\" }");
+
+            var exception = Assert.Throws<TargetInvocationException>(
+                () => Resolve(invalid, 0, "10002_trtrsl.json"));
+            StringAssert.Contains(
+                "UNIT_ELITE_VARIANT_LEGACY_FIELD_FORBIDDEN",
+                exception.InnerException.Message);
+            StringAssert.Contains("field=Default", exception.InnerException.Message);
+        }
+
         [TestCase("stats-level-null")]
         [TestCase("defense-string")]
         [TestCase("display-name-null")]
