@@ -45,8 +45,8 @@ public sealed class LanLobbyRoomLayout
     private const float ReferenceWidth = 1920f;
     private const float ReferenceHeight = 1080f;
     private const float SlotRootHeight = 664.5f;
-    private const float CardBodyLeft = 26f;
-    private const float CardBodyWidth = 329f;
+    private const float CardBodyLeft = -96.5f;
+    private const float CardBodyWidth = 566f;
     private const float CardBodyHeight = 626f;
     private const float TopBarLeft = 26.25f;
     private const float TopBarWidth = 320.25f;

@@ -402,7 +402,7 @@ namespace ArknoNights.Lobby.Tests
                 {
                     var frame = capture.keyRects.Single(rect => rect.name == slotRoot + "/CardBody");
                     var lower = capture.keyRects.Single(rect => rect.name == slotRoot + "/LowerDecoration");
-                    Assert.That(frame.width, Is.EqualTo(329f).Within(0.01f),
+                    Assert.That(frame.width, Is.EqualTo(566f).Within(0.01f),
                         capture.name + " slot " + (slotIndex + 1) + " CardBody width.");
                     Assert.That(frame.height, Is.EqualTo(626f).Within(0.01f),
                         capture.name + " slot " + (slotIndex + 1) + " CardBody height.");

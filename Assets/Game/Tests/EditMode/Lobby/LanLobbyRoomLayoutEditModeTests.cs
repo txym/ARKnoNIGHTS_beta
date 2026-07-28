@@ -35,8 +35,13 @@ namespace ArknoNights.Lobby.Tests
 
             foreach (var slot in layout.Slots)
             {
-                AssertRect(slot.CardBody, 26f, 38.5f, 329f, 626f);
-                AssertContained(slot.CardBody, slot.Root);
+                AssertRect(slot.CardBody, -96.5f, 38.5f, 566f, 626f);
+                Assert.That(
+                    slot.CardBody.Left + slot.CardBody.Width * .5f -
+                    (slot.TopBar.Left + slot.TopBar.Width * .5f),
+                    Is.EqualTo(.125f).Within(0.01f));
+                Assert.That(slot.CardBody.Left, Is.LessThan(0f));
+                Assert.That(slot.CardBody.Right, Is.GreaterThan(slot.Root.Width));
                 AssertContained(slot.LowerDecoration, slot.Root);
                 Assert.That(
                     slot.LowerDecoration.Top - slot.CardBody.Bottom,
@@ -99,9 +104,12 @@ namespace ArknoNights.Lobby.Tests
 
             foreach (var child in Children(canonical))
             {
-                if (ReferenceEquals(child, canonical.ReadyTopBar)) continue;
+                if (ReferenceEquals(child, canonical.CardBody) ||
+                    ReferenceEquals(child, canonical.ReadyTopBar)) continue;
                 AssertContained(child, canonical.Root);
             }
+            Assert.That(canonical.CardBody.Left, Is.EqualTo(-96.5f).Within(0.01f));
+            Assert.That(canonical.CardBody.Right, Is.EqualTo(469.5f).Within(0.01f));
             Assert.That(canonical.ReadyTopBar.Top - canonical.Root.Height, Is.EqualTo(8f).Within(0.01f));
 
             var canonicalChildren = Children(canonical);
