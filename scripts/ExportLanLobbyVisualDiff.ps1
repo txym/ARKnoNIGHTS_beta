@@ -251,6 +251,62 @@ public static class LanLobbyVisualDiff {
         }
         return maximum;
     }
+    public static LanLobbyBoundsMeasurement FindDominantLowerHorizontalContrastEdge(
+        Bitmap bitmap, Rectangle search, Rectangle[] exclusions)
+    {
+        ValidateSearch(bitmap,search);
+        const double minimumNormalizedContrast=20.0;
+        int firstY=Math.Max(search.Y,search.Bottom-40);
+        // The lower decoration is wider than the portrait frame. When a
+        // same-color ReadyOverlay covers its center, only the decoded side
+        // shoulders inside the unchanged frame ROI expose the top edge.
+        int minimumCoverage=Math.Max(3,(int)Math.Ceiling(search.Width*0.02));
+        int bestY=-1,bestCount=-1;
+        double bestScore=-1.0;
+        for(int y=firstY;y<search.Bottom;y++) {
+            int count=0;
+            double scoreSum=0.0;
+            for(int x=search.X;x<search.Right;x++) {
+                double score=NormalizedVerticalContrast(
+                    bitmap,search,exclusions,x,y,-1);
+                if(score<minimumNormalizedContrast) continue;
+                count++;
+                scoreSum+=score;
+            }
+            if(count<minimumCoverage) continue;
+            if(count>bestCount ||
+                (count==bestCount && (scoreSum>bestScore+0.001 ||
+                (Math.Abs(scoreSum-bestScore)<=0.001 && (bestY<0 || y<bestY))))) {
+                bestY=y;
+                bestCount=count;
+                bestScore=scoreSum;
+            }
+        }
+        return bestY<0
+            ? Unavailable("No dominant decoded lower-decoration top edge found.")
+            : AvailableBounds(search.X,bestY,search.Right-1,bestY,bestCount);
+    }
+    static double NormalizedVerticalContrast(
+        Bitmap bitmap, Rectangle search, Rectangle[] exclusions,
+        int x, int y, int direction)
+    {
+        if(IsExcluded(exclusions,x,y)) return 0.0;
+        Color origin=bitmap.GetPixel(x,y);
+        double maximum=0.0;
+        for(int distance=1;distance<=3;distance++) {
+            int neighborY=y+direction*distance;
+            if(neighborY<search.Y || neighborY>=search.Bottom ||
+                IsExcluded(exclusions,x,neighborY)) continue;
+            Color neighbor=bitmap.GetPixel(x,neighborY);
+            int difference=Math.Abs(origin.R-neighbor.R)+
+                Math.Abs(origin.G-neighbor.G)+Math.Abs(origin.B-neighbor.B);
+            int denominator=Math.Max(origin.R,neighbor.R)+
+                Math.Max(origin.G,neighbor.G)+Math.Max(origin.B,neighbor.B);
+            denominator=Math.Max(12,denominator);
+            maximum=Math.Max(maximum,255.0*difference/denominator);
+        }
+        return maximum;
+    }
     public static LanLobbyMaskComparison CompareBounds(
         LanLobbyVisualBounds actual, LanLobbyVisualBounds reference)
     {
@@ -1321,6 +1377,224 @@ function Get-LanLobbyPortraitFrameEdgeBounds
             y=$bounds.Y + ($bounds.Height - 1) / 2.0
         }
         pixelCount=[int]$measurement.PixelCount
+    }
+}
+
+function Get-LanLobbyPortraitLowerDecorationTop
+{
+    param(
+        [Parameter(Mandatory)] [Drawing.Bitmap] $Image,
+        [Parameter(Mandatory)] $Roi,
+        $Exclusions = @()
+    )
+
+    [Drawing.Rectangle[]]$exclusionRectangles = @($Exclusions | ForEach-Object { ConvertTo-LanLobbyRectangle $_ })
+    $measurement = [LanLobbyVisualDiff]::FindDominantLowerHorizontalContrastEdge(
+        $Image,
+        (ConvertTo-LanLobbyRectangle $Roi),
+        $exclusionRectangles)
+    return [pscustomobject][ordered]@{
+        available=[bool]$measurement.Available
+        failureReason=$measurement.FailureReason
+        y=$(if ($measurement.Available) { [int]$measurement.Bounds.Y } else { $null })
+        qualifyingPixelCount=[int]$measurement.PixelCount
+    }
+}
+
+function Get-LanLobbyDeterministicMedian([double[]] $Values)
+{
+    if ($null -eq $Values -or $Values.Count -eq 0)
+    {
+        throw 'Cannot calculate a portrait-frame consensus median from zero values.'
+    }
+    [double[]]$sorted = @($Values | Sort-Object)
+    $middle = [int][Math]::Floor($sorted.Count / 2.0)
+    if ($sorted.Count % 2 -eq 1) { return [double]$sorted[$middle] }
+    return ([double]$sorted[$middle-1]+[double]$sorted[$middle])/2.0
+}
+
+function Get-LanLobbyPortraitRelativeMetrics
+{
+    param(
+        [Parameter(Mandatory)] $FramePlacement,
+        [Parameter(Mandatory)] $TopBarPlacement,
+        [Parameter(Mandatory)] $LowerDecorationTop
+    )
+
+    if (-not $FramePlacement.available -or -not $TopBarPlacement.available -or -not $LowerDecorationTop.available)
+    {
+        throw "Portrait-frame relative metrics require decoded frame, top-bar, and lower-decoration pixels. $($FramePlacement.failureReason) / $($TopBarPlacement.failureReason) / $($LowerDecorationTop.failureReason)"
+    }
+    $frameRight = [double]$FramePlacement.bounds.x+[double]$FramePlacement.bounds.width
+    $frameBottom = [double]$FramePlacement.bounds.y+[double]$FramePlacement.bounds.height
+    $topBarRight = [double]$TopBarPlacement.bounds.x+[double]$TopBarPlacement.bounds.width
+    $topBarBottom = [double]$TopBarPlacement.bounds.y+[double]$TopBarPlacement.bounds.height
+    return [pscustomobject][ordered]@{
+        frameLeftFromTopBarLeftPx=[double]$FramePlacement.bounds.x-[double]$TopBarPlacement.bounds.x
+        frameRightFromTopBarRightPx=$frameRight-$topBarRight
+        frameCenterFromTopBarCenterPx=[double]$FramePlacement.center.x-[double]$TopBarPlacement.center.x
+        frameWidthFromTopBarWidthPx=[double]$FramePlacement.bounds.width-[double]$TopBarPlacement.bounds.width
+        frameTopFromTopBarBottomPx=[double]$FramePlacement.bounds.y-$topBarBottom
+        frameBottomFromLowerDecorationTopPx=$frameBottom-[double]$LowerDecorationTop.y
+    }
+}
+
+function Get-LanLobbyPortraitFrameConsensus
+{
+    param(
+        [Parameter(Mandatory)] $RoomCaptures,
+        [Parameter(Mandatory)] $ReferencePaths,
+        [Parameter(Mandatory)] $ReferenceByCapture
+    )
+
+    $contributors = @()
+    foreach ($capture in @($RoomCaptures | Sort-Object name))
+    {
+        $captureName = [string]$capture.name
+        $referenceFileName = [string]$ReferenceByCapture[$captureName]
+        $native = $null
+        $normalized = $null
+        try
+        {
+            $native = [Drawing.Bitmap]::FromFile([string]$ReferencePaths[$referenceFileName])
+            $normalized = New-Object Drawing.Bitmap 1920,1080
+            $graphics = [Drawing.Graphics]::FromImage($normalized)
+            try
+            {
+                $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBilinear
+                $graphics.DrawImage($native,0,0,1920,1080)
+            }
+            finally { $graphics.Dispose() }
+            foreach ($gate in @(Get-LanLobbyRoomGateSpecs $capture | Where-Object gateKind -ceq 'PortraitFrame'))
+            {
+                $frame = Get-LanLobbyPortraitFrameEdgeBounds -Image $normalized -Roi $gate.roi -MaskKind $gate.maskKind -Exclusions $gate.exclusions
+                $topBar = Get-LanLobbyPortraitFrameEdgeBounds -Image $normalized -Roi $gate.topBarRoi -MaskKind $gate.maskKind -Exclusions $gate.exclusions
+                $lowerTop = Get-LanLobbyPortraitLowerDecorationTop -Image $normalized -Roi $gate.roi -Exclusions $gate.exclusions
+                try { $metrics = Get-LanLobbyPortraitRelativeMetrics $frame $topBar $lowerTop }
+                catch { throw "Portrait-frame consensus contributor '$($gate.name)' failed: $($_.Exception.Message)" }
+                $contributors += [pscustomobject][ordered]@{
+                    gateName=[string]$gate.name
+                    capture=$captureName
+                    slotNumber=[int]$gate.slotIndex+1
+                    referenceFigure=$referenceFileName
+                    eligible=$true
+                    exclusionReason=$null
+                    frameVisibleBounds=$frame.bounds
+                    topBarVisibleBounds=$topBar.bounds
+                    lowerDecorationTopY=[int]$lowerTop.y
+                    relativeMetrics=$metrics
+                }
+            }
+        }
+        finally
+        {
+            if ($normalized) { $normalized.Dispose() }
+            if ($native) { $native.Dispose() }
+        }
+    }
+    if ($contributors.Count -ne 10)
+    {
+        throw "Portrait-frame relative consensus requires exactly ten eligible unoccluded reference contributors; found $($contributors.Count)."
+    }
+    $topMedian = Get-LanLobbyDeterministicMedian ([double[]]@(
+        $contributors | ForEach-Object { [double]$_.relativeMetrics.frameTopFromTopBarBottomPx }
+    ))
+    $bottomMedian = Get-LanLobbyDeterministicMedian ([double[]]@(
+        $contributors | ForEach-Object { [double]$_.relativeMetrics.frameBottomFromLowerDecorationTopPx }
+    ))
+    return [pscustomobject][ordered]@{
+        acceptanceRole='blocking'
+        coordinateSpace='frame-relative-to-own-decoded-topbar-and-lower-decoration'
+        calculationRule='median-of-eligible-reference-relative-offsets-even-mean-middle-two'
+        contributorCount=$contributors.Count
+        contributors=@($contributors)
+        target=[pscustomobject][ordered]@{
+            topBarHorizontalCenterDeltaPx=0.0
+            topBarWidthDeltaPx=0.0
+            frameTopFromTopBarBottomPx=[double]$topMedian
+            frameBottomFromLowerDecorationTopPx=[double]$bottomMedian
+        }
+    }
+}
+
+function Measure-LanLobbyPortraitRelativePlacement
+{
+    param(
+        [Parameter(Mandatory)] $FramePlacement,
+        [Parameter(Mandatory)] $TopBarPlacement,
+        [Parameter(Mandatory)] $LowerDecorationTop,
+        [Parameter(Mandatory)] $Consensus,
+        [Parameter(Mandatory)] $Thresholds
+    )
+
+    $actualMetrics = Get-LanLobbyPortraitRelativeMetrics $FramePlacement $TopBarPlacement $LowerDecorationTop
+    $targetTop = [double]$TopBarPlacement.bounds.y+[double]$TopBarPlacement.bounds.height+
+        [double]$Consensus.target.frameTopFromTopBarBottomPx
+    $targetBottom = [double]$LowerDecorationTop.y+
+        [double]$Consensus.target.frameBottomFromLowerDecorationTopPx
+    $targetLeft = [double]$TopBarPlacement.bounds.x
+    $targetRight = [double]$TopBarPlacement.bounds.x+[double]$TopBarPlacement.bounds.width
+    $actualLeft = [double]$FramePlacement.bounds.x
+    $actualTop = [double]$FramePlacement.bounds.y
+    $actualRight = $actualLeft+[double]$FramePlacement.bounds.width
+    $actualBottom = $actualTop+[double]$FramePlacement.bounds.height
+    $targetWidth = $targetRight-$targetLeft
+    $targetHeight = $targetBottom-$targetTop
+    if ($targetWidth -le 0 -or $targetHeight -le 0)
+    {
+        throw "Portrait-frame relative consensus produced a non-positive target size: ${targetWidth}x${targetHeight}."
+    }
+    $intersectionWidth = [Math]::Max(0.0,[Math]::Min($actualRight,$targetRight)-[Math]::Max($actualLeft,$targetLeft))
+    $intersectionHeight = [Math]::Max(0.0,[Math]::Min($actualBottom,$targetBottom)-[Math]::Max($actualTop,$targetTop))
+    $intersection = $intersectionWidth*$intersectionHeight
+    $union = ([double]$FramePlacement.bounds.width*[double]$FramePlacement.bounds.height)+
+        ($targetWidth*$targetHeight)-$intersection
+    $jaccard = if ($union -le 0) { 0.0 } else { $intersection/$union }
+    $edgeDelta = [pscustomobject][ordered]@{
+        unit='px'
+        left=[double]$actualMetrics.frameLeftFromTopBarLeftPx
+        top=[double]$actualMetrics.frameTopFromTopBarBottomPx-[double]$Consensus.target.frameTopFromTopBarBottomPx
+        right=[double]$actualMetrics.frameRightFromTopBarRightPx
+        bottom=[double]$actualMetrics.frameBottomFromLowerDecorationTopPx-[double]$Consensus.target.frameBottomFromLowerDecorationTopPx
+    }
+    $centerDelta = [pscustomobject][ordered]@{
+        unit='px'
+        deltaX=[double]$actualMetrics.frameCenterFromTopBarCenterPx
+        deltaY=(($actualTop+$actualBottom)/2.0)-(($targetTop+$targetBottom)/2.0)
+    }
+    $sizeDelta = [pscustomobject][ordered]@{
+        unit='px'
+        deltaWidth=[double]$FramePlacement.bounds.width-$targetWidth
+        deltaHeight=[double]$FramePlacement.bounds.height-$targetHeight
+    }
+    $contour = [pscustomobject][ordered]@{
+        intersectionPixels=[Math]::Round($intersection,3)
+        unionPixels=[Math]::Round($union,3)
+        jaccard=[Math]::Round($jaccard,6)
+    }
+    $passed =
+        [Math]::Abs([double]$edgeDelta.left) -le [double]$Thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs([double]$edgeDelta.top) -le [double]$Thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs([double]$edgeDelta.right) -le [double]$Thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs([double]$edgeDelta.bottom) -le [double]$Thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs([double]$centerDelta.deltaX) -le [double]$Thresholds.maximumCenterErrorPxPerAxis -and
+        [Math]::Abs([double]$centerDelta.deltaY) -le [double]$Thresholds.maximumCenterErrorPxPerAxis -and
+        [double]$contour.jaccard -ge [double]$Thresholds.minimumContourJaccard
+    return [pscustomobject][ordered]@{
+        acceptanceRole='blocking'
+        coordinateSpace=[string]$Consensus.coordinateSpace
+        actualMetrics=$actualMetrics
+        targetMetrics=$Consensus.target
+        lowerDecorationTop=[pscustomobject]$LowerDecorationTop
+        normalizedTargetBounds=[pscustomobject][ordered]@{
+            x=$targetLeft;y=$targetTop;width=$targetWidth;height=$targetHeight
+        }
+        edgeDeltaPx=$edgeDelta
+        centerDeltaPx=$centerDelta
+        sizeDeltaPx=$sizeDelta
+        contour=$contour
+        thresholds=$Thresholds
+        passed=$passed
     }
 }
 
@@ -2513,6 +2787,10 @@ $roomExclusionReports = @()
 $portraitFrameSharedGeometry = Get-LanLobbyPortraitFrameSharedGeometry @(
     $manifest.captures | Where-Object { [string]$_.name -in @('room-host','room-full','room-ready') }
 )
+$portraitFrameConsensus = Get-LanLobbyPortraitFrameConsensus `
+    -RoomCaptures @($manifest.captures | Where-Object { [string]$_.name -in @('room-host','room-full','room-ready') }) `
+    -ReferencePaths $referencePaths `
+    -ReferenceByCapture $referenceByCapture
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
@@ -2615,6 +2893,7 @@ try
                     $measurement = Measure-LanLobbyVisiblePlacement $actual $normalizedReference $gateSpec
                     $gateMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $gateSpec.roi $false
                     $portraitFrameRelation = $null
+                    $relativePlacement = $null
                     $sharedGeometryPassed = $null
                     $portraitCardBodyPassed = $null
                     if ([string]$gateSpec.gateKind -ceq 'PortraitFrame')
@@ -2657,6 +2936,17 @@ try
                             height=5
                         }
                         $topBarPlacement = Get-LanLobbyPortraitFrameEdgeBounds -Image $actual -Roi $gateSpec.topBarRoi -MaskKind $gateSpec.maskKind -Exclusions $gateSpec.exclusions
+                        $lowerTopPlacement = Get-LanLobbyPortraitLowerDecorationTop -Image $actual -Roi $gateSpec.roi -Exclusions $gateSpec.exclusions
+                        if (-not $lowerTopPlacement.available)
+                        {
+                            throw "Portrait-frame actual lower-decoration anchor '$($gateSpec.name)' failed: $($lowerTopPlacement.failureReason)"
+                        }
+                        $relativePlacement = Measure-LanLobbyPortraitRelativePlacement `
+                            -FramePlacement $measurement.actual `
+                            -TopBarPlacement $topBarPlacement `
+                            -LowerDecorationTop $lowerTopPlacement `
+                            -Consensus $portraitFrameConsensus `
+                            -Thresholds $measurement.thresholds
                         $portraitFrameRelation = Measure-LanLobbyPortraitFrameRelation `
                             -FramePlacement $measurement.actual `
                             -TopBarPlacement $topBarPlacement `
@@ -2672,12 +2962,15 @@ try
                     }
                     $gateMaterialPassed = $gateMaterialEvidence.passed -and
                         ($null -eq $portraitCardBodyPassed -or $portraitCardBodyPassed)
-                    $gatePassed = $measurement.passed -and $gateMaterialPassed -and
+                    $placementPassed = if ($null -ne $relativePlacement) { [bool]$relativePlacement.passed } else { [bool]$measurement.passed }
+                    $gatePassed = $placementPassed -and $gateMaterialPassed -and
                         ($null -eq $portraitFrameRelation -or $portraitFrameRelation.passed) -and
                         ($null -eq $sharedGeometryPassed -or $sharedGeometryPassed)
                     $gateStatus = if ($gatePassed) { 'Passed' } else { 'Failed' }
                     $gateReason = if (-not $gateMaterialPassed) {
                         'Blocking bitmap manifest bijection, identity, approved path, SHA-256, capture list, occurrence, or exact portrait CardBody/card_bg association evidence failed.'
+                    } elseif ($null -ne $relativePlacement -and -not $relativePlacement.passed) {
+                        'Visible portrait-frame placement exceeds a blocking reconciled top-bar/lower-decoration-relative edge, center, or Jaccard threshold.'
                     } elseif ($null -ne $portraitFrameRelation -and -not $portraitFrameRelation.passed) {
                         'Visible portrait-frame relation exceeds a blocking center, width, overlap, or seam threshold.'
                     } elseif ($null -ne $sharedGeometryPassed -and -not $sharedGeometryPassed) {
@@ -2705,10 +2998,22 @@ try
                         referenceVisibleCenter=$measurement.reference.center
                         actualVisiblePixelCount=$measurement.actual.pixelCount
                         referenceVisiblePixelCount=$measurement.reference.pixelCount
-                        edgeDeltaPx=$measurement.edgeDeltaPx
-                        centerDeltaPx=$measurement.centerDeltaPx
-                        sizeDeltaPx=$measurement.sizeDeltaPx
-                        contour=$measurement.contour
+                        absolutePlacement=$(if ($null -ne $relativePlacement) {
+                            [pscustomobject][ordered]@{
+                                acceptanceRole='diagnostic-only'
+                                edgeDeltaPx=$measurement.edgeDeltaPx
+                                centerDeltaPx=$measurement.centerDeltaPx
+                                sizeDeltaPx=$measurement.sizeDeltaPx
+                                contour=$measurement.contour
+                                thresholds=$measurement.thresholds
+                                passed=$measurement.passed
+                            }
+                        } else { $null })
+                        relativePlacement=$relativePlacement
+                        edgeDeltaPx=$(if ($null -ne $relativePlacement) { $relativePlacement.edgeDeltaPx } else { $measurement.edgeDeltaPx })
+                        centerDeltaPx=$(if ($null -ne $relativePlacement) { $relativePlacement.centerDeltaPx } else { $measurement.centerDeltaPx })
+                        sizeDeltaPx=$(if ($null -ne $relativePlacement) { $relativePlacement.sizeDeltaPx } else { $measurement.sizeDeltaPx })
+                        contour=$(if ($null -ne $relativePlacement) { $relativePlacement.contour } else { $measurement.contour })
                         thresholds=$measurement.thresholds
                         portraitFrameRelation=$portraitFrameRelation
                         sharedGeometryPassed=$sharedGeometryPassed
@@ -3422,6 +3727,7 @@ try
         roomExclusions=$roomExclusionReports
         roomGates=$roomGates
         portraitFrameSharedGeometry=$portraitFrameSharedGeometry
+        portraitFrameConsensus=$portraitFrameConsensus
         assets=$assets
         materialUsage=[ordered]@{
             bitmapSprites=$assets
@@ -3448,6 +3754,20 @@ try
     foreach ($record in @($portraitFrameSharedGeometry.records))
     {
         $markdown += "| $($record.capture) | $($record.slotNumber) | $($record.widthPx)x$($record.heightPx) px | $($record.localOffsetPx.x),$($record.localOffsetPx.y) px | $($record.matchesBaseline) | $($record.passed) |"
+    }
+    $markdown += @(
+        '',
+        '## Portrait-frame reconciled relative reference consensus',
+        '',
+        "portraitFrameConsensus: acceptanceRole=$($portraitFrameConsensus.acceptanceRole); coordinateSpace=$($portraitFrameConsensus.coordinateSpace); calculationRule=$($portraitFrameConsensus.calculationRule); contributors=$($portraitFrameConsensus.contributorCount).",
+        "Target: centerFromOwnTopBar=$($portraitFrameConsensus.target.topBarHorizontalCenterDeltaPx) px; widthFromOwnTopBar=$($portraitFrameConsensus.target.topBarWidthDeltaPx) px; topFromOwnTopBarBottom=$($portraitFrameConsensus.target.frameTopFromTopBarBottomPx) px; bottomFromOwnLowerDecorationTop=$($portraitFrameConsensus.target.frameBottomFromLowerDecorationTopPx) px.",
+        '',
+        '| Gate | Capture | Slot | Figure | Reference frame | Reference top bar | Lower top Y | Relative metrics |',
+        '| --- | --- | ---: | --- | --- | --- | ---: | --- |'
+    )
+    foreach ($contributor in @($portraitFrameConsensus.contributors))
+    {
+        $markdown += "| $($contributor.gateName) | $($contributor.capture) | $($contributor.slotNumber) | $($contributor.referenceFigure) | $($contributor.frameVisibleBounds | ConvertTo-Json -Compress) | $($contributor.topBarVisibleBounds | ConvertTo-Json -Compress) | $($contributor.lowerDecorationTopY) | $($contributor.relativeMetrics | ConvertTo-Json -Compress) |"
     }
     $markdown += @(
         '',

@@ -1427,10 +1427,19 @@ try
     }
     $portraitFrameGates = @($report.roomGates | Where-Object name -like '*.PortraitFrame')
     Assert-True ($portraitFrameGates.Count -eq 10) 'the dedicated portrait-frame gate inventory must contain exactly ten non-excluded gates'
+    Assert-True ($null -ne $report.portraitFrameConsensus) 'portrait-frame report must publish its reconciled relative reference consensus'
+    Assert-True ($report.portraitFrameConsensus.acceptanceRole -ceq 'blocking') 'portrait-frame consensus must be blocking'
+    Assert-True ($report.portraitFrameConsensus.coordinateSpace -ceq 'frame-relative-to-own-decoded-topbar-and-lower-decoration') 'portrait-frame consensus must use decoded per-sample anchors'
+    Assert-True ($report.portraitFrameConsensus.calculationRule -ceq 'median-of-eligible-reference-relative-offsets-even-mean-middle-two') 'portrait-frame consensus must name its deterministic median rule'
+    Assert-True (@($report.portraitFrameConsensus.contributors).Count -eq 10) 'portrait-frame consensus must contain all ten eligible unoccluded reference contributors'
+    Assert-True (($report.portraitFrameConsensus.target.topBarHorizontalCenterDeltaPx -eq 0) -and
+        ($report.portraitFrameConsensus.target.topBarWidthDeltaPx -eq 0)) 'portrait-frame horizontal consensus target must normalize to each sample top bar'
     foreach ($portraitFrameGate in $portraitFrameGates)
     {
         Assert-True ($portraitFrameGate.gateKind -ceq 'PortraitFrame') "$($portraitFrameGate.name) must use its dedicated gate kind"
         Assert-True ($portraitFrameGate.passed) "$($portraitFrameGate.name) unchanged fixture must pass; actual=$($portraitFrameGate.actualVisibleBounds | ConvertTo-Json -Compress), reference=$($portraitFrameGate.referenceVisibleBounds | ConvertTo-Json -Compress), relation=$($portraitFrameGate.portraitFrameRelation | ConvertTo-Json -Compress)"
+        Assert-True (($portraitFrameGate.absolutePlacement.acceptanceRole -ceq 'diagnostic-only') -and
+            $portraitFrameGate.relativePlacement.passed) "$($portraitFrameGate.name) must block on relative placement while retaining absolute diagnostics"
         Assert-True ($portraitFrameGate.portraitFrameRelation.passed) "$($portraitFrameGate.name) relation must pass"
         Assert-True ($portraitFrameGate.sharedGeometryPassed) "$($portraitFrameGate.name) shared geometry must pass"
         Assert-True (($portraitFrameGate.portraitFrameRelation.thresholds.maximumHorizontalCenterDeltaPx -eq 2) -and
@@ -1457,6 +1466,17 @@ try
     Assert-True (@($report.roomExclusions | Where-Object { -not $_.protectedRegionsClear }).Count -eq 0) 'barrage/popup/fourth-slot exclusions must not overlap protected gates'
     $baselineRoomFailures = @($report.roomGates | Where-Object { $_.status -eq 'Failed' } | ForEach-Object { "$($_.name):$($_.reason):j=$($_.contour.jaccard):edges=$($_.edgeDeltaPx.left)/$($_.edgeDeltaPx.top)/$($_.edgeDeltaPx.right)/$($_.edgeDeltaPx.bottom)" })
     Assert-True ($baselineRoomFailures.Count -eq 0) "baseline room visible-pixel gates must pass; failed: $($baselineRoomFailures -join ' | ')"
+
+    $translatedPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-with-bars-horizontal-translation' {
+        param($manifest, $caseCaptureDirectory)
+        Shift-LanLobbyFixtureRegion (Join-Path $caseCaptureDirectory 'room-host.png') (New-Object Drawing.Rectangle 225,170,322,561) 5 0
+    }
+    $translatedPortraitGate = @($translatedPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
+    Assert-True (
+        $translatedPortraitGate.passed -and
+        $translatedPortraitGate.relativePlacement.passed -and
+        ([Math]::Abs([double]$translatedPortraitGate.absolutePlacement.centerDeltaPx.deltaX) -gt 2)
+    ) 'translating a decoded frame together with its own bars must preserve blocking relative placement while absolute diagnostics move'
 
     $tintNormalizedResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-tint-normalized-silhouette' {
         param($manifest, $caseCaptureDirectory)
@@ -1495,6 +1515,7 @@ try
     }
     $shiftedPortraitGate = @($shiftedPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
     Assert-True (($shiftedPortraitGate.status -ceq 'Failed') -and
+        (-not $shiftedPortraitGate.relativePlacement.passed) -and
         ([Math]::Abs([double]$shiftedPortraitGate.portraitFrameRelation.topBarHorizontalCenterDeltaPx) -gt 2)) 'a 5 px decoded frame shift must fail its top-bar edge relation'
     Assert-LanLobbyFailedRoiDrawn $shiftedPortraitResult.output 'room-host' $shiftedPortraitGate.roi 'shifted portrait frame'
     Assert-LanLobbyFailedRoiDrawn $shiftedPortraitResult.output 'room-host' $shiftedPortraitGate.portraitFrameRelation.seamRoi 'shifted portrait frame seam'
