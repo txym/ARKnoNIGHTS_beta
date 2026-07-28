@@ -502,6 +502,84 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void HealthThresholdFullHeal_WaitsForAttackAndCompleteDoubleSpeedAnimation()
+        {
+            var input = CreateInput(
+                12,
+                new[]
+                {
+                    Attacker(
+                        "healer",
+                        100,
+                        1,
+                        "FULL_HEAL",
+                        attackIntervalTicks: 100,
+                        maxHitPoints: 1000,
+                        attack: 1,
+                        attackAnimationDurationTicks: 5),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        attack: 600)
+                },
+                new[]
+                {
+                    PassiveHealthThresholdFullHeal(
+                        "FULL_HEAL",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: false,
+                        animationKey: "Skill_A",
+                        animationOriginalDurationTicks: 5)
+                },
+                new[] { Unit("healer", "healer", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 6)
+                runner.Step();
+            var runtime = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "healer");
+            Assert.That(runtime.CurrentHitPoints, Is.EqualTo(400));
+            Assert.That(
+                runner.Events.Any(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.Tick == 6
+                    && item.UnitId == "healer"),
+                Is.True,
+                "The already-started attack must still deal damage.");
+            Assert.That(
+                runner.Events.Any(item =>
+                    item.Type == BattleEventType.Skill
+                    && item.UnitId == "healer"),
+                Is.False);
+
+            runner.Step();
+            var skill = runner.Events.Single(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "healer");
+            Assert.That(skill.Tick, Is.EqualTo(7));
+            Assert.That(skill.AnimationKey, Is.EqualTo("Skill_A"));
+            Assert.That(skill.OriginalAnimationTicks, Is.EqualTo(5));
+            Assert.That(skill.EffectiveAnimationTicks, Is.EqualTo(3));
+
+            while (runner.CurrentTick < 9)
+                runner.Step();
+            Assert.That(runtime.CurrentHitPoints, Is.EqualTo(400));
+
+            runner.Step();
+            Assert.That(runtime.CurrentHitPoints, Is.EqualTo(1000));
+            var heal = runner.Events.Single(item =>
+                item.Type == BattleEventType.HealthChanged
+                && item.UnitId == "healer");
+            Assert.That(heal.Tick, Is.EqualTo(10));
+            Assert.That(heal.DamageAmount, Is.EqualTo(600));
+            Assert.That(heal.HitPointsBefore, Is.EqualTo(400));
+            Assert.That(heal.HitPointsAfter, Is.EqualTo(1000));
+        }
+
+        [Test]
         public void ContinuousBlockThreshold_ReleasesExcessBlockWhenHealingDisablesIt()
         {
             var threshold = new UnitDefinition(
@@ -2398,6 +2476,52 @@ namespace ArknoNights.Battle.Tests
                 0);
         }
 
+        private static AbilityDefinition
+            PassiveHealthThresholdFullHeal(
+                string abilityId,
+                int thresholdHitPointsPermille,
+                bool inclusiveThreshold,
+                string animationKey,
+                int animationOriginalDurationTicks)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new HealthThresholdFullHealEffectDefinition(
+                    thresholdHitPointsPermille,
+                    inclusiveThreshold,
+                    animationKey,
+                    animationOriginalDurationTicks),
+                string.Empty,
+                0);
+        }
+
         private static BattlefieldCoordinate NearestCoordinate(
             FixedPosition position)
         {
@@ -2567,7 +2691,8 @@ namespace ArknoNights.Battle.Tests
             int magicResistance = 0,
             int maxHitPoints = 100000,
             int attack = 1000,
-            int defense = 0)
+            int defense = 0,
+            int attackAnimationDurationTicks = 1)
         {
             return new UnitDefinition(
                 typeId,
@@ -2577,7 +2702,7 @@ namespace ArknoNights.Battle.Tests
                 magicResistance,
                 speed,
                 attackIntervalTicks,
-                1,
+                attackAnimationDurationTicks,
                 damageType,
                 AttackMethod.Melee,
                 blockCapacity,

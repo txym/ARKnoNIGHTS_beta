@@ -21,6 +21,11 @@ namespace ArknoNights.Battle.Core
         private bool attackCountStateForceUnlocked;
         private int damageReceivedCount;
         private bool healthThresholdAdjacentSpawnTriggered;
+        private bool healthThresholdFullHealQueued;
+        private bool healthThresholdFullHealAnimationStarted;
+        private bool healthThresholdFullHealCompleted;
+        private int healthThresholdFullHealDueTick =
+            int.MinValue;
 
         internal RuntimeAbilityState(AbilityDefinition definition)
         {
@@ -193,6 +198,54 @@ namespace ArknoNights.Battle.Core
             return true;
         }
 
+        internal void QueueHealthThresholdFullHeal(
+            int currentHitPoints,
+            int maxHitPoints)
+        {
+            var effect =
+                Definition.HealthThresholdFullHealEffect;
+            if (effect == null || healthThresholdFullHealQueued)
+                return;
+            var scaledCurrent =
+                (long)currentHitPoints * 1000;
+            var scaledThreshold =
+                (long)maxHitPoints
+                * effect.ThresholdHitPointsPermille;
+            var condition = effect.InclusiveThreshold
+                ? scaledCurrent <= scaledThreshold
+                : scaledCurrent < scaledThreshold;
+            if (condition)
+                healthThresholdFullHealQueued = true;
+        }
+
+        internal bool TryStartHealthThresholdFullHeal(
+            int currentTick,
+            out HealthThresholdFullHealEffectDefinition effect)
+        {
+            effect = Definition.HealthThresholdFullHealEffect;
+            if (effect == null
+                || !healthThresholdFullHealQueued
+                || healthThresholdFullHealAnimationStarted
+                || healthThresholdFullHealCompleted)
+                return false;
+            healthThresholdFullHealAnimationStarted = true;
+            healthThresholdFullHealDueTick =
+                currentTick
+                + effect.AnimationEffectiveDurationTicks;
+            return true;
+        }
+
+        internal bool TryCompleteHealthThresholdFullHeal(
+            int currentTick)
+        {
+            if (!healthThresholdFullHealAnimationStarted
+                || healthThresholdFullHealCompleted
+                || currentTick < healthThresholdFullHealDueTick)
+                return false;
+            healthThresholdFullHealCompleted = true;
+            return true;
+        }
+
         internal void AppendStableSummary(StringBuilder builder)
         {
             builder.Append(',')
@@ -226,6 +279,20 @@ namespace ArknoNights.Battle.Core
                         healthThresholdAdjacentSpawnTriggered
                             ? 1
                             : 0);
+            if (Definition.HealthThresholdFullHealEffect != null)
+                builder.Append(":full-heal:")
+                    .Append(
+                        healthThresholdFullHealQueued ? 1 : 0)
+                    .Append(':')
+                    .Append(
+                        healthThresholdFullHealAnimationStarted
+                            ? 1
+                            : 0)
+                    .Append(':')
+                    .Append(
+                        healthThresholdFullHealCompleted ? 1 : 0)
+                    .Append(':')
+                    .Append(healthThresholdFullHealDueTick);
         }
     }
 
@@ -991,6 +1058,7 @@ namespace ArknoNights.Battle.Core
         {
             ResolveDueDeathSpawns();
             ResolveDueDeathAreaDamage();
+            ResolveDueHealthThresholdFullHeals();
             UpdateHealthThresholdStates();
             ResolveDeathsAndCleanup();
             ResolveDueDeathSpawns();
@@ -1776,8 +1844,93 @@ namespace ArknoNights.Battle.Core
                         unit,
                         ability.Definition
                             .HealthThresholdAdjacentSpawnEffect);
+                ability.QueueHealthThresholdFullHeal(
+                    unit.CurrentHitPoints,
+                    unit.Definition.MaxHitPoints);
             }
             ReleaseExcessBlockRelations();
+            StartReadyHealthThresholdFullHeals();
+        }
+
+        private void ResolveDueHealthThresholdFullHeals()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+            foreach (var ability in unit.AbilityStates
+                         .OrderBy(
+                             item => item.Definition.AbilityId,
+                             StringComparer.Ordinal))
+            {
+                if (!ability.TryCompleteHealthThresholdFullHeal(
+                        CurrentTick))
+                    continue;
+                var before = unit.CurrentHitPoints;
+                unit.CurrentHitPoints =
+                    unit.Definition.MaxHitPoints;
+                var amount = unit.CurrentHitPoints - before;
+                if (amount <= 0)
+                    continue;
+                Emit(
+                    BattleEventType.HealthChanged,
+                    unit.UnitId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    amount,
+                    before,
+                    unit.CurrentHitPoints,
+                    0,
+                    0,
+                    0,
+                    null,
+                    BattleStopReason.None);
+            }
+        }
+
+        private void StartReadyHealthThresholdFullHeals()
+        {
+            foreach (var caster in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+            foreach (var ability in caster.AbilityStates
+                         .OrderBy(
+                             item => item.Definition.AbilityId,
+                             StringComparer.Ordinal))
+            {
+                if (IsAttackAnimationLocked(caster)
+                    || IsSkillAnimationLocked(caster)
+                    || !ability.TryStartHealthThresholdFullHeal(
+                        CurrentTick,
+                        out var effect))
+                    continue;
+                caster.SkillAnimationLockUntilTick =
+                    CurrentTick
+                    + effect.AnimationEffectiveDurationTicks;
+                Emit(
+                    BattleEventType.Skill,
+                    caster.UnitId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    0,
+                    0,
+                    0,
+                    effect.AnimationOriginalDurationTicks,
+                    effect.AnimationEffectiveDurationTicks,
+                    null,
+                    BattleStopReason.None,
+                    effect.AnimationKey);
+            }
         }
 
         private void ReleaseExcessBlockRelations()
@@ -1917,6 +2070,7 @@ namespace ArknoNights.Battle.Core
 
         private void CastReadyAbilities()
         {
+            StartReadyHealthThresholdFullHeals();
             foreach (var caster in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray())
             foreach (var abilityState in caster.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal))
             {
