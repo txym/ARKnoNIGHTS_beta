@@ -32,6 +32,7 @@ public abstract class UnitSkelBase : MonoBehaviour
     [SerializeField] protected float speed = 1f;           // 基础播放倍速（作用在 SkeletonAnimation.timeScale）
     [SerializeField] protected string defaultAnimation = "Idle";
     [SerializeField] protected bool defaultLoop = true;
+    [SerializeField] protected string attackAnimationName = "Attack";
 
     [Header("Move Animation Settings")]
     [Tooltip("Host 指令只由 Move 状态触发，这里指定 Move 动画名")]
@@ -91,6 +92,16 @@ public abstract class UnitSkelBase : MonoBehaviour
     }
 
     public float GetSpeed() => speed;
+
+    public void ConfigureLegacySourceAnimations(
+        string idleAnimationName,
+        string configuredMoveAnimationName,
+        string configuredAttackAnimationName)
+    {
+        defaultAnimation = idleAnimationName ?? string.Empty;
+        moveAnimationName = configuredMoveAnimationName ?? string.Empty;
+        attackAnimationName = configuredAttackAnimationName ?? string.Empty;
+    }
 
     /// <summary>
     /// Supplies presentation-only values for catalog-backed battle views before Start.

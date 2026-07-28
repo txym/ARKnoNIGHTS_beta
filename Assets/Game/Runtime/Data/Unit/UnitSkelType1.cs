@@ -154,7 +154,7 @@ public class UnitSkelType1 : UnitSkelBase
 
             // 仅作用于 Attack 动画（固定 0 轨）
             const int trackIndex = 0;
-            const string attackAnimName = "Attack";
+            var attackAnimName = attackAnimationName;
 
             // 当前条目
             var entry = state.GetCurrent(trackIndex);

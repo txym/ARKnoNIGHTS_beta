@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using Spine.Unity;
-using System.Threading;
 
 public static class UnitFactory
 {
-    private const string JsonRootRel = "GameData/Units/Json"; // 位于 Assets 下
+    private const string JsonRootRel = "GameData/Units/EliteVariants/Json"; // 位于 Assets 下
+    private const int LegacyMappedSkeletonType = 2;
     private const string PrefabResPath = "Prefabs/DefaultUnit"; // Resources.Load 不要带 "Resources/"
 
     // �����ڻ��棨���ⲻ��¶��
@@ -48,35 +49,46 @@ public static class UnitFactory
             return result;
         }
 
-        var files = Directory.GetFiles(rootAbs, "*.json", SearchOption.AllDirectories);
-        System.Array.Sort(files, System.StringComparer.Ordinal);
+        List<LegacyResolvedSource> sources;
+        try
+        {
+            sources = UnitEliteVariantResolver
+                .LoadDirectory(rootAbs)
+                .Values
+                .OrderBy(item => item.TypeId)
+                .Select(source =>
+                {
+                    var resolved = UnitEliteVariantResolver.Resolve(source, 0);
+                    var idle = resolved.RequireAnimation("idle", source.Path);
+                    var move = resolved.RequireAnimation("move", source.Path);
+                    var attack = resolved.attackMethod == 0
+                        ? null
+                        : resolved.RequireAnimation("attack", source.Path);
+                    return new LegacyResolvedSource(
+                        resolved,
+                        idle.name,
+                        move.name,
+                        attack == null ? string.Empty : attack.name);
+                })
+                .ToList();
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError(
+                $"[UnitFactory] v2 单位源加载失败: {rootAbs}: {exception.Message}");
+            return result;
+        }
 
         int mNextUnitID = -1;
 
-        foreach (var file in files)
+        foreach (var source in sources)
         {
-            UnitJson j = null;
-            try
-            {
-                var json = File.ReadAllText(file);
-                j = JsonUtility.FromJson<UnitJson>(json);
-            }
-            catch
-            {
-                Debug.LogError($"[UnitFactory] JSON 解析失败: {file}");
-                continue;
-            }
-            if (j == null)
-            {
-                Debug.LogError($"[UnitFactory] JSON 为空: {file}");
-                continue;
-            }
-
-            var tpl = BuildTemplate(j);
+            var resolved = source.Resolved;
+            var tpl = BuildTemplate(resolved);
 
             if (sUnitSOMap.ContainsKey(tpl.typeID))
             {
-                Debug.LogError($"[UnitFactory] �ظ��� typeID: {tpl.typeID}����Դ�ļ���{file}");
+                Debug.LogError($"[UnitFactory] �ظ��� typeID: {tpl.typeID}");
                 continue; // ���߸��ǣ�soMap[tpl.typeID] = tpl;
             }
             sUnitSOMap.Add(tpl.typeID, tpl);
@@ -92,17 +104,12 @@ public static class UnitFactory
                 unitIdentity.unitID = mNextUnitID;
                 mNextUnitID--;
             }
-            switch(tpl.unitskeltype)
-            {
-                case 1:var unitskel1=go.AddComponent<UnitSkelType1>();
-                       unitskel1.unitIdentity = unitIdentity;
-                    break;
-                case 2:
-                    var unitskel2 = go.AddComponent<UnitSkelType2>();
-                    unitskel2.unitIdentity = unitIdentity;
-                    break;
-
-            }
+            var unitSkel = go.AddComponent<UnitSkelType2>();
+            unitSkel.unitIdentity = unitIdentity;
+            unitSkel.ConfigureLegacySourceAnimations(
+                source.IdleAnimationName,
+                source.MoveAnimationName,
+                source.AttackAnimationName);
             var skel = go.GetComponent<SkeletonAnimation>();
             if (!skel)
             {
@@ -111,7 +118,10 @@ public static class UnitFactory
             else
             {
 
-                var resPath = UnitResourcePaths.BuildSkeletonDataResourcePath(j.typeId, j.resourceKey, j.skeletonDataResourceName);
+                var resPath = UnitResourcePaths.BuildSkeletonDataResourcePath(
+                    resolved.typeId,
+                    resolved.resourceKey,
+                    resolved.skeletonDataResourceName);
                 var sda = Resources.Load<SkeletonDataAsset>(resPath);
                 if (!sda)
                 {
@@ -142,37 +152,57 @@ public static class UnitFactory
     }
 
     // 原样拷贝（不做数值兜底）
-    private static UnitTemplate BuildTemplate(UnitJson j)
+    private static UnitTemplate BuildTemplate(ResolvedUnitVariant source)
     {
         var so = ScriptableObject.CreateInstance<UnitTemplate>();
 
-        so.typeID = j.typeId;
-        so.uintName = j.resourceKey;
-        so.ProfilePicture = j.profilePictureResourceName;
-        so.Rarity = j.rarity;
-        so.cost = j.deploymentCost;
+        so.typeID = source.typeId;
+        so.uintName = source.resourceKey;
+        so.ProfilePicture = source.profilePictureResourceName;
+        so.Rarity = source.rarity;
+        so.cost = source.deploymentCost;
 
-        so.attackMethod = j.attackMethod;
-        so.actionMethod = j.actionMethod;
-        so.unitskeltype = j.unitSkeletonType;
+        so.attackMethod = source.attackMethod;
+        so.actionMethod = source.actionMethod;
+        so.unitskeltype = LegacyMappedSkeletonType;
 
-        so.HP = j.maxHitPoints;
-        so.atk = j.attack;
-        so.def = j.defense;
-        so.res = j.magicResistance;
+        so.HP = source.maxHitPoints;
+        so.atk = source.attack;
+        so.def = source.defense;
+        so.res = source.magicResistance;
 
-        so.attackInterval = j.BaseAttackIntervalSeconds;
-        so.attackRadius = j.attackRadiusMetres;
-        so.BlockRadius = j.blockRadiusMetres;
+        so.attackInterval = source.BaseAttackIntervalSeconds;
+        so.attackRadius = source.attackRadiusMetres;
+        so.BlockRadius = source.blockRadiusMetres;
 
-        so.moveSpeed = j.moveSpeedMetresPerSecond;
-        so.isBlock = j.canBlock;
+        so.moveSpeed = source.moveSpeedMetresPerSecond;
+        so.isBlock = source.canBlock;
 
-        so.FixedAbility = j.innateAbilityIds ?? new List<string>();
+        so.FixedAbility = new List<string>(source.innateAbilityIds);
 
-        so.LifeDeduct = j.lifeDeduct;
-        so.narrowTitle = j.tauntLevel;
+        so.LifeDeduct = source.lifeDeduct;
+        so.narrowTitle = source.tauntLevel;
 
         return so;
+    }
+
+    private sealed class LegacyResolvedSource
+    {
+        internal LegacyResolvedSource(
+            ResolvedUnitVariant resolved,
+            string idleAnimationName,
+            string moveAnimationName,
+            string attackAnimationName)
+        {
+            Resolved = resolved;
+            IdleAnimationName = idleAnimationName;
+            MoveAnimationName = moveAnimationName;
+            AttackAnimationName = attackAnimationName;
+        }
+
+        internal ResolvedUnitVariant Resolved { get; }
+        internal string IdleAnimationName { get; }
+        internal string MoveAnimationName { get; }
+        internal string AttackAnimationName { get; }
     }
 }
