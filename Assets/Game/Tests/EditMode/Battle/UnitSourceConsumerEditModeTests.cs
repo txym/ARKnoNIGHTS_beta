@@ -1,0 +1,265 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace ArknoNights.Battle.Tests
+{
+    public sealed class UnitSourceConsumerEditModeTests
+    {
+        private const string ExpectedRuntimeCatalogHash =
+            "359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA";
+
+        [Test]
+        public void Generate_ProjectsResolvedEliteZeroVariantsToIsolatedV1Catalog()
+        {
+            var outputPath = NewIsolatedPath("projection", "unit-catalog-v1.json");
+            var hashBefore = RuntimeCatalogHash();
+            Assert.That(hashBefore, Is.EqualTo(ExpectedRuntimeCatalogHash));
+
+            try
+            {
+                InvokeGenerator(RealSourceDirectory(), outputPath);
+            }
+            finally
+            {
+                Assert.That(RuntimeCatalogHash(), Is.EqualTo(hashBefore));
+            }
+
+            var document = JsonUtility.FromJson<CatalogProjectionDocument>(
+                File.ReadAllText(outputPath));
+            Assert.That(document, Is.Not.Null);
+            Assert.That(document.units, Is.Not.Null);
+            Assert.That(
+                document.units.Select(unit => unit.typeId),
+                Is.EqualTo(new[] { "1000", "5503", "5504" }));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "1000").unitSkelType,
+                Is.EqualTo(2));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "1000").moveAnimation,
+                Is.EqualTo("Run_Loop"));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "1000")
+                    .attackAnimationDurationTicks,
+                Is.EqualTo(20));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "5503").deploymentCost,
+                Is.EqualTo(2));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "5503").rarity,
+                Is.EqualTo(6));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "5503")
+                    .attackAnimationDurationTicks,
+                Is.EqualTo(54));
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "5503").hitAnimation,
+                Is.Empty);
+            Assert.That(
+                document.units.Single(unit => unit.typeId == "5504")
+                    .attackAnimationDurationTicks,
+                Is.EqualTo(24));
+        }
+
+        [Test]
+        public void Generate_RejectsUnrepresentableV2SourceWithoutTouchingOutput()
+        {
+            var sourceDirectory = CopyRealSources(
+                "unrepresentable",
+                "5504_arcslmi.json",
+                MakeNonAttacker);
+            AssertAtomicFailure(
+                sourceDirectory,
+                "UNIT_CATALOG_V1_SOURCE_UNREPRESENTABLE");
+        }
+
+        [Test]
+        public void Generate_RejectsUnknownAbilityWithoutTouchingOutput()
+        {
+            var sourceDirectory = CopyRealSources(
+                "unknown-ability",
+                "5504_arcslmi.json",
+                json => ReplaceRequired(
+                    json,
+                    "\"innateAbilityIds\": []",
+                    "\"innateAbilityIds\": [\"ABILITY_DOES_NOT_EXIST\"]"));
+            AssertAtomicFailure(
+                sourceDirectory,
+                "UNIT_CATALOG_SOURCE_ABILITY_UNKNOWN");
+        }
+
+        private static void AssertAtomicFailure(
+            string sourceDirectory,
+            string expectedErrorCode)
+        {
+            const string sentinel = "sentinel-do-not-overwrite";
+            var outputPath = Path.Combine(
+                Path.GetDirectoryName(sourceDirectory),
+                "unit-catalog-v1.json");
+            File.WriteAllText(outputPath, sentinel);
+            var hashBefore = RuntimeCatalogHash();
+            Assert.That(hashBefore, Is.EqualTo(ExpectedRuntimeCatalogHash));
+
+            var exception = Assert.Throws<TargetInvocationException>(
+                () => InvokeGenerator(sourceDirectory, outputPath));
+
+            Assert.That(
+                FlattenMessages(exception),
+                Does.Contain(expectedErrorCode));
+            Assert.That(File.ReadAllText(outputPath), Is.EqualTo(sentinel));
+            Assert.That(RuntimeCatalogHash(), Is.EqualTo(hashBefore));
+        }
+
+        private static string MakeNonAttacker(string json)
+        {
+            var normalized = json.Replace("\r\n", "\n");
+            normalized = ReplaceRequired(
+                normalized,
+                "\"attackMethod\": 1",
+                "\"attackMethod\": 0");
+            normalized = ReplaceRequired(
+                normalized,
+                "\"damageType\": \"Physical\"",
+                "\"damageType\": \"None\"");
+            normalized = ReplaceRequired(
+                normalized,
+                "\"attack\": 290",
+                "\"attack\": 0");
+            normalized = ReplaceRequired(
+                normalized,
+                "\"attackIntervalSeconds\": 1.5",
+                "\"attackIntervalSeconds\": 0");
+            return ReplaceRequired(
+                normalized,
+                "          {\n"
+                + "            \"key\": \"attack\",\n"
+                + "            \"name\": \"Attack\",\n"
+                + "            \"durationSeconds\": 1.166667\n"
+                + "          },\n",
+                string.Empty);
+        }
+
+        private static string CopyRealSources(
+            string scenario,
+            string transformedFileName,
+            Func<string, string> transform)
+        {
+            var fixtureDirectory = NewIsolatedPath(scenario, "sources");
+            Directory.CreateDirectory(fixtureDirectory);
+            foreach (var sourcePath in Directory.GetFiles(
+                         RealSourceDirectory(),
+                         "*.json",
+                         SearchOption.TopDirectoryOnly))
+            {
+                var fileName = Path.GetFileName(sourcePath);
+                var json = File.ReadAllText(sourcePath);
+                File.WriteAllText(
+                    Path.Combine(fixtureDirectory, fileName),
+                    string.Equals(
+                        fileName,
+                        transformedFileName,
+                        StringComparison.Ordinal)
+                        ? transform(json)
+                        : json);
+            }
+
+            return fixtureDirectory;
+        }
+
+        private static string ReplaceRequired(
+            string source,
+            string oldValue,
+            string newValue)
+        {
+            var index = source.IndexOf(oldValue, StringComparison.Ordinal);
+            Assert.That(index, Is.GreaterThanOrEqualTo(0), "Fixture token must exist.");
+            return source.Substring(0, index)
+                   + newValue
+                   + source.Substring(index + oldValue.Length);
+        }
+
+        private static void InvokeGenerator(string sourceDirectory, string outputPath)
+        {
+            var generator = Type.GetType(
+                "UnitCatalogGenerator, Assembly-CSharp-Editor");
+            Assert.That(generator, Is.Not.Null, "Unit catalog generator type must exist.");
+            var generate = generator.GetMethod(
+                "Generate",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string), typeof(string) },
+                null);
+            Assert.That(
+                generate,
+                Is.Not.Null,
+                "Generate(string, string) must exist and remain private.");
+            generate.Invoke(null, new object[] { sourceDirectory, outputPath });
+        }
+
+        private static string RealSourceDirectory()
+        {
+            return Path.Combine(
+                Application.dataPath,
+                "GameData/Units/EliteVariants/Json");
+        }
+
+        private static string NewIsolatedPath(string scenario, string leafName)
+        {
+            var root = Path.GetFullPath(Path.Combine(
+                Application.dataPath,
+                "../Temp/UnitEliteVariantsV2/CatalogProjection"));
+            var scenarioRoot = Path.Combine(
+                root,
+                scenario + "-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(scenarioRoot);
+            return Path.Combine(scenarioRoot, leafName);
+        }
+
+        private static string RuntimeCatalogHash()
+        {
+            var path = Path.Combine(
+                Application.dataPath,
+                "Resources/BattleData/unit-catalog-v1.json");
+            using (var sha256 = SHA256.Create())
+            using (var stream = File.OpenRead(path))
+            {
+                return BitConverter.ToString(sha256.ComputeHash(stream))
+                    .Replace("-", string.Empty);
+            }
+        }
+
+        private static string FlattenMessages(Exception exception)
+        {
+            var messages = new List<string>();
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                messages.Add(current.Message);
+            }
+
+            return string.Join(" | ", messages);
+        }
+
+        [Serializable]
+        private sealed class CatalogProjectionDocument
+        {
+            public CatalogProjectionEntry[] units;
+        }
+
+        [Serializable]
+        private sealed class CatalogProjectionEntry
+        {
+            public string typeId;
+            public int deploymentCost;
+            public int rarity;
+            public int attackAnimationDurationTicks;
+            public int unitSkelType;
+            public string moveAnimation;
+            public string hitAnimation;
+        }
+    }
+}

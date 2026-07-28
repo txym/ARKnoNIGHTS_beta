@@ -247,6 +247,30 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void Resolve_ExposesNoLegacyFourArgumentSourceContract()
+        {
+            var resolver = Type.GetType("UnitEliteVariantResolver, Assembly-CSharp");
+            Assert.That(resolver, Is.Not.Null, "Runtime resolver type must exist.");
+            var legacyOverload = resolver.GetMethod(
+                "Resolve",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[]
+                {
+                    typeof(string),
+                    typeof(string),
+                    typeof(int),
+                    typeof(string)
+                },
+                null);
+
+            Assert.That(
+                legacyOverload,
+                Is.Null,
+                "The temporary v1 source resolver bridge must be removed.");
+        }
+
+        [Test]
         public void Resolve_InheritsTextAndAbilitiesButHonoursExplicitEmptyArray()
         {
             var eliteTwo = Resolve(InheritanceFixture, 2, "9000_fixture.json");
