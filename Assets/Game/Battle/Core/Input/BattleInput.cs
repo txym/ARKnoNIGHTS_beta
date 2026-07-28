@@ -310,6 +310,11 @@ namespace ArknoNights.Battle.Core
                     builder.Append("|D:")
                         .Append(ability.OnHitDamageOverTimeEffect.DamagePerSecond).Append(',')
                         .Append(ability.OnHitDamageOverTimeEffect.DurationTicks);
+                if (ability.UnblockedAttackCharge != null)
+                    builder.Append("|E:")
+                        .Append(ability.UnblockedAttackCharge.CheckIntervalTicks).Append(',')
+                        .Append(ability.UnblockedAttackCharge.AttackAdditivePerStack).Append(',')
+                        .Append(ability.UnblockedAttackCharge.MaxStacks);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -391,6 +396,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.DeathAreaDamageEffect != null) validationErrors.Add(new ValidationError("ability.deathAreaDamage.unexpected", "Timed ability cannot define a death-area damage effect: " + ability.AbilityId));
                     if (ability.AttackAreaDamageModifier != null) validationErrors.Add(new ValidationError("ability.attackAreaDamage.unexpected", "Timed ability cannot define an attack-area damage modifier: " + ability.AbilityId));
                     if (ability.OnHitDamageOverTimeEffect != null) validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.unexpected", "Timed ability cannot define an on-hit damage-over-time effect: " + ability.AbilityId));
+                    if (ability.UnblockedAttackCharge != null) validationErrors.Add(new ValidationError("ability.unblockedAttackCharge.unexpected", "Timed ability cannot define an unblocked attack-charge effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -425,7 +431,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.EvasionModifier == null ? 0 : 1)
                         + (ability.DeathAreaDamageEffect == null ? 0 : 1)
                         + (ability.AttackAreaDamageModifier == null ? 0 : 1)
-                        + (ability.OnHitDamageOverTimeEffect == null ? 0 : 1);
+                        + (ability.OnHitDamageOverTimeEffect == null ? 0 : 1)
+                        + (ability.UnblockedAttackCharge == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -566,6 +573,11 @@ namespace ArknoNights.Battle.Core
                         && (ability.OnHitDamageOverTimeEffect.DamagePerSecond <= 0
                             || ability.OnHitDamageOverTimeEffect.DurationTicks <= 0))
                         validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.invalid", "On-hit damage-over-time effect is invalid: " + ability.AbilityId));
+                    if (ability.UnblockedAttackCharge != null
+                        && (ability.UnblockedAttackCharge.CheckIntervalTicks <= 0
+                            || ability.UnblockedAttackCharge.AttackAdditivePerStack <= 0
+                            || ability.UnblockedAttackCharge.MaxStacks <= 0))
+                        validationErrors.Add(new ValidationError("ability.unblockedAttackCharge.invalid", "Unblocked attack-charge effect is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

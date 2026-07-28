@@ -17,6 +17,7 @@ namespace ArknoNights.Battle.Core
         private bool healthThresholdActive;
         private int healthThresholdActiveUntilTick =
             int.MinValue;
+        private int unblockedAttackChargeStacks;
 
         internal RuntimeAbilityState(AbilityDefinition definition)
         {
@@ -44,6 +45,42 @@ namespace ArknoNights.Battle.Core
 
         internal bool IsHealthThresholdActive =>
             healthThresholdActive;
+        internal int UnblockedAttackChargeAdditive
+        {
+            get
+            {
+                var effect = Definition.UnblockedAttackCharge;
+                if (effect == null)
+                    return 0;
+                return (int)Math.Min(
+                    int.MaxValue,
+                    (long)unblockedAttackChargeStacks
+                    * effect.AttackAdditivePerStack);
+            }
+        }
+
+        internal void UpdateUnblockedAttackCharge(
+            bool isBlocked,
+            int currentTick,
+            int activationTick)
+        {
+            var effect = Definition.UnblockedAttackCharge;
+            if (effect == null
+                || isBlocked
+                || currentTick <= activationTick
+                || (currentTick - activationTick)
+                % effect.CheckIntervalTicks != 0
+                || unblockedAttackChargeStacks
+                >= effect.MaxStacks)
+                return;
+            unblockedAttackChargeStacks++;
+        }
+
+        internal void CompleteAttack()
+        {
+            if (Definition.UnblockedAttackCharge != null)
+                unblockedAttackChargeStacks = 0;
+        }
 
         internal void UpdateHealthThresholdState(
             int currentHitPoints,
@@ -90,14 +127,16 @@ namespace ArknoNights.Battle.Core
                 .Append(currentSkillPoints)
                 .Append(':')
                 .Append(castCount);
-            if (Definition.HealthThresholdCombatModifier == null)
-                return;
-            builder.Append(':')
-                .Append(healthThresholdTriggered ? 1 : 0)
-                .Append(':')
-                .Append(healthThresholdActive ? 1 : 0)
-                .Append(':')
-                .Append(healthThresholdActiveUntilTick);
+            if (Definition.HealthThresholdCombatModifier != null)
+                builder.Append(':')
+                    .Append(healthThresholdTriggered ? 1 : 0)
+                    .Append(':')
+                    .Append(healthThresholdActive ? 1 : 0)
+                    .Append(':')
+                    .Append(healthThresholdActiveUntilTick);
+            if (Definition.UnblockedAttackCharge != null)
+                builder.Append(":charge:")
+                    .Append(unblockedAttackChargeStacks);
         }
     }
 
@@ -328,8 +367,25 @@ namespace ArknoNights.Battle.Core
                     attack = ApplyMultiplier(
                         attack,
                         modifier.AttackMultiplierPermille);
-                return attack;
+                var charge = abilityStates.Sum(item =>
+                    (long)item.UnblockedAttackChargeAdditive);
+                return (int)Math.Min(
+                    int.MaxValue,
+                    attack + charge);
             }
+        }
+        internal void UpdateUnblockedAttackCharges(int currentTick)
+        {
+            foreach (var ability in abilityStates)
+                ability.UpdateUnblockedAttackCharge(
+                    IsBlocked,
+                    currentTick,
+                    ActivationTick);
+        }
+        internal void CompleteAttack()
+        {
+            foreach (var ability in abilityStates)
+                ability.CompleteAttack();
         }
         public int EffectiveDefense => ApplyThresholdMultiplier(
             Definition.Defense
@@ -841,6 +897,7 @@ namespace ArknoNights.Battle.Core
             RefreshAuraCombatModifiers();
             EvaluateBlocking();
             RefreshAuraCombatModifiers();
+            UpdateUnblockedAttackCharges();
             CastReadyAbilities();
             StartAttacks();
             ResolveDueDamage();
@@ -978,6 +1035,15 @@ namespace ArknoNights.Battle.Core
         {
             var due = pendingAttacks.Where(item => item.DamageTick == CurrentTick).OrderBy(item => item.TargetUnitId, StringComparer.Ordinal).ThenBy(item => item.AttackerUnitId, StringComparer.Ordinal).ToArray();
             pendingAttacks.RemoveAll(item => item.DamageTick == CurrentTick);
+            foreach (var attackerId in due
+                         .Select(item => item.AttackerUnitId)
+                         .Distinct(StringComparer.Ordinal)
+                         .OrderBy(item => item, StringComparer.Ordinal))
+            {
+                var attacker = FindUnit(attackerId);
+                if (attacker != null && attacker.IsAlive)
+                    attacker.CompleteAttack();
+            }
             var valid = due
                 .Where(item =>
                     FindUnit(item.AttackerUnitId).IsAlive
@@ -1436,6 +1502,16 @@ namespace ArknoNights.Battle.Core
                     unit.CurrentHitPoints,
                     unit.Definition.MaxHitPoints,
                     CurrentTick);
+        }
+
+        private void UpdateUnblockedAttackCharges()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+                unit.UpdateUnblockedAttackCharges(CurrentTick);
         }
 
         private void ApplyPassiveLifecycleEffects()

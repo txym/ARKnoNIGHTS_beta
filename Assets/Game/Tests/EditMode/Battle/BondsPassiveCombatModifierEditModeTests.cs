@@ -1088,6 +1088,52 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void UnblockedAttackCharge_AccumulatesAndClearsAtAttackEnd()
+        {
+            var input = CreateInput(
+                30,
+                new[]
+                {
+                    Attacker(
+                        "musician",
+                        2000,
+                        0,
+                        "UNBLOCKED_CHARGE",
+                        attackIntervalTicks: 20,
+                        attack: 100),
+                    NonAttacker("target", 10000)
+                },
+                new[]
+                {
+                    PassiveUnblockedAttackCharge(
+                        checkIntervalTicks: 5,
+                        attackAdditivePerStack: 30,
+                        maxStacks: 30)
+                },
+                new[] { Unit("musician", "musician", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 20)
+                runner.Step();
+            var musician = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "musician");
+            Assert.That(musician.EffectiveAttack, Is.EqualTo(220));
+
+            runner.Step();
+            Assert.That(musician.EffectiveAttack, Is.EqualTo(220));
+            runner.Step();
+            Assert.That(musician.EffectiveAttack, Is.EqualTo(100));
+            Assert.That(
+                runner.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Damage
+                        && item.UnitId == "musician")
+                    .Select(item => item.DamageAmount),
+                Is.EqualTo(new[] { 100, 220 }));
+        }
+
+        [Test]
         public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -1900,6 +1946,45 @@ namespace ArknoNights.Battle.Tests
                 new OnHitDamageOverTimeEffectDefinition(
                     damagePerSecond,
                     durationTicks),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveUnblockedAttackCharge(
+            int checkIntervalTicks,
+            int attackAdditivePerStack,
+            int maxStacks)
+        {
+            return new AbilityDefinition(
+                "UNBLOCKED_CHARGE",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new UnblockedAttackChargeDefinition(
+                    checkIntervalTicks,
+                    attackAdditivePerStack,
+                    maxStacks),
                 string.Empty,
                 0);
         }
