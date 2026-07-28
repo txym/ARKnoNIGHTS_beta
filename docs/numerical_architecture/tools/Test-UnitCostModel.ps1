@@ -137,6 +137,80 @@ function Get-ShopFixtureResourceDirectories {
     return @($directories | Sort-Object -Unique)
 }
 
+function Get-ShopAbilityTypeIds {
+    param(
+        [Parameter(Mandatory = $true)][string]$BondSpecPath,
+        [Parameter(Mandatory = $true)][string[]]$ShopTypeIds
+    )
+
+    $shopSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($typeId in $ShopTypeIds) {
+        [void]$shopSet.Add($typeId)
+    }
+    $abilityTypeIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $abilityMarkerPattern = '(?:\u80fd\u529b\u63cf\u8ff0|\u80fd\u529b\u8be6\u60c5|\u80fd\u529b\uff1a)'
+    foreach ($line in Get-Content -LiteralPath $BondSpecPath -Encoding UTF8) {
+        if ($line -match ('^(?<TypeId>\d+)\s+.+?' + $abilityMarkerPattern) -and $shopSet.Contains($Matches.TypeId)) {
+            [void]$abilityTypeIds.Add($Matches.TypeId)
+        }
+    }
+    return @($abilityTypeIds | Sort-Object { [int]$_ })
+}
+
+function Test-AbilityInputContract {
+    param(
+        [Parameter(Mandatory = $true)][string]$AbilityInputPath,
+        [Parameter(Mandatory = $true)][string]$BondSpecPath,
+        [Parameter(Mandatory = $true)][string[]]$ShopTypeIds
+    )
+
+    Assert-Condition (Test-Path -LiteralPath $AbilityInputPath -PathType Leaf) "Ability input '$AbilityInputPath' does not exist."
+    $abilityInput = Import-PowerShellDataFile -LiteralPath $AbilityInputPath
+    Assert-Equal 'DamageTypeOverrides/ExplicitRiskOnly/UnitScenarios' (($abilityInput.Keys | Sort-Object) -join '/') 'ability input top-level keys'
+
+    $scenarioKeys = @($abilityInput.UnitScenarios.Keys | ForEach-Object { [string]$_ })
+    $riskKeys = @($abilityInput.ExplicitRiskOnly.Keys | ForEach-Object { [string]$_ })
+    foreach ($typeId in Get-ShopAbilityTypeIds -BondSpecPath $BondSpecPath -ShopTypeIds $ShopTypeIds) {
+        Assert-Condition ($typeId -in $scenarioKeys -or $typeId -in $riskKeys) "BONDS ability TypeId '$typeId' is absent from UnitScenarios and ExplicitRiskOnly."
+    }
+    foreach ($scenarioKey in $scenarioKeys) {
+        $scenario = $abilityInput.UnitScenarios[$scenarioKey]
+        Assert-Equal ([int]$scenarioKey) ([int]$scenario.TypeId) "scenario $scenarioKey TypeId"
+        Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$scenario.ModelKind)) "Scenario $scenarioKey has no ModelKind."
+        Assert-Condition (@($scenario.Evidence).Count -gt 0) "Scenario $scenarioKey has no Evidence."
+        Assert-Condition ($null -ne $scenario.UnquantifiedRisk) "Scenario $scenarioKey has no UnquantifiedRisk collection."
+    }
+
+    $validTypeIds = @($ShopTypeIds + @('1137', '1138', '2033', '5504', '10002') | Sort-Object -Unique)
+    Assert-Equal 93 $validTypeIds.Count 'valid ability TypeId count'
+    foreach ($typeId in @($scenarioKeys + $riskKeys + @($abilityInput.DamageTypeOverrides.Keys | ForEach-Object { [string]$_ }) | Sort-Object -Unique)) {
+        Assert-Condition ($typeId -in $validTypeIds) "Ability input contains invalid top-level TypeId '$typeId'."
+    }
+
+    $unit10039 = $abilityInput.UnitScenarios['10039']
+    Assert-Equal ([decimal]0.10) ([decimal]$unit10039.Parameters.PhysicalDamageTakenMultiplier) '10039 physical damage-taken multiplier'
+    Assert-Equal ([decimal]0.10) ([decimal]$unit10039.Parameters.MagicDamageTakenMultiplier) '10039 magic damage-taken multiplier'
+    Assert-Condition ((@($abilityInput.ExplicitRiskOnly['10039']) -join '|') -match 'charge' -and (@($abilityInput.ExplicitRiskOnly['10039']) -join '|') -match 'range' -and (@($abilityInput.ExplicitRiskOnly['10039']) -join '|') -match 'block') '10039 unknown charge/range/blocking details are not all risk-only.'
+
+    $unit10077 = $abilityInput.UnitScenarios['10077']
+    Assert-Equal 10073 ([int]$unit10077.Parameters.SummonTypeId) '10077 summon TypeId'
+    Assert-Equal ([decimal]2) ([decimal]$unit10077.Parameters.SkillPointsPerSecond) '10077 SP/s'
+    Assert-Equal ([decimal]3) ([decimal]$unit10077.Parameters.InitialSkillPoints) '10077 initial SP'
+    Assert-Equal ([decimal]5) ([decimal]$unit10077.Parameters.SkillPointCost) '10077 SP cost'
+    Assert-Equal '1/3.5/6/8.5/11/13.5/16/18.5' ((@($unit10077.Parameters.SpawnTimesSeconds) | ForEach-Object { [string]([decimal]$_) }) -join '/') '10077 20-second summon times'
+
+    foreach ($typeId in @('10031', '1238', '1243')) {
+        $scenario = $abilityInput.UnitScenarios[$typeId]
+        Assert-Equal 'OrdinaryBaseline' ([string]$scenario.ModelKind) "$typeId baseline model"
+        $auditText = (@($scenario.Evidence) + @($scenario.UnquantifiedRisk)) -join '|'
+        Assert-Condition ($auditText -notmatch '\u9690\u533f|Stealth|\u9644\u52a0\u6cd5\u672f|\u591a\u65b9\u5411') "TypeId $typeId contains a forbidden unsupported modifier in scoring evidence."
+    }
+    Assert-Equal 'Physical' ([string]$abilityInput.DamageTypeOverrides['1238']) '1238 physical override'
+    Assert-Equal 'Physical' ([string]$abilityInput.DamageTypeOverrides['1243']) '1243 physical override'
+
+    return $abilityInput
+}
+
 function Get-UnitJsonSnapshot {
     param(
         [Parameter(Mandatory = $true)][string]$StagingRoot,
@@ -303,14 +377,22 @@ try {
     Remove-Item -LiteralPath $outputCsv, $analysisOutput -Force -ErrorAction SilentlyContinue
 
     $exporterPath = Join-Path $PSScriptRoot 'Export-UnitCostDataset.ps1'
+    $abilityInputPath = Join-Path $PSScriptRoot 'UnitCostAbilityInputs.psd1'
     $powershellPath = Join-Path $PSHOME 'powershell.exe'
     Test-CombatMetricHelpers -ExporterPath $exporterPath
     $fixtureResourceDirectories = Get-ShopFixtureResourceDirectories -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot
     $externalSnapshotBeforeWorkflow = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $fixtureResourceDirectories
     Assert-Equal 178 $externalSnapshotBeforeWorkflow.Count 'external staging workflow snapshot JSON file count'
+    $shopTypeIds = @(
+        $fixtureResourceDirectories |
+            Where-Object { $_ -ne '1322_wdgyht' } |
+            ForEach-Object { ($_ -split '_', 2)[0] }
+    )
+    $abilityInput = Test-AbilityInputContract -AbilityInputPath $abilityInputPath -BondSpecPath $BondSpecPath -ShopTypeIds $shopTypeIds
     & $powershellPath -NoProfile -ExecutionPolicy Bypass -File $exporterPath `
         -BondSpecPath $BondSpecPath `
         -StagingRoot $StagingRoot `
+        -AbilityInputPath $abilityInputPath `
         -OutputCsvPath $outputCsv `
         -AnalysisOutputPath $analysisOutput
     if ($LASTEXITCODE -ne 0) {
@@ -327,7 +409,10 @@ try {
     Assert-Equal 1 @($rows | Where-Object TypeId -eq '1000').Count 'known TypeId 1000'
     foreach ($property in @(
             'RawMedianDps', 'WinsorizedMedianDps', 'RawMedianTtdSeconds', 'WinsorizedMedianTtdSeconds',
-            'OutputReference', 'DefenseReference', 'PanelPower', 'PanelModelStatus'
+            'OutputReference', 'DefenseReference', 'PanelPower', 'PanelModelStatus',
+            'AbilityModelKind', 'OutputScenarioLow', 'OutputScenarioMain', 'OutputScenarioHigh',
+            'DefenseScenarioMain', 'EquivalentEntityContribution', 'AbilityPowerMultiplier',
+            'ContinuousPower', 'AbilityEvidence', 'RiskFlags'
         )) {
         Assert-Condition ($rows[0].PSObject.Properties.Name -contains $property) "CSV is missing combat metric column '$property'."
     }
@@ -349,6 +434,24 @@ try {
         Assert-Condition ($panelPower -gt 0) "Type ID $($row.TypeId) has nonpositive PanelPower '$panelPower'."
         Assert-Condition (-not [double]::IsNaN([double]$panelPower) -and -not [double]::IsInfinity([double]$panelPower)) "Type ID $($row.TypeId) has invalid PanelPower '$panelPower'."
         Assert-Condition ([decimal]$row.OutputReference -gt 0 -and [decimal]$row.DefenseReference -gt 0) "Type ID $($row.TypeId) has invalid combat references."
+    }
+    foreach ($row in $rows) {
+        $continuousPower = [decimal]$row.ContinuousPower
+        Assert-Condition ($continuousPower -gt 0) "Type ID $($row.TypeId) has nonpositive ContinuousPower '$continuousPower'."
+        Assert-Condition (-not [double]::IsNaN([double]$continuousPower) -and -not [double]::IsInfinity([double]$continuousPower)) "Type ID $($row.TypeId) has invalid ContinuousPower '$continuousPower'."
+        $expectedAbilityMultiplier = [decimal][Math]::Sqrt([double]([decimal]$row.OutputScenarioMain * [decimal]$row.DefenseScenarioMain))
+        Assert-Condition ([Math]::Abs([double]([decimal]$row.AbilityPowerMultiplier - $expectedAbilityMultiplier)) -lt 0.000000001) "Type ID $($row.TypeId) AbilityPowerMultiplier is not reproducible from exported scenario components."
+        $expectedContinuousPower = if ([string]::IsNullOrWhiteSpace([string]$row.PanelPower)) {
+            [decimal]$row.EquivalentEntityContribution
+        }
+        else {
+            ([decimal]$row.PanelPower * [decimal]$row.AbilityPowerMultiplier) + [decimal]$row.EquivalentEntityContribution
+        }
+        Assert-Condition ([Math]::Abs([double]($continuousPower - $expectedContinuousPower)) -lt 0.000000001) "Type ID $($row.TypeId) ContinuousPower is not reproducible from exported components."
+    }
+    foreach ($typeId in @('10031', '1238', '1243')) {
+        $row = @($rows | Where-Object TypeId -eq $typeId)[0]
+        Assert-Condition ([string]$row.AbilityEvidence -notmatch '\u9690\u533f|Stealth|\u9644\u52a0\u6cd5\u672f|\u591a\u65b9\u5411') "Type ID $typeId contains a forbidden unsupported modifier in exported scoring evidence."
     }
     foreach ($typeId in @('1017', '1042', '1146', '1355', '1008', '1026', '1333')) {
         $row = @($rows | Where-Object TypeId -eq $typeId)
@@ -374,6 +477,11 @@ try {
     }
 
     Assert-Condition (Test-Path -LiteralPath $analysisOutput -PathType Leaf) "Missing analysis output '$analysisOutput'."
+    $analysis = Get-Content -LiteralPath $analysisOutput -Raw -Encoding UTF8 | ConvertFrom-Json
+    $riskAuditTypeIds = @($analysis.RiskAudit | ForEach-Object { [string]$_.TypeId })
+    foreach ($row in $rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.RiskFlags) }) {
+        Assert-Condition ([string]$row.TypeId -in $riskAuditTypeIds) "Risk-bearing TypeId $($row.TypeId) is absent from the analysis RiskAudit."
+    }
 
     $regressionFailures = [System.Collections.Generic.List[string]]::new()
     Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures -FixtureResourceDirectories $fixtureResourceDirectories -FixtureDamageType 'InvalidDamageType' -FailureMessage 'Illegal non-empty damageType for TypeId 1238 was accepted instead of rejected.'
