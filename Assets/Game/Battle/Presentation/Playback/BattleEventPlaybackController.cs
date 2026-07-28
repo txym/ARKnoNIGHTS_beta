@@ -267,6 +267,17 @@ namespace ArknoNights.Battle.Presentation
                     damaged.MarkNonMoveAnimationStarted();
                     break;
 
+                case BattleEventType.HealthChanged:
+                    if (!TryGetView(item.UnitId, item, out var changed))
+                        return false;
+                    changed.HitPoints = item.HitPointsAfter;
+                    changed.View.SetStatusBarState(
+                        changed.UnitId,
+                        changed.Side != ToBattleSide(Observer),
+                        changed.HitPoints,
+                        0);
+                    break;
+
                 case BattleEventType.Death:
                     if (!TryGetView(item.UnitId, item, out var dead)) return false;
                     dead.IsAlive = false;

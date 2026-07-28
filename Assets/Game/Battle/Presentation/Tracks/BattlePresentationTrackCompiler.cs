@@ -126,6 +126,17 @@ namespace ArknoNights.Battle.Presentation
                         target.HitPoints.Add(new UnitPresentationTrack.HpKey(item.Tick, item.Sequence, item.HitPointsAfter));
                         break;
 
+                    case BattleEventType.HealthChanged:
+                        if (item.HitPointsAfter < 0
+                            || item.HitPointsAfter
+                            > actor.Snapshot.MaxHitPoints)
+                        {
+                            AddError(errors, "track.healthChanged.contract.invalid", "Health change target HP is invalid.", result.BattleId, item.UnitId, item.Tick, item.Sequence);
+                            break;
+                        }
+                        actor.HitPoints.Add(new UnitPresentationTrack.HpKey(item.Tick, item.Sequence, item.HitPointsAfter));
+                        break;
+
                     case BattleEventType.Death:
                         if (actor.DeathTick.HasValue)
                         {

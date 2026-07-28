@@ -13,7 +13,8 @@ namespace ArknoNights.Battle.Core
         Damage,
         Death,
         BattleEnded,
-        Skill
+        Skill,
+        HealthChanged
     }
 
     /// <summary>Immutable presentation-neutral record emitted by the authoritative tick runner.</summary>

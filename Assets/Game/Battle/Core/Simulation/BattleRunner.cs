@@ -127,12 +127,54 @@ namespace ArknoNights.Battle.Core
         internal int MoveRemainder { get; set; }
         internal int MoveXNumeratorRemainder { get; set; }
         internal int MoveYNumeratorRemainder { get; set; }
+        internal int PassiveHealthRemainder { get; set; }
         internal UnitDefinition Definition { get; }
         internal IReadOnlyList<RuntimeAbilityState> AbilityStates { get; }
         internal bool IsTargetable => abilityStates.All(item =>
             item.Definition.UnitTraitEffect == null
             || item.Definition.UnitTraitEffect.Kind != UnitTraitEffectKind.Untargetable);
-        internal bool HasBlockingCapacity => blockedUnitIds.Count < Definition.BlockCapacity;
+        internal int EffectiveBlockCapacity
+        {
+            get
+            {
+                var value = (long)Definition.BlockCapacity
+                    + PassiveCombatModifiers.Sum(item =>
+                        (long)item.BlockCapacityAdditive);
+                return value <= 0
+                    ? 0
+                    : value >= int.MaxValue
+                        ? int.MaxValue
+                        : (int)value;
+            }
+        }
+        internal int EffectiveMagicResistance => Math.Max(
+            0,
+            Math.Min(
+                100,
+                Definition.MagicResistance
+                + PassiveCombatModifiers.Sum(item =>
+                    item.MagicResistanceAdditive)));
+        internal int EffectiveAttackIntervalTicks
+        {
+            get
+            {
+                var finalAttackSpeed = 100
+                    + PassiveCombatModifiers.Sum(item =>
+                        item.AttackSpeedAdditive);
+                if (finalAttackSpeed <= 0)
+                    return 0;
+                var numerator =
+                    (long)Definition.AttackIntervalTicks * 100;
+                return Math.Max(
+                    1,
+                    (int)Math.Min(
+                        int.MaxValue,
+                        (numerator + finalAttackSpeed - 1)
+                        / finalAttackSpeed));
+            }
+        }
+        internal bool HasBlockingCapacity =>
+            blockedUnitIds.Count < EffectiveBlockCapacity;
         internal bool IsBlocked => blockedUnitIds.Count != 0;
         internal bool HasBlockWith(string unitId) => blockedUnitIds.Contains(unitId);
         internal void AddBlock(string unitId)
@@ -142,6 +184,61 @@ namespace ArknoNights.Battle.Core
             blockedUnitIds.Sort(StringComparer.Ordinal);
         }
         internal bool RemoveBlock(string unitId) => blockedUnitIds.Remove(unitId);
+
+        internal int ApplyDamageTakenModifiers(
+            DamageType damageType,
+            int amount)
+        {
+            if (damageType != DamageType.Physical
+                && damageType != DamageType.Magic)
+                return amount;
+            foreach (var modifier in PassiveCombatModifiers)
+            {
+                var permille = damageType == DamageType.Physical
+                    ? modifier.PhysicalDamageTakenPermille
+                    : modifier.MagicDamageTakenPermille;
+                amount = (int)((long)amount * permille / 1000);
+            }
+
+            return amount;
+        }
+
+        private IEnumerable<PassiveCombatModifierDefinition>
+            PassiveCombatModifiers =>
+            abilityStates
+                .Select(item => item.Definition.PassiveCombatModifier)
+                .Where(item => item != null);
+        internal int PassiveHitPointsPerSecond =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.PassiveLifecycleEffect != null)
+                .Sum(item =>
+                    item.Definition.PassiveLifecycleEffect
+                        .HitPointsPerSecond);
+        internal int PassiveLifetimeTicks
+        {
+            get
+            {
+                var lifetimes = abilityStates
+                    .Where(item =>
+                        item.Definition.PassiveLifecycleEffect != null
+                        && item.Definition.PassiveLifecycleEffect
+                            .LifetimeTicks > 0)
+                    .Select(item =>
+                        item.Definition.PassiveLifecycleEffect
+                            .LifetimeTicks)
+                    .ToArray();
+                return lifetimes.Length == 0
+                    ? 0
+                    : lifetimes.Min();
+            }
+        }
+        internal IEnumerable<OnDamageReactionEffectDefinition>
+            OnDamageReactions =>
+            abilityStates
+                .Select(item =>
+                    item.Definition.OnDamageReactionEffect)
+                .Where(item => item != null);
     }
 
     public readonly struct BattleStepTrace : IEquatable<BattleStepTrace>
@@ -323,6 +420,8 @@ namespace ArknoNights.Battle.Core
             StartAttacks();
             ResolveDueDamage();
             ResolveDeathsAndCleanup();
+            ApplyPassiveLifecycleEffects();
+            ResolveDeathsAndCleanup();
             EvaluateBattleEnd();
             if (Status == BattleRunnerStatus.Stopped) return;
             RecoverAutomaticSkillPointsAndCast();
@@ -412,14 +511,21 @@ namespace ArknoNights.Battle.Core
 
         private void StartAttacks()
         {
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.CanAttack && !IsAttackAnimationLocked(item) && !IsSkillAnimationLocked(item) && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.CanAttack && item.EffectiveAttackIntervalTicks > 0 && !IsAttackAnimationLocked(item) && !IsSkillAnimationLocked(item) && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 var target = GetAttackTarget(unit);
                 if (target == null) continue;
                 if (DistanceSquared(unit.Position, target.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) continue;
-                var effectiveTicks = Math.Min(unit.Definition.AttackAnimationDurationTicks, unit.Definition.AttackIntervalTicks);
+                var attackIntervalTicks =
+                    unit.EffectiveAttackIntervalTicks;
+                var effectiveTicks = Math.Min(
+                    unit.Definition.AttackAnimationDurationTicks,
+                    attackIntervalTicks);
                 var damageTick = CurrentTick + effectiveTicks;
-                unit.NextAttackAllowedTick = CurrentTick + unit.Definition.AttackIntervalTicks;
+                unit.NextAttackAllowedTick =
+                    attackIntervalTicks >= int.MaxValue - CurrentTick
+                        ? int.MaxValue
+                        : CurrentTick + attackIntervalTicks;
                 unit.AttackAnimationLockUntilTick = Math.Max(unit.AttackAnimationLockUntilTick, damageTick);
                 pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, unit.Definition.Attack, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
                 Emit(BattleEventType.Attack, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, unit.Definition.AttackAnimationDurationTicks, effectiveTicks, null, BattleStopReason.None);
@@ -431,6 +537,7 @@ namespace ArknoNights.Battle.Core
             var due = pendingAttacks.Where(item => item.DamageTick == CurrentTick).OrderBy(item => item.TargetUnitId, StringComparer.Ordinal).ThenBy(item => item.AttackerUnitId, StringComparer.Ordinal).ToArray();
             pendingAttacks.RemoveAll(item => item.DamageTick == CurrentTick);
             var valid = due.Where(item => FindUnit(item.AttackerUnitId).IsAlive && FindUnit(item.TargetUnitId).IsAlive).ToArray();
+            var reactions = new List<DamageReaction>();
             foreach (var targetGroup in valid.GroupBy(item => item.TargetUnitId, StringComparer.Ordinal))
             {
                 var target = FindUnit(targetGroup.Key);
@@ -439,6 +546,50 @@ namespace ArknoNights.Battle.Core
                 var total = hits.Sum(item => item.Amount);
                 target.CurrentHitPoints = Math.Max(0, before - total);
                 foreach (var hit in hits) Emit(BattleEventType.Damage, hit.Attack.AttackerUnitId, null, hit.Attack.TargetUnitId, null, null, hit.Attack.DamageType, hit.Amount, before, target.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None);
+                foreach (var hit in hits.Where(item => item.Amount > 0))
+                foreach (var reaction in target.OnDamageReactions)
+                    reactions.Add(new DamageReaction(
+                        target.UnitId,
+                        hit.Attack.AttackerUnitId,
+                        reaction));
+            }
+
+            foreach (var reactionGroup in reactions
+                         .GroupBy(
+                             item => item.TargetUnitId,
+                             StringComparer.Ordinal)
+                         .OrderBy(item => item.Key, StringComparer.Ordinal))
+            {
+                var target = FindUnit(reactionGroup.Key);
+                if (target == null || target.CurrentHitPoints <= 0)
+                    continue;
+                var resolved = reactionGroup
+                    .Select(item => new ResolvedDamageReaction(
+                        item,
+                        CalculateReactionDamage(
+                            item.Effect,
+                            target)))
+                    .ToArray();
+                var before = target.CurrentHitPoints;
+                var total = resolved.Sum(item => item.Amount);
+                target.CurrentHitPoints = Math.Max(0, before - total);
+                foreach (var reaction in resolved)
+                    Emit(
+                        BattleEventType.Damage,
+                        reaction.Reaction.OwnerUnitId,
+                        null,
+                        reaction.Reaction.TargetUnitId,
+                        null,
+                        null,
+                        reaction.Reaction.Effect.DamageType,
+                        reaction.Amount,
+                        before,
+                        target.CurrentHitPoints,
+                        0,
+                        0,
+                        0,
+                        null,
+                        BattleStopReason.None);
             }
         }
 
@@ -455,6 +606,75 @@ namespace ArknoNights.Battle.Core
                 foreach (var other in runtimeUnits.Where(item => item.IsAlive && item.TargetUnitId == unit.UnitId).OrderBy(item => item.UnitId, StringComparer.Ordinal)) SetTarget(other, null);
             }
             pendingAttacks.RemoveAll(item => !FindUnit(item.AttackerUnitId).IsAlive);
+        }
+
+        private void ApplyPassiveLifecycleEffects()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            {
+                var lifetimeTicks = unit.PassiveLifetimeTicks;
+                if (lifetimeTicks > 0
+                    && CurrentTick - unit.ActivationTick >= lifetimeTicks)
+                {
+                    var before = unit.CurrentHitPoints;
+                    unit.CurrentHitPoints = 0;
+                    Emit(
+                        BattleEventType.HealthChanged,
+                        unit.UnitId,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        before,
+                        before,
+                        0,
+                        0,
+                        0,
+                        0,
+                        null,
+                        BattleStopReason.None);
+                    continue;
+                }
+
+                var rate = unit.PassiveHitPointsPerSecond;
+                if (rate == 0)
+                    continue;
+                unit.PassiveHealthRemainder += Math.Abs(rate);
+                var magnitude =
+                    unit.PassiveHealthRemainder
+                    / BattleInput.TicksPerSecond;
+                unit.PassiveHealthRemainder %=
+                    BattleInput.TicksPerSecond;
+                if (magnitude == 0)
+                    continue;
+                var beforeHitPoints = unit.CurrentHitPoints;
+                unit.CurrentHitPoints = rate > 0
+                    ? Math.Min(
+                        unit.Definition.MaxHitPoints,
+                        unit.CurrentHitPoints + magnitude)
+                    : Math.Max(0, unit.CurrentHitPoints - magnitude);
+                if (unit.CurrentHitPoints == beforeHitPoints)
+                    continue;
+                Emit(
+                    BattleEventType.HealthChanged,
+                    unit.UnitId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    rate < 0 ? DamageType.True : (DamageType?)null,
+                    magnitude,
+                    beforeHitPoints,
+                    unit.CurrentHitPoints,
+                    0,
+                    0,
+                    0,
+                    null,
+                    BattleStopReason.None);
+            }
         }
 
         private void EvaluateBattleEnd()
@@ -669,7 +889,28 @@ namespace ArknoNights.Battle.Core
         private static bool IsInAttackRange(FixedPosition first, FixedPosition second) => DistanceSquared(first, second) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre;
         private static int CalculateDamage(PendingAttack attack, RuntimeUnitState target)
         {
-            return DamageCalculator.Calculate(attack.DamageType, attack.Attack, target.Definition.Defense, target.Definition.MagicResistance);
+            var damage = DamageCalculator.Calculate(
+                attack.DamageType,
+                attack.Attack,
+                target.Definition.Defense,
+                target.EffectiveMagicResistance);
+            return target.ApplyDamageTakenModifiers(
+                attack.DamageType,
+                damage);
+        }
+
+        private static int CalculateReactionDamage(
+            OnDamageReactionEffectDefinition reaction,
+            RuntimeUnitState target)
+        {
+            var damage = DamageCalculator.Calculate(
+                reaction.DamageType,
+                reaction.DamageAmount,
+                target.Definition.Defense,
+                target.EffectiveMagicResistance);
+            return target.ApplyDamageTakenModifiers(
+                reaction.DamageType,
+                damage);
         }
 
         private static int IntegerSquareRootCeiling(long value)
@@ -733,6 +974,8 @@ namespace ArknoNights.Battle.Core
         private readonly struct BlockProposal { public BlockProposal(RuntimeUnitState actor, RuntimeUnitState target) { Actor = actor; Target = target; } public RuntimeUnitState Actor { get; } public RuntimeUnitState Target { get; } }
         private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
+        private readonly struct DamageReaction { public DamageReaction(string ownerUnitId, string targetUnitId, OnDamageReactionEffectDefinition effect) { OwnerUnitId = ownerUnitId; TargetUnitId = targetUnitId; Effect = effect; } public string OwnerUnitId { get; } public string TargetUnitId { get; } public OnDamageReactionEffectDefinition Effect { get; } }
+        private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
 
         private static List<RuntimeUnitState> BuildInitialUnits(
             BattleInput input,

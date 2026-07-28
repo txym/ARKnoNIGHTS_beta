@@ -204,6 +204,21 @@ namespace ArknoNights.Battle.Core
                 builder.Append("|A:").Append(ability.AbilityId).Append(',').Append((int)ability.ActivationKind).Append(',').Append((int)ability.SilencePolicy).Append(',').Append(ability.InitialSkillPoints).Append(',').Append(ability.RequiredSkillPoints).Append(',').Append((int)ability.SkillPointGeneration).Append(',').Append(ability.SummonEffect == null ? string.Empty : ability.SummonEffect.SummonTypeId).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.Count).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.SideLengthCentimetres).Append(',').Append(ability.SummonEffect != null && ability.SummonEffect.InheritPathFromCaster ? 1 : 0).Append(',').Append(ability.AnimationKey).Append(',').Append(ability.SkillAnimationOriginalDurationTicks);
                 if (ability.UnitTraitEffect != null)
                     builder.Append("|G:").Append((int)ability.UnitTraitEffect.Kind);
+                if (ability.PassiveCombatModifier != null)
+                    builder.Append("|C:")
+                        .Append(ability.PassiveCombatModifier.BlockCapacityAdditive).Append(',')
+                        .Append(ability.PassiveCombatModifier.MagicResistanceAdditive).Append(',')
+                        .Append(ability.PassiveCombatModifier.AttackSpeedAdditive).Append(',')
+                        .Append(ability.PassiveCombatModifier.PhysicalDamageTakenPermille).Append(',')
+                        .Append(ability.PassiveCombatModifier.MagicDamageTakenPermille);
+                if (ability.PassiveLifecycleEffect != null)
+                    builder.Append("|L:")
+                        .Append(ability.PassiveLifecycleEffect.HitPointsPerSecond).Append(',')
+                        .Append(ability.PassiveLifecycleEffect.LifetimeTicks);
+                if (ability.OnDamageReactionEffect != null)
+                    builder.Append("|R:")
+                        .Append((int)ability.OnDamageReactionEffect.DamageType).Append(',')
+                        .Append(ability.OnDamageReactionEffect.DamageAmount);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -270,6 +285,9 @@ namespace ArknoNights.Battle.Core
                     if (ability.InitialSkillPoints < 0) validationErrors.Add(new ValidationError("ability.skillPoints.initial.invalid", "Initial skill points cannot be negative: " + ability.AbilityId));
                     if (ability.InitialSkillPoints > ability.RequiredSkillPoints) validationErrors.Add(new ValidationError("ability.skillPoints.order.invalid", "Initial skill points cannot exceed required skill points: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null) validationErrors.Add(new ValidationError("ability.trait.unexpected", "Timed ability cannot define a unit trait: " + ability.AbilityId));
+                    if (ability.PassiveCombatModifier != null) validationErrors.Add(new ValidationError("ability.combatModifier.unexpected", "Timed ability cannot define a passive combat modifier: " + ability.AbilityId));
+                    if (ability.PassiveLifecycleEffect != null) validationErrors.Add(new ValidationError("ability.lifecycle.unexpected", "Timed ability cannot define a passive lifecycle effect: " + ability.AbilityId));
+                    if (ability.OnDamageReactionEffect != null) validationErrors.Add(new ValidationError("ability.damageReaction.unexpected", "Timed ability cannot define an on-damage reaction: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -288,8 +306,36 @@ namespace ArknoNights.Battle.Core
                         validationErrors.Add(new ValidationError("ability.passive.generation.invalid", "Passive ability must use None skill-point generation: " + ability.AbilityId));
                     if (ability.SummonEffect != null)
                         validationErrors.Add(new ValidationError("ability.passive.summon.unexpected", "Passive ability cannot define a summon effect: " + ability.AbilityId));
-                    if (ability.UnitTraitEffect == null || !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
-                        validationErrors.Add(new ValidationError("ability.trait.invalid", "Passive ability requires a valid unit trait: " + ability.AbilityId));
+                    var passiveEffectCount =
+                        (ability.UnitTraitEffect == null ? 0 : 1)
+                        + (ability.PassiveCombatModifier == null ? 0 : 1)
+                        + (ability.PassiveLifecycleEffect == null ? 0 : 1)
+                        + (ability.OnDamageReactionEffect == null ? 0 : 1);
+                    if (passiveEffectCount != 1)
+                        validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
+                    if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
+                        validationErrors.Add(new ValidationError("ability.trait.invalid", "Passive ability has an invalid unit trait: " + ability.AbilityId));
+                    if (ability.PassiveCombatModifier != null
+                        && (ability.PassiveCombatModifier.IsNeutral
+                            || ability.PassiveCombatModifier.BlockCapacityAdditive < 0
+                            || ability.PassiveCombatModifier.MagicResistanceAdditive < -100
+                            || ability.PassiveCombatModifier.MagicResistanceAdditive > 100
+                            || ability.PassiveCombatModifier.AttackSpeedAdditive <= -100
+                            || ability.PassiveCombatModifier.AttackSpeedAdditive > 10000
+                            || ability.PassiveCombatModifier.PhysicalDamageTakenPermille <= 0
+                            || ability.PassiveCombatModifier.PhysicalDamageTakenPermille > 10000
+                            || ability.PassiveCombatModifier.MagicDamageTakenPermille <= 0
+                            || ability.PassiveCombatModifier.MagicDamageTakenPermille > 10000))
+                        validationErrors.Add(new ValidationError("ability.combatModifier.invalid", "Passive combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.PassiveLifecycleEffect != null
+                        && (ability.PassiveLifecycleEffect.IsNeutral
+                            || ability.PassiveLifecycleEffect.LifetimeTicks < 0))
+                        validationErrors.Add(new ValidationError("ability.lifecycle.invalid", "Passive lifecycle effect is invalid: " + ability.AbilityId));
+                    if (ability.OnDamageReactionEffect != null
+                        && (ability.OnDamageReactionEffect.DamageAmount <= 0
+                            || ability.OnDamageReactionEffect.DamageType == DamageType.None
+                            || !Enum.IsDefined(typeof(DamageType), ability.OnDamageReactionEffect.DamageType)))
+                        validationErrors.Add(new ValidationError("ability.damageReaction.invalid", "On-damage reaction is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)
