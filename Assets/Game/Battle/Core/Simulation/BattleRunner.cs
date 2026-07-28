@@ -505,6 +505,15 @@ namespace ArknoNights.Battle.Core
                     new KeyValuePair<string, DeathAreaDamageEffectDefinition>(
                         item.Definition.AbilityId,
                         item.Definition.DeathAreaDamageEffect));
+        internal IEnumerable<KeyValuePair<string, AttackAreaDamageModifierDefinition>>
+            AttackAreaDamageModifiers =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.AttackAreaDamageModifier != null)
+                .Select(item =>
+                    new KeyValuePair<string, AttackAreaDamageModifierDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.AttackAreaDamageModifier));
         internal void SetAuraCombatModifiers(
             IEnumerable<IExternalCombatModifierDefinition> modifiers)
         {
@@ -880,7 +889,12 @@ namespace ArknoNights.Battle.Core
         {
             var due = pendingAttacks.Where(item => item.DamageTick == CurrentTick).OrderBy(item => item.TargetUnitId, StringComparer.Ordinal).ThenBy(item => item.AttackerUnitId, StringComparer.Ordinal).ToArray();
             pendingAttacks.RemoveAll(item => item.DamageTick == CurrentTick);
-            var valid = due.Where(item => FindUnit(item.AttackerUnitId).IsAlive && FindUnit(item.TargetUnitId).IsAlive).ToArray();
+            var valid = due
+                .Where(item =>
+                    FindUnit(item.AttackerUnitId).IsAlive
+                    && FindUnit(item.TargetUnitId).IsAlive)
+                .SelectMany(ExpandAttackAreaDamage)
+                .ToArray();
             var reactions = new List<DamageReaction>();
             foreach (var targetGroup in valid.GroupBy(item => item.TargetUnitId, StringComparer.Ordinal))
             {
@@ -935,6 +949,74 @@ namespace ArknoNights.Battle.Core
                         null,
                         BattleStopReason.None);
             }
+        }
+
+        private IEnumerable<PendingAttack> ExpandAttackAreaDamage(
+            PendingAttack attack)
+        {
+            var attacker = FindUnit(attack.AttackerUnitId);
+            var primaryTarget = FindUnit(attack.TargetUnitId);
+            var modifiers = attacker.AttackAreaDamageModifiers
+                .Where(item =>
+                    item.Value.IsAreaAttack(
+                        attack.AttackOrdinal))
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .ToArray();
+            if (modifiers.Length == 0)
+                return new[] { attack };
+
+            var expanded = new List<PendingAttack>();
+            foreach (var ability in modifiers)
+            {
+                var targets = runtimeUnits
+                    .Where(target =>
+                        IsActive(target)
+                        && target.Side != attacker.Side
+                        && IsInAttackArea(
+                            primaryTarget.Position,
+                            target.Position,
+                            ability.Value))
+                    .OrderBy(
+                        target => target.UnitId,
+                        StringComparer.Ordinal);
+                foreach (var target in targets)
+                {
+                    var scaledAttack = (int)Math.Min(
+                        int.MaxValue,
+                        (long)attack.Attack
+                        * ability.Value.AttackMultiplierPermille
+                        / 1000);
+                    expanded.Add(new PendingAttack(
+                        attack.AttackerUnitId,
+                        target.UnitId,
+                        attack.DamageTick,
+                        ability.Value.DamageType,
+                        scaledAttack,
+                        attack.TargetDefenseMultiplierPermille,
+                        attack.AttackOrdinal,
+                        attack.OriginalTicks,
+                        attack.EffectiveTicks));
+                }
+            }
+            return expanded;
+        }
+
+        private static bool IsInAttackArea(
+            FixedPosition centre,
+            FixedPosition candidate,
+            AttackAreaDamageModifierDefinition modifier)
+        {
+            if (modifier.Shape == AttackAreaShape.Radius)
+                return DistanceSquared(centre, candidate)
+                    <= (long)modifier.RadiusCentimetres
+                       * modifier.RadiusCentimetres;
+            var centreCell =
+                NearestBattlefieldCoordinate(centre);
+            var candidateCell =
+                NearestBattlefieldCoordinate(candidate);
+            return Math.Abs(centreCell.X - candidateCell.X)
+                   + Math.Abs(centreCell.Y - candidateCell.Y)
+                   <= 1;
         }
 
         private void ResolveDeathsAndCleanup()
@@ -1489,6 +1571,23 @@ namespace ArknoNights.Battle.Core
                 .OrderBy(item => DistanceSquared(item, position))
                 .ThenBy(item => item.XUnits)
                 .ThenBy(item => item.YUnits)
+                .First();
+        }
+
+        private static BattlefieldCoordinate
+            NearestBattlefieldCoordinate(FixedPosition position)
+        {
+            return Enumerable
+                .Range(1, BattlefieldCoordinate.Width)
+                .SelectMany(x => Enumerable
+                    .Range(1, BattlefieldCoordinate.Height)
+                    .Select(y =>
+                        new BattlefieldCoordinate(x, y)))
+                .OrderBy(item => DistanceSquared(
+                    FixedPosition.FromCell(item),
+                    position))
+                .ThenBy(item => item.X)
+                .ThenBy(item => item.Y)
                 .First();
         }
 

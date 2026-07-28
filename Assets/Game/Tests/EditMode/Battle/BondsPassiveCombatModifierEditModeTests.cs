@@ -925,6 +925,119 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void RadiusAttackArea_DamagesEveryEnemyWithinTargetRadius()
+        {
+            var input = CreateInput(
+                3,
+                new[]
+                {
+                    Attacker(
+                        "splash",
+                        2000,
+                        0,
+                        "RADIUS_SPLASH",
+                        attackIntervalTicks: 100,
+                        attack: 100),
+                    NonAttacker("target", 1000),
+                    NonAttacker("far", 1000)
+                },
+                new[]
+                {
+                    PassiveAttackArea(
+                        "RADIUS_SPLASH",
+                        AttackAreaShape.Radius,
+                        firstAreaAttackOrdinal: 1,
+                        repeatInterval: 1,
+                        DamageType.Physical,
+                        attackMultiplierPermille: 1000,
+                        radiusCentimetres: 150)
+                },
+                new[] { Unit("splash", "splash", 5, 4) },
+                new[]
+                {
+                    Unit("centre", "target", 5, 4),
+                    Unit("near", "target", 6, 4),
+                    Unit("far", "far", 7, 4)
+                });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var hits = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "splash")
+                .OrderBy(item => item.RelatedUnitId)
+                .ToArray();
+
+            Assert.That(
+                hits.Select(item => item.RelatedUnitId),
+                Is.EqualTo(new[] { "centre", "near" }));
+            Assert.That(
+                hits.Select(item => item.DamageAmount),
+                Is.EqualTo(new[] { 100, 100 }));
+            Assert.That(
+                result.FinalUnits.Single(item =>
+                    item.UnitId == "far").HitPoints,
+                Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void OrthogonalAttackArea_ExpandsEveryThirdAttackToCrossCells()
+        {
+            var input = CreateInput(
+                7,
+                new[]
+                {
+                    Attacker(
+                        "trumpeter",
+                        2000,
+                        0,
+                        "CROSS_THIRD",
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    NonAttacker("target", 1000)
+                },
+                new[]
+                {
+                    PassiveAttackArea(
+                        "CROSS_THIRD",
+                        AttackAreaShape.OrthogonalAdjacentCells,
+                        firstAreaAttackOrdinal: 3,
+                        repeatInterval: 3,
+                        DamageType.Physical,
+                        attackMultiplierPermille: 1000,
+                        radiusCentimetres: 0)
+                },
+                new[] { Unit("trumpeter", "trumpeter", 5, 4) },
+                new[]
+                {
+                    Unit("primary", "target", 5, 4),
+                    Unit("adjacent", "target", 6, 4),
+                    Unit("diagonal", "target", 4, 3)
+                });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var hits = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "trumpeter")
+                .ToArray();
+
+            Assert.That(
+                hits.Where(item => item.Tick < 6)
+                    .Select(item => item.RelatedUnitId),
+                Is.EqualTo(new[] { "primary", "primary" }));
+            Assert.That(
+                hits.Where(item => item.Tick == 6)
+                    .Select(item => item.RelatedUnitId)
+                    .OrderBy(item => item),
+                Is.EqualTo(new[] { "adjacent", "primary" }));
+            Assert.That(
+                result.FinalUnits.Single(item =>
+                    item.UnitId == "diagonal").HitPoints,
+                Is.EqualTo(1000));
+        }
+
+        [Test]
         public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -1657,6 +1770,50 @@ namespace ArknoNights.Battle.Tests
                     attackMultiplierPermille,
                     radiusCentimetres,
                     delayTicks),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveAttackArea(
+            string abilityId,
+            AttackAreaShape shape,
+            int firstAreaAttackOrdinal,
+            int repeatInterval,
+            DamageType damageType,
+            int attackMultiplierPermille,
+            int radiusCentimetres)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new AttackAreaDamageModifierDefinition(
+                    shape,
+                    firstAreaAttackOrdinal,
+                    repeatInterval,
+                    damageType,
+                    attackMultiplierPermille,
+                    radiusCentimetres),
                 string.Empty,
                 0);
         }
