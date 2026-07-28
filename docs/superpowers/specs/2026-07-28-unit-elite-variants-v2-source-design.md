@@ -595,14 +595,17 @@ Assets/Resources/BattleData/ability-catalog-v1.json
 
 ## 15. 文档迁移
 
-实施时同步更新：
+首批 `1000`、`5503`、`5504` 的 v2 迁移已经同步更新：
 
 - `docs/SPEC.md`；
 - `docs/ARCHITECTURE.md`；
 - `docs/TEST_PLAN.md`；
-- 与 `unit-source-v1` 和 v1 sidecar 有关的长期技术决策。
+- `docs/UNIT-DATA-001.md`；
+- `docs/decisions/2026-07-28-unit-elite-variants-v2-source.md`。
 
-在代码迁移完成前，主 SPEC 继续描述当前已实现的数据链；本设计文档描述已确认但尚未实施的目标状态，避免文档提前宣称未交付行为。
+上述文档现描述已经实施的首批三单位 v2 源链和冻结 Player 目录边界。
+其余单位导入、运行时精英 2/3 选择、目录迁移和独立动画层仍属于后续范围，
+不得因首批迁移完成而提前宣称已经实现。
 
 ## 16. 后续阶段
 

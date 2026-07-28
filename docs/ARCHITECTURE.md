@@ -60,7 +60,7 @@ TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译�
 
 1. `ButtonDebug.Debugbutton` 调用 `UnitFactory.SpawnAll`；
 2. `UnitFactory` 通过共享 `UnitEliteVariantResolver` 读取 `Application.dataPath/GameData/Units/EliteVariants/Json` 下的 v2 文档，当前只包含 `1000`、`5503`、`5504`；
-3. 工厂在创建对象前完成全部文档、精英 0、资源与必要动画绑定校验；
+3. 工厂在创建首个 `UnitTemplate` 或 GameObject 前完成全部 v2 源文档加载、精英 0 解析和必需 idle/move/attack 语义动画绑定校验；物理 `SkeletonDataAsset` 仍在对象创建后的第 7 步加载；
 4. 工厂把已解析的 v2 事实显式适配到内存 `UnitTemplate`，并按 `typeID` 写入静态字典；
 5. 工厂加载 `Resources/Prefabs/DefaultUnit` 并为每种类型实例化一个对象；
 6. 工厂动态添加 `UnitIdentity` 和兼容用 `UnitSkelType2`；

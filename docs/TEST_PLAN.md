@@ -231,7 +231,7 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 ### 7.2 已知构建风险
 
 1. `UITest.targetSprite` 条件编译作用域阻塞已修复并通过 Standalone 构建复测。
-2. 旧 `UnitFactory` 仍从 `Application.dataPath/GameData/Units/Json` 读取松散 JSON；它是旧原型风险，不是新 Demo 数据链。新 Demo 使用 `Resources` 中的 `unit-catalog-v1` 与 `local-battle-v1`，已在 Player 实际加载。
+2. 旧 `UnitFactory` 仍从 `Application.dataPath/GameData/Units/EliteVariants/Json` 读取 v2 源文档；它是待销毁的 legacy/debug 原型风险，不是正式 Demo 数据链。正式 Demo 使用 `Resources` 中冻结的 `unit-catalog-v1` 与 `local-battle-v1`，已在 Player 实际加载。
 3. 当前只启用 `SampleScene`，还没有独立启动或正式战斗场景可供构建流程选择。
 
 ### 7.3 目标平台确认后的验证步骤
