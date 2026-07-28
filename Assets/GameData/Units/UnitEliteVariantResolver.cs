@@ -950,6 +950,14 @@ internal static class UnitEliteVariantResolver
                     "UNIT_ELITE_VARIANT_ANIMATION_SHAPE_INVALID context=" + context);
             }
 
+            if (string.Equals(animation.key, "Default", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "UNIT_ELITE_VARIANT_LEGACY_FIELD_FORBIDDEN"
+                    + " field=Default"
+                    + " context=" + context);
+            }
+
             if (!keys.Add(animation.key))
             {
                 throw new InvalidOperationException(
