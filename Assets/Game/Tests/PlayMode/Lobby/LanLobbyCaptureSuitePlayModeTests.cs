@@ -404,9 +404,9 @@ namespace ArknoNights.Lobby.Tests
                     var lower = capture.keyRects.Single(rect => rect.name == slotRoot + "/LowerDecoration");
                     Assert.That(frame.width, Is.EqualTo(566f).Within(0.01f),
                         capture.name + " slot " + (slotIndex + 1) + " CardBody width.");
-                    Assert.That(frame.height, Is.EqualTo(626f).Within(0.01f),
+                    Assert.That(frame.height, Is.EqualTo(695f).Within(0.01f),
                         capture.name + " slot " + (slotIndex + 1) + " CardBody height.");
-                    Assert.That(VerticalOverlap(frame, lower), Is.EqualTo(81.5f).Within(1f),
+                    Assert.That(VerticalOverlap(frame, lower), Is.EqualTo(92.5f).Within(1f),
                         capture.name + " slot " + (slotIndex + 1) + " frame/lower overlap.");
 
                     if (baselineFrame == null)

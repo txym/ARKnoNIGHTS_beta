@@ -46,8 +46,9 @@ public sealed class LanLobbyRoomLayout
     private const float ReferenceHeight = 1080f;
     private const float SlotRootHeight = 664.5f;
     private const float CardBodyLeft = -96.5f;
+    private const float CardBodyTop = -58f;
     private const float CardBodyWidth = 566f;
-    private const float CardBodyHeight = 626f;
+    private const float CardBodyHeight = 695f;
     private const float TopBarLeft = 26.25f;
     private const float TopBarWidth = 320.25f;
     private const float TopBarSourceWidth = 234f;
@@ -65,7 +66,7 @@ public sealed class LanLobbyRoomLayout
         FromTopLeft(1365f, 177.75f, 363.75f, SlotRootHeight, ReferenceHeight)
     };
 
-    private static readonly LanLobbyRect CanonicalCardBody = FromTopLeft(CardBodyLeft, 0f, CardBodyWidth, CardBodyHeight, SlotRootHeight);
+    private static readonly LanLobbyRect CanonicalCardBody = FromTopLeft(CardBodyLeft, CardBodyTop, CardBodyWidth, CardBodyHeight, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalPortraitContentArea =
         FromTopLeft(18.5f, 0f, 337f, 553.25f, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalTopBar = FromTopLeft(TopBarLeft, 0f, TopBarWidth, TopBarWidth * TopBarSourceHeight / TopBarSourceWidth, SlotRootHeight);
