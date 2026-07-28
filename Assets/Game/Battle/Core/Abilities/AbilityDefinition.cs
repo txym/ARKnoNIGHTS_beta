@@ -81,6 +81,29 @@ namespace ArknoNights.Battle.Core
         public int DamageAmount { get; }
     }
 
+    public sealed class UnblockedDamageTakenModifierDefinition
+    {
+        public const int NeutralDamageTakenPermille = 1000;
+
+        public UnblockedDamageTakenModifierDefinition(
+            int physicalDamageTakenPermille,
+            int magicDamageTakenPermille)
+        {
+            PhysicalDamageTakenPermille =
+                physicalDamageTakenPermille;
+            MagicDamageTakenPermille =
+                magicDamageTakenPermille;
+        }
+
+        public int PhysicalDamageTakenPermille { get; }
+        public int MagicDamageTakenPermille { get; }
+        public bool IsNeutral =>
+            PhysicalDamageTakenPermille
+            == NeutralDamageTakenPermille
+            && MagicDamageTakenPermille
+            == NeutralDamageTakenPermille;
+    }
+
     public sealed class HealthThresholdCombatModifierDefinition
     {
         public const int NeutralMultiplierPermille = 1000;
@@ -278,6 +301,28 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, string animationKey, int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                passiveCombatModifier,
+                passiveLifecycleEffect,
+                onDamageReactionEffect,
+                healthThresholdCombatModifier,
+                null,
+                animationKey,
+                skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -294,6 +339,8 @@ namespace ArknoNights.Battle.Core
             OnDamageReactionEffect = onDamageReactionEffect;
             HealthThresholdCombatModifier =
                 healthThresholdCombatModifier;
+            UnblockedDamageTakenModifier =
+                unblockedDamageTakenModifier;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -313,6 +360,8 @@ namespace ArknoNights.Battle.Core
         public OnDamageReactionEffectDefinition OnDamageReactionEffect { get; }
         public HealthThresholdCombatModifierDefinition
             HealthThresholdCombatModifier { get; }
+        public UnblockedDamageTakenModifierDefinition
+            UnblockedDamageTakenModifier { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

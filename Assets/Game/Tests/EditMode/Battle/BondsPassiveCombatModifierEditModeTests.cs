@@ -496,6 +496,77 @@ namespace ArknoNights.Battle.Tests
             Assert.That(runtime.BlockedUnitIds, Is.EqualTo(new[] { "enemy-a" }));
         }
 
+        [Test]
+        public void UnblockedDamageReduction_AppliesOnlyToPhysicalAndMagicDamage()
+        {
+            Assert.That(
+                RunConditionalDamage(
+                    DamageType.Physical,
+                    targetBlockCapacity: 0),
+                Is.EqualTo(500));
+            Assert.That(
+                RunConditionalDamage(
+                    DamageType.Magic,
+                    targetBlockCapacity: 0),
+                Is.EqualTo(500));
+            Assert.That(
+                RunConditionalDamage(
+                    DamageType.True,
+                    targetBlockCapacity: 0),
+                Is.EqualTo(1000));
+            Assert.That(
+                RunConditionalDamage(
+                    DamageType.Physical,
+                    targetBlockCapacity: 1),
+                Is.EqualTo(1000));
+        }
+
+        private static int RunConditionalDamage(
+            DamageType damageType,
+            int targetBlockCapacity)
+        {
+            var target = new UnitDefinition(
+                "target",
+                5000,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                DamageType.None,
+                AttackMethod.None,
+                targetBlockCapacity,
+                0,
+                true,
+                new[] { "UNBLOCKED_REDUCTION" },
+                4);
+            var input = CreateInput(
+                3,
+                new[]
+                {
+                    Attacker(
+                        "attacker",
+                        2000,
+                        1,
+                        damageType: damageType,
+                        attackIntervalTicks: 100,
+                        attack: 1000),
+                    target
+                },
+                new[] { PassiveUnblockedDamageReduction() },
+                new[] { Unit("attacker", "attacker", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+
+            return new BattleRunner(input)
+                .RunToCompletion()
+                .Events
+                .Single(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.RelatedUnitId == "target")
+                .DamageAmount;
+        }
+
         private static BattleEvent RunSingleDamage(
             DamageType damageType,
             PassiveCombatModifierDefinition modifier)
@@ -658,6 +729,30 @@ namespace ArknoNights.Battle.Tests
                     blockCapacityAdditive,
                     attackSpeedAdditive,
                     moveSpeedMultiplierPermille),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveUnblockedDamageReduction()
+        {
+            return new AbilityDefinition(
+                "UNBLOCKED_REDUCTION",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new UnblockedDamageTakenModifierDefinition(
+                    500,
+                    500),
                 string.Empty,
                 0);
         }

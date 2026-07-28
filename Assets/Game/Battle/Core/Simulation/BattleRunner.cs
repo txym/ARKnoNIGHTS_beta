@@ -263,11 +263,23 @@ namespace ArknoNights.Battle.Core
             if (damageType != DamageType.Physical
                 && damageType != DamageType.Magic)
                 return amount;
-            foreach (var modifier in PassiveCombatModifiers)
+            foreach (var abilityState in abilityStates)
             {
-                var permille = damageType == DamageType.Physical
-                    ? modifier.PhysicalDamageTakenPermille
-                    : modifier.MagicDamageTakenPermille;
+                var passive =
+                    abilityState.Definition.PassiveCombatModifier;
+                var conditional =
+                    abilityState.Definition
+                        .UnblockedDamageTakenModifier;
+                var permille = passive != null
+                    ? damageType == DamageType.Physical
+                        ? passive.PhysicalDamageTakenPermille
+                        : passive.MagicDamageTakenPermille
+                    : conditional != null && !IsBlocked
+                        ? damageType == DamageType.Physical
+                            ? conditional.PhysicalDamageTakenPermille
+                            : conditional.MagicDamageTakenPermille
+                        : PassiveCombatModifierDefinition
+                            .NeutralDamageTakenPermille;
                 amount = (int)((long)amount * permille / 1000);
             }
 
