@@ -156,6 +156,59 @@ function Get-DirectoryByName {
     return $matches[0]
 }
 
+function Get-ResourceCombatRecord {
+    param(
+        [Parameter(Mandatory = $true)][System.IO.DirectoryInfo]$ResourceDirectory,
+        [Parameter(Mandatory = $true)][string]$TypeId,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$DamageTypeOverrides,
+        [Parameter(Mandatory = $true)][System.Collections.Generic.HashSet[string]]$AllowedDamageTypes
+    )
+
+    $levelsPath = Join-Path $ResourceDirectory.FullName 'unit-levels.json'
+    $sourcePath = Join-Path $ResourceDirectory.FullName 'unit-source-v1.json'
+    Assert-Condition (Test-Path -LiteralPath $levelsPath -PathType Leaf) "Resource directory '$($ResourceDirectory.Name)' is missing unit-levels.json."
+    Assert-Condition (Test-Path -LiteralPath $sourcePath -PathType Leaf) "Resource directory '$($ResourceDirectory.Name)' is missing unit-source-v1.json."
+    try {
+        $levelsDocument = Get-Content -LiteralPath $levelsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $sourceDocument = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "Resource directory '$($ResourceDirectory.Name)' contains invalid JSON: $($_.Exception.Message)"
+    }
+    Assert-Condition ([string]$sourceDocument.typeId -ceq $TypeId) "Resource directory '$($ResourceDirectory.Name)' source typeId '$($sourceDocument.typeId)' does not match '$TypeId'."
+    $levelZero = Get-RequiredLevelZero -LevelsDocument $levelsDocument -DirectoryName $ResourceDirectory.Name
+
+    $stagingDamageType = [string]$sourceDocument.damageType
+    if ([string]::IsNullOrWhiteSpace($stagingDamageType)) {
+        Assert-Condition ($DamageTypeOverrides.Contains($TypeId)) "TypeId '$TypeId' is missing a damageType."
+        $damageType = [string]$DamageTypeOverrides[$TypeId]
+        $damageTypeSource = 'ConfirmedOverride'
+    }
+    else {
+        Assert-Condition ($AllowedDamageTypes.Contains($stagingDamageType)) "TypeId '$TypeId' has invalid damageType '$stagingDamageType'."
+        if ($DamageTypeOverrides.Contains($TypeId)) {
+            Assert-Condition ($stagingDamageType -ceq [string]$DamageTypeOverrides[$TypeId]) "TypeId '$TypeId' has conflicting damageType '$stagingDamageType'; confirmed damageType is '$($DamageTypeOverrides[$TypeId])'."
+        }
+        $damageType = $stagingDamageType
+        $damageTypeSource = 'Staging'
+    }
+
+    return [pscustomobject][ordered]@{
+        TypeId = [int]$TypeId
+        ResourceDirectory = $ResourceDirectory.Name
+        DamageType = $damageType
+        DamageTypeSource = $damageTypeSource
+        MaxHitPoints = $levelZero.MaxHitPoints
+        Attack = $levelZero.Attack
+        Defense = $levelZero.Defense
+        MagicResistance = $levelZero.MagicResistance
+        AttackIntervalSeconds = $levelZero.AttackIntervalSeconds
+        EffectiveAttackIntervalSeconds = $levelZero.AttackIntervalSeconds * [decimal]0.5
+        MoveSpeedMetresPerSecond = $levelZero.MoveSpeedMetresPerSecond
+        LifeDeduct = $levelZero.LifeDeduct
+    }
+}
+
 function Get-NonNegativeCombatValue {
     param(
         [Parameter(Mandatory = $true)][decimal]$Value,
@@ -992,6 +1045,217 @@ function Get-R1CalibratedRows {
         })
 }
 
+function Get-EliteResourcePlan {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$DirectoryNames,
+        [Parameter(Mandatory = $true)][string]$TypeId,
+        [Parameter(Mandatory = $true)][string]$E0ResourceDirectory
+    )
+
+    $nameCounts = @{}
+    foreach ($directoryName in $DirectoryNames) {
+        $nameCounts[$directoryName] = 1 + $(if ($nameCounts.ContainsKey($directoryName)) { [int]$nameCounts[$directoryName] } else { 0 })
+    }
+    Assert-Condition ($nameCounts.ContainsKey($E0ResourceDirectory) -and [int]$nameCounts[$E0ResourceDirectory] -eq 1) "TypeId '$TypeId' must have exactly one E0 resource directory '$E0ResourceDirectory'."
+
+    $elite2DedicatedName = if ($TypeId -ceq '1322') { '1322_wdgyht' } else { "${E0ResourceDirectory}_2" }
+    $elite3DedicatedName = if ($TypeId -ceq '1322') { '1322_wdgyht_3' } else { "${E0ResourceDirectory}_3" }
+    $elite2DedicatedCount = if ($nameCounts.ContainsKey($elite2DedicatedName)) { [int]$nameCounts[$elite2DedicatedName] } else { 0 }
+    $elite3DedicatedCount = if ($nameCounts.ContainsKey($elite3DedicatedName)) { [int]$nameCounts[$elite3DedicatedName] } else { 0 }
+    Assert-Condition ($elite2DedicatedCount -le 1) "TypeId '$TypeId' has ambiguous E2 resource directory '$elite2DedicatedName'."
+    Assert-Condition ($elite3DedicatedCount -le 1) "TypeId '$TypeId' has ambiguous E3 resource directory '$elite3DedicatedName'."
+
+    $elite2IsDedicated = $elite2DedicatedCount -eq 1
+    $elite2ResourceDirectory = if ($elite2IsDedicated) { $elite2DedicatedName } else { $E0ResourceDirectory }
+    $elite3IsDedicated = $elite3DedicatedCount -eq 1
+    $elite3ResourceDirectory = if ($elite3IsDedicated) { $elite3DedicatedName } else { $elite2ResourceDirectory }
+
+    return [pscustomobject][ordered]@{
+        TypeId = $TypeId
+        E0ResourceDirectory = $E0ResourceDirectory
+        Elite2ResourceDirectory = $elite2ResourceDirectory
+        Elite2ResourceSource = if ($elite2IsDedicated) { 'Dedicated' } else { 'InheritedE0' }
+        Elite2IsDedicated = $elite2IsDedicated
+        Elite3ResourceDirectory = $elite3ResourceDirectory
+        Elite3ResourceSource = if ($elite3IsDedicated) { 'Dedicated' } else { 'InheritedE2' }
+        Elite3IsDedicated = $elite3IsDedicated
+    }
+}
+
+function Get-EliteStageCalculation {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet(1, 2, 3)][int]$EliteLevel,
+        [Parameter(Mandatory = $true)][decimal]$E0ContinuousPower,
+        [Parameter(Mandatory = $true)][int]$E0Cost,
+        [AllowNull()][Nullable[decimal]]$E0PanelPower,
+        [AllowNull()][Nullable[decimal]]$StagePanelPower,
+        [Parameter(Mandatory = $true)][decimal]$AbilityPowerMultiplier,
+        [Parameter(Mandatory = $true)][decimal]$EquivalentEntityContribution,
+        [Parameter(Mandatory = $true)][string]$ResourceSource
+    )
+
+    Assert-Condition ($E0ContinuousPower -gt 0) "E0 ContinuousPower '$E0ContinuousPower' must be positive."
+    Assert-Condition ($E0Cost -gt 0) "E0 Cost '$E0Cost' must be positive."
+    Assert-Condition ($AbilityPowerMultiplier -gt 0) "AbilityPowerMultiplier '$AbilityPowerMultiplier' must be positive."
+    Assert-Condition ($EquivalentEntityContribution -ge 0) "EquivalentEntityContribution '$EquivalentEntityContribution' must be nonnegative."
+
+    $entityCount = switch ($EliteLevel) {
+        1 { 2 }
+        2 { 3 }
+        3 { 5 }
+    }
+    $hasBasePanelPower = $null -ne $E0PanelPower
+    $hasStagePanelPower = $null -ne $StagePanelPower
+    $usesVariantPanel = $EliteLevel -gt 1 -and $ResourceSource -in @('Dedicated', 'InheritedE2') -and $hasBasePanelPower -and $hasStagePanelPower
+    $continuousPowerPerBody = if ($usesVariantPanel) {
+        ([decimal]$StagePanelPower * $AbilityPowerMultiplier) + $EquivalentEntityContribution
+    }
+    else {
+        $E0ContinuousPower
+    }
+    Assert-Condition ($continuousPowerPerBody -gt 0) "E$EliteLevel ContinuousPower '$continuousPowerPerBody' must be positive."
+
+    $totalPower = $continuousPowerPerBody * [decimal]$entityCount
+    $totalCost = $E0Cost * $entityCount
+    return [pscustomobject][ordered]@{
+        EliteLevel = $EliteLevel
+        EntityCount = $entityCount
+        ResourceSource = $ResourceSource
+        ContinuousPowerPerBody = $continuousPowerPerBody
+        TotalPower = $totalPower
+        TotalCost = $totalCost
+        PowerPerCostRatio = $continuousPowerPerBody / [decimal]$E0Cost
+        PanelPowerStatus = if ($EliteLevel -eq 1) {
+            'NoDedicatedPanel'
+        }
+        elseif (-not $hasBasePanelPower) {
+            'InheritedE0ContinuousPowerNoPanelPower'
+        }
+        elseif ($ResourceSource -ceq 'Dedicated' -and $usesVariantPanel) {
+            'DedicatedPanelPower'
+        }
+        elseif ($ResourceSource -ceq 'InheritedE2' -and $usesVariantPanel) {
+            'InheritedE2PanelPower'
+        }
+        else {
+            'InheritedE0ContinuousPower'
+        }
+    }
+}
+
+function Get-CombatPanelMetrics {
+    param(
+        [Parameter(Mandatory = $true)]$CombatRecord,
+        [Parameter(Mandatory = $true)][object[]]$Defenders,
+        [Parameter(Mandatory = $true)][object[]]$Attackers,
+        [Parameter(Mandatory = $true)][decimal]$DpsLowerBound,
+        [Parameter(Mandatory = $true)][decimal]$DpsUpperBound,
+        [Parameter(Mandatory = $true)][decimal]$TtdLowerBound,
+        [Parameter(Mandatory = $true)][decimal]$TtdUpperBound,
+        [Parameter(Mandatory = $true)][decimal]$OutputReference,
+        [Parameter(Mandatory = $true)][decimal]$DefenseReference
+    )
+
+    Assert-Condition ([string]$CombatRecord.DamageType -cne 'None') "Type ID $($CombatRecord.TypeId) cannot calculate PanelPower with damageType None."
+    $effectiveInterval = Get-EffectiveAttackInterval -Attacker $CombatRecord
+    $dpsValues = [decimal[]]@($Defenders | ForEach-Object {
+            (Get-OrdinaryAttackDamage -Attacker $CombatRecord -Defender $_) / $effectiveInterval
+        })
+    $ttdValues = [decimal[]]@($Attackers | ForEach-Object {
+            $damagePerHit = Get-OrdinaryAttackDamage -Attacker $_ -Defender $CombatRecord
+            [decimal][Math]::Ceiling([double]([decimal]$CombatRecord.MaxHitPoints / $damagePerHit)) * (Get-EffectiveAttackInterval -Attacker $_)
+        })
+    $rawMedianDps = Get-Median -Values $dpsValues
+    $rawMedianTtd = Get-Median -Values $ttdValues
+    $winsorizedMedianDps = (Get-ClampedCombatValues -Values ([decimal[]]@($rawMedianDps)) -LowerBound $DpsLowerBound -UpperBound $DpsUpperBound)[0]
+    $winsorizedMedianTtd = (Get-ClampedCombatValues -Values ([decimal[]]@($rawMedianTtd)) -LowerBound $TtdLowerBound -UpperBound $TtdUpperBound)[0]
+    $panelPower = Get-GeometricCombinedValue `
+        -Output ($winsorizedMedianDps / $OutputReference) `
+        -Defense ($winsorizedMedianTtd / $DefenseReference)
+    Assert-Condition ($panelPower -gt 0 -and -not [double]::IsNaN([double]$panelPower) -and -not [double]::IsInfinity([double]$panelPower)) "Type ID $($CombatRecord.TypeId) produced invalid variant PanelPower '$panelPower'."
+    return [pscustomobject][ordered]@{
+        RawMedianDps = $rawMedianDps
+        WinsorizedMedianDps = $winsorizedMedianDps
+        RawMedianTtdSeconds = $rawMedianTtd
+        WinsorizedMedianTtdSeconds = $winsorizedMedianTtd
+        PanelPower = $panelPower
+    }
+}
+
+function Get-EconomyConstraintGrid {
+    param([Parameter(Mandatory = $true)][object[]]$Rows)
+
+    $goldBudgets = [int[]]@(34, 76, 126, 184, 250, 324)
+    $costBudgets = [int[]]@(54, 99, 126, 195)
+    $medianCostByRarity = @{}
+    foreach ($rarity in 1..6) {
+        $costs = [decimal[]]@($Rows | Where-Object { [int]$_.Rarity -eq $rarity } | ForEach-Object { [decimal]$_.FinalBaseCost })
+        Assert-Condition ($costs.Count -gt 0) "Economy grid has no R$rarity Cost sample."
+        $medianCost = Get-Median -Values $costs
+        Assert-Condition ($medianCost -gt 0) "Economy grid R$rarity median Cost '$medianCost' must be positive."
+        $medianCostByRarity[$rarity] = $medianCost
+    }
+
+    $gridRows = [System.Collections.Generic.List[object]]::new()
+    $quantityRatios = [System.Collections.Generic.List[object]]::new()
+    foreach ($goldBudget in $goldBudgets) {
+        foreach ($costBudget in $costBudgets) {
+            $caseRows = [System.Collections.Generic.List[object]]::new()
+            foreach ($rarity in 1..6) {
+                $medianCost = [decimal]$medianCostByRarity[$rarity]
+                $goldLimitedQuantity = [int][Math]::Floor([decimal]$goldBudget / [decimal]$rarity)
+                $costLimitedQuantity = [int][Math]::Floor([decimal]$costBudget / $medianCost)
+                $quantity = [Math]::Min($goldLimitedQuantity, $costLimitedQuantity)
+                $limiter = if ($goldLimitedQuantity -lt $costLimitedQuantity) {
+                    'Gold'
+                }
+                elseif ($costLimitedQuantity -lt $goldLimitedQuantity) {
+                    'Cost'
+                }
+                else {
+                    'Both'
+                }
+                $caseRow = [pscustomobject][ordered]@{
+                    GoldBudget = $goldBudget
+                    CostBudget = $costBudget
+                    Rarity = $rarity
+                    MedianCost = $medianCost
+                    GoldLimitedQuantity = $goldLimitedQuantity
+                    CostLimitedQuantity = $costLimitedQuantity
+                    Quantity = $quantity
+                    Limiter = $limiter
+                }
+                $caseRows.Add($caseRow)
+                $gridRows.Add($caseRow)
+            }
+            $r1Quantity = [decimal]$caseRows[0].Quantity
+            $r2Quantity = [decimal]$caseRows[1].Quantity
+            $r6Quantity = [decimal]$caseRows[5].Quantity
+            $quantityRatios.Add([pscustomobject][ordered]@{
+                    GoldBudget = $goldBudget
+                    CostBudget = $costBudget
+                    R1ToR2 = if ($r2Quantity -gt 0) { $r1Quantity / $r2Quantity } else { $null }
+                    R2ToR6 = if ($r6Quantity -gt 0) { $r2Quantity / $r6Quantity } else { $null }
+                })
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        GoldBudgets = $goldBudgets
+        CostBudgets = $costBudgets
+        MedianCostByRarity = [pscustomobject][ordered]@{
+            R1 = $medianCostByRarity[1]
+            R2 = $medianCostByRarity[2]
+            R3 = $medianCostByRarity[3]
+            R4 = $medianCostByRarity[4]
+            R5 = $medianCostByRarity[5]
+            R6 = $medianCostByRarity[6]
+        }
+        Rows = $gridRows.ToArray()
+        QuantityRatios = $quantityRatios.ToArray()
+    }
+}
+
 function Get-R1CalibrationModel {
     param(
         [Parameter(Mandatory = $true)][object[]]$Rows,
@@ -1537,6 +1801,8 @@ try {
     }
 
     $directories = @(Get-ChildItem -LiteralPath $StagingRoot -Directory)
+    $directoryNames = [string[]]@($directories.Name)
+    $actuallyReadResourceDirectories = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     $damageTypeOverrides = $abilityInput.DamageTypeOverrides
     $allowedDamageTypes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($damageType in @('Physical', 'Magic', 'True', 'None')) {
@@ -1550,10 +1816,7 @@ try {
         else {
             Get-OnlyDirectory -Directories $directories -TypeId $typeId
         }
-        if ($typeId -ceq '1322') {
-            $eliteDirectory = Get-DirectoryByName -Directories $directories -Name '1322_wdgyht'
-            $eliteEvidence.Add([pscustomobject][ordered]@{ TypeId = 1322; EliteLevel = 2; ResourceDirectory = $eliteDirectory.Name })
-        }
+        [void]$actuallyReadResourceDirectories.Add($resourceDirectory.Name)
 
         $levelsPath = Join-Path $resourceDirectory.FullName 'unit-levels.json'
         $sourcePath = Join-Path $resourceDirectory.FullName 'unit-source-v1.json'
@@ -1760,6 +2023,7 @@ try {
     }
     foreach ($typeId in $nonShopTypeIds) {
         $resourceDirectory = Get-OnlyDirectory -Directories $directories -TypeId $typeId
+        [void]$actuallyReadResourceDirectories.Add($resourceDirectory.Name)
         $levelsDocument = Get-Content -LiteralPath (Join-Path $resourceDirectory.FullName 'unit-levels.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $sourceDocument = Get-Content -LiteralPath (Join-Path $resourceDirectory.FullName 'unit-source-v1.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $levelZero = Get-RequiredLevelZero -LevelsDocument $levelsDocument -DirectoryName $resourceDirectory.Name
@@ -2024,6 +2288,167 @@ try {
     $r1CalibrationModel = Get-R1CalibrationModel -Rows @($costCurveModel.Rows)
     $rows = @($r1CalibrationModel.Rows)
 
+    $eliteEvidence = [System.Collections.Generic.List[object]]::new()
+    $eliteRows = foreach ($row in $rows) {
+        $typeId = [string]$row.TypeId
+        $resourcePlan = Get-EliteResourcePlan `
+            -DirectoryNames $directoryNames `
+            -TypeId $typeId `
+            -E0ResourceDirectory ([string]$row.ResourceDirectory)
+        $e0PanelPower = if ($null -ne $row.PanelPower) { [Nullable[decimal]]([decimal]$row.PanelPower) } else { $null }
+        $elite2PanelPower = $e0PanelPower
+        if ($resourcePlan.Elite2IsDedicated) {
+            $elite2Directory = Get-DirectoryByName -Directories $directories -Name $resourcePlan.Elite2ResourceDirectory
+            [void]$actuallyReadResourceDirectories.Add($elite2Directory.Name)
+            $elite2Record = Get-ResourceCombatRecord `
+                -ResourceDirectory $elite2Directory `
+                -TypeId $typeId `
+                -DamageTypeOverrides $damageTypeOverrides `
+                -AllowedDamageTypes $allowedDamageTypes
+            if ($null -ne $e0PanelPower) {
+                $elite2PanelMetrics = Get-CombatPanelMetrics `
+                    -CombatRecord $elite2Record `
+                    -Defenders $defenderRows `
+                    -Attackers $attackingRows `
+                    -DpsLowerBound $dpsP5 `
+                    -DpsUpperBound $dpsP95 `
+                    -TtdLowerBound $ttdP5 `
+                    -TtdUpperBound $ttdP95 `
+                    -OutputReference $outputReference `
+                    -DefenseReference $defenseReference
+                $elite2PanelPower = [Nullable[decimal]]([decimal]$elite2PanelMetrics.PanelPower)
+            }
+            else {
+                $elite2PanelPower = $null
+            }
+            $eliteEvidence.Add([pscustomobject][ordered]@{
+                    TypeId = [int]$typeId
+                    EliteLevel = 2
+                    ResourceDirectory = $elite2Directory.Name
+                    PanelPower = $elite2PanelPower
+                    PanelPowerStatus = if ($null -ne $elite2PanelPower) { 'RecomputedFromDedicatedLevel0' } else { 'NotApplicableE0HasNoPanelPower' }
+                })
+        }
+
+        $elite3PanelPower = $elite2PanelPower
+        if ($resourcePlan.Elite3IsDedicated) {
+            $elite3Directory = Get-DirectoryByName -Directories $directories -Name $resourcePlan.Elite3ResourceDirectory
+            [void]$actuallyReadResourceDirectories.Add($elite3Directory.Name)
+            $elite3Record = Get-ResourceCombatRecord `
+                -ResourceDirectory $elite3Directory `
+                -TypeId $typeId `
+                -DamageTypeOverrides $damageTypeOverrides `
+                -AllowedDamageTypes $allowedDamageTypes
+            if ($null -ne $e0PanelPower) {
+                $elite3PanelMetrics = Get-CombatPanelMetrics `
+                    -CombatRecord $elite3Record `
+                    -Defenders $defenderRows `
+                    -Attackers $attackingRows `
+                    -DpsLowerBound $dpsP5 `
+                    -DpsUpperBound $dpsP95 `
+                    -TtdLowerBound $ttdP5 `
+                    -TtdUpperBound $ttdP95 `
+                    -OutputReference $outputReference `
+                    -DefenseReference $defenseReference
+                $elite3PanelPower = [Nullable[decimal]]([decimal]$elite3PanelMetrics.PanelPower)
+            }
+            else {
+                $elite3PanelPower = $null
+            }
+            $eliteEvidence.Add([pscustomobject][ordered]@{
+                    TypeId = [int]$typeId
+                    EliteLevel = 3
+                    ResourceDirectory = $elite3Directory.Name
+                    PanelPower = $elite3PanelPower
+                    PanelPowerStatus = if ($null -ne $elite3PanelPower) { 'RecomputedFromDedicatedLevel0' } else { 'NotApplicableE0HasNoPanelPower' }
+                })
+        }
+
+        $elite1 = Get-EliteStageCalculation `
+            -EliteLevel 1 `
+            -E0ContinuousPower ([decimal]$row.ContinuousPower) `
+            -E0Cost ([int]$row.FinalBaseCost) `
+            -E0PanelPower $e0PanelPower `
+            -StagePanelPower $e0PanelPower `
+            -AbilityPowerMultiplier ([decimal]$row.AbilityPowerMultiplier) `
+            -EquivalentEntityContribution ([decimal]$row.EquivalentEntityContribution) `
+            -ResourceSource 'NoDedicatedPanel'
+        $elite2 = Get-EliteStageCalculation `
+            -EliteLevel 2 `
+            -E0ContinuousPower ([decimal]$row.ContinuousPower) `
+            -E0Cost ([int]$row.FinalBaseCost) `
+            -E0PanelPower $e0PanelPower `
+            -StagePanelPower $elite2PanelPower `
+            -AbilityPowerMultiplier ([decimal]$row.AbilityPowerMultiplier) `
+            -EquivalentEntityContribution ([decimal]$row.EquivalentEntityContribution) `
+            -ResourceSource $resourcePlan.Elite2ResourceSource
+        $elite3 = Get-EliteStageCalculation `
+            -EliteLevel 3 `
+            -E0ContinuousPower ([decimal]$row.ContinuousPower) `
+            -E0Cost ([int]$row.FinalBaseCost) `
+            -E0PanelPower $e0PanelPower `
+            -StagePanelPower $elite3PanelPower `
+            -AbilityPowerMultiplier ([decimal]$row.AbilityPowerMultiplier) `
+            -EquivalentEntityContribution ([decimal]$row.EquivalentEntityContribution) `
+            -ResourceSource $resourcePlan.Elite3ResourceSource
+
+        $eliteRisks = [System.Collections.Generic.List[string]]::new()
+        $e0Efficiency = [decimal]$row.ContinuousPower / [decimal]$row.FinalBaseCost
+        foreach ($stageAudit in @(
+                [pscustomobject]@{ EliteLevel = 2; IsDedicated = [bool]$resourcePlan.Elite2IsDedicated; Calculation = $elite2 },
+                [pscustomobject]@{ EliteLevel = 3; IsDedicated = [bool]$resourcePlan.Elite3IsDedicated; Calculation = $elite3 }
+            )) {
+            if (-not $stageAudit.IsDedicated) {
+                continue
+            }
+            if ($null -eq $e0PanelPower) {
+                $eliteRisks.Add("E$($stageAudit.EliteLevel) has a dedicated resource but E0 has no PanelPower; E0 ContinuousPower is inherited.")
+                continue
+            }
+            $stageEfficiency = [decimal]$stageAudit.Calculation.PowerPerCostRatio
+            $deltaPercent = (($stageEfficiency / $e0Efficiency) - [decimal]1) * [decimal]100
+            if ($deltaPercent -ne 0 -and -not [double]::IsNaN([double]$deltaPercent) -and -not [double]::IsInfinity([double]$deltaPercent)) {
+                $formattedDelta = $deltaPercent.ToString('+0.############################;-0.############################;0', [System.Globalization.CultureInfo]::InvariantCulture)
+                $eliteRisks.Add("E$($stageAudit.EliteLevel) dedicated variant efficiency differs from E0 by $formattedDelta%; C0 is unchanged.")
+            }
+        }
+        if ($typeId -in @('1025', '1131', '1132')) {
+            $eliteRisks.Add('E2 ability definition from BONDS is not separately remodeled; the E0 ability contribution is reused without an invented numeric modifier.')
+        }
+
+        $properties = [ordered]@{}
+        foreach ($property in $row.PSObject.Properties) {
+            $properties[$property.Name] = $property.Value
+        }
+        $properties.Elite1EntityCount = $elite1.EntityCount
+        $properties.Elite1TotalPower = $elite1.TotalPower
+        $properties.Elite1TotalCost = $elite1.TotalCost
+        $properties.Elite1PowerPerCostRatio = $elite1.PowerPerCostRatio
+        $properties.Elite2ResourceDirectory = $resourcePlan.Elite2ResourceDirectory
+        $properties.Elite2ResourceSource = $resourcePlan.Elite2ResourceSource
+        $properties.Elite2PanelPower = $elite2PanelPower
+        $properties.Elite2ContinuousPowerPerBody = $elite2.ContinuousPowerPerBody
+        $properties.Elite2PanelPowerStatus = $elite2.PanelPowerStatus
+        $properties.Elite2TotalPower = $elite2.TotalPower
+        $properties.Elite2TotalCost = $elite2.TotalCost
+        $properties.Elite2PowerPerCostRatio = $elite2.PowerPerCostRatio
+        $properties.Elite3ResourceDirectory = $resourcePlan.Elite3ResourceDirectory
+        $properties.Elite3ResourceSource = $resourcePlan.Elite3ResourceSource
+        $properties.Elite3PanelPower = $elite3PanelPower
+        $properties.Elite3ContinuousPowerPerBody = $elite3.ContinuousPowerPerBody
+        $properties.Elite3PanelPowerStatus = $elite3.PanelPowerStatus
+        $properties.Elite3TotalPower = $elite3.TotalPower
+        $properties.Elite3TotalCost = $elite3.TotalCost
+        $properties.Elite3PowerPerCostRatio = $elite3.PowerPerCostRatio
+        $properties.EliteEfficiencyRisk = $eliteRisks -join ' | '
+        [pscustomobject]$properties
+    }
+    $rows = @($eliteRows)
+    Assert-Condition (@($rows | Where-Object { $_.Elite2ResourceSource -ceq 'Dedicated' }).Count -eq 81) 'Expected 81 dedicated E2 resources.'
+    Assert-Condition (@($rows | Where-Object { $_.Elite3ResourceSource -ceq 'Dedicated' }).Count -eq 1) 'Expected one dedicated E3 resource.'
+    Assert-Condition ($actuallyReadResourceDirectories.Count -eq 181) "Expected 181 actually-read resource directories; found $($actuallyReadResourceDirectories.Count)."
+    $economyPressure = Get-EconomyConstraintGrid -Rows $rows
+
     $rawRarityMedianPower = [ordered]@{}
     $isotonicRarityMedianPower = [ordered]@{}
     $rarityBaseCosts = [ordered]@{}
@@ -2035,10 +2460,37 @@ try {
     }
 
     $analysis = [ordered]@{
-        SchemaVersion = 'unit-cost-analysis-v5'
+        SchemaVersion = 'unit-cost-analysis-v6'
         ShopRowCount = $rows.Count
         RarityDistribution = [ordered]@{ R1 = 9; R2 = 20; R3 = 14; R4 = 24; R5 = 21; R6 = 6 }
         EliteEvidence = @($eliteEvidence)
+        EliteModel = [ordered]@{
+            EntityCountMultipliers = @(1, 2, 3, 5)
+            CostMultipliers = @(1, 2, 3, 5)
+            Elite1PanelRule = 'No dedicated E1 panel; per-body ContinuousPower and absolute efficiency equal E0.'
+            VariantPanelRule = 'Dedicated E2/E3 level 0 is rescored against the E0 defender/attacker samples, E0 winsor bounds, and E0 references.'
+            ContinuousPowerFormula = 'Stage PanelPower * E0 AbilityPowerMultiplier + E0 EquivalentEntityContribution.'
+            SpecialtyRule = 'Rows without E0 PanelPower inherit E0 ContinuousPower and are annotated.'
+            DedicatedE2Count = @($rows | Where-Object { $_.Elite2ResourceSource -ceq 'Dedicated' }).Count
+            DedicatedE3Count = @($rows | Where-Object { $_.Elite3ResourceSource -ceq 'Dedicated' }).Count
+            InheritedE2Count = @($rows | Where-Object { $_.Elite2ResourceSource -ceq 'InheritedE0' }).Count
+            InheritedE3Count = @($rows | Where-Object { $_.Elite3ResourceSource -ceq 'InheritedE2' }).Count
+            ActuallyReadResourceDirectoryCount = $actuallyReadResourceDirectories.Count
+            ActuallyReadJsonFileCount = $actuallyReadResourceDirectories.Count * 2
+            ActuallyReadResourceDirectories = @($actuallyReadResourceDirectories | Sort-Object)
+            EliteEfficiencyRiskCount = @($rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.EliteEfficiencyRisk) }).Count
+            AbilityReuseRiskTypeIds = @(1025, 1131, 1132)
+        }
+        EconomyPressure = [ordered]@{
+            ScopeNote = 'Stress check only; permanent Cost income is unconfirmed.'
+            PermanentCostIncomeStatus = 'Unconfirmed'
+            QuantityFormula = 'min(floor(GoldBudget / rarity), floor(CostBudget / median final Cost for rarity))'
+            GoldBudgets = $economyPressure.GoldBudgets
+            CostBudgets = $economyPressure.CostBudgets
+            MedianCostByRarity = $economyPressure.MedianCostByRarity
+            Rows = $economyPressure.Rows
+            QuantityRatios = $economyPressure.QuantityRatios
+        }
         CombatModel = [ordered]@{
             DefenderCount = $defenderRows.Count
             OrdinaryAttackerCount = $attackingRows.Count

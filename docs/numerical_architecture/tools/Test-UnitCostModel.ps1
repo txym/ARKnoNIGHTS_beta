@@ -321,6 +321,169 @@ function Test-R1CalibrationHelpers {
     Assert-Equal ([decimal]1.50) ([decimal]$kappaCandidates[$kappaCandidates.Count - 1]) 'R1 calibration maximum kappa'
 }
 
+function Test-EliteAndEconomyHelpers {
+    param([Parameter(Mandatory = $true)][string]$ExporterPath)
+
+    $helperScript = Get-UnitCostHelperScript -ExporterPath $ExporterPath
+    . $helperScript `
+        -BondSpecPath 'test-only' `
+        -StagingRoot 'test-only' `
+        -OutputCsvPath 'test-only.csv' `
+        -AnalysisOutputPath 'test-only.json'
+
+    $genericPlan = Get-EliteResourcePlan `
+        -DirectoryNames @('1001_bigbo', '1001_bigbo_2') `
+        -TypeId '1001' `
+        -E0ResourceDirectory '1001_bigbo'
+    Assert-Equal '1001_bigbo_2' ([string]$genericPlan.Elite2ResourceDirectory) 'generic E2 dedicated directory'
+    Assert-Equal 'Dedicated' ([string]$genericPlan.Elite2ResourceSource) 'generic E2 dedicated source'
+    Assert-Equal '1001_bigbo_2' ([string]$genericPlan.Elite3ResourceDirectory) 'generic E3 nearest-lower inheritance'
+    Assert-Equal 'InheritedE2' ([string]$genericPlan.Elite3ResourceSource) 'generic E3 inherited source'
+
+    $fallbackPlan = Get-EliteResourcePlan `
+        -DirectoryNames @('1008_ghost') `
+        -TypeId '1008' `
+        -E0ResourceDirectory '1008_ghost'
+    Assert-Equal '1008_ghost' ([string]$fallbackPlan.Elite2ResourceDirectory) 'missing E2 inherits E0'
+    Assert-Equal 'InheritedE0' ([string]$fallbackPlan.Elite2ResourceSource) 'missing E2 source'
+    Assert-Equal '1008_ghost' ([string]$fallbackPlan.Elite3ResourceDirectory) 'missing E3 inherits nearest lower'
+    Assert-Equal 'InheritedE2' ([string]$fallbackPlan.Elite3ResourceSource) 'missing E3 nearest-lower source'
+
+    $reversePlan = Get-EliteResourcePlan `
+        -DirectoryNames @('1322_wdgyht', '1322_wdgyht_2', '1322_wdgyht_2_2') `
+        -TypeId '1322' `
+        -E0ResourceDirectory '1322_wdgyht_2'
+    Assert-Equal '1322_wdgyht' ([string]$reversePlan.Elite2ResourceDirectory) '1322 reverse E2 mapping'
+    Assert-Equal 'Dedicated' ([string]$reversePlan.Elite2ResourceSource) '1322 reverse E2 source'
+    Assert-Equal '1322_wdgyht' ([string]$reversePlan.Elite3ResourceDirectory) '1322 E3 nearest-lower inheritance'
+    Assert-Equal 'InheritedE2' ([string]$reversePlan.Elite3ResourceSource) '1322 reverse E3 source'
+
+    $e1 = Get-EliteStageCalculation `
+        -EliteLevel 1 `
+        -E0ContinuousPower ([decimal]12) `
+        -E0Cost 4 `
+        -E0PanelPower ([decimal]10) `
+        -StagePanelPower ([decimal]10) `
+        -AbilityPowerMultiplier ([decimal]1.1) `
+        -EquivalentEntityContribution ([decimal]1) `
+        -ResourceSource 'NoDedicatedPanel'
+    Assert-Equal ([decimal]12) ([decimal]$e1.ContinuousPowerPerBody) 'E1 per-body power equals E0'
+    Assert-Equal ([decimal]24) ([decimal]$e1.TotalPower) 'E1 total power'
+    Assert-Equal 8 ([int]$e1.TotalCost) 'E1 total Cost'
+    Assert-Equal ([decimal]3) ([decimal]$e1.PowerPerCostRatio) 'E1 efficiency equals E0'
+
+    $e2Fallback = Get-EliteStageCalculation `
+        -EliteLevel 2 `
+        -E0ContinuousPower ([decimal]12) `
+        -E0Cost 4 `
+        -E0PanelPower ([decimal]10) `
+        -StagePanelPower ([decimal]10) `
+        -AbilityPowerMultiplier ([decimal]1.1) `
+        -EquivalentEntityContribution ([decimal]1) `
+        -ResourceSource 'InheritedE0'
+    Assert-Equal ([decimal]12) ([decimal]$e2Fallback.ContinuousPowerPerBody) 'no-dedicated E2 per-body power equals E0'
+    Assert-Equal ([decimal]36) ([decimal]$e2Fallback.TotalPower) 'E2 total power'
+    Assert-Equal 12 ([int]$e2Fallback.TotalCost) 'E2 total Cost'
+    Assert-Equal ([decimal]3) ([decimal]$e2Fallback.PowerPerCostRatio) 'no-dedicated E2 efficiency equals E0'
+
+    $dedicatedStage = Get-EliteStageCalculation `
+        -EliteLevel 3 `
+        -E0ContinuousPower ([decimal]12) `
+        -E0Cost 4 `
+        -E0PanelPower ([decimal]10) `
+        -StagePanelPower ([decimal]14) `
+        -AbilityPowerMultiplier ([decimal]1.1) `
+        -EquivalentEntityContribution ([decimal]1) `
+        -ResourceSource 'Dedicated'
+    Assert-Condition ([decimal]$dedicatedStage.ContinuousPowerPerBody -gt 0) 'dedicated stage power must be positive.'
+    Assert-Condition (-not [double]::IsNaN([double]$dedicatedStage.PowerPerCostRatio) -and -not [double]::IsInfinity([double]$dedicatedStage.PowerPerCostRatio)) 'dedicated stage efficiency must be finite.'
+
+    $inheritedE3Stage = Get-EliteStageCalculation `
+        -EliteLevel 3 `
+        -E0ContinuousPower ([decimal]12) `
+        -E0Cost 4 `
+        -E0PanelPower ([decimal]10) `
+        -StagePanelPower ([decimal]14) `
+        -AbilityPowerMultiplier ([decimal]1.1) `
+        -EquivalentEntityContribution ([decimal]1) `
+        -ResourceSource 'InheritedE2'
+    Assert-Equal ([decimal]16.4) ([decimal]$inheritedE3Stage.ContinuousPowerPerBody) 'E3 inherits nearest-lower E2 panel power'
+    Assert-Equal ([decimal]4.1) ([decimal]$inheritedE3Stage.PowerPerCostRatio) 'E3 inherited E2 absolute efficiency'
+
+    $economy = Get-EconomyConstraintGrid -Rows @(
+        [pscustomobject]@{ Rarity = 1; FinalBaseCost = 2 },
+        [pscustomobject]@{ Rarity = 2; FinalBaseCost = 4 },
+        [pscustomobject]@{ Rarity = 3; FinalBaseCost = 6 },
+        [pscustomobject]@{ Rarity = 4; FinalBaseCost = 8 },
+        [pscustomobject]@{ Rarity = 5; FinalBaseCost = 10 },
+        [pscustomobject]@{ Rarity = 6; FinalBaseCost = 12 }
+    )
+    Assert-Equal 144 @($economy.Rows).Count 'economy grid row count'
+    Assert-Equal '34/76/126/184/250/324' (@($economy.GoldBudgets) -join '/') 'economy Gold budgets'
+    Assert-Equal '54/99/126/195' (@($economy.CostBudgets) -join '/') 'economy Cost budgets'
+    foreach ($row in @($economy.Rows)) {
+        Assert-Condition ([decimal]$row.Quantity -eq [Math]::Floor([decimal]$row.Quantity) -and [decimal]$row.Quantity -ge 0) 'economy quantity must be a nonnegative integer.'
+    }
+    $economyCase = @($economy.Rows | Where-Object { [int]$_.GoldBudget -eq 34 -and [int]$_.CostBudget -eq 54 })
+    Assert-Equal 6 $economyCase.Count 'economy 34/54 rarity count'
+    $r1 = @($economyCase | Where-Object Rarity -eq 1)[0]
+    $r2 = @($economyCase | Where-Object Rarity -eq 2)[0]
+    $r6 = @($economyCase | Where-Object Rarity -eq 6)[0]
+    Assert-Equal '34/27/27/Cost' "$($r1.GoldLimitedQuantity)/$($r1.CostLimitedQuantity)/$($r1.Quantity)/$($r1.Limiter)" 'economy 34/54 R1'
+    Assert-Equal '17/13/13/Cost' "$($r2.GoldLimitedQuantity)/$($r2.CostLimitedQuantity)/$($r2.Quantity)/$($r2.Limiter)" 'economy 34/54 R2'
+    Assert-Equal '5/4/4/Cost' "$($r6.GoldLimitedQuantity)/$($r6.CostLimitedQuantity)/$($r6.Quantity)/$($r6.Limiter)" 'economy 34/54 R6'
+    $ratioCase = @($economy.QuantityRatios | Where-Object { [int]$_.GoldBudget -eq 34 -and [int]$_.CostBudget -eq 54 })[0]
+    Assert-Equal ([decimal]27 / [decimal]13) ([decimal]$ratioCase.R1ToR2) 'economy 34/54 R1/R2 quantity ratio'
+    Assert-Equal ([decimal]3.25) ([decimal]$ratioCase.R2ToR6) 'economy 34/54 R2/R6 quantity ratio'
+}
+
+function Test-DirectVariantPanelPower {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExporterPath,
+        [Parameter(Mandatory = $true)][string]$StagingRoot,
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$DamageTypeOverrides,
+        [Parameter(Mandatory = $true)]$CombatModel
+    )
+
+    $variantStagingRoot = $StagingRoot
+    $helperScript = Get-UnitCostHelperScript -ExporterPath $ExporterPath
+    . $helperScript `
+        -BondSpecPath 'test-only' `
+        -StagingRoot 'test-only' `
+        -OutputCsvPath 'test-only.csv' `
+        -AnalysisOutputPath 'test-only.json'
+    $allowedVariantDamageTypes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($damageType in @('Physical', 'Magic', 'True', 'None')) {
+        [void]$allowedVariantDamageTypes.Add($damageType)
+    }
+    $e0VariantSample = @($Rows | Where-Object PanelModelStatus -eq 'BaseOrdinaryCombat')
+    foreach ($variantCase in @(
+            [pscustomobject]@{ TypeId = '1006'; ResourceDirectory = '1006_shield_2'; CsvProperty = 'Elite2PanelPower' },
+            [pscustomobject]@{ TypeId = '1006'; ResourceDirectory = '1006_shield_3'; CsvProperty = 'Elite3PanelPower' },
+            [pscustomobject]@{ TypeId = '1322'; ResourceDirectory = '1322_wdgyht'; CsvProperty = 'Elite2PanelPower' }
+        )) {
+        $variantRecord = Get-ResourceCombatRecord `
+            -ResourceDirectory (Get-Item -LiteralPath (Join-Path $variantStagingRoot $variantCase.ResourceDirectory)) `
+            -TypeId $variantCase.TypeId `
+            -DamageTypeOverrides $DamageTypeOverrides `
+            -AllowedDamageTypes $allowedVariantDamageTypes
+        Assert-Equal $variantCase.ResourceDirectory ([string]$variantRecord.ResourceDirectory) "Type ID $($variantCase.TypeId) direct variant level-0 resource"
+        $variantPanelMetrics = Get-CombatPanelMetrics `
+            -CombatRecord $variantRecord `
+            -Defenders $e0VariantSample `
+            -Attackers $e0VariantSample `
+            -DpsLowerBound ([decimal]$CombatModel.DpsWinsorization.P5) `
+            -DpsUpperBound ([decimal]$CombatModel.DpsWinsorization.P95) `
+            -TtdLowerBound ([decimal]$CombatModel.TtdWinsorization.P5) `
+            -TtdUpperBound ([decimal]$CombatModel.TtdWinsorization.P95) `
+            -OutputReference ([decimal]$CombatModel.OutputReference) `
+            -DefenseReference ([decimal]$CombatModel.DefenseReference)
+        $variantRow = @($Rows | Where-Object TypeId -eq $variantCase.TypeId)[0]
+        Assert-Equal ([decimal]$variantPanelMetrics.PanelPower) ([decimal]$variantRow.($variantCase.CsvProperty)) "Type ID $($variantCase.TypeId) $($variantCase.CsvProperty) direct level-0 reproducibility"
+    }
+}
+
 function Get-ShopFixtureResourceDirectories {
     param(
         [Parameter(Mandatory = $true)][string]$BondSpecPath,
@@ -364,18 +527,34 @@ function Get-ShopFixtureResourceDirectories {
     }
     Assert-Equal '1137/1138/2033/5504/10002' ($nonShopTypeIds -join '/') 'non-shop TypeIds for external snapshot'
 
+    $allDirectories = @(Get-ChildItem -LiteralPath $StagingRoot -Directory)
+    $allDirectoryNames = @($allDirectories.Name)
     $directories = [System.Collections.Generic.List[string]]::new()
-    foreach ($typeId in @($typeIds) + @($nonShopTypeIds)) {
+    foreach ($typeId in @($typeIds)) {
         if ($typeId -ceq '1322') {
             $directories.Add('1322_wdgyht_2')
-            continue
         }
-        $matches = @(Get-ChildItem -LiteralPath $StagingRoot -Directory -Filter "${typeId}_*" | Where-Object { $_.Name -notmatch '_[23]$' })
-        Assert-Equal 1 $matches.Count "base resource directory count for TypeId $typeId external snapshot"
+        else {
+            $matches = @($allDirectories | Where-Object { $_.Name -like "${typeId}_*" -and $_.Name -notmatch '_[23]$' })
+            Assert-Equal 1 $matches.Count "base resource directory count for TypeId $typeId external snapshot"
+            $directories.Add($matches[0].Name)
+        }
+        $e0ResourceDirectory = $directories[$directories.Count - 1]
+        $elite2DedicatedName = if ($typeId -ceq '1322') { '1322_wdgyht' } else { "${e0ResourceDirectory}_2" }
+        $elite3DedicatedName = if ($typeId -ceq '1322') { '1322_wdgyht_3' } else { "${e0ResourceDirectory}_3" }
+        if ($elite2DedicatedName -in $allDirectoryNames) {
+            $directories.Add($elite2DedicatedName)
+        }
+        if ($elite3DedicatedName -in $allDirectoryNames) {
+            $directories.Add($elite3DedicatedName)
+        }
+    }
+    foreach ($typeId in @($nonShopTypeIds)) {
+        $matches = @($allDirectories | Where-Object { $_.Name -like "${typeId}_*" -and $_.Name -notmatch '_[23]$' })
+        Assert-Equal 1 $matches.Count "base non-shop resource directory count for TypeId $typeId external snapshot"
         $directories.Add($matches[0].Name)
     }
-    $directories.Add('1322_wdgyht')
-    Assert-Equal 100 @($directories | Sort-Object -Unique).Count 'shop/non-shop plus elite-evidence snapshot resource directory count'
+    Assert-Equal 181 @($directories | Sort-Object -Unique).Count 'shop/non-shop plus actual elite-resource snapshot directory count'
     return @($directories | Sort-Object -Unique)
 }
 
@@ -814,16 +993,17 @@ try {
     Test-CombatMetricHelpers -ExporterPath $exporterPath
     Test-CostCurveHelpers -ExporterPath $exporterPath
     Test-R1CalibrationHelpers -ExporterPath $exporterPath
+    Test-EliteAndEconomyHelpers -ExporterPath $exporterPath
     $fixtureResourceDirectories = Get-ShopFixtureResourceDirectories -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot
     $externalSnapshotBeforeWorkflow = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $fixtureResourceDirectories
     $bondSpecSnapshotBeforeWorkflow = Get-FileIntegritySnapshot -Path $BondSpecPath
     $abilityInputSnapshotBeforeWorkflow = Get-FileIntegritySnapshot -Path $abilityInputPath
-    Assert-Equal 200 $externalSnapshotBeforeWorkflow.Count 'shop/non-shop plus elite-evidence snapshot JSON file count'
+    Assert-Equal 362 $externalSnapshotBeforeWorkflow.Count 'shop/non-shop plus actual elite-resource snapshot JSON file count'
     $shopTypeIds = @(
         $fixtureResourceDirectories |
-            Where-Object { $_ -ne '1322_wdgyht' } |
             ForEach-Object { ($_ -split '_', 2)[0] } |
-            Where-Object { $_ -notin @('1137', '1138', '2033', '5504', '10002') }
+            Where-Object { $_ -notin @('1137', '1138', '2033', '5504', '10002') } |
+            Sort-Object -Unique
     )
     $abilityInput = Test-AbilityInputContract -AbilityInputPath $abilityInputPath -BondSpecPath $BondSpecPath -ShopTypeIds $shopTypeIds
     & $powershellPath -NoProfile -ExecutionPolicy Bypass -File $exporterPath `
@@ -856,7 +1036,14 @@ try {
             'ScenarioEventTimesSeconds', 'ScenarioAttackCount', 'ScenarioSpecialAttackCount',
             'RarityMedianPower', 'IsotonicRarityMedianPower', 'CompressionAlpha',
             'RarityBaseCost', 'WithinTierFactor', 'RawCostBeforeRounding', 'FinalBaseCost',
-            'R1InitialCost', 'R1CalibrationKappa', 'R1CalibratedRawCost'
+            'R1InitialCost', 'R1CalibrationKappa', 'R1CalibratedRawCost',
+            'Elite1EntityCount', 'Elite1TotalPower', 'Elite1TotalCost', 'Elite1PowerPerCostRatio',
+            'Elite2ResourceDirectory', 'Elite2ResourceSource', 'Elite2PanelPower',
+            'Elite2ContinuousPowerPerBody', 'Elite2PanelPowerStatus', 'Elite2TotalPower',
+            'Elite2TotalCost', 'Elite2PowerPerCostRatio',
+            'Elite3ResourceDirectory', 'Elite3ResourceSource', 'Elite3PanelPower',
+            'Elite3ContinuousPowerPerBody', 'Elite3PanelPowerStatus', 'Elite3TotalPower',
+            'Elite3TotalCost', 'Elite3PowerPerCostRatio', 'EliteEfficiencyRisk'
         )) {
         Assert-Condition ($rows[0].PSObject.Properties.Name -contains $property) "CSV is missing combat metric column '$property'."
     }
@@ -982,6 +1169,71 @@ try {
     }
     Assert-Condition (@($rows | Where-Object { [int]$_.FinalBaseCost -gt 30 }).Count -le 8) 'More than eight units have FinalBaseCost > 30.'
 
+    $elite2FallbackTypeIds = @('1008', '1017', '1026', '1042', '1243', '1434', '1502', '2031', '2035', '2043', '2046', '5503', '10039')
+    Assert-Equal 81 @($rows | Where-Object Elite2ResourceSource -eq 'Dedicated').Count 'actual dedicated E2 row count'
+    Assert-Equal 13 @($rows | Where-Object Elite2ResourceSource -eq 'InheritedE0').Count 'actual inherited E2 row count'
+    Assert-Equal 1 @($rows | Where-Object Elite3ResourceSource -eq 'Dedicated').Count 'actual dedicated E3 row count'
+    Assert-Equal 93 @($rows | Where-Object Elite3ResourceSource -eq 'InheritedE2').Count 'actual inherited E3 row count'
+    foreach ($row in $rows) {
+        $e0Power = [decimal]$row.ContinuousPower
+        $e0Cost = [decimal]$row.FinalBaseCost
+        $e0Efficiency = $e0Power / $e0Cost
+        Assert-Equal 2 ([int]$row.Elite1EntityCount) "Type ID $($row.TypeId) E1 entity count"
+        Assert-Equal ($e0Power * [decimal]2) ([decimal]$row.Elite1TotalPower) "Type ID $($row.TypeId) E1 total power"
+        Assert-Equal ($e0Cost * [decimal]2) ([decimal]$row.Elite1TotalCost) "Type ID $($row.TypeId) E1 total Cost"
+        Assert-Equal $e0Efficiency ([decimal]$row.Elite1PowerPerCostRatio) "Type ID $($row.TypeId) E1 absolute efficiency"
+        foreach ($eliteLevel in @(2, 3)) {
+            $entityCount = if ($eliteLevel -eq 2) { 3 } else { 5 }
+            $stagePower = [decimal]$row.("Elite${eliteLevel}ContinuousPowerPerBody")
+            $stageTotalPower = [decimal]$row.("Elite${eliteLevel}TotalPower")
+            $stageTotalCost = [decimal]$row.("Elite${eliteLevel}TotalCost")
+            $stageEfficiency = [decimal]$row.("Elite${eliteLevel}PowerPerCostRatio")
+            Assert-Condition ($stagePower -gt 0 -and -not [double]::IsNaN([double]$stagePower) -and -not [double]::IsInfinity([double]$stagePower)) "Type ID $($row.TypeId) E$eliteLevel per-body power must be finite and positive."
+            Assert-Equal ($stagePower * [decimal]$entityCount) $stageTotalPower "Type ID $($row.TypeId) E$eliteLevel total power"
+            Assert-Equal ($e0Cost * [decimal]$entityCount) $stageTotalCost "Type ID $($row.TypeId) E$eliteLevel total Cost"
+            Assert-Equal ($stagePower / $e0Cost) $stageEfficiency "Type ID $($row.TypeId) E$eliteLevel absolute efficiency"
+            Assert-Condition ($stageEfficiency -gt 0 -and -not [double]::IsNaN([double]$stageEfficiency) -and -not [double]::IsInfinity([double]$stageEfficiency)) "Type ID $($row.TypeId) E$eliteLevel efficiency must be finite and positive."
+        }
+        if ([string]$row.Elite2ResourceSource -ceq 'InheritedE0') {
+            Assert-Condition ([string]$row.TypeId -in $elite2FallbackTypeIds) "Unexpected E2 fallback Type ID $($row.TypeId)."
+            Assert-Equal $e0Power ([decimal]$row.Elite2ContinuousPowerPerBody) "Type ID $($row.TypeId) inherited E2 power"
+            Assert-Equal $e0Efficiency ([decimal]$row.Elite2PowerPerCostRatio) "Type ID $($row.TypeId) inherited E2 efficiency"
+        }
+        if ([string]$row.Elite3ResourceSource -ceq 'InheritedE2') {
+            Assert-Equal ([decimal]$row.Elite2ContinuousPowerPerBody) ([decimal]$row.Elite3ContinuousPowerPerBody) "Type ID $($row.TypeId) inherited E3 power"
+            Assert-Equal ([decimal]$row.Elite2PowerPerCostRatio) ([decimal]$row.Elite3PowerPerCostRatio) "Type ID $($row.TypeId) inherited E3 efficiency"
+        }
+        foreach ($eliteLevel in @(2, 3)) {
+            if ([string]$row.("Elite${eliteLevel}ResourceSource") -cne 'Dedicated') {
+                continue
+            }
+            if (-not [string]::IsNullOrWhiteSpace([string]$row.PanelPower)) {
+                $stagePanelPower = [decimal]$row.("Elite${eliteLevel}PanelPower")
+                Assert-Condition ($stagePanelPower -gt 0 -and -not [double]::IsNaN([double]$stagePanelPower) -and -not [double]::IsInfinity([double]$stagePanelPower)) "Type ID $($row.TypeId) dedicated E$eliteLevel PanelPower must be finite and positive."
+            }
+            else {
+                Assert-Equal $e0Power ([decimal]$row.("Elite${eliteLevel}ContinuousPowerPerBody")) "Type ID $($row.TypeId) specialty E$eliteLevel inherited ContinuousPower"
+                Assert-Equal 'InheritedE0ContinuousPowerNoPanelPower' ([string]$row.("Elite${eliteLevel}PanelPowerStatus")) "Type ID $($row.TypeId) specialty E$eliteLevel annotation"
+            }
+            $stageEfficiency = [decimal]$row.("Elite${eliteLevel}PowerPerCostRatio")
+            if ($stageEfficiency -ne $e0Efficiency) {
+                Assert-Condition ([string]$row.EliteEfficiencyRisk -match "E$eliteLevel" -and [string]$row.EliteEfficiencyRisk -match '%') "Type ID $($row.TypeId) dedicated E$eliteLevel efficiency delta lacks a percentage risk."
+            }
+        }
+    }
+    Assert-Equal ($elite2FallbackTypeIds -join '/') (@($rows | Where-Object Elite2ResourceSource -eq 'InheritedE0' | ForEach-Object { [string]$_.TypeId }) -join '/') 'actual E2 fallback TypeIds'
+    $row1322 = @($rows | Where-Object TypeId -eq '1322')[0]
+    Assert-Equal '1322_wdgyht' ([string]$row1322.Elite2ResourceDirectory) '1322 direct reverse E2 resource'
+    Assert-Equal 'Dedicated' ([string]$row1322.Elite2ResourceSource) '1322 direct reverse E2 source'
+    Assert-Condition ([string]$row1322.Elite2ResourceDirectory -cne '1322_wdgyht_2_2') '1322 generic suffix incorrectly overrode reverse E2 mapping.'
+    $row1006 = @($rows | Where-Object TypeId -eq '1006')[0]
+    Assert-Equal '1006_shield_3' ([string]$row1006.Elite3ResourceDirectory) '1006 direct E3 resource'
+    Assert-Equal 'Dedicated' ([string]$row1006.Elite3ResourceSource) '1006 direct E3 source'
+    foreach ($typeId in @('1025', '1131', '1132')) {
+        $eliteAbilityRiskRow = @($rows | Where-Object TypeId -eq $typeId)[0]
+        Assert-Condition ([string]$eliteAbilityRiskRow.EliteEfficiencyRisk -match 'E2 ability' -and [string]$eliteAbilityRiskRow.EliteEfficiencyRisk -match 'not separately remodel') "Type ID $typeId lacks the explicit E2 ability reuse risk."
+    }
+
     foreach ($typeId in @('10031', '1238', '1243')) {
         $row = @($rows | Where-Object TypeId -eq $typeId)[0]
         Assert-Condition ([string]$row.AbilityEvidence -notmatch '\u9690\u533f|Stealth|\u9644\u52a0\u6cd5\u672f|\u591a\u65b9\u5411') "Type ID $typeId contains a forbidden unsupported modifier in exported scoring evidence."
@@ -1055,7 +1307,7 @@ try {
 
     Assert-Condition (Test-Path -LiteralPath $analysisOutput -PathType Leaf) "Missing analysis output '$analysisOutput'."
     $analysis = Get-Content -LiteralPath $analysisOutput -Raw -Encoding UTF8 | ConvertFrom-Json
-    Assert-Equal 'unit-cost-analysis-v5' ([string]$analysis.SchemaVersion) 'analysis schema version'
+    Assert-Equal 'unit-cost-analysis-v6' ([string]$analysis.SchemaVersion) 'analysis schema version'
     Assert-Equal 94 ([int]$analysis.ShopRowCount) 'analysis shop row count'
     Assert-Equal '9/20/14/24/21/6' (@(
             [int]$analysis.RarityDistribution.R1,
@@ -1069,6 +1321,26 @@ try {
     Assert-Equal ([decimal]1.35) ([decimal]$analysis.CostModel.SelectedMaximumWithinTierFactor) 'analysis selected maximum within-tier factor'
     Assert-Condition (-not [bool]$analysis.CostModel.ParameterScanTriggered) 'actual data unexpectedly triggered the top-sparsity scan.'
     Assert-Equal 8 ([int]$analysis.CostModel.HighCostCount) 'analysis high-Cost count'
+    Assert-Equal '1/2/3/5' (@($analysis.EliteModel.EntityCountMultipliers) -join '/') 'analysis elite entity multipliers'
+    Assert-Equal 81 ([int]$analysis.EliteModel.DedicatedE2Count) 'analysis dedicated E2 count'
+    Assert-Equal 1 ([int]$analysis.EliteModel.DedicatedE3Count) 'analysis dedicated E3 count'
+    Assert-Equal 181 ([int]$analysis.EliteModel.ActuallyReadResourceDirectoryCount) 'analysis actually-read resource directory count'
+    Assert-Equal 'Unconfirmed' ([string]$analysis.EconomyPressure.PermanentCostIncomeStatus) 'permanent Cost income status'
+    Assert-Condition ([string]$analysis.EconomyPressure.ScopeNote -match 'permanent Cost income' -and [string]$analysis.EconomyPressure.ScopeNote -match 'unconfirmed') 'economy pressure note must state permanent Cost income is unconfirmed.'
+    Assert-Equal '34/76/126/184/250/324' (@($analysis.EconomyPressure.GoldBudgets) -join '/') 'analysis economy Gold budgets'
+    Assert-Equal '54/99/126/195' (@($analysis.EconomyPressure.CostBudgets) -join '/') 'analysis economy Cost budgets'
+    Assert-Equal 144 @($analysis.EconomyPressure.Rows).Count 'analysis economy grid row count'
+    Assert-Equal 24 @($analysis.EconomyPressure.QuantityRatios).Count 'analysis economy ratio case count'
+    foreach ($economyRow in @($analysis.EconomyPressure.Rows)) {
+        Assert-Condition ([decimal]$economyRow.Quantity -eq [Math]::Floor([decimal]$economyRow.Quantity) -and [decimal]$economyRow.Quantity -ge 0) 'analysis economy quantity must be a nonnegative integer.'
+        Assert-Condition ([string]$economyRow.Limiter -in @('Gold', 'Cost', 'Both')) 'analysis economy limiter must be Gold, Cost, or Both.'
+    }
+    Test-DirectVariantPanelPower `
+        -ExporterPath $exporterPath `
+        -StagingRoot $StagingRoot `
+        -Rows $rows `
+        -DamageTypeOverrides $abilityInput.DamageTypeOverrides `
+        -CombatModel $analysis.CombatModel
     Assert-Equal 'Calibrated' ([string]$analysis.CostModel.R1CalibrationStatus) 'R1 calibration status'
     Assert-Condition (@($analysis.CostModel.CandidateAudit).Count -ge 1) 'Cost model candidate audit is empty.'
     $r1Rows = @($rows | Where-Object { [int]$_.Rarity -eq 1 })

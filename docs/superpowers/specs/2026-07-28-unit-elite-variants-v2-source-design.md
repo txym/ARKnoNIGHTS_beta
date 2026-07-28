@@ -1,10 +1,15 @@
 # 自包含单位精英变体 v2 源数据设计
 
-状态：已确认，尚未实施。
+状态：已实施（首批 1000、5503、5504；其余单位导入未开始）。
+
+当前实施保持现有 Player Resources 目录冻结；正式运行时仍只读取生成目录。
+源直读 `UnitFactory` 仅作为 legacy/debug 适配器保留并进入销毁计划，旧 Hit/
+presentation 链的完整销毁范围继续由 `docs/bonds/UnitAnimation.md` 维护。
+独立动画层尚未实施。
 
 ## 1. 背景
 
-项目当前存在两套单位源 JSON：
+迁移前项目存在两套单位源 JSON：
 
 - `Assets/GameData/Units/Json/*.json` 使用 `unit-source-v1`，保存单位级规则、精零数值和模型绑定；
 - `Assets/GameData/Units/EliteVariants/Json/*.json` 使用 `unit-elite-variants-v1`，作为依赖前者的稀疏精英变体 sidecar。
@@ -590,14 +595,17 @@ Assets/Resources/BattleData/ability-catalog-v1.json
 
 ## 15. 文档迁移
 
-实施时同步更新：
+首批 `1000`、`5503`、`5504` 的 v2 迁移已经同步更新：
 
 - `docs/SPEC.md`；
 - `docs/ARCHITECTURE.md`；
 - `docs/TEST_PLAN.md`；
-- 与 `unit-source-v1` 和 v1 sidecar 有关的长期技术决策。
+- `docs/UNIT-DATA-001.md`；
+- `docs/decisions/2026-07-28-unit-elite-variants-v2-source.md`。
 
-在代码迁移完成前，主 SPEC 继续描述当前已实现的数据链；本设计文档描述已确认但尚未实施的目标状态，避免文档提前宣称未交付行为。
+上述文档现描述已经实施的首批三单位 v2 源链和冻结 Player 目录边界。
+其余单位导入、运行时精英 2/3 选择、目录迁移和独立动画层仍属于后续范围，
+不得因首批迁移完成而提前宣称已经实现。
 
 ## 16. 后续阶段
 

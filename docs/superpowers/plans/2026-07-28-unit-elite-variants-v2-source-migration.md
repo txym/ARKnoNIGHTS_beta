@@ -1346,10 +1346,26 @@ rg -n `
   'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
   Assets `
   --glob '*.cs' `
+  --glob '*.json' `
+  --glob '!Assets/Game/Tests/**'
+```
+
+Expected: zero production matches. Generated runtime catalog files do not
+contain those strings.
+
+Then inspect the test-only matches:
+
+```powershell
+rg -n `
+  'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
+  Assets/Game/Tests `
+  --glob '*.cs' `
   --glob '*.json'
 ```
 
-Expected: zero matches. Generated runtime catalog files do not contain those strings.
+Only the explicit invalid-schema fixture, old-directory absence assertions,
+and old-root-DTO destruction message may remain. These behavior regressions
+must not be deleted or obfuscated merely to produce a zero source-text scan.
 
 - [ ] **Step 3: Update SPEC and architecture**
 
@@ -1418,6 +1434,13 @@ rg -n `
   'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
   Assets `
   --glob '*.cs' `
+  --glob '*.json' `
+  --glob '!Assets/Game/Tests/**'
+
+rg -n `
+  'GameData/Units/Json|Assets/GameData/Units/Json|unit-source-v1|unit-elite-variants-v1' `
+  Assets/Game/Tests `
+  --glob '*.cs' `
   --glob '*.json'
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 `
@@ -1430,7 +1453,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTe
   -NoGraphics
 ```
 
-Expected: the reference scan returns no active source/code match; all targeted tests pass with a non-zero count.
+Expected: the production reference scan returns no match; the test-only scan
+returns only the allowlisted negative/absence/destruction regressions; all
+targeted tests pass with a non-zero count.
 
 - [ ] **Step 6: Commit cleanup and documentation**
 
@@ -1556,8 +1581,34 @@ rg -n `
 
 git diff --check
 git status --short
-git diff --stat 7e658b4..HEAD
-git diff --name-status 7e658b4..HEAD
+
+$migrationCommits = @(
+  '7e658b4',
+  '76a7fbc',
+  '98e55b1',
+  '4c603aa',
+  'aefd415',
+  'fb34027',
+  'eb99edc',
+  'd53df52',
+  '73a8e24',
+  '2b98c76',
+  '0516c3f',
+  '22f6e9f',
+  '1392142',
+  '198d5ee',
+  '9b75bc8',
+  'ddf4bf4'
+)
+
+foreach ($commit in $migrationCommits) {
+  git show --check --format= $commit
+  if ($LASTEXITCODE -ne 0) {
+    throw "Migration commit diff-check failed: $commit"
+  }
+  git show --stat --oneline $commit
+  git show --name-status --format= $commit
+}
 ```
 
 Expected:
@@ -1566,7 +1617,8 @@ Expected:
 - old directory result `False`;
 - forbidden-field scan has zero matches;
 - `git diff --check` has zero diagnostics;
-- the commit range contains only files listed in this plan;
+- the explicit migration commit list contains only files listed in this plan
+  (including its design/plan amendments);
 - unrelated dirty-worktree changes remain unstaged and unmodified by these commits.
 
 - [ ] **Step 7: Inspect final serialization and runtime logs**

@@ -13,8 +13,6 @@ public class UITest : MonoBehaviour
     [Header("精灵路径（Assets 开头）")]
     public string spritePath = "Assets/GameData/UIIconImage";
 
-    private const string JsonRootRel = "GameData/Units/Json"; // 位于 Assets 下
-
     void Start()
     {
        

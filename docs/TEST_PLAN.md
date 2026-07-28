@@ -231,7 +231,7 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 ### 7.2 已知构建风险
 
 1. `UITest.targetSprite` 条件编译作用域阻塞已修复并通过 Standalone 构建复测。
-2. 旧 `UnitFactory` 仍从 `Application.dataPath/GameData/Units/Json` 读取松散 JSON；它是旧原型风险，不是新 Demo 数据链。新 Demo 使用 `Resources` 中的 `unit-catalog-v1` 与 `local-battle-v1`，已在 Player 实际加载。
+2. 旧 `UnitFactory` 仍从 `Application.dataPath/GameData/Units/EliteVariants/Json` 读取 v2 源文档；它是待销毁的 legacy/debug 原型风险，不是正式 Demo 数据链。正式 Demo 使用 `Resources` 中冻结的 `unit-catalog-v1` 与 `local-battle-v1`，已在 Player 实际加载。
 3. 当前只启用 `SampleScene`，还没有独立启动或正式战斗场景可供构建流程选择。
 
 ### 7.3 目标平台确认后的验证步骤
@@ -462,10 +462,15 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 未验证：未在本轮 Windows Player 手工走完部署、点击/拖拽命中与完整返回准备；尚无逐图对照图 1～图 6 的持久化视觉差异报告；共享脏工作树下的最终无关差异审查尚未完成。故本节只证明部分验收，不将 UI-005 记为完成。详细审计见 `docs/UI-005-REPORT.md`。
 - UnityConnect 在线请求可能在测试完成后滞留；本轮由 `scripts/Invoke-UnityTests.ps1` 在 XML 已写入且测试数大于零后管理其子进程。未执行人工 GUI 完整一轮或 Windows Player 构建，均为未验证。
 
-## 29. UNIT-DATA-001 单位源数据迁移验证（2026-07-23）
+## 29. UNIT-DATA-001 与单位精英变体 v2 源迁移验证（2026-07-23、2026-07-28）
 
-- EditMode 覆盖：两个 `unit-source-v1` 源文件的新字段与旧键消失；空中文显示名不回退资源键、空技能说明合法；能力 ID 保留；目录的 `resourceKey`/中文文本/`lifeDeduct`/`rarity` 映射；`rarity` 对 `0` 与 `7` 的拒绝；待部署快照从目录投影 `rarity`；以及真实目录的速度、Tick、资源、动画和固定对战确定性回归。
-- 执行时先通过 `UnitCatalogGenerator.Generate` 重新生成 `Assets/Resources/BattleData/unit-catalog-v1.json`，再运行相关 EditMode 与 PlayMode。目录、测试、编译或构建的实际结果仅在本节完成后补充；没有 XML 或构建日志的项目必须标记为未验证。
+- v2 EditMode 覆盖：`unit-elite-variants-v2` schema、精英 0 完整性、高阶最近低阶继承、`combat`/`shared`/`model` 原子块、`sourceVariant`、动画 key/名称/必需时长、旧源字段消失、合法不攻击/不阻挡数据，以及三个真实源的数值、资源和动画事实。
+- 消费者 EditMode 覆盖：`UnitCatalogGenerator`、`AbilityCatalogGenerator`、`UnitJsonBake` 只读取 v2，未知召唤与不可表示的 v1 投影显式失败；真实目录回归同时区分 authored v2 事实与 frozen `unit-catalog-v1` 事实，不修改冻结目录期望。
+- Task 6 的静态验收分别扫描生产 C#/JSON 与测试 C#/JSON。生产扫描必须为零匹配；测试扫描只允许无效 schema fixture、旧目录不存在断言和旧根 DTO 销毁断言，不能删除或混淆这些负向回归字符串。
+- 精确定向 GREEN 使用 `UnitEliteVariantSourceEditModeTests;UnitSourceConsumerEditModeTests;BattleCoreEditModeTests`，输出到 `Temp/UnitEliteVariantsV2/Task6-Green`；必须核对非零测试数、零失败、零跳过或明确记录跳过、编译/异常日志和 Unity 退出状态。
+- 2026-07-29 Task 6 实际结果：生产扫描零匹配；测试扫描保留 `6` 个 allowlisted 行。定向 EditMode 为 `105/105` 通过、失败 `0`、跳过 `0`，其中 v2 source `43/43`、consumer `5/5`、BattleCore `57/57`；日志未命中编译错误、编译失败、未处理异常、空引用或断言失败。结果位于 `Temp/UnitEliteVariantsV2/Task6-Green/EditModeResults.xml` 与 `EditMode.log`。结果落盘后 Unity 未在 `20` 秒 grace period 内自然退出，runner 强制停止；随后确认无 Unity 进程残留。
+- 首批迁移禁止执行目录生成器，`unit-catalog-v1.json` 与 `ability-catalog-v1.json` 必须保持冻结哈希。PlayMode、目标平台构建和其余单位/独立动画层不属于 Task 6 精确定向验收，未执行时必须标记为未验证。
+- 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：
 - 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。
 - 实际测试：仓库 `scripts/Invoke-UnityTests.ps1` 分别运行全量 EditMode 与 PlayMode；脚本在结果 XML 写入后验证非零测试数并解析结果。EditMode 为 `66` 通过、`0` 失败、`0` 跳过；PlayMode 为 `14` 通过、`0` 失败、`0` 跳过。Unity 清理 `Temp` 时删除了这些短生命周期 XML，因此计数以脚本当场解析的结果为准；无测试失败或编译错误。
 - 实际 Windows Standalone 构建：`Task006StandaloneBuild.BuildWindowsX64` 成功，日志 `Temp/UNIT-DATA-001/WindowsStandaloneBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=2`，产物输出到忽略的 `Temp/TASK-006/WindowsStandalone/`。未执行人工 GUI 验收；中文名和技能说明仍等待用户填写。

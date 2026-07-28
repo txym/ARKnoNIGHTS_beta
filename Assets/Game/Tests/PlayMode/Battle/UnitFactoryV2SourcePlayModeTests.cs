@@ -36,9 +36,20 @@ namespace ArknoNights.Battle.Tests
                     "SpawnAll",
                     BindingFlags.Static | BindingFlags.Public);
                 Assert.That(spawnAll, Is.Not.Null);
+                var getTemplate = factoryType.GetMethod(
+                    "GetUnitBasicValueSO",
+                    BindingFlags.Static | BindingFlags.Public);
+                Assert.That(getTemplate, Is.Not.Null);
 
                 var arguments = new object[] { parent.transform, true, null };
                 var spawnedResult = spawnAll.Invoke(null, arguments) as IEnumerable;
+                foreach (var typeId in new[] { 1000, 5503, 5504 })
+                {
+                    templates.Add(
+                        getTemplate.Invoke(null, new object[] { typeId })
+                        as UnityEngine.Object);
+                }
+
                 var idMap = arguments[2] as IDictionary;
                 Assert.That(spawnedResult, Is.Not.Null);
                 Assert.That(idMap, Is.Not.Null);
@@ -49,9 +60,9 @@ namespace ArknoNights.Battle.Tests
                     idMap.Keys.Cast<int>().OrderBy(id => id),
                     Is.EqualTo(new[] { 1000, 5503, 5504 }));
 
-                AssertTemplate(factoryType, templates, 1000, "gopro", 820, 190, 1, 2, 1.9f, 0.7f);
-                AssertTemplate(factoryType, templates, 5503, "arcslma", 18000, 1100, 6, 2, 0.2f, 2.0f);
-                AssertTemplate(factoryType, templates, 5504, "arcslmi", 2500, 290, 3, 2, 1.9f, 0.75f);
+                AssertTemplate(templates[0], 1000, "gopro", 820, 190, 1, 2, 1.9f, 0.7f);
+                AssertTemplate(templates[1], 5503, "arcslma", 18000, 1100, 6, 2, 0.2f, 2.0f);
+                AssertTemplate(templates[2], 5504, "arcslmi", 2500, 290, 3, 2, 1.9f, 0.75f);
 
                 var type2 = Type.GetType("UnitSkelType2, Assembly-CSharp");
                 Assert.That(type2, Is.Not.Null);
@@ -103,8 +114,7 @@ namespace ArknoNights.Battle.Tests
         }
 
         private static void AssertTemplate(
-            Type factoryType,
-            ICollection<UnityEngine.Object> templates,
+            UnityEngine.Object template,
             int typeId,
             string resourceKey,
             int maxHitPoints,
@@ -114,14 +124,7 @@ namespace ArknoNights.Battle.Tests
             float moveSpeed,
             float baseAttackInterval)
         {
-            var getTemplate = factoryType.GetMethod(
-                "GetUnitBasicValueSO",
-                BindingFlags.Static | BindingFlags.Public);
-            Assert.That(getTemplate, Is.Not.Null);
-
-            var template = getTemplate.Invoke(null, new object[] { typeId }) as UnityEngine.Object;
             Assert.That(template, Is.Not.Null, "Missing legacy UnitTemplate for type " + typeId);
-            templates.Add(template);
 
             Assert.That(Field<int>(template, "typeID"), Is.EqualTo(typeId));
             Assert.That(Field<string>(template, "uintName"), Is.EqualTo(resourceKey));
