@@ -837,8 +837,8 @@ namespace ArknoNights.Lobby.Tests
             {
                 var slot = RequireChild(room, "RoomCard_" + index);
                 AssertDirectChildren(slot,
-                    "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
-                    "OccupiedContent", "LowerDecoration", "CreatorTag");
+                    "CardBody", "ReadyOverlay", "EmptyContent", "OccupiedContent",
+                    "TopBar", "LowerDecoration", "CreatorTag");
                 AssertResourceSprite(RequireChild(slot, "CardBody").GetComponent<Image>(), "card_bg");
                 AssertResourceSprite(RequireChild(slot, "TopBar").GetComponent<Image>(), "bg_top_normal");
 
@@ -942,6 +942,89 @@ namespace ArknoNights.Lobby.Tests
                 "portrait", "avatar", "profilename", "playername", "playerid", "profilecard"
             };
             Assert.That(hostNodeNames.Any(name => forbiddenProfileNames.Any(name.Contains)), Is.False);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSlot_AllStatesKeepOnePortraitFrameFootprint()
+        {
+            var room = RequireChild(view.transform, "LanLobbyRoot/Room");
+
+            view.BindRoom(HostOnlyRoom("654321"), "host");
+            Canvas.ForceUpdateCanvases();
+            var emptySlot = RequireChild(room, "RoomCard_1").GetComponent<RectTransform>();
+            var emptyFrame = WorldRect(RequireChild(emptySlot, "CardBody").GetComponent<RectTransform>());
+
+            view.BindRoom(RoomWithGuest("654321", guestReady: false), "guest-1");
+            Canvas.ForceUpdateCanvases();
+            var waitingSlot = RequireChild(room, "RoomCard_1").GetComponent<RectTransform>();
+            var waitingFrame = WorldRect(RequireChild(waitingSlot, "CardBody").GetComponent<RectTransform>());
+
+            view.BindRoom(RoomWithGuest("654321", guestReady: true), "guest-1");
+            Canvas.ForceUpdateCanvases();
+            var readySlot = RequireChild(room, "RoomCard_1").GetComponent<RectTransform>();
+            var readyFrame = WorldRect(RequireChild(readySlot, "CardBody").GetComponent<RectTransform>());
+            var hostSlot = RequireChild(room, "RoomCard_0").GetComponent<RectTransform>();
+            var hostFrame = WorldRect(RequireChild(hostSlot, "CardBody").GetComponent<RectTransform>());
+
+            AssertWorldRect(waitingFrame, emptyFrame);
+            AssertWorldRect(readyFrame, emptyFrame);
+
+            var relativeFrames = new[]
+            {
+                RelativeToRoot(emptyFrame, WorldRect(emptySlot)),
+                RelativeToRoot(waitingFrame, WorldRect(waitingSlot)),
+                RelativeToRoot(readyFrame, WorldRect(readySlot)),
+                RelativeToRoot(hostFrame, WorldRect(hostSlot))
+            };
+            for (var index = 1; index < relativeFrames.Length; index++)
+            {
+                AssertWorldRect(relativeFrames[index], relativeFrames[0]);
+                Assert.That(relativeFrames[index].width, Is.EqualTo(relativeFrames[0].width).Within(.05f));
+                Assert.That(relativeFrames[index].height, Is.EqualTo(relativeFrames[0].height).Within(.05f));
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomSlot_LayersFrameBehindContentAndBars()
+        {
+            var layout = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[1];
+            var room = RequireChild(view.transform, "LanLobbyRoot/Room");
+
+            view.BindRoom(RoomWithGuest("654321", guestReady: false), "guest-1");
+            Canvas.ForceUpdateCanvases();
+            var slot = RequireChild(room, "RoomCard_1");
+            AssertDirectChildren(slot,
+                "CardBody", "ReadyOverlay", "EmptyContent", "OccupiedContent",
+                "TopBar", "LowerDecoration", "CreatorTag");
+            AssertBottomLeftRect(RequireChild(slot, "TopBar").GetComponent<RectTransform>(), layout.TopBar);
+            AssertBottomLeftRect(RequireChild(slot, "ReadyOverlay").GetComponent<RectTransform>(), layout.StateOverlay);
+            AssertBottomLeftRect(RequireChild(slot, "EmptyContent").GetComponent<RectTransform>(), layout.EmptyInvite);
+            AssertBottomLeftRect(RequireChild(RequireChild(slot, "OccupiedContent"), "ReadyIcon").GetComponent<RectTransform>(), layout.ReadyIcon);
+            AssertBottomLeftAnchor(RequireChild(RequireChild(slot, "OccupiedContent"), "ReadyLabel").GetComponent<RectTransform>(), layout.ReadyLabel);
+            AssertBottomLeftRect(RequireChild(slot, "LowerDecoration").GetComponent<RectTransform>(), layout.LowerDecoration);
+            AssertBottomLeftRect(RequireChild(slot, "CreatorTag").GetComponent<RectTransform>(), layout.CreatorTag);
+
+            view.BindRoom(RoomWithGuest("654321", guestReady: true), "guest-1");
+            Canvas.ForceUpdateCanvases();
+            AssertBottomLeftRect(RequireChild(slot, "TopBar").GetComponent<RectTransform>(), layout.ReadyTopBar);
+
+            var cardBody = RequireChild(slot, "CardBody");
+            var readyOverlay = RequireChild(slot, "ReadyOverlay");
+            var emptyContent = RequireChild(slot, "EmptyContent");
+            var occupiedContent = RequireChild(slot, "OccupiedContent");
+            var topBar = RequireChild(slot, "TopBar");
+            var lowerDecoration = RequireChild(slot, "LowerDecoration");
+            Assert.That(cardBody.GetSiblingIndex(), Is.LessThan(readyOverlay.GetSiblingIndex()));
+            Assert.That(cardBody.GetSiblingIndex(), Is.LessThan(emptyContent.GetSiblingIndex()));
+            Assert.That(cardBody.GetSiblingIndex(), Is.LessThan(occupiedContent.GetSiblingIndex()));
+            Assert.That(topBar.GetSiblingIndex(), Is.GreaterThan(readyOverlay.GetSiblingIndex()));
+            Assert.That(topBar.GetSiblingIndex(), Is.GreaterThan(emptyContent.GetSiblingIndex()));
+            Assert.That(topBar.GetSiblingIndex(), Is.GreaterThan(occupiedContent.GetSiblingIndex()));
+            Assert.That(lowerDecoration.GetSiblingIndex(), Is.GreaterThan(topBar.GetSiblingIndex()));
+
             yield return null;
         }
 
@@ -1487,12 +1570,40 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(actual.pivot, Is.EqualTo(Vector2.zero));
         }
 
+        private static Rect WorldRect(RectTransform transform)
+        {
+            var corners = new Vector3[4];
+            transform.GetWorldCorners(corners);
+            var minX = corners.Min(point => point.x);
+            var minY = corners.Min(point => point.y);
+            var maxX = corners.Max(point => point.x);
+            var maxY = corners.Max(point => point.y);
+            return Rect.MinMaxRect(minX, minY, maxX, maxY);
+        }
+
+        private static void AssertWorldRect(Rect actual, Rect expected, float tolerance = .05f)
+        {
+            Assert.That(actual.xMin, Is.EqualTo(expected.xMin).Within(tolerance));
+            Assert.That(actual.yMin, Is.EqualTo(expected.yMin).Within(tolerance));
+            Assert.That(actual.xMax, Is.EqualTo(expected.xMax).Within(tolerance));
+            Assert.That(actual.yMax, Is.EqualTo(expected.yMax).Within(tolerance));
+        }
+
+        private static Rect RelativeToRoot(Rect child, Rect root)
+        {
+            return new Rect(
+                child.xMin - root.xMin,
+                child.yMin - root.yMin,
+                child.width,
+                child.height);
+        }
+
         private static void AssertWaitingGuestSlot(Transform slot)
         {
             var slotLayout = RoomSlotLayout(slot);
             AssertDirectChildren(slot,
-                "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
-                "OccupiedContent", "LowerDecoration", "CreatorTag");
+                "CardBody", "ReadyOverlay", "EmptyContent", "OccupiedContent",
+                "TopBar", "LowerDecoration", "CreatorTag");
             AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
             AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
             Assert.That(RequireChild(slot, "CardBody").GetComponent<Image>().color, Is.EqualTo(Color.white));
@@ -1528,8 +1639,8 @@ namespace ArknoNights.Lobby.Tests
         {
             var slotLayout = RoomSlotLayout(slot);
             AssertDirectChildren(slot,
-                "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
-                "OccupiedContent", "LowerDecoration", "CreatorTag");
+                "CardBody", "ReadyOverlay", "EmptyContent", "OccupiedContent",
+                "TopBar", "LowerDecoration", "CreatorTag");
             AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
             AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
             Assert.That(RequireChild(slot, "CardBody").GetComponent<Image>().color, Is.EqualTo(Color.white));

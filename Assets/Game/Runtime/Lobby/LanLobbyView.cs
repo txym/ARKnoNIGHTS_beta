@@ -597,10 +597,6 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionBottomLeft(cardBody.rectTransform, layout.CardBody);
         cardBody.preserveAspect = false;
 
-        var topBar = Image("TopBar", root, "bg_top_normal");
-        PositionBottomLeft(topBar.rectTransform, layout.TopBar);
-        topBar.preserveAspect = true;
-
         var readyOverlay = Image("ReadyOverlay", root, "player_card_self_frame");
         PositionBottomLeft(readyOverlay.rectTransform, layout.StateOverlay);
         readyOverlay.preserveAspect = true;
@@ -639,6 +635,10 @@ public sealed class LanLobbyView : MonoBehaviour
         var readyLabel = Text("ReadyLabel", occupiedContent, 28, TextAnchor.MiddleLeft, Color.black);
         readyLabel.text = "已就绪";
         PositionPreferredText(readyLabel, layout.ReadyLabel);
+
+        var topBar = Image("TopBar", root, "bg_top_normal");
+        PositionBottomLeft(topBar.rectTransform, layout.TopBar);
+        topBar.preserveAspect = true;
 
         var lowerDecoration = Image("LowerDecoration", root, "card_deco_self");
         PositionBottomLeft(lowerDecoration.rectTransform, layout.LowerDecoration);
