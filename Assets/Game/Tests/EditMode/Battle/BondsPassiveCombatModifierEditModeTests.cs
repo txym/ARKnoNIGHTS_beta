@@ -671,6 +671,60 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AttackCountState_FirstReleaseUnlocksAlliedCountStates()
+        {
+            var input = CreateInput(
+                10,
+                new[]
+                {
+                    Attacker(
+                        "boss",
+                        2000,
+                        0,
+                        "BOSS_STATE",
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    Attacker(
+                        "ally",
+                        2000,
+                        0,
+                        "ALLY_STATE",
+                        attackIntervalTicks: 100,
+                        attack: 100),
+                    NonAttacker("target", 100000)
+                },
+                new[]
+                {
+                    PassiveAttackCountState(
+                        unlockedAttackMultiplierPermille: 1500,
+                        abilityId: "BOSS_STATE",
+                        releasesAlliedAttackCountStates: true),
+                    PassiveAttackCountState(
+                        unlockedAttackMultiplierPermille: 1500,
+                        abilityId: "ALLY_STATE")
+                },
+                new[]
+                {
+                    Unit("boss", "boss", 5, 4),
+                    Unit("ally", "ally", 5, 4)
+                },
+                new[] { Unit("target", "target", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 7)
+                runner.Step();
+
+            var ally = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "ally");
+            Assert.That(ally.StartedAttackCount, Is.EqualTo(1));
+            Assert.That(ally.EffectiveAttack, Is.EqualTo(150));
+            Assert.That(
+                runner.RuntimeUnits.Single(item =>
+                    item.UnitId == "boss").EffectiveAttack,
+                Is.EqualTo(150));
+        }
+
+        [Test]
         public void DeathSpawn_DelaysSplitAndPreventsPrematureVictory()
         {
             var input = CreateInput(
@@ -1763,10 +1817,12 @@ namespace ArknoNights.Battle.Tests
             int unlockedHitPointsPerSecond = 0,
             int unlockedTargetDefenseMultiplierPermille =
                 AttackCountStateModifierDefinition
-                    .NeutralMultiplierPermille)
+                    .NeutralMultiplierPermille,
+            string abilityId = "PRISONER_STATE",
+            bool releasesAlliedAttackCountStates = false)
         {
             return new AbilityDefinition(
-                "PRISONER_STATE",
+                abilityId,
                 string.Empty,
                 string.Empty,
                 AbilityActivationKind.Passive,
@@ -1789,7 +1845,8 @@ namespace ArknoNights.Battle.Tests
                     unlockedAttackMultiplierPermille,
                     unlockedMagicResistanceAdditive,
                     unlockedHitPointsPerSecond,
-                    unlockedTargetDefenseMultiplierPermille),
+                    unlockedTargetDefenseMultiplierPermille,
+                    releasesAlliedAttackCountStates),
                 string.Empty,
                 0);
         }

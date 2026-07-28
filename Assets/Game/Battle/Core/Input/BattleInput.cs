@@ -247,7 +247,8 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.AttackCountStateModifier.UnlockedAttackMultiplierPermille).Append(',')
                         .Append(ability.AttackCountStateModifier.UnlockedMagicResistanceAdditive).Append(',')
                         .Append(ability.AttackCountStateModifier.UnlockedHitPointsPerSecond).Append(',')
-                        .Append(ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille);
+                        .Append(ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille).Append(',')
+                        .Append(ability.AttackCountStateModifier.ReleasesAlliedAttackCountStates ? 1 : 0);
                 if (ability.DeathSpawnEffect != null)
                 {
                     builder.Append("|X:")

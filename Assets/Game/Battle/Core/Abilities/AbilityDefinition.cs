@@ -202,6 +202,27 @@ namespace ArknoNights.Battle.Core
             int unlockedMagicResistanceAdditive,
             int unlockedHitPointsPerSecond,
             int unlockedTargetDefenseMultiplierPermille)
+            : this(
+                transitionBeforeAttackOrdinal,
+                lockedAttackSpeedAdditive,
+                lockedDefenseAdditive,
+                unlockedAttackMultiplierPermille,
+                unlockedMagicResistanceAdditive,
+                unlockedHitPointsPerSecond,
+                unlockedTargetDefenseMultiplierPermille,
+                false)
+        {
+        }
+
+        public AttackCountStateModifierDefinition(
+            int transitionBeforeAttackOrdinal,
+            int lockedAttackSpeedAdditive,
+            int lockedDefenseAdditive,
+            int unlockedAttackMultiplierPermille,
+            int unlockedMagicResistanceAdditive,
+            int unlockedHitPointsPerSecond,
+            int unlockedTargetDefenseMultiplierPermille,
+            bool releasesAlliedAttackCountStates)
         {
             TransitionBeforeAttackOrdinal =
                 transitionBeforeAttackOrdinal;
@@ -216,6 +237,8 @@ namespace ArknoNights.Battle.Core
                 unlockedHitPointsPerSecond;
             UnlockedTargetDefenseMultiplierPermille =
                 unlockedTargetDefenseMultiplierPermille;
+            ReleasesAlliedAttackCountStates =
+                releasesAlliedAttackCountStates;
         }
 
         public int TransitionBeforeAttackOrdinal { get; }
@@ -228,6 +251,7 @@ namespace ArknoNights.Battle.Core
         {
             get;
         }
+        public bool ReleasesAlliedAttackCountStates { get; }
         public bool IsNeutral =>
             LockedAttackSpeedAdditive == 0
             && LockedDefenseAdditive == 0

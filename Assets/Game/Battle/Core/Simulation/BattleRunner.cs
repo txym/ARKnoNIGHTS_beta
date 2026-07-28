@@ -18,6 +18,7 @@ namespace ArknoNights.Battle.Core
         private int healthThresholdActiveUntilTick =
             int.MinValue;
         private int unblockedAttackChargeStacks;
+        private bool attackCountStateForceUnlocked;
 
         internal RuntimeAbilityState(AbilityDefinition definition)
         {
@@ -45,6 +46,35 @@ namespace ArknoNights.Battle.Core
 
         internal bool IsHealthThresholdActive =>
             healthThresholdActive;
+        internal bool IsAttackCountStateUnlocked(
+            int startedAttackCount)
+        {
+            var effect = Definition.AttackCountStateModifier;
+            return effect != null
+                && (attackCountStateForceUnlocked
+                    || startedAttackCount
+                    >= effect.TransitionBeforeAttackOrdinal);
+        }
+
+        internal bool WillReleaseAlliesOnAttack(
+            int nextAttackOrdinal)
+        {
+            var effect = Definition.AttackCountStateModifier;
+            return effect != null
+                && effect.ReleasesAlliedAttackCountStates
+                && !attackCountStateForceUnlocked
+                && nextAttackOrdinal
+                == effect.TransitionBeforeAttackOrdinal;
+        }
+
+        internal bool ForceUnlockAttackCountState()
+        {
+            if (Definition.AttackCountStateModifier == null
+                || attackCountStateForceUnlocked)
+                return false;
+            attackCountStateForceUnlocked = true;
+            return true;
+        }
         internal int UnblockedAttackChargeAdditive
         {
             get
@@ -137,6 +167,9 @@ namespace ArknoNights.Battle.Core
             if (Definition.UnblockedAttackCharge != null)
                 builder.Append(":charge:")
                     .Append(unblockedAttackChargeStacks);
+            if (Definition.AttackCountStateModifier != null
+                && attackCountStateForceUnlocked)
+                builder.Append(":forced-unlock");
         }
     }
 
@@ -284,6 +317,11 @@ namespace ArknoNights.Battle.Core
         internal int MoveYNumeratorRemainder { get; set; }
         internal int PassiveHealthRemainder { get; set; }
         internal int StartedAttackCount { get; private set; }
+        internal bool ReleasedAlliesOnLastAttack
+        {
+            get;
+            private set;
+        }
         internal int InstanceMoveSpeedMultiplierPermille
         {
             get;
@@ -412,6 +450,9 @@ namespace ArknoNights.Battle.Core
         }
         internal int BeginAttackAndGetEffectiveAttack()
         {
+            ReleasedAlliesOnLastAttack = abilityStates.Any(item =>
+                item.WillReleaseAlliesOnAttack(
+                    StartedAttackCount + 1));
             StartedAttackCount++;
             var attack = EffectiveAttack;
             foreach (var modifier in abilityStates
@@ -427,6 +468,11 @@ namespace ArknoNights.Battle.Core
                     * modifier.AttackMultiplierPermille
                     / 1000);
             return attack;
+        }
+        internal void ForceUnlockAttackCountStates()
+        {
+            foreach (var ability in abilityStates)
+                ability.ForceUnlockAttackCountState();
         }
         internal int EffectiveTargetDefenseMultiplierPermille
         {
@@ -682,22 +728,21 @@ namespace ArknoNights.Battle.Core
         private IEnumerable<AttackCountStateModifierDefinition>
             ActiveLockedAttackCountStateModifiers =>
             abilityStates
-                .Select(item =>
-                    item.Definition.AttackCountStateModifier)
                 .Where(item =>
-                    item != null
-                    && StartedAttackCount
-                    < item.TransitionBeforeAttackOrdinal);
+                    item.Definition.AttackCountStateModifier != null
+                    && !item.IsAttackCountStateUnlocked(
+                        StartedAttackCount))
+                .Select(item =>
+                    item.Definition.AttackCountStateModifier);
 
         private IEnumerable<AttackCountStateModifierDefinition>
             ActiveUnlockedAttackCountStateModifiers =>
             abilityStates
-                .Select(item =>
-                    item.Definition.AttackCountStateModifier)
                 .Where(item =>
-                    item != null
-                    && StartedAttackCount
-                    >= item.TransitionBeforeAttackOrdinal);
+                    item.IsAttackCountStateUnlocked(
+                        StartedAttackCount))
+                .Select(item =>
+                    item.Definition.AttackCountStateModifier);
 
         private static int ApplyMultiplier(
             int value,
@@ -1015,6 +1060,17 @@ namespace ArknoNights.Battle.Core
                 if (target == null) continue;
                 if (DistanceSquared(unit.Position, target.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) continue;
                 var attack = unit.BeginAttackAndGetEffectiveAttack();
+                if (unit.ReleasedAlliesOnLastAttack)
+                {
+                    foreach (var ally in runtimeUnits
+                                 .Where(item =>
+                                     IsActive(item)
+                                     && item.Side == unit.Side)
+                                 .OrderBy(
+                                     item => item.UnitId,
+                                     StringComparer.Ordinal))
+                        ally.ForceUnlockAttackCountStates();
+                }
                 var attackIntervalTicks =
                     unit.EffectiveAttackIntervalTicks;
                 var effectiveTicks = Math.Min(
