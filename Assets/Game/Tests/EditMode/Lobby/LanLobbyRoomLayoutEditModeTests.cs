@@ -29,26 +29,37 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void RoomLayout_KeepsCardBodyAndLowerDecorationContainedWithSeamOverlap()
+        public void RoomLayout_UsesOneCompensatedPortraitFrameWithDeepLowerOverlap()
         {
             var layout = global::LanLobbyRoomLayout.ForSize(1920, 1080);
 
             foreach (var slot in layout.Slots)
             {
+                AssertRect(slot.CardBody, 26f, 38.5f, 329f, 626f);
                 AssertContained(slot.CardBody, slot.Root);
                 AssertContained(slot.LowerDecoration, slot.Root);
-                Assert.That(slot.LowerDecoration.Top - slot.CardBody.Bottom, Is.EqualTo(8.75f).Within(0.01f));
+                Assert.That(
+                    slot.LowerDecoration.Top - slot.CardBody.Bottom,
+                    Is.EqualTo(81.5f).Within(0.01f));
+                Assert.That(
+                    slot.LowerDecoration.Top - slot.CardBody.Bottom,
+                    Is.GreaterThanOrEqualTo(60f));
             }
         }
 
         [Test]
-        public void RoomLayout_FitsReadyContourToCardWidthWithItsSourceAspect()
+        public void RoomLayout_EnlargesOnlyPortraitFrameAndPreservesExistingSlotChildren()
         {
             var slot = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
 
-            Assert.That(slot.StateOverlay.Left, Is.EqualTo(slot.CardBody.Left).Within(0.01f));
-            Assert.That(slot.StateOverlay.Bottom, Is.EqualTo(slot.CardBody.Bottom).Within(0.01f));
-            Assert.That(slot.StateOverlay.Width, Is.EqualTo(slot.CardBody.Width).Within(0.01f));
+            AssertRect(slot.TopBar, 26.25f, 622.073718f, 320.25f, 42.426282f);
+            AssertRect(slot.ReadyTopBar, 26.25f, 621.5f, 320.25f, 51f);
+            AssertRect(slot.StateOverlay, 18.5f, 111.25f, 337f, 135.589844f);
+            AssertRect(slot.EmptyInvite, 18.5f, 324.151364f, 337f, 127.447273f);
+            AssertRect(slot.ReadyIcon, 114.5f, 144.25f, 38f, 38f);
+            AssertRect(slot.ReadyLabel, 168.5f, 148.25f, 0f, 0f);
+            AssertRect(slot.LowerDecoration, 0f, 0f, 363.75f, 120f);
+            AssertRect(slot.CreatorTag, 123.5f, 576.25f, 124f, 35f);
             Assert.That(slot.StateOverlay.Width / slot.StateOverlay.Height, Is.EqualTo(256f / 103f).Within(0.0001f));
             AssertContained(slot.StateOverlay, slot.Root);
         }

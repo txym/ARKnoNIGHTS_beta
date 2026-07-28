@@ -45,9 +45,9 @@ public sealed class LanLobbyRoomLayout
     private const float ReferenceWidth = 1920f;
     private const float ReferenceHeight = 1080f;
     private const float SlotRootHeight = 664.5f;
-    private const float CardBodyLeft = 18.5f;
-    private const float CardBodyWidth = 337f;
-    private const float CardBodyHeight = 553.25f;
+    private const float CardBodyLeft = 26f;
+    private const float CardBodyWidth = 329f;
+    private const float CardBodyHeight = 626f;
     private const float TopBarLeft = 26.25f;
     private const float TopBarWidth = 320.25f;
     private const float TopBarSourceWidth = 234f;
@@ -66,17 +66,19 @@ public sealed class LanLobbyRoomLayout
     };
 
     private static readonly LanLobbyRect CanonicalCardBody = FromTopLeft(CardBodyLeft, 0f, CardBodyWidth, CardBodyHeight, SlotRootHeight);
+    private static readonly LanLobbyRect CanonicalPortraitContentArea =
+        FromTopLeft(18.5f, 0f, 337f, 553.25f, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalTopBar = FromTopLeft(TopBarLeft, 0f, TopBarWidth, TopBarWidth * TopBarSourceHeight / TopBarSourceWidth, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalReadyTopBar = FromTopLeft(TopBarLeft, -8f, TopBarWidth, 51f, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalStateOverlay = new LanLobbyRect(
-        CanonicalCardBody.Left,
-        CanonicalCardBody.Bottom,
-        CanonicalCardBody.Width,
-        CanonicalCardBody.Width * ReadyContourSourceHeight / ReadyContourSourceWidth);
+        CanonicalPortraitContentArea.Left,
+        CanonicalPortraitContentArea.Bottom,
+        CanonicalPortraitContentArea.Width,
+        CanonicalPortraitContentArea.Width * ReadyContourSourceHeight / ReadyContourSourceWidth);
     private static readonly LanLobbyRect CanonicalEmptyInvite = CenteredIn(
-        CanonicalCardBody,
-        CardBodyWidth,
-        CardBodyWidth * EmptyInviteSourceHeight / EmptyInviteSourceWidth);
+        CanonicalPortraitContentArea,
+        CanonicalPortraitContentArea.Width,
+        CanonicalPortraitContentArea.Width * EmptyInviteSourceHeight / EmptyInviteSourceWidth);
     private static readonly LanLobbyRect CanonicalReadyIcon = new LanLobbyRect(114.5f, 144.25f, 38f, 38f);
     private static readonly LanLobbyRect CanonicalReadyLabel = new LanLobbyRect(168.5f, 148.25f, 0f, 0f);
     private static readonly LanLobbyRect CanonicalLowerDecoration = FromTopLeft(0f, 544.5f, 363.75f, 120f, SlotRootHeight);
