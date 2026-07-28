@@ -20,8 +20,12 @@
 - The source schema is exactly `unit-elite-variants-v2`; there is no v1 fallback.
 - The temporary four-argument v1 resolver bridge may exist only while Tasks 1-2
   keep the old unit catalog generator compiling. Task 3 must remove the bridge,
-  every legacy v1 DTO used by it, and its friend-assembly access before Task 3
-  can be considered complete.
+  and every `LegacyUnitEliteVariant*` DTO used by it before Task 3 can be
+  considered complete. Keep `InternalsVisibleTo("Assembly-CSharp-Editor")`
+  because the Editor generator consumes the shared internal v2 resolver.
+- The flat legacy `UnitJson` DTO may remain only until Task 5 keeps the existing
+  `UnitFactory` compiling. Task 5 must remove that DTO after migrating the
+  factory to the resolved v2 value.
 - Phase 1 migrates only TypeIds `1000`, `5503`, and `5504`.
 - Every migrated unit has `deploymentCost = 2`, `attackRadiusMetres = 0`, and `blockRadiusMetres = 0`.
 - Do not add `unitSkeletonType`, `hitAnimation`, `attackAnimationDurationSeconds`, separate move/attack/death animation fields, `resourceFolderName`, `initialEliteLevel`, `Default` bindings, `animationBehavior`, playback speed, or target playback duration to v2.
@@ -765,8 +769,9 @@ git commit -m "data: migrate initial units to variant v2 sources"
 Add a behavior/reflection regression test named
 `Resolve_ExposesNoLegacyFourArgumentSourceContract`. It must assert that
 `UnitEliteVariantResolver` exposes no `Resolve` overload with the parameter
-types `(string, string, int, string)`. Remove the temporary friend-assembly
-access after the old generator no longer requires it.
+types `(string, string, int, string)`. The friend-assembly declaration remains
+necessary for the Editor generator to call the shared internal v2 resolver and
+is not itself a v1 source contract.
 
 Use reflection to invoke this exact private overload:
 
@@ -856,10 +861,11 @@ Do not call the parameterless `Generate()` during this phase.
 
 After the generator compiles against direct v2 input, remove the temporary
 four-argument resolver overload, all `LegacyUnitEliteVariant*` DTOs used only
-by that overload, the obsolete flat v1 source classes in `UnitJson.cs`, and
-`InternalsVisibleTo("Assembly-CSharp-Editor")` if it is no longer required.
-No source parser or compatibility fallback for `unit-source-v1` or
-`unit-elite-variants-v1` may remain.
+by that overload, and every parser/fallback for `unit-elite-variants-v1`.
+Retain `InternalsVisibleTo("Assembly-CSharp-Editor")` solely for direct v2
+resolver access. Retain the flat legacy `UnitJson` DTO solely until Task 5,
+because the not-yet-migrated `UnitFactory` still requires it to compile; do not
+add any new caller or capability to that DTO.
 
 Before converting any unit, load the complete set of authored
 `ability-source-v1` IDs from `AbilitySourceDirectory`. Validate schema, non-empty
@@ -1076,6 +1082,7 @@ git commit -m "refactor: read unit abilities from variant v2"
 
 **Files:**
 
+- Modify: `Assets/GameData/Units/UnitJson.cs`
 - Modify: `Assets/Game/Runtime/Initial/UnitFactory.cs`
 - Modify: `Assets/Game/Runtime/Data/Unit/UnitSkelBase.cs`
 - Modify: `Assets/Game/Runtime/Data/Unit/UnitSkelType1.cs`
@@ -1158,6 +1165,12 @@ foreach (var source in sources.Values.OrderBy(item => item.TypeId))
 ```
 
 Do not catch a source validation exception and continue. A malformed authority file must abort `SpawnAll` after logging one contextual error; it must not return a partial three-unit set.
+
+After `UnitFactory` compiles against `ResolvedUnitVariant`, remove the obsolete
+flat legacy `UnitJson` source DTO and its nested v1-only DTOs from
+`UnitJson.cs`. Add a behavior/reflection regression proving the old root DTO is
+no longer loadable. Keep the v2 DTOs, resolved value, JSON shape reader, and
+Editor friend access.
 
 - [ ] **Step 4: Map the resolved v2 value to the legacy template**
 
@@ -1258,6 +1271,7 @@ Expected: both fixtures pass; the formal runtime catalog still creates its exist
 
 ```powershell
 git add -- `
+  Assets/GameData/Units/UnitJson.cs `
   Assets/Game/Runtime/Initial/UnitFactory.cs `
   Assets/Game/Runtime/Data/Unit/UnitSkelBase.cs `
   Assets/Game/Runtime/Data/Unit/UnitSkelType1.cs `
