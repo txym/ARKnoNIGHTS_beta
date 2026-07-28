@@ -30,6 +30,7 @@ All root `UI/Lobby` rows use an `Unpacked direct` normal filename from the appro
 | bg_top_normal.png | [uc]autochessouter/bg_top_normal.png | UI/Lobby/bg_top_normal | Room slot normal top bar | Preserve | 5A9479B9AFDD4FC3F597CCBF4A1A0D92C1BB1B5053D716E8C20267E6B2C77C4F | Unpacked direct |
 | bg_top_ready.png | [uc]autochessouter/bg_top_ready.png | UI/Lobby/bg_top_ready | Ready room slot top bar | Preserve | EFAA99906A087AAF5AD631E4DF8CFCD7E90C4F463621779A13447675F221482D | Unpacked direct |
 | card_empty.png | [uc]autochessouter/card_empty.png | UI/Lobby/card_empty | Empty room slot card | Nine-slice | 4DD34E0B5BE318770082B14F245591D80F6ABFF00451744C4BEF3459798DCE31 | Unpacked direct |
+| card_deco_bg.png | [uc]autochessouter/card_deco_bg.png | UI/Lobby/card_deco_bg | Neutral room slot lower decoration | Preserve | C907B3527747B947ECCA08757DD6601BCA46B8EC5AF835F61F226BBBF8E1EBF1 | Unpacked direct |
 | card_deco_self.png | [uc]autochessouter/card_deco_self.png | UI/Lobby/card_deco_self | Local player card decoration | Preserve | A3217A0EE5C8B1D7325758162C9859BEC765C7B63331881C90CDA4804A93F661 | Unpacked direct |
 | bg_plus.png | [uc]autochessouter/bg_plus.png | UI/Lobby/bg_plus | Empty room slot add marker | Preserve | E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D | Unpacked direct |
 | btn_match_normal.png | [uc]autochessouter/btn_match_normal.png | UI/Lobby/btn_match_normal | Room start-match button | Nine-slice | 62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD | Unpacked direct |

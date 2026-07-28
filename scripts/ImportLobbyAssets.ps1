@@ -26,7 +26,7 @@ $assetNames = @(
     'bg_terrain', 'shallow_main', 'room_create_btn_bg', 'room_join_btn_bg', 'create_icon', 'join_icon',
     'img_player_bkg', 'img_player_confirmed', 'player_card_waiting', 'player_card_ready', 'player_card_self_frame',
     'team_icon_frame', 'team_hp_back', 'btn_match_host_normal', 'btn_match_host_grey', 'btn_match_grey', 'btn_match_cancel',
-    'card_bg', 'bg_top_normal', 'bg_top_ready', 'card_empty', 'card_deco_self', 'bg_plus', 'btn_match_normal', 'btn_topmenu_back', 'img_return', 'host_top_tag'
+    'card_bg', 'bg_top_normal', 'bg_top_ready', 'card_empty', 'card_deco_bg', 'card_deco_self', 'bg_plus', 'btn_match_normal', 'btn_topmenu_back', 'img_return', 'host_top_tag'
 )
 
 $roomSelectAssetNames = @(

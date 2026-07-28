@@ -646,7 +646,8 @@ public sealed class LanLobbyView : MonoBehaviour
         slot.EmptyContent.GetComponent<Image>().sprite = Sprite("card_empty");
         slot.EmptyInviteIcon.sprite = Sprite("bg_plus");
         slot.ReadyIcon.sprite = Sprite("player_card_ready");
-        slot.LowerDecoration.sprite = Sprite("card_deco_self");
+        slot.LowerDecoration.sprite = Sprite(isReady ? "card_deco_self" : "card_deco_bg");
+        slot.LowerDecoration.color = isReady ? Color.white : new Color(.5f, .5f, .5f, 1f);
         slot.CreatorTag.sprite = Sprite("host_top_tag");
         slot.EmptyInviteLabel.text = "邀请";
         slot.EmptyInviteHint.text = "复制同盟密钥以邀请队友";

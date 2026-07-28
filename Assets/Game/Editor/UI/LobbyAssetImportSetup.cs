@@ -29,6 +29,7 @@ public sealed class LobbyAssetImportSetup : AssetPostprocessor
         LobbyAssetDirectory + "bg_top_normal.png",
         LobbyAssetDirectory + "bg_top_ready.png",
         LobbyAssetDirectory + "card_empty.png",
+        LobbyAssetDirectory + "card_deco_bg.png",
         LobbyAssetDirectory + "card_deco_self.png",
         LobbyAssetDirectory + "bg_plus.png",
         LobbyAssetDirectory + "btn_match_normal.png",

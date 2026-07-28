@@ -429,6 +429,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             case "bg_top_normal": source = RootSource(spriteName, "5A9479B9AFDD4FC3F597CCBF4A1A0D92C1BB1B5053D716E8C20267E6B2C77C4F"); return true;
             case "bg_top_ready": source = RootSource(spriteName, "EFAA99906A087AAF5AD631E4DF8CFCD7E90C4F463621779A13447675F221482D"); return true;
             case "card_empty": source = RootSource(spriteName, "4DD34E0B5BE318770082B14F245591D80F6ABFF00451744C4BEF3459798DCE31"); return true;
+            case "card_deco_bg": source = RootSource(spriteName, "C907B3527747B947ECCA08757DD6601BCA46B8EC5AF835F61F226BBBF8E1EBF1"); return true;
             case "card_deco_self": source = RootSource(spriteName, "A3217A0EE5C8B1D7325758162C9859BEC765C7B63331881C90CDA4804A93F661"); return true;
             case "bg_plus": source = RootSource(spriteName, "E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D"); return true;
             case "btn_match_normal": source = RootSource(spriteName, "62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD"); return true;

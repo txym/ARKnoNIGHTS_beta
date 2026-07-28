@@ -408,7 +408,7 @@ namespace ArknoNights.Lobby.Tests
                         { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
                         { "player_card_self_frame", 1 }, { "card_empty", 3 }, { "bg_plus", 3 },
-                        { "player_card_ready", 1 }, { "card_deco_self", 4 }, { "host_top_tag", 1 },
+                        { "player_card_ready", 1 }, { "card_deco_bg", 3 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_normal", 1 }, { "btn_match_host_normal", 1 }
                     };
                 case "room-full":
@@ -417,7 +417,7 @@ namespace ArknoNights.Lobby.Tests
                         { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
                         { "player_card_self_frame", 1 }, { "player_card_ready", 1 },
-                        { "card_deco_self", 4 }, { "host_top_tag", 1 },
+                        { "card_deco_bg", 3 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_grey", 1 }, { "btn_match_host_grey", 1 }
                     };
                 case "room-ready":
@@ -713,6 +713,7 @@ namespace ArknoNights.Lobby.Tests
                 { "bg_top_normal", new BitmapSourceExpectation("5A9479B9AFDD4FC3F597CCBF4A1A0D92C1BB1B5053D716E8C20267E6B2C77C4F") },
                 { "bg_top_ready", new BitmapSourceExpectation("EFAA99906A087AAF5AD631E4DF8CFCD7E90C4F463621779A13447675F221482D") },
                 { "card_empty", new BitmapSourceExpectation("4DD34E0B5BE318770082B14F245591D80F6ABFF00451744C4BEF3459798DCE31") },
+                { "card_deco_bg", new BitmapSourceExpectation("C907B3527747B947ECCA08757DD6601BCA46B8EC5AF835F61F226BBBF8E1EBF1") },
                 { "card_deco_self", new BitmapSourceExpectation("A3217A0EE5C8B1D7325758162C9859BEC765C7B63331881C90CDA4804A93F661") },
                 { "bg_plus", new BitmapSourceExpectation("E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D") },
                 { "btn_match_normal", new BitmapSourceExpectation("62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD") },

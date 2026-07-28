@@ -1456,7 +1456,9 @@ namespace ArknoNights.Lobby.Tests
             AssertActiveResourceSprite(RequireChild(occupiedContent, "ReadyIcon"), "player_card_ready", false);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").gameObject.activeSelf, Is.False);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
-            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", true);
+            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_bg", true);
+            Assert.That(RequireChild(slot, "LowerDecoration").GetComponent<Image>().color,
+                Is.EqualTo(new Color(.5f, .5f, .5f, 1f)));
             AssertActiveResourceSprite(RequireChild(slot, "CreatorTag"), "host_top_tag", false);
             Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
                 Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
@@ -1493,7 +1495,9 @@ namespace ArknoNights.Lobby.Tests
             AssertActiveResourceSprite(RequireChild(occupiedContent, "ReadyIcon"), "player_card_ready", false);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").gameObject.activeSelf, Is.False);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
-            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", true);
+            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_bg", true);
+            Assert.That(RequireChild(slot, "LowerDecoration").GetComponent<Image>().color,
+                Is.EqualTo(new Color(.5f, .5f, .5f, 1f)));
             AssertActiveResourceSprite(RequireChild(slot, "CreatorTag"), "host_top_tag", false);
             Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
                 Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
@@ -1543,6 +1547,7 @@ namespace ArknoNights.Lobby.Tests
             var lowerDecoration = RequireChild(slot, "LowerDecoration");
             Assert.That(lowerDecoration.gameObject.activeSelf, Is.True);
             AssertResourceSprite(lowerDecoration.GetComponent<Image>(), "card_deco_self");
+            Assert.That(lowerDecoration.GetComponent<Image>().color, Is.EqualTo(Color.white));
             Assert.That(lowerDecoration.GetComponent<Image>().preserveAspect, Is.True);
             Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
         }
