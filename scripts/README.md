@@ -14,3 +14,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTe
 `-ExecutionPolicy Bypass` 仅作用于这个启动的 PowerShell 进程，不会更改用户或机器的执行策略。
 
 可选 `-TestFilter '<完整 NUnit fixture 或测试名>'`。每轮输出写到 `Temp/UnityTests/<UTC 时间戳>/`，包含 XML、Unity 日志和 `summary.txt`；脚本返回非零退出码代表未验证或测试失败。
+
+## BONDS 单位 Spine 动画审计
+
+关闭当前项目的 Unity Editor 后，可运行只读动画审计：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\Invoke-BondsUnitAnimationAudit.ps1 `
+  -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -ProjectPath 'G:\ARKnoNIGHTS_beta' `
+  -NoGraphics
+```
+
+脚本会在发现本项目已有 Unity 进程时失败。成功后只在项目 `Temp` 目录写入
+`bonds-unit-animation-audit-v1.json` 和 `bonds-unit-animation-audit.log`；
+它不会修改 Spine 资源或单位 JSON。报告必须包含 93 个 TypeId 和 172 个唯一变体，
+否则脚本返回非零退出码。
