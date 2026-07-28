@@ -290,6 +290,70 @@ namespace ArknoNights.Battle.Core
         public int SummonedMoveSpeedMultiplierPermille { get; }
     }
 
+    public enum AuraTargetSide
+    {
+        Allies,
+        Enemies
+    }
+
+    public sealed class AuraCombatModifierDefinition
+    {
+        public const int NeutralMultiplierPermille = 1000;
+
+        public AuraCombatModifierDefinition(
+            AuraTargetSide targetSide,
+            bool isGlobal,
+            int radiusCentimetres,
+            bool excludeSource,
+            bool nonStackingByAbilityId,
+            int attackMultiplierPermille,
+            int defenseAdditive,
+            int magicResistanceAdditive,
+            int attackSpeedMultiplierPermille,
+            int moveSpeedMultiplierPermille,
+            int hitPointsPerSecond)
+        {
+            TargetSide = targetSide;
+            IsGlobal = isGlobal;
+            RadiusCentimetres = radiusCentimetres;
+            ExcludeSource = excludeSource;
+            NonStackingByAbilityId =
+                nonStackingByAbilityId;
+            AttackMultiplierPermille =
+                attackMultiplierPermille;
+            DefenseAdditive = defenseAdditive;
+            MagicResistanceAdditive =
+                magicResistanceAdditive;
+            AttackSpeedMultiplierPermille =
+                attackSpeedMultiplierPermille;
+            MoveSpeedMultiplierPermille =
+                moveSpeedMultiplierPermille;
+            HitPointsPerSecond = hitPointsPerSecond;
+        }
+
+        public AuraTargetSide TargetSide { get; }
+        public bool IsGlobal { get; }
+        public int RadiusCentimetres { get; }
+        public bool ExcludeSource { get; }
+        public bool NonStackingByAbilityId { get; }
+        public int AttackMultiplierPermille { get; }
+        public int DefenseAdditive { get; }
+        public int MagicResistanceAdditive { get; }
+        public int AttackSpeedMultiplierPermille { get; }
+        public int MoveSpeedMultiplierPermille { get; }
+        public int HitPointsPerSecond { get; }
+        public bool IsNeutral =>
+            AttackMultiplierPermille
+                == NeutralMultiplierPermille
+            && DefenseAdditive == 0
+            && MagicResistanceAdditive == 0
+            && AttackSpeedMultiplierPermille
+                == NeutralMultiplierPermille
+            && MoveSpeedMultiplierPermille
+                == NeutralMultiplierPermille
+            && HitPointsPerSecond == 0;
+    }
+
     public sealed class SummonEffectDefinition
     {
         public SummonEffectDefinition(string summonTypeId, int count, int sideLengthCentimetres, bool inheritPathFromCaster)
@@ -530,6 +594,32 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, string animationKey, int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                passiveCombatModifier,
+                passiveLifecycleEffect,
+                onDamageReactionEffect,
+                healthThresholdCombatModifier,
+                unblockedDamageTakenModifier,
+                attackSequenceModifier,
+                attackCountStateModifier,
+                deathSpawnEffect,
+                null,
+                animationKey,
+                skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -552,6 +642,7 @@ namespace ArknoNights.Battle.Core
             AttackCountStateModifier =
                 attackCountStateModifier;
             DeathSpawnEffect = deathSpawnEffect;
+            AuraCombatModifier = auraCombatModifier;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -578,6 +669,10 @@ namespace ArknoNights.Battle.Core
         public AttackCountStateModifierDefinition
             AttackCountStateModifier { get; }
         public DeathSpawnEffectDefinition DeathSpawnEffect { get; }
+        public AuraCombatModifierDefinition AuraCombatModifier
+        {
+            get;
+        }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

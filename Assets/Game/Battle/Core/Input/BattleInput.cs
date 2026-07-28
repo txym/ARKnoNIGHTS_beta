@@ -267,6 +267,19 @@ namespace ArknoNights.Battle.Core
                                 ? 0
                                 : option.Weight);
                 }
+                if (ability.AuraCombatModifier != null)
+                    builder.Append("|O:")
+                        .Append((int)ability.AuraCombatModifier.TargetSide).Append(',')
+                        .Append(ability.AuraCombatModifier.IsGlobal ? 1 : 0).Append(',')
+                        .Append(ability.AuraCombatModifier.RadiusCentimetres).Append(',')
+                        .Append(ability.AuraCombatModifier.ExcludeSource ? 1 : 0).Append(',')
+                        .Append(ability.AuraCombatModifier.NonStackingByAbilityId ? 1 : 0).Append(',')
+                        .Append(ability.AuraCombatModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.AuraCombatModifier.DefenseAdditive).Append(',')
+                        .Append(ability.AuraCombatModifier.MagicResistanceAdditive).Append(',')
+                        .Append(ability.AuraCombatModifier.AttackSpeedMultiplierPermille).Append(',')
+                        .Append(ability.AuraCombatModifier.MoveSpeedMultiplierPermille).Append(',')
+                        .Append(ability.AuraCombatModifier.HitPointsPerSecond);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -341,6 +354,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.AttackSequenceModifier != null) validationErrors.Add(new ValidationError("ability.attackSequence.unexpected", "Timed ability cannot define an attack-sequence modifier: " + ability.AbilityId));
                     if (ability.AttackCountStateModifier != null) validationErrors.Add(new ValidationError("ability.attackCountState.unexpected", "Timed ability cannot define an attack-count state modifier: " + ability.AbilityId));
                     if (ability.DeathSpawnEffect != null) validationErrors.Add(new ValidationError("ability.deathSpawn.unexpected", "Timed ability cannot define a death-spawn effect: " + ability.AbilityId));
+                    if (ability.AuraCombatModifier != null) validationErrors.Add(new ValidationError("ability.aura.unexpected", "Timed ability cannot define an aura modifier: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -368,7 +382,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.UnblockedDamageTakenModifier == null ? 0 : 1)
                         + (ability.AttackSequenceModifier == null ? 0 : 1)
                         + (ability.AttackCountStateModifier == null ? 0 : 1)
-                        + (ability.DeathSpawnEffect == null ? 0 : 1);
+                        + (ability.DeathSpawnEffect == null ? 0 : 1)
+                        + (ability.AuraCombatModifier == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -458,6 +473,20 @@ namespace ArknoNights.Battle.Core
                                 validationErrors.Add(new ValidationError("ability.deathSpawn.type.unknown", "Death-spawn type is unknown: " + option.SummonTypeId));
                         }
                     }
+                    if (ability.AuraCombatModifier != null
+                        && (ability.AuraCombatModifier.IsNeutral
+                            || !Enum.IsDefined(typeof(AuraTargetSide), ability.AuraCombatModifier.TargetSide)
+                            || (ability.AuraCombatModifier.IsGlobal
+                                && ability.AuraCombatModifier.RadiusCentimetres != 0)
+                            || (!ability.AuraCombatModifier.IsGlobal
+                                && ability.AuraCombatModifier.RadiusCentimetres <= 0)
+                            || ability.AuraCombatModifier.AttackMultiplierPermille <= 0
+                            || ability.AuraCombatModifier.DefenseAdditive < 0
+                            || ability.AuraCombatModifier.MagicResistanceAdditive < -100
+                            || ability.AuraCombatModifier.MagicResistanceAdditive > 100
+                            || ability.AuraCombatModifier.AttackSpeedMultiplierPermille <= 0
+                            || ability.AuraCombatModifier.MoveSpeedMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.aura.invalid", "Aura combat modifier is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

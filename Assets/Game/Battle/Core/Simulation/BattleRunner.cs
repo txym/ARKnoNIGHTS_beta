@@ -105,6 +105,9 @@ namespace ArknoNights.Battle.Core
     {
         private readonly List<string> blockedUnitIds = new List<string>();
         private readonly List<RuntimeAbilityState> abilityStates;
+        private readonly List<AuraCombatModifierDefinition>
+            auraCombatModifiers =
+                new List<AuraCombatModifierDefinition>();
 
         internal RuntimeUnitState(
             string unitId,
@@ -247,7 +250,9 @@ namespace ArknoNights.Battle.Core
                 + PassiveCombatModifiers.Sum(item =>
                     item.MagicResistanceAdditive)
                 + ActiveUnlockedAttackCountStateModifiers.Sum(item =>
-                    item.UnlockedMagicResistanceAdditive)));
+                    item.UnlockedMagicResistanceAdditive)
+                + auraCombatModifiers.Sum(item =>
+                    item.MagicResistanceAdditive)));
         public int EffectiveAttackIntervalTicks
         {
             get
@@ -259,6 +264,12 @@ namespace ArknoNights.Battle.Core
                         item.AttackSpeedAdditive)
                     + ActiveLockedAttackCountStateModifiers.Sum(item =>
                         item.LockedAttackSpeedAdditive);
+                if (finalAttackSpeed <= 0)
+                    return 0;
+                foreach (var modifier in auraCombatModifiers)
+                    finalAttackSpeed = ApplyMultiplier(
+                        finalAttackSpeed,
+                        modifier.AttackSpeedMultiplierPermille);
                 if (finalAttackSpeed <= 0)
                     return 0;
                 var numerator =
@@ -285,20 +296,36 @@ namespace ArknoNights.Battle.Core
                     attack = ApplyMultiplier(
                         attack,
                         modifier.UnlockedAttackMultiplierPermille);
+                foreach (var modifier in auraCombatModifiers)
+                    attack = ApplyMultiplier(
+                        attack,
+                        modifier.AttackMultiplierPermille);
                 return attack;
             }
         }
         public int EffectiveDefense => ApplyThresholdMultiplier(
             Definition.Defense
             + ActiveLockedAttackCountStateModifiers.Sum(item =>
-                item.LockedDefenseAdditive),
+                item.LockedDefenseAdditive)
+            + auraCombatModifiers.Sum(item =>
+                item.DefenseAdditive),
             item => item.DefenseMultiplierPermille);
-        public int EffectiveMoveSpeedCentimetresPerSecond =>
-            ApplyThresholdMultiplier(
+        public int EffectiveMoveSpeedCentimetresPerSecond
+        {
+            get
+            {
+                var speed = ApplyThresholdMultiplier(
                 ApplyMultiplier(
                     Definition.MoveSpeedCentimetresPerSecond,
                     InstanceMoveSpeedMultiplierPermille),
                 item => item.MoveSpeedMultiplierPermille);
+                foreach (var modifier in auraCombatModifiers)
+                    speed = ApplyMultiplier(
+                        speed,
+                        modifier.MoveSpeedMultiplierPermille);
+                return speed;
+            }
+        }
         internal int BeginAttackAndGetEffectiveAttack()
         {
             StartedAttackCount++;
@@ -393,7 +420,9 @@ namespace ArknoNights.Battle.Core
                     item.Definition.PassiveLifecycleEffect
                         .HitPointsPerSecond)
             + ActiveUnlockedAttackCountStateModifiers.Sum(item =>
-                item.UnlockedHitPointsPerSecond);
+                item.UnlockedHitPointsPerSecond)
+            + auraCombatModifiers.Sum(item =>
+                item.HitPointsPerSecond);
         internal int PassiveLifetimeTicks
         {
             get
@@ -427,6 +456,23 @@ namespace ArknoNights.Battle.Core
                     new KeyValuePair<string, DeathSpawnEffectDefinition>(
                         item.Definition.AbilityId,
                         item.Definition.DeathSpawnEffect));
+        internal IEnumerable<KeyValuePair<string, AuraCombatModifierDefinition>>
+            AuraCombatModifiers =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.AuraCombatModifier != null)
+                .Select(item =>
+                    new KeyValuePair<string, AuraCombatModifierDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.AuraCombatModifier));
+        internal void SetAuraCombatModifiers(
+            IEnumerable<AuraCombatModifierDefinition> modifiers)
+        {
+            auraCombatModifiers.Clear();
+            auraCombatModifiers.AddRange(
+                modifiers
+                ?? Enumerable.Empty<AuraCombatModifierDefinition>());
+        }
 
         private int ApplyThresholdMultiplier(
             int value,
@@ -644,9 +690,11 @@ namespace ArknoNights.Battle.Core
         {
             ResolveDueDeathSpawns();
             UpdateHealthThresholdStates();
+            RefreshAuraCombatModifiers();
             RemoveInvalidPendingAttacks();
             AcquireTargets();
             ApplyMovement();
+            RefreshAuraCombatModifiers();
             EvaluateBlocking();
             CastReadyAbilities();
             StartAttacks();
@@ -654,10 +702,12 @@ namespace ArknoNights.Battle.Core
             UpdateHealthThresholdStates();
             ResolveDeathsAndCleanup();
             ResolveDueDeathSpawns();
+            RefreshAuraCombatModifiers();
             ApplyPassiveLifecycleEffects();
             UpdateHealthThresholdStates();
             ResolveDeathsAndCleanup();
             ResolveDueDeathSpawns();
+            RefreshAuraCombatModifiers();
             EvaluateBattleEnd();
             if (Status == BattleRunnerStatus.Stopped) return;
             RecoverAutomaticSkillPointsAndCast();
@@ -925,6 +975,69 @@ namespace ArknoNights.Battle.Core
                     unitSnapshots.Add(summoned.UnitId, snapshot);
                     EmitSpawn(summoned, snapshot);
                 }
+            }
+        }
+
+        private void RefreshAuraCombatModifiers()
+        {
+            var contributions = new List<AuraContribution>();
+            foreach (var source in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var ability in source.AuraCombatModifiers
+                         .OrderBy(item => item.Key, StringComparer.Ordinal))
+            foreach (var target in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            {
+                var modifier = ability.Value;
+                if (modifier.ExcludeSource
+                    && ReferenceEquals(source, target))
+                    continue;
+                var sideMatches =
+                    modifier.TargetSide == AuraTargetSide.Allies
+                        ? source.Side == target.Side
+                        : source.Side != target.Side;
+                if (!sideMatches)
+                    continue;
+                if (!modifier.IsGlobal
+                    && DistanceSquared(source.Position, target.Position)
+                    > (long)modifier.RadiusCentimetres
+                    * modifier.RadiusCentimetres)
+                    continue;
+                contributions.Add(new AuraContribution(
+                    source.UnitId,
+                    target.UnitId,
+                    ability.Key,
+                    modifier));
+            }
+
+            foreach (var target in runtimeUnits)
+            {
+                var accepted = new List<AuraCombatModifierDefinition>();
+                var nonStackingAbilityIds =
+                    new HashSet<string>(StringComparer.Ordinal);
+                foreach (var contribution in contributions
+                             .Where(item =>
+                                 string.Equals(
+                                     item.TargetUnitId,
+                                     target.UnitId,
+                                     StringComparison.Ordinal))
+                             .OrderBy(item =>
+                                 item.SourceUnitId,
+                                 StringComparer.Ordinal)
+                             .ThenBy(item =>
+                                 item.AbilityId,
+                                 StringComparer.Ordinal))
+                {
+                    if (contribution.Modifier
+                            .NonStackingByAbilityId
+                        && !nonStackingAbilityIds.Add(
+                            contribution.AbilityId))
+                        continue;
+                    accepted.Add(contribution.Modifier);
+                }
+                target.SetAuraCombatModifiers(accepted);
             }
         }
 
@@ -1394,6 +1507,25 @@ namespace ArknoNights.Battle.Core
             public FixedPosition Position { get; }
             public string AbilityId { get; }
             public DeathSpawnEffectDefinition Effect { get; }
+        }
+        private readonly struct AuraContribution
+        {
+            public AuraContribution(
+                string sourceUnitId,
+                string targetUnitId,
+                string abilityId,
+                AuraCombatModifierDefinition modifier)
+            {
+                SourceUnitId = sourceUnitId;
+                TargetUnitId = targetUnitId;
+                AbilityId = abilityId;
+                Modifier = modifier;
+            }
+
+            public string SourceUnitId { get; }
+            public string TargetUnitId { get; }
+            public string AbilityId { get; }
+            public AuraCombatModifierDefinition Modifier { get; }
         }
 
         private static List<RuntimeUnitState> BuildInitialUnits(

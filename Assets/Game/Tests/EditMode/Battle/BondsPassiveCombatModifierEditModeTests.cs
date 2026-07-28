@@ -842,6 +842,114 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(300));
         }
 
+        [Test]
+        public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
+        {
+            var input = CreateInput(
+                2,
+                new[]
+                {
+                    NonAttacker("aura-source", 1000, "ARMOR_AURA"),
+                    Attacker(
+                        "target",
+                        0,
+                        0,
+                        attackIntervalTicks: 100,
+                        defense: 100),
+                    NonAttacker("dummy", 100000)
+                },
+                new[]
+                {
+                    PassiveAura(
+                        "ARMOR_AURA",
+                        AuraTargetSide.Allies,
+                        isGlobal: false,
+                        radiusCentimetres: 250,
+                        excludeSource: true,
+                        nonStackingByAbilityId: true,
+                        defenseAdditive: 300,
+                        magicResistanceAdditive: 30)
+                },
+                new[]
+                {
+                    Unit("source-a", "aura-source", 4, 4),
+                    Unit("source-b", "aura-source", 8, 4),
+                    Unit("target-close", "target", 6, 4),
+                    Unit("target-far", "target", 1, 1)
+                },
+                new[] { Unit("dummy", "dummy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+
+            var source = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "source-a");
+            var close = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "target-close");
+            var far = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "target-far");
+            Assert.That(source.EffectiveDefense, Is.EqualTo(0));
+            Assert.That(close.EffectiveDefense, Is.EqualTo(400));
+            Assert.That(close.EffectiveMagicResistance, Is.EqualTo(30));
+            Assert.That(far.EffectiveDefense, Is.EqualTo(100));
+            Assert.That(far.EffectiveMagicResistance, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void GlobalFriendlyAuraAndEnemySlowModifyCurrentCombatStats()
+        {
+            var input = CreateInput(
+                2,
+                new[]
+                {
+                    NonAttacker("order-source", 1000, "GLOBAL_ORDER"),
+                    Attacker(
+                        "target",
+                        0,
+                        0,
+                        attackIntervalTicks: 20,
+                        attack: 100),
+                    NonAttacker("slow-source", 1000, "ENEMY_SLOW")
+                },
+                new[]
+                {
+                    PassiveAura(
+                        "GLOBAL_ORDER",
+                        AuraTargetSide.Allies,
+                        isGlobal: true,
+                        radiusCentimetres: 0,
+                        excludeSource: false,
+                        nonStackingByAbilityId: true,
+                        attackMultiplierPermille: 1100,
+                        defenseAdditive: 100),
+                    PassiveAura(
+                        "ENEMY_SLOW",
+                        AuraTargetSide.Enemies,
+                        isGlobal: false,
+                        radiusCentimetres: 250,
+                        excludeSource: false,
+                        nonStackingByAbilityId: true,
+                        attackSpeedMultiplierPermille: 500)
+                },
+                new[]
+                {
+                    Unit("order", "order-source", 4, 4),
+                    Unit("target", "target", 5, 4)
+                },
+                new[] { Unit("slow", "slow-source", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+
+            var target = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "target");
+            Assert.That(target.EffectiveAttack, Is.EqualTo(110));
+            Assert.That(target.EffectiveDefense, Is.EqualTo(100));
+            Assert.That(
+                target.EffectiveAttackIntervalTicks,
+                Is.EqualTo(40));
+        }
+
         private static int[] RunAttackSequence(
             int firstEnhancedAttackOrdinal,
             int repeatInterval,
@@ -1221,6 +1329,61 @@ namespace ArknoNights.Battle.Tests
                     sideLengthCentimetres,
                     snapToNearestPassableCell,
                     summonedMoveSpeedMultiplierPermille),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveAura(
+            string abilityId,
+            AuraTargetSide targetSide,
+            bool isGlobal,
+            int radiusCentimetres,
+            bool excludeSource,
+            bool nonStackingByAbilityId,
+            int attackMultiplierPermille =
+                AuraCombatModifierDefinition
+                    .NeutralMultiplierPermille,
+            int defenseAdditive = 0,
+            int magicResistanceAdditive = 0,
+            int attackSpeedMultiplierPermille =
+                AuraCombatModifierDefinition
+                    .NeutralMultiplierPermille,
+            int moveSpeedMultiplierPermille =
+                AuraCombatModifierDefinition
+                    .NeutralMultiplierPermille,
+            int hitPointsPerSecond = 0)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new AuraCombatModifierDefinition(
+                    targetSide,
+                    isGlobal,
+                    radiusCentimetres,
+                    excludeSource,
+                    nonStackingByAbilityId,
+                    attackMultiplierPermille,
+                    defenseAdditive,
+                    magicResistanceAdditive,
+                    attackSpeedMultiplierPermille,
+                    moveSpeedMultiplierPermille,
+                    hitPointsPerSecond),
                 string.Empty,
                 0);
         }
