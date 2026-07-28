@@ -1,12 +1,25 @@
 {
-  "schemaVersion": "unit-elite-variants-v1",
+  "schemaVersion": "unit-elite-variants-v2",
   "typeId": 1000,
+  "common": {
+    "rarity": 1,
+    "deploymentCost": 2,
+    "attackMethod": 1,
+    "actionMethod": 1,
+    "attackRadiusMetres": 0,
+    "blockRadiusMetres": 0,
+    "canBlock": true,
+    "blockCapacity": 1,
+    "tauntLevel": 0,
+    "damageType": "Physical"
+  },
   "variants": [
     {
       "minEliteLevel": 0,
       "sourceVariant": "1000_gopro",
       "statsLevel": 0,
       "displayNameZhHans": "猎狗",
+      "skillDescriptionZhHans": "",
       "stats": {
         "combat": {
           "maxHitPoints": 820,
@@ -21,16 +34,28 @@
         }
       },
       "model": {
-        "resourceFolderName": "1000_gopro",
         "resourceKey": "gopro",
         "skeletonDataResourceName": "enemy_1000_gopro_SkeletonData",
         "profilePictureResourceName": "UIImage_1000_gopro",
-        "unitSkeletonType": 1,
-        "attackAnimationDurationSeconds": 1.0,
-        "moveAnimation": "Run_Loop",
-        "attackAnimation": "Attack",
-        "hitAnimation": "",
-        "deathAnimation": "Die"
+        "animations": [
+          {
+            "key": "idle",
+            "name": "Idle"
+          },
+          {
+            "key": "move",
+            "name": "Run_Loop"
+          },
+          {
+            "key": "attack",
+            "name": "Attack",
+            "durationSeconds": 1.0
+          },
+          {
+            "key": "death",
+            "name": "Die"
+          }
+        ]
       },
       "innateAbilityIds": []
     },
@@ -48,16 +73,28 @@
         }
       },
       "model": {
-        "resourceFolderName": "1000_gopro_2",
         "resourceKey": "gopro_2",
         "skeletonDataResourceName": "enemy_1000_gopro_2_SkeletonData",
         "profilePictureResourceName": "UIImage_1000_gopro_2",
-        "unitSkeletonType": 1,
-        "attackAnimationDurationSeconds": 1.0,
-        "moveAnimation": "Run_Loop",
-        "attackAnimation": "Attack",
-        "hitAnimation": "",
-        "deathAnimation": "Die"
+        "animations": [
+          {
+            "key": "idle",
+            "name": "Idle"
+          },
+          {
+            "key": "move",
+            "name": "Run_Loop"
+          },
+          {
+            "key": "attack",
+            "name": "Attack",
+            "durationSeconds": 1.0
+          },
+          {
+            "key": "death",
+            "name": "Die"
+          }
+        ]
       }
     },
     {
@@ -74,16 +111,28 @@
         }
       },
       "model": {
-        "resourceFolderName": "1000_gopro_3",
         "resourceKey": "gopro_3",
         "skeletonDataResourceName": "enemy_1000_gopro_3_SkeletonData",
         "profilePictureResourceName": "UIImage_1000_gopro_3",
-        "unitSkeletonType": 1,
-        "attackAnimationDurationSeconds": 1.0,
-        "moveAnimation": "Run_Loop",
-        "attackAnimation": "Attack",
-        "hitAnimation": "",
-        "deathAnimation": "Die"
+        "animations": [
+          {
+            "key": "idle",
+            "name": "Idle"
+          },
+          {
+            "key": "move",
+            "name": "Run_Loop"
+          },
+          {
+            "key": "attack",
+            "name": "Attack",
+            "durationSeconds": 1.0
+          },
+          {
+            "key": "death",
+            "name": "Die"
+          }
+        ]
       }
     }
   ]

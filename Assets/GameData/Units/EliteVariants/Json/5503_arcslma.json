@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "unit-elite-variants-v2",
+  "typeId": 5503,
+  "common": {
+    "rarity": 6,
+    "deploymentCost": 2,
+    "attackMethod": 1,
+    "actionMethod": 1,
+    "attackRadiusMetres": 0,
+    "blockRadiusMetres": 0,
+    "canBlock": true,
+    "blockCapacity": 1,
+    "tauntLevel": 0,
+    "damageType": "Physical"
+  },
+  "variants": [
+    {
+      "minEliteLevel": 0,
+      "sourceVariant": "5503_arcslma",
+      "statsLevel": 0,
+      "displayNameZhHans": "果冻小子",
+      "skillDescriptionZhHans": "",
+      "stats": {
+        "combat": {
+          "maxHitPoints": 18000,
+          "attack": 1100,
+          "defense": 0,
+          "magicResistance": 0
+        },
+        "shared": {
+          "moveSpeedMetresPerSecond": 0.2,
+          "attackIntervalSeconds": 4.0,
+          "lifeDeduct": 1
+        }
+      },
+      "model": {
+        "resourceKey": "arcslma",
+        "skeletonDataResourceName": "enemy_5503_arcslma_SkeletonData",
+        "profilePictureResourceName": "UIImage_5503_arcslma",
+        "animations": [
+          {
+            "key": "idle",
+            "name": "Idle"
+          },
+          {
+            "key": "move",
+            "name": "Move"
+          },
+          {
+            "key": "attack",
+            "name": "Attack",
+            "durationSeconds": 2.666667
+          },
+          {
+            "key": "death",
+            "name": "Die"
+          },
+          {
+            "key": "skill",
+            "name": "Skill",
+            "durationSeconds": 1.5
+          }
+        ]
+      },
+      "innateAbilityIds": [
+        "SUMMON_JELLY_MINIONS"
+      ]
+    }
+  ]
+}

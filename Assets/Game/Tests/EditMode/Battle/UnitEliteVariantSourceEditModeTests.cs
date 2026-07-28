@@ -412,6 +412,75 @@ namespace ArknoNights.Battle.Tests
             }
         }
 
+        [Test]
+        public void RealSources_AreOnlyTheThreeSelfContainedV2Documents()
+        {
+            var v2Directory = Path.Combine(
+                Application.dataPath,
+                "GameData/Units/EliteVariants/Json");
+            var sources = LoadDirectory(v2Directory);
+
+            Assert.That(DictionaryKeys(sources), Is.EqualTo(new[] { 1000, 5503, 5504 }));
+            Assert.That(Directory.Exists(
+                Path.Combine(Application.dataPath, "GameData/Units/Json")), Is.False);
+        }
+
+        [TestCase(1000, 0, "猎狗", "gopro", 820, 190)]
+        [TestCase(1000, 2, "猎狗pro", "gopro_2", 1700, 260)]
+        [TestCase(1000, 3, "狂暴的猎狗pro", "gopro_3", 3000, 370)]
+        [TestCase(5503, 0, "果冻小子", "arcslma", 18000, 1100)]
+        [TestCase(5504, 0, "果冻丁", "arcslmi", 2500, 290)]
+        public void RealSources_ResolveExpectedVariantFacts(
+            int typeId,
+            int eliteLevel,
+            string name,
+            string resourceKey,
+            int hp,
+            int attack)
+        {
+            var resolved = ResolveReal(typeId, eliteLevel);
+            Assert.That(Field<string>(resolved, "displayNameZhHans"), Is.EqualTo(name));
+            Assert.That(Field<string>(resolved, "resourceKey"), Is.EqualTo(resourceKey));
+            Assert.That(Field<int>(resolved, "maxHitPoints"), Is.EqualTo(hp));
+            Assert.That(Field<int>(resolved, "attack"), Is.EqualTo(attack));
+            Assert.That(Field<int>(resolved, "deploymentCost"), Is.EqualTo(2));
+            Assert.That(Field<float>(resolved, "attackRadiusMetres"), Is.Zero);
+            Assert.That(Field<float>(resolved, "blockRadiusMetres"), Is.Zero);
+        }
+
+        [TestCase(1000, 0, "Idle", "Run_Loop", "Attack", 1.0f, "Die", null, 0f)]
+        [TestCase(1000, 2, "Idle", "Run_Loop", "Attack", 1.0f, "Die", null, 0f)]
+        [TestCase(1000, 3, "Idle", "Run_Loop", "Attack", 1.0f, "Die", null, 0f)]
+        [TestCase(5503, 0, "Idle", "Move", "Attack", 2.666667f, "Die", "Skill", 1.5f)]
+        [TestCase(5504, 0, "Idle", "Move", "Attack", 1.166667f, "Die", null, 0f)]
+        public void RealSources_DeclareExpectedLoadableSpineAnimations(
+            int typeId,
+            int eliteLevel,
+            string idleAnimation,
+            string moveAnimation,
+            string attackAnimation,
+            float attackDuration,
+            string deathAnimation,
+            string skillAnimation,
+            float skillDuration)
+        {
+            var resolved = ResolveReal(typeId, eliteLevel);
+            var expectedKeys = skillAnimation == null
+                ? new[] { "idle", "move", "attack", "death" }
+                : new[] { "idle", "move", "attack", "death", "skill" };
+            Assert.That(AnimationKeys(resolved), Is.EqualTo(expectedKeys));
+            AssertAnimationBinding(resolved, "idle", idleAnimation, 0f);
+            AssertAnimationBinding(resolved, "move", moveAnimation, 0f);
+            AssertAnimationBinding(resolved, "attack", attackAnimation, attackDuration);
+            AssertAnimationBinding(resolved, "death", deathAnimation, 0f);
+            if (skillAnimation != null)
+            {
+                AssertAnimationBinding(resolved, "skill", skillAnimation, skillDuration);
+            }
+
+            AssertDeclaredAnimationsExistInSpine(resolved);
+        }
+
         private static string InvalidFixture(string fixture)
         {
             switch (fixture)
@@ -580,6 +649,137 @@ namespace ArknoNights.Battle.Tests
                 null);
             Assert.That(method, Is.Not.Null, "LoadDirectory(string) must exist.");
             return method.Invoke(null, new object[] { directory });
+        }
+
+        private static int[] DictionaryKeys(object sources)
+        {
+            var dictionary = sources as IDictionary;
+            Assert.That(dictionary, Is.Not.Null, "LoadDirectory must return a dictionary.");
+            return dictionary.Keys.Cast<int>().OrderBy(key => key).ToArray();
+        }
+
+        private static object ResolveReal(int typeId, int eliteLevel)
+        {
+            var v2Directory = Path.Combine(
+                Application.dataPath,
+                "GameData/Units/EliteVariants/Json");
+            var sources = LoadDirectory(v2Directory) as IDictionary;
+            Assert.That(sources, Is.Not.Null, "LoadDirectory must return a dictionary.");
+            Assert.That(sources.Contains(typeId), Is.True, "Missing real source: " + typeId);
+            var source = sources[typeId];
+            return Resolve(
+                Property<string>(source, "Json"),
+                eliteLevel,
+                Property<string>(source, "Path"));
+        }
+
+        private static string[] AnimationKeys(object resolved)
+        {
+            return Field<IList>(resolved, "animations")
+                .Cast<object>()
+                .Select(animation => Field<string>(animation, "key"))
+                .ToArray();
+        }
+
+        private static void AssertAnimationBinding(
+            object resolved,
+            string key,
+            string expectedName,
+            float expectedDuration)
+        {
+            var animation = Field<IList>(resolved, "animations")
+                .Cast<object>()
+                .Single(item => Field<string>(item, "key") == key);
+            Assert.That(Field<string>(animation, "name"), Is.EqualTo(expectedName));
+            Assert.That(
+                Field<float>(animation, "durationSeconds"),
+                Is.EqualTo(expectedDuration).Within(0.000001f));
+        }
+
+        private static void AssertDeclaredAnimationsExistInSpine(object resolved)
+        {
+            var typeId = Field<int>(resolved, "typeId");
+            var resourceKey = Field<string>(resolved, "resourceKey");
+            var skeletonDataResourceName =
+                Field<string>(resolved, "skeletonDataResourceName");
+            var resourcePath = BuildSkeletonDataResourcePath(
+                typeId,
+                resourceKey,
+                skeletonDataResourceName);
+            var skeletonAsset = Resources.Load(resourcePath);
+            Assert.That(skeletonAsset, Is.Not.Null, "SkeletonDataAsset missing: " + resourcePath);
+            Assert.That(
+                skeletonAsset.GetType().FullName,
+                Is.EqualTo("Spine.Unity.SkeletonDataAsset"),
+                "Unexpected skeleton asset type: " + resourcePath);
+
+            var getSkeletonData = skeletonAsset.GetType().GetMethod(
+                "GetSkeletonData",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                new[] { typeof(bool) },
+                null);
+            Assert.That(getSkeletonData, Is.Not.Null, "Spine API unavailable: " + resourcePath);
+            var skeletonData = getSkeletonData.Invoke(skeletonAsset, new object[] { false });
+            Assert.That(skeletonData, Is.Not.Null, "Spine data cannot be loaded: " + resourcePath);
+            var findAnimation = skeletonData.GetType().GetMethod(
+                "FindAnimation",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                new[] { typeof(string) },
+                null);
+            Assert.That(findAnimation, Is.Not.Null, "Spine FindAnimation API unavailable.");
+
+            foreach (var declared in Field<IList>(resolved, "animations").Cast<object>())
+            {
+                var name = Field<string>(declared, "name");
+                var actual = findAnimation.Invoke(skeletonData, new object[] { name });
+                Assert.That(
+                    actual,
+                    Is.Not.Null,
+                    "Declared animation is absent: " + resourcePath + "/" + name);
+
+                var declaredDuration = Field<float>(declared, "durationSeconds");
+                if (declaredDuration <= 0f)
+                {
+                    continue;
+                }
+
+                var durationProperty = actual.GetType().GetProperty(
+                    "Duration",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(durationProperty, Is.Not.Null, "Spine duration API unavailable.");
+                var actualDuration = Convert.ToSingle(durationProperty.GetValue(actual, null));
+                Assert.That(
+                    actualDuration,
+                    Is.EqualTo(declaredDuration).Within(0.000001f),
+                    resourcePath + "/" + name);
+            }
+        }
+
+        private static string BuildSkeletonDataResourcePath(
+            int typeId,
+            string resourceKey,
+            string skeletonDataResourceName)
+        {
+            var pathsType = Type.GetType("UnitResourcePaths, Assembly-CSharp");
+            Assert.That(pathsType, Is.Not.Null, "UnitResourcePaths type must exist.");
+            var method = pathsType.GetMethod(
+                "BuildSkeletonDataResourcePath",
+                BindingFlags.Static | BindingFlags.Public);
+            Assert.That(method, Is.Not.Null, "Skeleton resource path API must exist.");
+            return (string)method.Invoke(
+                null,
+                new object[] { typeId, resourceKey, skeletonDataResourceName });
+        }
+
+        private static T Property<T>(object source, string name)
+        {
+            var property = source.GetType().GetProperty(
+                name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.That(property, Is.Not.Null, "Missing source property: " + name);
+            return (T)property.GetValue(source, null);
         }
 
         private static T Field<T>(object source, string name)
