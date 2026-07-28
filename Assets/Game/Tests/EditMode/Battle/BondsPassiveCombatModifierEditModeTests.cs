@@ -843,6 +843,88 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void DeathAreaDamage_DelaysExplosionAndHitsEnemiesInRadius()
+        {
+            var input = CreateInput(
+                35,
+                new[]
+                {
+                    Attacker(
+                        "bomb",
+                        0,
+                        0,
+                        "DEATH_EXPLOSION",
+                        attackIntervalTicks: 100,
+                        maxHitPoints: 100,
+                        attack: 100),
+                    Attacker(
+                        "killer",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        maxHitPoints: 100000,
+                        attack: 1000),
+                    NonAttacker("near", 1000),
+                    NonAttacker("far", 1000)
+                },
+                new[]
+                {
+                    PassiveDeathAreaDamage(
+                        DamageType.Magic,
+                        attackMultiplierPermille: 2000,
+                        radiusCentimetres: 150,
+                        delayTicks: 26)
+                },
+                new[] { Unit("bomb", "bomb", 5, 4) },
+                new[]
+                {
+                    Unit("killer", "killer", 5, 4),
+                    Unit("near", "near", 6, 4),
+                    Unit("far", "far", 7, 4)
+                });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var death = result.Events.Single(item =>
+                item.Type == BattleEventType.Death
+                && item.UnitId == "bomb");
+            var explosionHits = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "bomb"
+                    && item.Tick == death.Tick + 26)
+                .OrderBy(item => item.RelatedUnitId)
+                .ToArray();
+
+            Assert.That(
+                explosionHits.Select(item => item.RelatedUnitId),
+                Is.EqualTo(new[] { "killer", "near" }));
+            Assert.That(
+                explosionHits.Select(item => item.DamageAmount),
+                Is.EqualTo(new[] { 200, 200 }));
+            Assert.That(
+                result.Events.Any(item =>
+                    item.Type == BattleEventType.BattleEnded
+                    && item.Tick < death.Tick + 26),
+                Is.False);
+            Assert.That(
+                result.FinalUnits.Single(item =>
+                    item.UnitId == "far").HitPoints,
+                Is.EqualTo(1000));
+            Assert.That(
+                input.CanonicalSummary,
+                Does.Contain("|Z:1,2000,150,26"));
+            Assert.That(
+                new BattlePresentationTrackCompiler().TryCompile(
+                    result,
+                    out _,
+                    out var diagnostics),
+                Is.True,
+                string.Join(
+                    "; ",
+                    diagnostics.Select(item => item.ToString())));
+        }
+
+        [Test]
         public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -1537,6 +1619,44 @@ namespace ArknoNights.Battle.Tests
                     sideLengthCentimetres,
                     snapToNearestPassableCell,
                     summonedMoveSpeedMultiplierPermille),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveDeathAreaDamage(
+            DamageType damageType,
+            int attackMultiplierPermille,
+            int radiusCentimetres,
+            int delayTicks)
+        {
+            return new AbilityDefinition(
+                "DEATH_EXPLOSION",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new DeathAreaDamageEffectDefinition(
+                    damageType,
+                    attackMultiplierPermille,
+                    radiusCentimetres,
+                    delayTicks),
                 string.Empty,
                 0);
         }

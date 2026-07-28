@@ -496,6 +496,15 @@ namespace ArknoNights.Battle.Core
                     new KeyValuePair<string, EvasionModifierDefinition>(
                         item.Definition.AbilityId,
                         item.Definition.EvasionModifier));
+        internal IEnumerable<KeyValuePair<string, DeathAreaDamageEffectDefinition>>
+            DeathAreaDamageEffects =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.DeathAreaDamageEffect != null)
+                .Select(item =>
+                    new KeyValuePair<string, DeathAreaDamageEffectDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.DeathAreaDamageEffect));
         internal void SetAuraCombatModifiers(
             IEnumerable<IExternalCombatModifierDefinition> modifiers)
         {
@@ -647,6 +656,9 @@ namespace ArknoNights.Battle.Core
         private readonly List<PendingAttack> pendingAttacks = new List<PendingAttack>();
         private readonly List<PendingDeathSpawn>
             pendingDeathSpawns = new List<PendingDeathSpawn>();
+        private readonly List<PendingDeathAreaDamage>
+            pendingDeathAreaDamages =
+                new List<PendingDeathAreaDamage>();
         private readonly Dictionary<string, UnitDefinition> unitDefinitions;
         private readonly Dictionary<string, AbilityDefinition> abilityDefinitions;
         private readonly Dictionary<string, BattleUnitInstanceSnapshot> unitSnapshots = new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal);
@@ -720,7 +732,10 @@ namespace ArknoNights.Battle.Core
         private void RunAuthoritativeTick()
         {
             ResolveDueDeathSpawns();
+            ResolveDueDeathAreaDamage();
             UpdateHealthThresholdStates();
+            ResolveDeathsAndCleanup();
+            ResolveDueDeathSpawns();
             RefreshAuraCombatModifiers();
             RemoveInvalidPendingAttacks();
             AcquireTargets();
@@ -937,6 +952,16 @@ namespace ArknoNights.Battle.Core
                         unit.Position,
                         effect.Key,
                         effect.Value));
+                foreach (var effect in unit.DeathAreaDamageEffects)
+                    pendingDeathAreaDamages.Add(
+                        new PendingDeathAreaDamage(
+                            CurrentTick + effect.Value.DelayTicks,
+                            unit.UnitId,
+                            unit.Side,
+                            unit.Position,
+                            unit.EffectiveAttack,
+                            effect.Key,
+                            effect.Value));
             }
             foreach (var unit in runtimeUnits.Where(item => !item.IsAlive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
@@ -1008,6 +1033,98 @@ namespace ArknoNights.Battle.Core
                     EmitSpawn(summoned, snapshot);
                 }
             }
+        }
+
+        private void ResolveDueDeathAreaDamage()
+        {
+            var due = pendingDeathAreaDamages
+                .Where(item => item.DueTick <= CurrentTick)
+                .OrderBy(item => item.DueTick)
+                .ThenBy(
+                    item => item.OwnerUnitId,
+                    StringComparer.Ordinal)
+                .ThenBy(
+                    item => item.AbilityId,
+                    StringComparer.Ordinal)
+                .ToArray();
+            pendingDeathAreaDamages.RemoveAll(item =>
+                item.DueTick <= CurrentTick);
+            var hits = due
+                .SelectMany(pending => runtimeUnits
+                    .Where(target =>
+                        IsActive(target)
+                        && target.Side != pending.Side
+                        && DistanceSquared(
+                            pending.Position,
+                            target.Position)
+                        <= (long)pending.Effect.RadiusCentimetres
+                           * pending.Effect.RadiusCentimetres)
+                    .OrderBy(
+                        target => target.UnitId,
+                        StringComparer.Ordinal)
+                    .Select(target =>
+                        new DeathAreaDamageHit(
+                            pending,
+                            target.UnitId,
+                            CalculateDeathAreaDamage(
+                                pending,
+                                target))))
+                .ToArray();
+            foreach (var group in hits
+                         .GroupBy(
+                             item => item.TargetUnitId,
+                             StringComparer.Ordinal)
+                         .OrderBy(
+                             item => item.Key,
+                             StringComparer.Ordinal))
+            {
+                var target = FindUnit(group.Key);
+                if (target == null || !target.IsAlive)
+                    continue;
+                var resolved = group.ToArray();
+                var before = target.CurrentHitPoints;
+                var total = resolved.Sum(item =>
+                    (long)item.Amount);
+                target.CurrentHitPoints = (int)Math.Max(
+                    0,
+                    before - Math.Min(int.MaxValue, total));
+                foreach (var hit in resolved)
+                    Emit(
+                        BattleEventType.Damage,
+                        hit.Pending.OwnerUnitId,
+                        null,
+                        hit.TargetUnitId,
+                        null,
+                        null,
+                        hit.Pending.Effect.DamageType,
+                        hit.Amount,
+                        before,
+                        target.CurrentHitPoints,
+                        0,
+                        0,
+                        0,
+                        null,
+                        BattleStopReason.None);
+            }
+        }
+
+        private static int CalculateDeathAreaDamage(
+            PendingDeathAreaDamage pending,
+            RuntimeUnitState target)
+        {
+            var scaledAttack = (int)Math.Min(
+                int.MaxValue,
+                (long)pending.Attack
+                * pending.Effect.AttackMultiplierPermille
+                / 1000);
+            var damage = DamageCalculator.Calculate(
+                pending.Effect.DamageType,
+                scaledAttack,
+                target.EffectiveDefense,
+                target.EffectiveMagicResistance);
+            return target.ApplyDamageTakenModifiers(
+                pending.Effect.DamageType,
+                damage);
         }
 
         private void RefreshAuraCombatModifiers()
@@ -1208,11 +1325,15 @@ namespace ArknoNights.Battle.Core
                                 item.IsAlive
                                 && item.Side == BattleSide.Home)
                             || pendingDeathSpawns.Any(item =>
+                                item.Side == BattleSide.Home)
+                            || pendingDeathAreaDamages.Any(item =>
                                 item.Side == BattleSide.Home);
             var awayAlive = runtimeUnits.Any(item =>
                                 item.IsAlive
                                 && item.Side == BattleSide.Away)
                             || pendingDeathSpawns.Any(item =>
+                                item.Side == BattleSide.Away)
+                            || pendingDeathAreaDamages.Any(item =>
                                 item.Side == BattleSide.Away);
             if (homeAlive == awayAlive) { if (!homeAlive) EndBattle(BattleStopReason.MutualAnnihilation, null); return; }
             EndBattle(BattleStopReason.Victory, homeAlive ? BattleSide.Home : BattleSide.Away);
@@ -1601,6 +1722,8 @@ namespace ArknoNights.Battle.Core
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
         private readonly struct DamageReaction { public DamageReaction(string ownerUnitId, string targetUnitId, OnDamageReactionEffectDefinition effect) { OwnerUnitId = ownerUnitId; TargetUnitId = targetUnitId; Effect = effect; } public string OwnerUnitId { get; } public string TargetUnitId { get; } public OnDamageReactionEffectDefinition Effect { get; } }
         private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
+        private readonly struct DeathAreaDamageHit { public DeathAreaDamageHit(PendingDeathAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingDeathAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
+        private readonly struct PendingDeathAreaDamage { public PendingDeathAreaDamage(int dueTick, string ownerUnitId, BattleSide side, FixedPosition position, int attack, string abilityId, DeathAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; Position = position; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public FixedPosition Position { get; } public int Attack { get; } public string AbilityId { get; } public DeathAreaDamageEffectDefinition Effect { get; } }
         private readonly struct PendingDeathSpawn
         {
             public PendingDeathSpawn(
@@ -1736,6 +1859,18 @@ namespace ArknoNights.Battle.Core
                          .ThenBy(item => item.OwnerUnitId, StringComparer.Ordinal)
                          .ThenBy(item => item.AbilityId, StringComparer.Ordinal))
                 builder.Append("|X:")
+                    .Append(pending.DueTick).Append(',')
+                    .Append(pending.OwnerUnitId).Append(',')
+                    .Append(pending.AbilityId);
+            foreach (var pending in pendingDeathAreaDamages
+                         .OrderBy(item => item.DueTick)
+                         .ThenBy(
+                             item => item.OwnerUnitId,
+                             StringComparer.Ordinal)
+                         .ThenBy(
+                             item => item.AbilityId,
+                             StringComparer.Ordinal))
+                builder.Append("|Z:")
                     .Append(pending.DueTick).Append(',')
                     .Append(pending.OwnerUnitId).Append(',')
                     .Append(pending.AbilityId);

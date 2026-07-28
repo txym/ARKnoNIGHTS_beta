@@ -292,6 +292,12 @@ namespace ArknoNights.Battle.Core
                     builder.Append("|V:")
                         .Append(ability.EvasionModifier.PhysicalChancePermille).Append(',')
                         .Append(ability.EvasionModifier.MagicChancePermille);
+                if (ability.DeathAreaDamageEffect != null)
+                    builder.Append("|Z:")
+                        .Append((int)ability.DeathAreaDamageEffect.DamageType).Append(',')
+                        .Append(ability.DeathAreaDamageEffect.AttackMultiplierPermille).Append(',')
+                        .Append(ability.DeathAreaDamageEffect.RadiusCentimetres).Append(',')
+                        .Append(ability.DeathAreaDamageEffect.DelayTicks);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -370,6 +376,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.BlockedCounterpartCombatModifier != null) validationErrors.Add(new ValidationError("ability.blockedCounterpart.unexpected", "Timed ability cannot define a blocked-counterpart modifier: " + ability.AbilityId));
                     if (ability.NearbySameTypeSelfModifier != null) validationErrors.Add(new ValidationError("ability.nearbySameType.unexpected", "Timed ability cannot define a nearby-same-type modifier: " + ability.AbilityId));
                     if (ability.EvasionModifier != null) validationErrors.Add(new ValidationError("ability.evasion.unexpected", "Timed ability cannot define an evasion modifier: " + ability.AbilityId));
+                    if (ability.DeathAreaDamageEffect != null) validationErrors.Add(new ValidationError("ability.deathAreaDamage.unexpected", "Timed ability cannot define a death-area damage effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -401,7 +408,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.AuraCombatModifier == null ? 0 : 1)
                         + (ability.BlockedCounterpartCombatModifier == null ? 0 : 1)
                         + (ability.NearbySameTypeSelfModifier == null ? 0 : 1)
-                        + (ability.EvasionModifier == null ? 0 : 1);
+                        + (ability.EvasionModifier == null ? 0 : 1)
+                        + (ability.DeathAreaDamageEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -519,6 +527,13 @@ namespace ArknoNights.Battle.Core
                             || ability.EvasionModifier.MagicChancePermille < 0
                             || ability.EvasionModifier.MagicChancePermille > 1000))
                         validationErrors.Add(new ValidationError("ability.evasion.invalid", "Evasion modifier is invalid: " + ability.AbilityId));
+                    if (ability.DeathAreaDamageEffect != null
+                        && (ability.DeathAreaDamageEffect.DamageType == DamageType.None
+                            || !Enum.IsDefined(typeof(DamageType), ability.DeathAreaDamageEffect.DamageType)
+                            || ability.DeathAreaDamageEffect.AttackMultiplierPermille <= 0
+                            || ability.DeathAreaDamageEffect.RadiusCentimetres <= 0
+                            || ability.DeathAreaDamageEffect.DelayTicks <= 0))
+                        validationErrors.Add(new ValidationError("ability.deathAreaDamage.invalid", "Death-area damage effect is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)
