@@ -521,6 +521,69 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(1000));
         }
 
+        [Test]
+        public void FirstAttackModifier_EnhancesOnlyTheFirstStartedAttack()
+        {
+            Assert.That(
+                RunAttackSequence(
+                    firstEnhancedAttackOrdinal: 1,
+                    repeatInterval: 0,
+                    attackMultiplierPermille: 2000,
+                    maxTicks: 7),
+                Is.EqualTo(new[] { 200, 100, 100 }));
+        }
+
+        [Test]
+        public void RepeatingAttackModifier_EnhancesEveryThirdStartedAttack()
+        {
+            Assert.That(
+                RunAttackSequence(
+                    firstEnhancedAttackOrdinal: 3,
+                    repeatInterval: 3,
+                    attackMultiplierPermille: 1300,
+                    maxTicks: 13),
+                Is.EqualTo(new[] { 100, 100, 130, 100, 100, 130 }));
+        }
+
+        private static int[] RunAttackSequence(
+            int firstEnhancedAttackOrdinal,
+            int repeatInterval,
+            int attackMultiplierPermille,
+            int maxTicks)
+        {
+            var input = CreateInput(
+                maxTicks,
+                new[]
+                {
+                    Attacker(
+                        "sequence",
+                        2000,
+                        0,
+                        "ATTACK_SEQUENCE",
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    NonAttacker("target", 100000)
+                },
+                new[]
+                {
+                    PassiveAttackSequence(
+                        firstEnhancedAttackOrdinal,
+                        repeatInterval,
+                        attackMultiplierPermille)
+                },
+                new[] { Unit("sequence", "sequence", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+
+            return new BattleRunner(input)
+                .RunToCompletion()
+                .Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "sequence")
+                .Select(item => item.DamageAmount)
+                .ToArray();
+        }
+
         private static int RunConditionalDamage(
             DamageType damageType,
             int targetBlockCapacity)
@@ -753,6 +816,35 @@ namespace ArknoNights.Battle.Tests
                 new UnblockedDamageTakenModifierDefinition(
                     500,
                     500),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveAttackSequence(
+            int firstEnhancedAttackOrdinal,
+            int repeatInterval,
+            int attackMultiplierPermille)
+        {
+            return new AbilityDefinition(
+                "ATTACK_SEQUENCE",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new AttackSequenceModifierDefinition(
+                    firstEnhancedAttackOrdinal,
+                    repeatInterval,
+                    attackMultiplierPermille),
                 string.Empty,
                 0);
         }

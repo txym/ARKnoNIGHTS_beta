@@ -234,6 +234,11 @@ namespace ArknoNights.Battle.Core
                     builder.Append("|U:")
                         .Append(ability.UnblockedDamageTakenModifier.PhysicalDamageTakenPermille).Append(',')
                         .Append(ability.UnblockedDamageTakenModifier.MagicDamageTakenPermille);
+                if (ability.AttackSequenceModifier != null)
+                    builder.Append("|Q:")
+                        .Append(ability.AttackSequenceModifier.FirstEnhancedAttackOrdinal).Append(',')
+                        .Append(ability.AttackSequenceModifier.RepeatInterval).Append(',')
+                        .Append(ability.AttackSequenceModifier.AttackMultiplierPermille);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -305,6 +310,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.OnDamageReactionEffect != null) validationErrors.Add(new ValidationError("ability.damageReaction.unexpected", "Timed ability cannot define an on-damage reaction: " + ability.AbilityId));
                     if (ability.HealthThresholdCombatModifier != null) validationErrors.Add(new ValidationError("ability.healthThreshold.unexpected", "Timed ability cannot define a health-threshold modifier: " + ability.AbilityId));
                     if (ability.UnblockedDamageTakenModifier != null) validationErrors.Add(new ValidationError("ability.unblockedDamageTaken.unexpected", "Timed ability cannot define an unblocked damage-taken modifier: " + ability.AbilityId));
+                    if (ability.AttackSequenceModifier != null) validationErrors.Add(new ValidationError("ability.attackSequence.unexpected", "Timed ability cannot define an attack-sequence modifier: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -329,7 +335,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.PassiveLifecycleEffect == null ? 0 : 1)
                         + (ability.OnDamageReactionEffect == null ? 0 : 1)
                         + (ability.HealthThresholdCombatModifier == null ? 0 : 1)
-                        + (ability.UnblockedDamageTakenModifier == null ? 0 : 1);
+                        + (ability.UnblockedDamageTakenModifier == null ? 0 : 1)
+                        + (ability.AttackSequenceModifier == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -375,6 +382,13 @@ namespace ArknoNights.Battle.Core
                             || ability.UnblockedDamageTakenModifier.MagicDamageTakenPermille <= 0
                             || ability.UnblockedDamageTakenModifier.MagicDamageTakenPermille > 10000))
                         validationErrors.Add(new ValidationError("ability.unblockedDamageTaken.invalid", "Unblocked damage-taken modifier is invalid: " + ability.AbilityId));
+                    if (ability.AttackSequenceModifier != null
+                        && (ability.AttackSequenceModifier.FirstEnhancedAttackOrdinal <= 0
+                            || ability.AttackSequenceModifier.RepeatInterval < 0
+                            || ability.AttackSequenceModifier.AttackMultiplierPermille <= 0
+                            || ability.AttackSequenceModifier.AttackMultiplierPermille
+                                == AttackSequenceModifierDefinition.NeutralAttackMultiplierPermille))
+                        validationErrors.Add(new ValidationError("ability.attackSequence.invalid", "Attack-sequence modifier is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)
