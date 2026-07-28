@@ -105,7 +105,17 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
-        public IEnumerator RoomView_RestoresLegacyForegroundAndHomeAddsCompleteRoomSelectAffordances()
+        public IEnumerator RoomPage_DoesNotActivateTheStretchDistortedLegacyGridForeground()
+        {
+            view.ShowRoom(HostOnlyRoom("654321"), "host");
+
+            Assert.That(view.transform.Find("LanLobbyRoot/GridForeground").gameObject.activeSelf, Is.False,
+                "shallow_main is a 49x65 legacy overlay and must remain inactive on the Room page.");
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RoomView_KeepsLegacyForegroundInactiveAndHomeAddsCompleteRoomSelectAffordances()
         {
             var home = view.transform.Find("LanLobbyRoot/Home");
             var room = view.transform.Find("LanLobbyRoot/Room");
@@ -114,7 +124,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(grid.gameObject.activeSelf, Is.False);
             view.ShowRoom();
             Assert.That(room.gameObject.activeSelf, Is.True);
-            Assert.That(grid.gameObject.activeSelf, Is.True);
+            Assert.That(grid.gameObject.activeSelf, Is.False);
             view.ShowHome();
             Assert.That(grid.gameObject.activeSelf, Is.False);
 
@@ -649,6 +659,9 @@ namespace ArknoNights.Lobby.Tests
             var primary = RequireOnlyVisibleRoomPrimaryAction(view);
 
             AssertResourceSprite(primary.GetComponent<Image>(), "btn_match_normal");
+            AssertResourceSprite(RequireChild(primary.transform, "ActionIcon").GetComponent<Image>(), "btn_match_host_normal");
+            Assert.That(primary.GetComponentInChildren<Text>().color,
+                Is.EqualTo(new Color(33f / 255f, 33f / 255f, 33f / 255f, 1f)));
             Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("协议启动"));
             Assert.That(primary.interactable, Is.True);
             Click(primary);
@@ -670,6 +683,9 @@ namespace ArknoNights.Lobby.Tests
             var primary = RequireOnlyVisibleRoomPrimaryAction(view);
 
             AssertResourceSprite(primary.GetComponent<Image>(), "btn_match_grey");
+            AssertResourceSprite(RequireChild(primary.transform, "ActionIcon").GetComponent<Image>(), "btn_match_host_grey");
+            Assert.That(primary.GetComponentInChildren<Text>().color,
+                Is.EqualTo(new Color(157f / 255f, 157f / 255f, 157f / 255f, 1f)));
             Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("协议启动"));
             Assert.That(primary.interactable, Is.False);
             Assert.That(primary.GetComponent<CanvasRenderer>().GetColor(), Is.EqualTo(Color.white),
@@ -740,7 +756,7 @@ namespace ArknoNights.Lobby.Tests
                 .ToArray();
             Assert.That(leaveButtons, Has.Length.EqualTo(1));
             var leave = leaveButtons[0];
-            AssertResourceSprite(leave.GetComponent<Image>(), "btn_topmenu_back");
+            AssertResourceSprite(leave.GetComponent<Image>(), "img_return");
             AssertBottomLeftRect(
                 leave.GetComponent<RectTransform>(),
                 global::LanLobbyRoomLayout.ForSize(1920, 1080).LeaveAction);
@@ -898,6 +914,11 @@ namespace ArknoNights.Lobby.Tests
             AssertResourceSprite(RequireChild(hostSlot, "ReadyOverlay").GetComponent<Image>(), "player_card_self_frame");
             AssertResourceSprite(RequireChild(hostSlot, "CreatorTag").GetComponent<Image>(), "host_top_tag");
             Assert.That(RequireChild(hostSlot, "CreatorTag").gameObject.activeSelf, Is.True);
+            var hostLayout = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
+            Assert.That(RequireChild(hostSlot, "CardBody").GetComponent<Image>().color,
+                Is.EqualTo(new Color(9f / 255f, 187f / 255f, 151f / 255f, 1f)));
+            AssertBottomLeftRect(RequireChild(hostSlot, "TopBar").GetComponent<RectTransform>(), hostLayout.ReadyTopBar);
+            AssertBottomLeftRect(RequireChild(hostSlot, "CreatorTag").GetComponent<RectTransform>(), hostLayout.CreatorTag);
             Assert.That(RequireChild(RequireChild(hostSlot, "OccupiedContent"), "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
             var hostNodeNames = hostSlot.GetComponentsInChildren<Transform>(true)
                 .Select(item => item.name.ToLowerInvariant())
@@ -1406,11 +1427,15 @@ namespace ArknoNights.Lobby.Tests
 
         private static void AssertWaitingGuestSlot(Transform slot)
         {
+            var slotLayout = RoomSlotLayout(slot);
             AssertDirectChildren(slot,
                 "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
                 "OccupiedContent", "LowerDecoration", "CreatorTag");
             AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
             AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
+            Assert.That(RequireChild(slot, "CardBody").GetComponent<Image>().color, Is.EqualTo(Color.white));
+            AssertBottomLeftRect(RequireChild(slot, "TopBar").GetComponent<RectTransform>(), slotLayout.TopBar);
+            Assert.That(RequireChild(slot, "TopBar").GetComponent<Image>().preserveAspect, Is.True);
             AssertActiveResourceSprite(RequireChild(slot, "ReadyOverlay"), "player_card_self_frame", false);
 
             var emptyContent = RequireChild(slot, "EmptyContent");
@@ -1436,11 +1461,15 @@ namespace ArknoNights.Lobby.Tests
 
         private static void AssertEmptyGuestSlot(Transform slot)
         {
+            var slotLayout = RoomSlotLayout(slot);
             AssertDirectChildren(slot,
                 "CardBody", "TopBar", "ReadyOverlay", "EmptyContent",
                 "OccupiedContent", "LowerDecoration", "CreatorTag");
             AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
             AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
+            Assert.That(RequireChild(slot, "CardBody").GetComponent<Image>().color, Is.EqualTo(Color.white));
+            AssertBottomLeftRect(RequireChild(slot, "TopBar").GetComponent<RectTransform>(), slotLayout.TopBar);
+            Assert.That(RequireChild(slot, "TopBar").GetComponent<Image>().preserveAspect, Is.True);
             AssertActiveResourceSprite(RequireChild(slot, "ReadyOverlay"), "player_card_self_frame", false);
 
             var emptyContent = RequireChild(slot, "EmptyContent");
@@ -1474,8 +1503,15 @@ namespace ArknoNights.Lobby.Tests
 
         private static void AssertReadyGuestSlot(Transform slot)
         {
-            AssertResourceSprite(RequireChild(slot, "CardBody").GetComponent<Image>(), "card_bg");
-            AssertResourceSprite(RequireChild(slot, "TopBar").GetComponent<Image>(), "bg_top_ready");
+            var slotLayout = RoomSlotLayout(slot);
+            var cardBody = RequireChild(slot, "CardBody").GetComponent<Image>();
+            var topBar = RequireChild(slot, "TopBar").GetComponent<Image>();
+            AssertResourceSprite(cardBody, "card_bg");
+            Assert.That(cardBody.color, Is.EqualTo(new Color(9f / 255f, 187f / 255f, 151f / 255f, 1f)));
+            AssertResourceSprite(topBar, "bg_top_ready");
+            AssertBottomLeftRect(topBar.rectTransform, slotLayout.ReadyTopBar);
+            Assert.That(topBar.preserveAspect, Is.False,
+                "The measured ready top bar uses an intentional 8 px vertical overhang instead of source-aspect fitting.");
 
             var readyOverlay = RequireChild(slot, "ReadyOverlay");
             Assert.That(readyOverlay.gameObject.activeSelf, Is.True);
@@ -1492,6 +1528,10 @@ namespace ArknoNights.Lobby.Tests
             AssertResourceSprite(readyIcon, "player_card_ready");
             Assert.That(readyIcon.preserveAspect, Is.True);
             Assert.That(Aspect(readyIcon.rectTransform), Is.EqualTo(Aspect(readyIcon.sprite)).Within(.0001f));
+            AssertBottomLeftRect(readyIcon.rectTransform, slotLayout.ReadyIcon);
+            AssertBottomLeftAnchor(
+                RequireChild(occupiedContent, "ReadyLabel").GetComponent<RectTransform>(),
+                slotLayout.ReadyLabel);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
 
             var lowerDecoration = RequireChild(slot, "LowerDecoration");
@@ -1499,6 +1539,14 @@ namespace ArknoNights.Lobby.Tests
             AssertResourceSprite(lowerDecoration.GetComponent<Image>(), "card_deco_self");
             Assert.That(lowerDecoration.GetComponent<Image>().preserveAspect, Is.True);
             Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
+        }
+
+        private static global::LanLobbyRoomSlotLayout RoomSlotLayout(Transform slot)
+        {
+            const string prefix = "RoomCard_";
+            Assert.That(slot.name.StartsWith(prefix, System.StringComparison.Ordinal), Is.True, slot.name);
+            var index = int.Parse(slot.name.Substring(prefix.Length));
+            return global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[index];
         }
 
         private static List<Transform> ChildrenWithPrefix(Transform parent, string prefix)

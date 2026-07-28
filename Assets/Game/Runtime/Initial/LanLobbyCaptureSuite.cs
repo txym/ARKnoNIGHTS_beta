@@ -429,6 +429,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             case "bg_plus": source = RootSource(spriteName, "E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D"); return true;
             case "btn_match_normal": source = RootSource(spriteName, "62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD"); return true;
             case "btn_topmenu_back": source = RootSource(spriteName, "BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303"); return true;
+            case "img_return": source = RootSource(spriteName, "3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09"); return true;
             case "host_top_tag": source = RootSource(spriteName, "861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009"); return true;
             case "room_select_right_bg": case "room_select_title_icon": case "room_select_dot": case "room_select_img_startroom":
             case "room_select_create_btn_bg_down": case "room_select_create_left_line": case "room_select_create_logo":

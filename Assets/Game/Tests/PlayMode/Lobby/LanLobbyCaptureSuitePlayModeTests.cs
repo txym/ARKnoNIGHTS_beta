@@ -226,8 +226,8 @@ namespace ArknoNights.Lobby.Tests
                 "Rendered join_icon occurrences must sum to two across the two Home states.");
             Assert.That(home.spriteSources.Select(sprite => sprite.node), Is.Unique,
                 "Each Sprite usage row must identify one stable rendered node.");
-            Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.True,
-                "The Room provenance table must include the foreground once that page restores it.");
+            Assert.That(roomHost.spriteSources.Any(sprite => sprite.spriteName == "shallow_main"), Is.False,
+                "The Room provenance table must exclude the inactive stretch-distorted legacy foreground.");
             Assert.That(roomHost.codeNativeGeometry.Select(geometry => geometry.name), Is.EquivalentTo(new[] { "LanLobbyRoot/OpaqueBlocker" }),
                 "Room must report the visible blocker but no Home-only frame geometry.");
             foreach (var room in parsed.captures.Where(record => record.name.StartsWith("room-", StringComparison.Ordinal)))
@@ -405,28 +405,28 @@ namespace ArknoNights.Lobby.Tests
                 case "room-host":
                     return new Dictionary<string, int>
                     {
-                        { "bg_terrain", 1 }, { "shallow_main", 1 }, { "card_bg", 4 },
+                        { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
                         { "player_card_self_frame", 1 }, { "card_empty", 3 }, { "bg_plus", 3 },
                         { "player_card_ready", 1 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
-                        { "btn_topmenu_back", 1 }, { "btn_match_normal", 1 }
+                        { "img_return", 1 }, { "btn_match_normal", 1 }, { "btn_match_host_normal", 1 }
                     };
                 case "room-full":
                     return new Dictionary<string, int>
                     {
-                        { "bg_terrain", 1 }, { "shallow_main", 1 }, { "card_bg", 4 },
+                        { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
                         { "player_card_self_frame", 1 }, { "player_card_ready", 1 },
                         { "card_deco_self", 1 }, { "host_top_tag", 1 },
-                        { "btn_topmenu_back", 1 }, { "btn_match_grey", 1 }
+                        { "img_return", 1 }, { "btn_match_grey", 1 }, { "btn_match_host_grey", 1 }
                     };
                 case "room-ready":
                     return new Dictionary<string, int>
                     {
-                        { "bg_terrain", 1 }, { "shallow_main", 1 }, { "card_bg", 4 },
+                        { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 4 }, { "player_card_self_frame", 4 },
                         { "player_card_ready", 4 }, { "card_deco_self", 4 }, { "host_top_tag", 1 },
-                        { "btn_topmenu_back", 1 }, { "btn_match_normal", 1 }
+                        { "img_return", 1 }, { "btn_match_normal", 1 }, { "btn_match_host_normal", 1 }
                     };
                 default:
                     Assert.Fail("Unexpected room capture: " + captureName);
@@ -717,6 +717,9 @@ namespace ArknoNights.Lobby.Tests
                 { "bg_plus", new BitmapSourceExpectation("E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D") },
                 { "btn_match_normal", new BitmapSourceExpectation("62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD") },
                 { "btn_topmenu_back", new BitmapSourceExpectation("BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303") },
+                { "img_return", new BitmapSourceExpectation("3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09") },
+                { "btn_match_host_normal", new BitmapSourceExpectation("9D36CBDA42FC64CEB7590CBEDF5E49176BFA90E63A8B263FD3C87EE08C3BF3DF") },
+                { "btn_match_host_grey", new BitmapSourceExpectation("C4CD3326EA4D04777AAA540525405DF8AA217D2E972443FDE95C202333F93614") },
                 { "host_top_tag", new BitmapSourceExpectation("861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009") }
             };
 

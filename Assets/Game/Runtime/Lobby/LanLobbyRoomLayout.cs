@@ -8,6 +8,7 @@ public sealed class LanLobbyRoomSlotLayout
         LanLobbyRect root,
         LanLobbyRect cardBody,
         LanLobbyRect topBar,
+        LanLobbyRect readyTopBar,
         LanLobbyRect stateOverlay,
         LanLobbyRect emptyInvite,
         LanLobbyRect readyIcon,
@@ -18,6 +19,7 @@ public sealed class LanLobbyRoomSlotLayout
         Root = root;
         CardBody = cardBody;
         TopBar = topBar;
+        ReadyTopBar = readyTopBar;
         StateOverlay = stateOverlay;
         EmptyInvite = emptyInvite;
         ReadyIcon = readyIcon;
@@ -29,6 +31,7 @@ public sealed class LanLobbyRoomSlotLayout
     public LanLobbyRect Root { get; }
     public LanLobbyRect CardBody { get; }
     public LanLobbyRect TopBar { get; }
+    public LanLobbyRect ReadyTopBar { get; }
     public LanLobbyRect StateOverlay { get; }
     public LanLobbyRect EmptyInvite { get; }
     public LanLobbyRect ReadyIcon { get; }
@@ -49,11 +52,8 @@ public sealed class LanLobbyRoomLayout
     private const float TopBarSourceHeight = 31f;
     private const float EmptyInviteSourceWidth = 275f;
     private const float EmptyInviteSourceHeight = 104f;
-    private const float ReadyCheckSourceSize = 34f;
     private const float ReadyContourSourceWidth = 256f;
     private const float ReadyContourSourceHeight = 103f;
-    private const float HostTagSourceWidth = 72f;
-    private const float HostTagSourceHeight = 26f;
 
     private static readonly LanLobbyRect[] CanonicalRoots =
     {
@@ -65,6 +65,7 @@ public sealed class LanLobbyRoomLayout
 
     private static readonly LanLobbyRect CanonicalCardBody = FromTopLeft(CardBodyLeft, 0f, CardBodyWidth, CardBodyHeight, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalTopBar = FromTopLeft(CardBodyLeft, 0f, CardBodyWidth, CardBodyWidth * TopBarSourceHeight / TopBarSourceWidth, SlotRootHeight);
+    private static readonly LanLobbyRect CanonicalReadyTopBar = FromTopLeft(CardBodyLeft, -8f, CardBodyWidth, 51f, SlotRootHeight);
     private static readonly LanLobbyRect CanonicalStateOverlay = new LanLobbyRect(
         CanonicalCardBody.Left,
         CanonicalCardBody.Bottom,
@@ -74,43 +75,51 @@ public sealed class LanLobbyRoomLayout
         CanonicalCardBody,
         CardBodyWidth,
         CardBodyWidth * EmptyInviteSourceHeight / EmptyInviteSourceWidth);
-    private static readonly LanLobbyRect CanonicalReadyIcon = CenteredIn(
-        CanonicalCardBody,
-        ReadyCheckSourceSize,
-        ReadyCheckSourceSize);
-    private static readonly LanLobbyRect CanonicalReadyLabel = new LanLobbyRect(
-        CanonicalReadyIcon.Left,
-        CanonicalReadyIcon.Bottom,
-        0f,
-        0f);
+    private static readonly LanLobbyRect CanonicalReadyIcon = new LanLobbyRect(114.5f, 148.25f, 38f, 38f);
+    private static readonly LanLobbyRect CanonicalReadyLabel = new LanLobbyRect(139.5f, 148.25f, 0f, 0f);
     private static readonly LanLobbyRect CanonicalLowerDecoration = FromTopLeft(0f, 544.5f, 363.75f, 120f, SlotRootHeight);
-    private static readonly LanLobbyRect CanonicalCreatorTag = FromTopLeft(
-        CardBodyLeft,
-        0f,
-        HostTagSourceWidth,
-        HostTagSourceHeight,
-        SlotRootHeight);
+    private static readonly LanLobbyRect CanonicalCreatorTag = new LanLobbyRect(123.5f, 576.25f, 124f, 35f);
 
-    private static readonly LanLobbyRect CanonicalLeaveAction = FromTopLeft(43.5f, 30f, 118f, 52.5f, ReferenceHeight);
+    private static readonly LanLobbyRect CanonicalLeaveAction = FromTopLeft(37f, 29f, 75f, 80f, ReferenceHeight);
     private static readonly LanLobbyRect CanonicalLatency = FromTopLeft(176f, 30f, 250f, 52.5f, ReferenceHeight);
-    private static readonly LanLobbyRect CanonicalPrimaryAction = FromTopLeft(1487.25f, 942.75f, 432f, 94.5f, ReferenceHeight);
+    private static readonly LanLobbyRect CanonicalPrimaryAction = FromTopLeft(1487.25f, 941.75f, 436f, 95.5f, ReferenceHeight);
+    private static readonly LanLobbyRect CanonicalDisabledPrimaryAction = FromTopLeft(1487.25f, 933.75f, 435f, 105f, ReferenceHeight);
+    private static readonly LanLobbyRect CanonicalPrimaryIcon = new LanLobbyRect(1573f, 60f, 62f, 56f);
+    private static readonly LanLobbyRect CanonicalDisabledPrimaryIcon = new LanLobbyRect(1571f, 64f, 63f, 52f);
+    private static readonly LanLobbyRect CanonicalPrimaryLabel = new LanLobbyRect(1645f, 71f, 150f, 38f);
+    private static readonly LanLobbyRect CanonicalDisabledPrimaryLabel = new LanLobbyRect(1645f, 69f, 150f, 38f);
 
     private LanLobbyRoomLayout(
         IReadOnlyList<LanLobbyRoomSlotLayout> slots,
         LanLobbyRect leaveAction,
         LanLobbyRect latency,
-        LanLobbyRect primaryAction)
+        LanLobbyRect primaryAction,
+        LanLobbyRect disabledPrimaryAction,
+        LanLobbyRect primaryIcon,
+        LanLobbyRect disabledPrimaryIcon,
+        LanLobbyRect primaryLabel,
+        LanLobbyRect disabledPrimaryLabel)
     {
         Slots = slots;
         LeaveAction = leaveAction;
         Latency = latency;
         PrimaryAction = primaryAction;
+        DisabledPrimaryAction = disabledPrimaryAction;
+        PrimaryIcon = primaryIcon;
+        DisabledPrimaryIcon = disabledPrimaryIcon;
+        PrimaryLabel = primaryLabel;
+        DisabledPrimaryLabel = disabledPrimaryLabel;
     }
 
     public IReadOnlyList<LanLobbyRoomSlotLayout> Slots { get; }
     public LanLobbyRect LeaveAction { get; }
     public LanLobbyRect Latency { get; }
     public LanLobbyRect PrimaryAction { get; }
+    public LanLobbyRect DisabledPrimaryAction { get; }
+    public LanLobbyRect PrimaryIcon { get; }
+    public LanLobbyRect DisabledPrimaryIcon { get; }
+    public LanLobbyRect PrimaryLabel { get; }
+    public LanLobbyRect DisabledPrimaryLabel { get; }
 
     public static LanLobbyRoomLayout ForSize(int width, int height)
     {
@@ -130,6 +139,7 @@ public sealed class LanLobbyRoomLayout
                 ScaleAndOffset(root, scale, leftInset, bottomInset),
                 Scale(CanonicalCardBody, scale),
                 Scale(CanonicalTopBar, scale),
+                Scale(CanonicalReadyTopBar, scale),
                 Scale(CanonicalStateOverlay, scale),
                 Scale(CanonicalEmptyInvite, scale),
                 Scale(CanonicalReadyIcon, scale),
@@ -142,7 +152,12 @@ public sealed class LanLobbyRoomLayout
             new ReadOnlyCollection<LanLobbyRoomSlotLayout>(slots),
             ScaleAndOffset(CanonicalLeaveAction, scale, leftInset, bottomInset),
             ScaleAndOffset(CanonicalLatency, scale, leftInset, bottomInset),
-            ScaleAndOffset(CanonicalPrimaryAction, scale, leftInset, bottomInset));
+            ScaleAndOffset(CanonicalPrimaryAction, scale, leftInset, bottomInset),
+            ScaleAndOffset(CanonicalDisabledPrimaryAction, scale, leftInset, bottomInset),
+            ScaleAndOffset(CanonicalPrimaryIcon, scale, leftInset, bottomInset),
+            ScaleAndOffset(CanonicalDisabledPrimaryIcon, scale, leftInset, bottomInset),
+            ScaleAndOffset(CanonicalPrimaryLabel, scale, leftInset, bottomInset),
+            ScaleAndOffset(CanonicalDisabledPrimaryLabel, scale, leftInset, bottomInset));
     }
 
     private static LanLobbyRect FromTopLeft(float left, float top, float width, float height, float canvasHeight)

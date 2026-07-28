@@ -25,6 +25,8 @@ public sealed class LanLobbyView : MonoBehaviour
         public RectTransform Root;
         public Image CardBody;
         public Image TopBar;
+        public LanLobbyRect WaitingTopBarLayout;
+        public LanLobbyRect ReadyTopBarLayout;
         public Image ReadyOverlay;
         public GameObject EmptyContent;
         public Image EmptyInviteIcon;
@@ -55,8 +57,10 @@ public sealed class LanLobbyView : MonoBehaviour
     private Text latencyText;
     private Text roomCodeText;
     private Button roomPrimaryActionButton;
+    private Image roomPrimaryActionIcon;
     private Text roomPrimaryActionLabel;
     private Button roomLeaveButton;
+    private LanLobbyRoomLayout roomLayout;
     private string localPlayerId;
     private bool boundLocalIsHost;
     private bool boundLocalMemberReady;
@@ -108,7 +112,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         if (homeRoot != null) homeRoot.gameObject.SetActive(false);
         if (roomRoot != null) roomRoot.gameObject.SetActive(true);
-        if (legacyGridForeground != null) legacyGridForeground.gameObject.SetActive(true);
+        if (legacyGridForeground != null) legacyGridForeground.gameObject.SetActive(false);
     }
 
     public void ShowRoom(LobbyRoomSnapshot room, string localId)
@@ -181,6 +185,23 @@ public sealed class LanLobbyView : MonoBehaviour
 
         roomPrimaryActionButton.GetComponent<Image>().sprite = Sprite(
             primaryUsesNormalSprite ? "btn_match_normal" : "btn_match_grey");
+        var primaryActionLayout = primaryUsesNormalSprite
+            ? roomLayout.PrimaryAction
+            : roomLayout.DisabledPrimaryAction;
+        var primaryIconLayout = primaryUsesNormalSprite
+            ? roomLayout.PrimaryIcon
+            : roomLayout.DisabledPrimaryIcon;
+        var primaryLabelLayout = primaryUsesNormalSprite
+            ? roomLayout.PrimaryLabel
+            : roomLayout.DisabledPrimaryLabel;
+        PositionBottomLeft(roomPrimaryActionButton.GetComponent<RectTransform>(), primaryActionLayout);
+        roomPrimaryActionIcon.sprite = Sprite(
+            primaryUsesNormalSprite ? "btn_match_host_normal" : "btn_match_host_grey");
+        PositionBottomLeft(roomPrimaryActionIcon.rectTransform, RelativeTo(primaryIconLayout, primaryActionLayout));
+        PositionBottomLeft(roomPrimaryActionLabel.rectTransform, RelativeTo(primaryLabelLayout, primaryActionLayout));
+        roomPrimaryActionLabel.color = primaryUsesNormalSprite
+            ? new Color(33f / 255f, 33f / 255f, 33f / 255f, 1f)
+            : new Color(157f / 255f, 157f / 255f, 157f / 255f, 1f);
         roomPrimaryActionLabel.text = localIsHost
             ? "协议启动"
             : localMemberReady
@@ -464,6 +485,7 @@ public sealed class LanLobbyView : MonoBehaviour
     private void BuildRoom(Transform parent)
     {
         var layout = LanLobbyRoomLayout.ForSize(1920, 1080);
+        roomLayout = layout;
         latencyText = Text("LocalLatency", parent, 28, TextAnchor.UpperLeft, new Color(.3f, .95f, .95f));
         PositionBottomLeft(latencyText.rectTransform, layout.Latency);
         latencyText.text = "0 ms";
@@ -478,7 +500,7 @@ public sealed class LanLobbyView : MonoBehaviour
             BindSlot(slot, RoomSlotPresentationState.Empty, null, false);
         }
 
-        roomLeaveButton = Button("LeaveAction", parent, "btn_topmenu_back", string.Empty, 30, true);
+        roomLeaveButton = Button("LeaveAction", parent, "img_return", string.Empty, 30, false);
         PositionBottomLeft(roomLeaveButton.GetComponent<RectTransform>(), layout.LeaveAction);
         roomLeaveButton.onClick.AddListener(RequestRoomLeave);
 
@@ -486,6 +508,11 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionBottomLeft(roomPrimaryActionButton.GetComponent<RectTransform>(), layout.PrimaryAction);
         roomPrimaryActionButton.transition = Selectable.Transition.None;
         roomPrimaryActionLabel = roomPrimaryActionButton.GetComponentInChildren<Text>();
+        roomPrimaryActionLabel.fontSize = 38;
+        roomPrimaryActionIcon = Image("ActionIcon", roomPrimaryActionButton.transform, "btn_match_host_normal");
+        roomPrimaryActionIcon.preserveAspect = false;
+        PositionBottomLeft(roomPrimaryActionIcon.rectTransform, RelativeTo(layout.PrimaryIcon, layout.PrimaryAction));
+        PositionBottomLeft(roomPrimaryActionLabel.rectTransform, RelativeTo(layout.PrimaryLabel, layout.PrimaryAction));
         roomPrimaryActionButton.onClick.AddListener(RequestRoomPrimaryAction);
     }
 
@@ -567,13 +594,15 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var creatorTag = Image("CreatorTag", root, "host_top_tag");
         PositionBottomLeft(creatorTag.rectTransform, layout.CreatorTag);
-        creatorTag.preserveAspect = true;
+        creatorTag.preserveAspect = false;
 
         return new RoomSlotView
         {
             Root = root,
             CardBody = cardBody,
             TopBar = topBar,
+            WaitingTopBarLayout = layout.TopBar,
+            ReadyTopBarLayout = layout.ReadyTopBar,
             ReadyOverlay = readyOverlay,
             EmptyContent = emptyContentImage.gameObject,
             EmptyInviteIcon = emptyInviteIcon,
@@ -596,7 +625,12 @@ public sealed class LanLobbyView : MonoBehaviour
         var isEmpty = state == RoomSlotPresentationState.Empty;
         var isReady = state == RoomSlotPresentationState.Ready;
         slot.CardBody.sprite = Sprite("card_bg");
+        slot.CardBody.color = isReady
+            ? new Color(9f / 255f, 187f / 255f, 151f / 255f, 1f)
+            : Color.white;
         slot.TopBar.sprite = Sprite(isReady ? "bg_top_ready" : "bg_top_normal");
+        PositionBottomLeft(slot.TopBar.rectTransform, isReady ? slot.ReadyTopBarLayout : slot.WaitingTopBarLayout);
+        slot.TopBar.preserveAspect = !isReady;
         slot.ReadyOverlay.sprite = Sprite("player_card_self_frame");
         slot.EmptyContent.GetComponent<Image>().sprite = Sprite("card_empty");
         slot.EmptyInviteIcon.sprite = Sprite("bg_plus");

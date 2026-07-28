@@ -70,28 +70,28 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void RoomLayout_UsesOnlyNativeOrDeferredGeometryForUnmeasuredReadyChildren()
+        public void RoomLayout_PlacesMeasuredReadyLayersAtTheirReferenceVisibleTargets()
         {
             var slot = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
 
-            Assert.That(slot.ReadyIcon.Width, Is.EqualTo(34f).Within(0.01f));
-            Assert.That(slot.ReadyIcon.Height, Is.EqualTo(34f).Within(0.01f));
-            Assert.That(slot.ReadyIcon.Left, Is.EqualTo(slot.CardBody.Left + (slot.CardBody.Width - slot.ReadyIcon.Width) * .5f).Within(0.01f));
-            Assert.That(slot.ReadyIcon.Bottom, Is.EqualTo(slot.CardBody.Bottom + (slot.CardBody.Height - slot.ReadyIcon.Height) * .5f).Within(0.01f));
-            AssertRect(slot.ReadyLabel, slot.ReadyIcon.Left, slot.ReadyIcon.Bottom, 0f, 0f);
-            AssertRect(slot.CreatorTag, slot.TopBar.Left, slot.TopBar.Top - 26f, 72f, 26f);
+            AssertRect(slot.ReadyTopBar, 26.25f, 621.5f, 320.25f, 51f);
+            AssertRect(slot.ReadyIcon, 114.5f, 148.25f, 38f, 38f);
+            AssertRect(slot.ReadyLabel, 139.5f, 148.25f, 0f, 0f);
+            AssertRect(slot.CreatorTag, 123.5f, 576.25f, 124f, 35f);
         }
 
         [Test]
-        public void RoomLayout_KeepsEveryChildLocalAndUniformlyScaledWithoutLetterboxInsets()
+        public void RoomLayout_KeepsChildrenLocalAndUniformlyScaledWithOnlyTheMeasuredReadyTopOverhang()
         {
             var canonical = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
             var scaled = global::LanLobbyRoomLayout.ForSize(2560, 1440).Slots[0];
 
             foreach (var child in Children(canonical))
             {
+                if (ReferenceEquals(child, canonical.ReadyTopBar)) continue;
                 AssertContained(child, canonical.Root);
             }
+            Assert.That(canonical.ReadyTopBar.Top - canonical.Root.Height, Is.EqualTo(8f).Within(0.01f));
 
             var canonicalChildren = Children(canonical);
             var scaledChildren = Children(scaled);
@@ -107,8 +107,19 @@ namespace ArknoNights.Lobby.Tests
         {
             var layout = global::LanLobbyRoomLayout.ForSize(1920, 1080);
 
-            AssertRect(layout.PrimaryAction, 1487.25f, 42.75f, 432f, 94.5f);
-            AssertRect(layout.LeaveAction, 43.5f, 997.5f, 118f, 52.5f);
+            AssertRect(layout.PrimaryAction, 1487.25f, 42.75f, 436f, 95.5f);
+            AssertRect(layout.DisabledPrimaryAction, 1487.25f, 41.25f, 435f, 105f);
+            // btn_match_host_normal's DarkOnCyan source-visible height is
+            // 38/41 of its RectTransform, so 56 px produces the measured
+            // 52 px Player foreground without shifting its visible top.
+            AssertRect(layout.PrimaryIcon, 1573f, 60f, 62f, 56f);
+            AssertRect(layout.DisabledPrimaryIcon, 1571f, 64f, 63f, 52f);
+            AssertRect(layout.PrimaryLabel, 1645f, 71f, 150f, 38f);
+            AssertRect(layout.DisabledPrimaryLabel, 1645f, 69f, 150f, 38f);
+            // The 54x56 img_return source has a blended light core near
+            // x=15,y=8,w=28,h=28; compensate the source-visible inset so that
+            // the decoded Player core lands on reference x=58,y=40,w=39,h=40.
+            AssertRect(layout.LeaveAction, 37f, 971f, 75f, 80f);
             Assert.That(layout.LeaveAction.Right <= layout.Latency.Left || layout.Latency.Right <= layout.LeaveAction.Left || layout.LeaveAction.Top <= layout.Latency.Bottom || layout.Latency.Top <= layout.LeaveAction.Bottom, Is.True);
         }
 
@@ -122,6 +133,11 @@ namespace ArknoNights.Lobby.Tests
             AssertScaled(canonical.LeaveAction, scaled.LeaveAction, 4f / 3f);
             AssertScaled(canonical.Latency, scaled.Latency, 4f / 3f);
             AssertScaled(canonical.PrimaryAction, scaled.PrimaryAction, 4f / 3f);
+            AssertScaled(canonical.DisabledPrimaryAction, scaled.DisabledPrimaryAction, 4f / 3f);
+            AssertScaled(canonical.PrimaryIcon, scaled.PrimaryIcon, 4f / 3f);
+            AssertScaled(canonical.DisabledPrimaryIcon, scaled.DisabledPrimaryIcon, 4f / 3f);
+            AssertScaled(canonical.PrimaryLabel, scaled.PrimaryLabel, 4f / 3f);
+            AssertScaled(canonical.DisabledPrimaryLabel, scaled.DisabledPrimaryLabel, 4f / 3f);
         }
 
         [Test]
@@ -162,6 +178,7 @@ namespace ArknoNights.Lobby.Tests
             {
                 slot.CardBody,
                 slot.TopBar,
+                slot.ReadyTopBar,
                 slot.StateOverlay,
                 slot.EmptyInvite,
                 slot.ReadyIcon,

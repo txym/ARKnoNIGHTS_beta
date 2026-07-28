@@ -33,6 +33,7 @@ public sealed class LobbyAssetImportSetup : AssetPostprocessor
         LobbyAssetDirectory + "bg_plus.png",
         LobbyAssetDirectory + "btn_match_normal.png",
         LobbyAssetDirectory + "btn_topmenu_back.png",
+        LobbyAssetDirectory + "img_return.png",
         LobbyAssetDirectory + "host_top_tag.png",
         LobbyAssetDirectory + "Home/room_select_right_bg.png",
         LobbyAssetDirectory + "Home/room_select_title_icon.png",

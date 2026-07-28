@@ -34,6 +34,7 @@ All root `UI/Lobby` rows use an `Unpacked direct` normal filename from the appro
 | bg_plus.png | [uc]autochessouter/bg_plus.png | UI/Lobby/bg_plus | Empty room slot add marker | Preserve | E2CA5554B27862FE172E2D18D50092618B2E895C2AD63CDB57019BE593B7B66D | Unpacked direct |
 | btn_match_normal.png | [uc]autochessouter/btn_match_normal.png | UI/Lobby/btn_match_normal | Room start-match button | Nine-slice | 62B586274488AE3A7BF203829DDFE0C80955993AE22334F46EDE076215C3ADCD | Unpacked direct |
 | btn_topmenu_back.png | [uc]autochessouter/btn_topmenu_back.png | UI/Lobby/btn_topmenu_back | Room top-menu back button | Preserve | BB78B1FCB84BA5F3A2FF8992809C8B0EFD4CAC5E1E960A8056BAA79A1A6E6303 | Unpacked direct |
+| img_return.png | [uc]autochessouter/img_return.png | UI/Lobby/img_return | Room square return action | Exact | 3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09 | Unpacked direct |
 | host_top_tag.png | [uc]autochessouter/host_top_tag.png | UI/Lobby/host_top_tag | Host room slot top tag | Preserve | 861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009 | Unpacked direct |
 | room_select_right_bg.png | [uc]autochessouter/room_select_right_bg.png | UI/Lobby/Home/room_select_right_bg | Home right-side background | Preserve |
 | room_select_title_icon.png | [uc]autochessouter/room_select_title_icon.png | UI/Lobby/Home/room_select_title_icon | Home title ornament | Preserve |
