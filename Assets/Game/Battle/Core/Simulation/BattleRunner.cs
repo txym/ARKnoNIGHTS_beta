@@ -19,6 +19,7 @@ namespace ArknoNights.Battle.Core
             int.MinValue;
         private int unblockedAttackChargeStacks;
         private bool attackCountStateForceUnlocked;
+        private int damageReceivedCount;
 
         internal RuntimeAbilityState(AbilityDefinition definition)
         {
@@ -112,6 +113,20 @@ namespace ArknoNights.Battle.Core
                 unblockedAttackChargeStacks = 0;
         }
 
+        internal bool RegisterDamageReceived(
+            out int receivedOrdinal)
+        {
+            receivedOrdinal = 0;
+            var effect = Definition.TriggeredSpawnEffect;
+            if (effect == null
+                || effect.TriggerKind
+                != TriggeredSpawnKind.DamageReceived)
+                return false;
+            damageReceivedCount++;
+            receivedOrdinal = damageReceivedCount;
+            return effect.IsTriggered(damageReceivedCount);
+        }
+
         internal void UpdateHealthThresholdState(
             int currentHitPoints,
             int maxHitPoints,
@@ -170,6 +185,11 @@ namespace ArknoNights.Battle.Core
             if (Definition.AttackCountStateModifier != null
                 && attackCountStateForceUnlocked)
                 builder.Append(":forced-unlock");
+            if (Definition.TriggeredSpawnEffect != null
+                && Definition.TriggeredSpawnEffect.TriggerKind
+                == TriggeredSpawnKind.DamageReceived)
+                builder.Append(":received:")
+                    .Append(damageReceivedCount);
         }
     }
 
@@ -1107,7 +1127,16 @@ namespace ArknoNights.Battle.Core
                 .SelectMany(ExpandAttackAreaDamage)
                 .ToArray();
             var reactions = new List<DamageReaction>();
-            foreach (var targetGroup in valid.GroupBy(item => item.TargetUnitId, StringComparer.Ordinal))
+            var successfulAttacks =
+                new Dictionary<string, PendingAttack>(
+                    StringComparer.Ordinal);
+            foreach (var targetGroup in valid
+                         .GroupBy(
+                             item => item.TargetUnitId,
+                             StringComparer.Ordinal)
+                         .OrderBy(
+                             item => item.Key,
+                             StringComparer.Ordinal))
             {
                 var target = FindUnit(targetGroup.Key);
                 var hits = targetGroup.Select(item => new DamageHit(item, CalculateDamage(item, target))).ToArray();
@@ -1119,8 +1148,30 @@ namespace ArknoNights.Battle.Core
                 {
                     var attacker =
                         FindUnit(hit.Attack.AttackerUnitId);
+                    var attackKey =
+                        hit.Attack.AttackerUnitId
+                        + "\0"
+                        + hit.Attack.AttackOrdinal;
+                    if (!successfulAttacks.ContainsKey(attackKey))
+                        successfulAttacks.Add(
+                            attackKey,
+                            hit.Attack);
                     if (target.CurrentHitPoints > 0)
                     {
+                        foreach (var abilityState in target.AbilityStates
+                                     .OrderBy(
+                                         item => item.Definition.AbilityId,
+                                         StringComparer.Ordinal))
+                        {
+                            if (abilityState.RegisterDamageReceived(
+                                    out var receivedOrdinal))
+                                TrySpawnTriggeredUnit(
+                                    target,
+                                    abilityState.Definition.AbilityId,
+                                    abilityState.Definition
+                                        .TriggeredSpawnEffect,
+                                    receivedOrdinal);
+                        }
                         foreach (var effect in attacker
                                      .OnHitDamageOverTimeEffects
                                      .OrderBy(
@@ -1137,6 +1188,34 @@ namespace ArknoNights.Battle.Core
                             target.UnitId,
                             hit.Attack.AttackerUnitId,
                             reaction));
+                }
+            }
+
+            foreach (var attack in successfulAttacks.Values
+                         .OrderBy(
+                             item => item.AttackerUnitId,
+                             StringComparer.Ordinal)
+                         .ThenBy(item => item.AttackOrdinal))
+            {
+                var attacker = FindUnit(attack.AttackerUnitId);
+                foreach (var abilityState in attacker.AbilityStates
+                             .OrderBy(
+                                 item => item.Definition.AbilityId,
+                                 StringComparer.Ordinal))
+                {
+                    var effect =
+                        abilityState.Definition.TriggeredSpawnEffect;
+                    if (effect == null
+                        || effect.TriggerKind
+                        != TriggeredSpawnKind.SuccessfulAttack
+                        || !effect.IsTriggered(
+                            attack.AttackOrdinal))
+                        continue;
+                    TrySpawnTriggeredUnit(
+                        attacker,
+                        abilityState.Definition.AbilityId,
+                        effect,
+                        attack.AttackOrdinal);
                 }
             }
 
@@ -1177,6 +1256,60 @@ namespace ArknoNights.Battle.Core
                         null,
                         BattleStopReason.None);
             }
+        }
+
+        private void TrySpawnTriggeredUnit(
+            RuntimeUnitState owner,
+            string abilityId,
+            TriggeredSpawnEffectDefinition effect,
+            int triggerOrdinal)
+        {
+            if (effect.MaxActiveSameType > 0
+                && runtimeUnits.Count(item =>
+                    item.IsAlive
+                    && item.Side == owner.Side
+                    && string.Equals(
+                        item.TypeId,
+                        effect.SummonTypeId,
+                        StringComparison.Ordinal))
+                >= effect.MaxActiveSameType)
+                return;
+            var definition =
+                unitDefinitions[effect.SummonTypeId];
+            var offsetX = StableSpawnOffset(
+                Input.BattleId,
+                owner.UnitId,
+                abilityId,
+                triggerOrdinal,
+                1,
+                0,
+                effect.SideLengthCentimetres);
+            var offsetY = StableSpawnOffset(
+                Input.BattleId,
+                owner.UnitId,
+                abilityId,
+                triggerOrdinal,
+                1,
+                1,
+                effect.SideLengthCentimetres);
+            var summoned = new RuntimeUnitState(
+                dynamicUnitIdAllocator.Allocate(),
+                owner.PlayerId,
+                owner.Side,
+                definition,
+                new FixedPosition(
+                    owner.Position.XUnits + offsetX,
+                    owner.Position.YUnits + offsetY),
+                0,
+                Array.Empty<BuffPlaceholder>(),
+                CurrentTick + 1,
+                CreateAbilityStates(
+                    definition,
+                    abilityDefinitions));
+            runtimeUnits.Add(summoned);
+            var snapshot = CreateSpawnSnapshot(summoned, true);
+            unitSnapshots.Add(summoned.UnitId, snapshot);
+            EmitSpawn(summoned, snapshot);
         }
 
         private IEnumerable<PendingAttack> ExpandAttackAreaDamage(

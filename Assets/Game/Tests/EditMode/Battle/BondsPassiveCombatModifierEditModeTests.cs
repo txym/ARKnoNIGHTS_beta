@@ -1188,6 +1188,133 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void SuccessfulAttackTriggeredSpawn_FiresOnEveryThirdHit()
+        {
+            var input = CreateInput(
+                7,
+                new[]
+                {
+                    Attacker(
+                        "builder",
+                        2000,
+                        0,
+                        "ATTACK_SPAWN",
+                        attackIntervalTicks: 2,
+                        attack: 10),
+                    NonAttacker("target", 10000),
+                    NonAttacker("fragment", 1000)
+                },
+                new[]
+                {
+                    PassiveTriggeredSpawn(
+                        "ATTACK_SPAWN",
+                        TriggeredSpawnKind.SuccessfulAttack,
+                        firstTriggerOrdinal: 3,
+                        repeatInterval: 3,
+                        summonTypeId: "fragment",
+                        sideLengthCentimetres: 40,
+                        maxActiveSameType: 12)
+                },
+                new[] { Unit("builder", "builder", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+
+            var runner = new BattleRunner(input);
+            var result = runner.RunToCompletion();
+            var spawn = result.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitTypeId == "fragment");
+            var ownerPosition = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "builder").Position;
+
+            Assert.That(spawn.Tick, Is.EqualTo(6));
+            Assert.That(
+                Math.Abs(
+                    spawn.ToPosition.Value.XUnits
+                    - ownerPosition.XUnits),
+                Is.LessThanOrEqualTo(20));
+            Assert.That(
+                Math.Abs(
+                    spawn.ToPosition.Value.YUnits
+                    - ownerPosition.YUnits),
+                Is.LessThanOrEqualTo(20));
+            Assert.That(
+                spawn.SpawnSnapshot.ActivationTick,
+                Is.EqualTo(7));
+        }
+
+        [Test]
+        public void DamageReceivedTriggeredSpawn_RespectsFriendlyTypeCap()
+        {
+            Assert.That(
+                RunDamageReceivedSpawn(initialFragments: 0),
+                Is.EqualTo(1));
+            Assert.That(
+                RunDamageReceivedSpawn(initialFragments: 8),
+                Is.EqualTo(0));
+        }
+
+        private static int RunDamageReceivedSpawn(int initialFragments)
+        {
+            var homeUnits = Enumerable.Range(1, 10)
+                .Select(index =>
+                    Unit(
+                        "hitter-" + index,
+                        "hitter",
+                        5,
+                        4))
+                .ToArray();
+            var awayUnits = new[]
+                {
+                    Unit("builder", "builder", 5, 4)
+                }
+                .Concat(Enumerable.Range(1, initialFragments)
+                    .Select(index =>
+                        Unit(
+                            "fragment-" + index,
+                            "fragment",
+                            1,
+                            1)))
+                .ToArray();
+            var input = CreateInput(
+                3,
+                new[]
+                {
+                    Attacker(
+                        "hitter",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        attack: 10),
+                    NonAttacker(
+                        "builder",
+                        10000,
+                        "RECEIVED_SPAWN"),
+                    NonAttacker("fragment", 1000)
+                },
+                new[]
+                {
+                    PassiveTriggeredSpawn(
+                        "RECEIVED_SPAWN",
+                        TriggeredSpawnKind.DamageReceived,
+                        firstTriggerOrdinal: 10,
+                        repeatInterval: 10,
+                        summonTypeId: "fragment",
+                        sideLengthCentimetres: 40,
+                        maxActiveSameType: 8)
+                },
+                homeUnits,
+                awayUnits);
+
+            return new BattleRunner(input)
+                .RunToCompletion()
+                .Events
+                .Count(item =>
+                    item.Type == BattleEventType.Spawn
+                    && item.UnitTypeId == "fragment"
+                    && item.SpawnSnapshot.IsDynamicallyGenerated);
+        }
+
+        [Test]
         public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -2042,6 +2169,53 @@ namespace ArknoNights.Battle.Tests
                     checkIntervalTicks,
                     attackAdditivePerStack,
                     maxStacks),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveTriggeredSpawn(
+            string abilityId,
+            TriggeredSpawnKind triggerKind,
+            int firstTriggerOrdinal,
+            int repeatInterval,
+            string summonTypeId,
+            int sideLengthCentimetres,
+            int maxActiveSameType)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new TriggeredSpawnEffectDefinition(
+                    triggerKind,
+                    firstTriggerOrdinal,
+                    repeatInterval,
+                    summonTypeId,
+                    sideLengthCentimetres,
+                    maxActiveSameType),
                 string.Empty,
                 0);
         }
