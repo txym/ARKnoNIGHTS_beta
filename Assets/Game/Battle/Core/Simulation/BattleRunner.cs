@@ -48,6 +48,11 @@ namespace ArknoNights.Battle.Core
 
         internal bool IsHealthThresholdActive =>
             healthThresholdActive;
+        internal bool IsHealthThresholdUnblockable =>
+            healthThresholdActive
+            && Definition.HealthThresholdCombatModifier != null
+            && Definition.HealthThresholdCombatModifier
+                .MakesUnblockable;
         internal bool IsAttackCountStateUnlocked(
             int startedAttackCount)
         {
@@ -161,7 +166,7 @@ namespace ArknoNights.Battle.Core
             healthThresholdActive = true;
             healthThresholdActiveUntilTick =
                 effect.DurationTicks > 0
-                    ? currentTick + effect.DurationTicks
+                    ? currentTick + effect.DurationTicks - 1
                     : int.MaxValue;
         }
 
@@ -386,6 +391,9 @@ namespace ArknoNights.Battle.Core
         {
             get
             {
+                if (abilityStates.Any(item =>
+                        item.IsHealthThresholdUnblockable))
+                    return 0;
                 var value = (long)Definition.BlockCapacity
                     + PassiveCombatModifiers.Sum(item =>
                         (long)item.BlockCapacityAdditive)
@@ -1072,16 +1080,7 @@ namespace ArknoNights.Battle.Core
                     if (!unit.IsAlive || other == null || !other.IsAlive || DistanceSquared(unit.Position, other.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) EndBlock(unit, other);
                 }
             }
-            foreach (var unit in runtimeUnits
-                         .Where(item =>
-                             item.BlockedUnitIds.Count
-                             > item.EffectiveBlockCapacity)
-                         .OrderBy(item => item.UnitId, StringComparer.Ordinal)
-                         .ToArray())
-            foreach (var releasedUnitId in unit.BlockedUnitIds
-                         .Skip(unit.EffectiveBlockCapacity)
-                         .ToArray())
-                EndBlock(unit, FindUnit(releasedUnitId));
+            ReleaseExcessBlockRelations();
 
             var proposals = runtimeUnits.Where(item => IsActive(item) && item.HasBlockingCapacity && HasLiveTarget(item))
                 .Select(item => new BlockProposal(item, FindUnit(item.TargetUnitId)))
@@ -1778,6 +1777,23 @@ namespace ArknoNights.Battle.Core
                         ability.Definition
                             .HealthThresholdAdjacentSpawnEffect);
             }
+            ReleaseExcessBlockRelations();
+        }
+
+        private void ReleaseExcessBlockRelations()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(item =>
+                             item.BlockedUnitIds.Count
+                             > item.EffectiveBlockCapacity)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal)
+                         .ToArray())
+            foreach (var releasedUnitId in unit.BlockedUnitIds
+                         .Skip(unit.EffectiveBlockCapacity)
+                         .ToArray())
+                EndBlock(unit, FindUnit(releasedUnitId));
         }
 
         private void UpdateUnblockedAttackCharges()

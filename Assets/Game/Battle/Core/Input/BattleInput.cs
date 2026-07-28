@@ -229,7 +229,8 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.HealthThresholdCombatModifier.DefenseMultiplierPermille).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.BlockCapacityAdditive).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.AttackSpeedAdditive).Append(',')
-                        .Append(ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille);
+                        .Append(ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.MakesUnblockable ? 1 : 0);
                 if (ability.UnblockedDamageTakenModifier != null)
                     builder.Append("|U:")
                         .Append(ability.UnblockedDamageTakenModifier.PhysicalDamageTakenPermille).Append(',')

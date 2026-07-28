@@ -121,6 +121,31 @@ namespace ArknoNights.Battle.Core
             int blockCapacityAdditive,
             int attackSpeedAdditive,
             int moveSpeedMultiplierPermille)
+            : this(
+                thresholdHitPointsPermille,
+                inclusiveThreshold,
+                triggerOnce,
+                durationTicks,
+                attackMultiplierPermille,
+                defenseMultiplierPermille,
+                blockCapacityAdditive,
+                attackSpeedAdditive,
+                moveSpeedMultiplierPermille,
+                false)
+        {
+        }
+
+        public HealthThresholdCombatModifierDefinition(
+            int thresholdHitPointsPermille,
+            bool inclusiveThreshold,
+            bool triggerOnce,
+            int durationTicks,
+            int attackMultiplierPermille,
+            int defenseMultiplierPermille,
+            int blockCapacityAdditive,
+            int attackSpeedAdditive,
+            int moveSpeedMultiplierPermille,
+            bool makesUnblockable)
         {
             ThresholdHitPointsPermille =
                 thresholdHitPointsPermille;
@@ -136,6 +161,7 @@ namespace ArknoNights.Battle.Core
             AttackSpeedAdditive = attackSpeedAdditive;
             MoveSpeedMultiplierPermille =
                 moveSpeedMultiplierPermille;
+            MakesUnblockable = makesUnblockable;
         }
 
         public int ThresholdHitPointsPermille { get; }
@@ -147,6 +173,7 @@ namespace ArknoNights.Battle.Core
         public int BlockCapacityAdditive { get; }
         public int AttackSpeedAdditive { get; }
         public int MoveSpeedMultiplierPermille { get; }
+        public bool MakesUnblockable { get; }
         public bool IsNeutral =>
             AttackMultiplierPermille
             == NeutralMultiplierPermille
@@ -155,7 +182,8 @@ namespace ArknoNights.Battle.Core
             && BlockCapacityAdditive == 0
             && AttackSpeedAdditive == 0
             && MoveSpeedMultiplierPermille
-            == NeutralMultiplierPermille;
+            == NeutralMultiplierPermille
+            && !MakesUnblockable;
     }
 
     public sealed class AttackSequenceModifierDefinition

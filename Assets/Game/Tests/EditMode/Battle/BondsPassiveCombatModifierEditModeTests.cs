@@ -435,6 +435,73 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void OneShotHealthThreshold_UnblocksImmediatelyForExactDuration()
+        {
+            var input = CreateInput(
+                35,
+                new[]
+                {
+                    Attacker(
+                        "runner",
+                        100,
+                        1,
+                        "ESCAPE",
+                        attackIntervalTicks: 1000,
+                        maxHitPoints: 1000,
+                        attack: 1),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        attack: 600)
+                },
+                new[]
+                {
+                    PassiveThreshold(
+                        "ESCAPE",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: false,
+                        triggerOnce: true,
+                        durationTicks: 30,
+                        moveSpeedMultiplierPermille: 2500,
+                        makesUnblockable: true)
+                },
+                new[] { Unit("runner", "runner", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+            Assert.That(
+                runner.RuntimeUnits.Single(item =>
+                    item.UnitId == "runner").BlockedUnitIds,
+                Is.EqualTo(new[] { "enemy" }));
+
+            runner.Step();
+            var runtime = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "runner");
+            Assert.That(runtime.CurrentHitPoints, Is.EqualTo(400));
+            Assert.That(runtime.BlockedUnitIds, Is.Empty);
+            Assert.That(runtime.EffectiveBlockCapacity, Is.Zero);
+            Assert.That(
+                runtime.EffectiveMoveSpeedCentimetresPerSecond,
+                Is.EqualTo(250));
+
+            while (runner.CurrentTick < 31)
+                runner.Step();
+            Assert.That(runtime.EffectiveBlockCapacity, Is.Zero);
+            Assert.That(
+                runtime.EffectiveMoveSpeedCentimetresPerSecond,
+                Is.EqualTo(250));
+
+            runner.Step();
+            Assert.That(runtime.EffectiveBlockCapacity, Is.EqualTo(1));
+            Assert.That(
+                runtime.EffectiveMoveSpeedCentimetresPerSecond,
+                Is.EqualTo(100));
+        }
+
+        [Test]
         public void ContinuousBlockThreshold_ReleasesExcessBlockWhenHealingDisablesIt()
         {
             var threshold = new UnitDefinition(
@@ -1917,7 +1984,8 @@ namespace ArknoNights.Battle.Tests
             int attackSpeedAdditive = 0,
             int moveSpeedMultiplierPermille =
                 HealthThresholdCombatModifierDefinition
-                    .NeutralMultiplierPermille)
+                    .NeutralMultiplierPermille,
+            bool makesUnblockable = false)
         {
             return new AbilityDefinition(
                 abilityId,
@@ -1942,7 +2010,8 @@ namespace ArknoNights.Battle.Tests
                     defenseMultiplierPermille,
                     blockCapacityAdditive,
                     attackSpeedAdditive,
-                    moveSpeedMultiplierPermille),
+                    moveSpeedMultiplierPermille,
+                    makesUnblockable),
                 string.Empty,
                 0);
         }
