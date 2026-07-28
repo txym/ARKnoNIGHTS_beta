@@ -60,6 +60,12 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         return TryGetPlayerOutputDirectory(requestedDirectory, simulatedDataPath, simulatedCurrentDirectory, out normalizedDirectory, out error);
     }
 
+    /// <summary>Test seam for the fixed-resolution geometry export contract.</summary>
+    public static bool IsSupportedCaptureSizeForTests(int width, int height)
+    {
+        return width == CaptureWidth && height == CaptureHeight;
+    }
+
     private IEnumerator Capture(string directory, bool quitWhenComplete, bool captureScreen)
     {
         if (captureScreen && !TryGetPlayerOutputDirectory(directory, out outputDirectory, out var error))
@@ -147,9 +153,16 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         var width = probe.width;
         var height = probe.height;
         Destroy(probe);
-        var rects = KeyRects();
-        var spriteSources = SpriteSources(name);
-        var codeNativeGeometry = CodeNativeGeometries();
+        if (!IsSupportedCaptureSizeForTests(width, height))
+        {
+            FailCapture(
+                "Capture dimensions must be exactly " + CaptureWidth + "x" + CaptureHeight +
+                " before exporting screen-bottom-left geometry: " + width + "x" + height,
+                captureScreen);
+        }
+        var rects = KeyRects(width, height);
+        var spriteSources = SpriteSources(name, width, height);
+        var codeNativeGeometry = CodeNativeGeometries(width, height);
         captures.Add(new CaptureRecord
         {
             name = name,
@@ -173,7 +186,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         });
     }
 
-    private CaptureRect[] KeyRects()
+    private CaptureRect[] KeyRects(int captureWidth, int captureHeight)
     {
         var names = new List<string>
         {
@@ -210,12 +223,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         {
             var rect = view.transform.Find(name) as RectTransform;
             if (rect == null) continue;
-            var corners = new Vector3[4];
-            rect.GetWorldCorners(corners);
-            var minX = corners.Min(corner => corner.x);
-            var minY = corners.Min(corner => corner.y);
-            var maxX = corners.Max(corner => corner.x);
-            var maxY = corners.Max(corner => corner.y);
+            CaptureBounds(rect, captureWidth, captureHeight, out var minX, out var minY, out var maxX, out var maxY);
             values.Add(new CaptureRect
             {
                 name = name,
@@ -236,7 +244,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
         if (value != null && value.gameObject.activeInHierarchy) names.Add(path);
     }
 
-    private SpriteSource[] SpriteSources(string captureName)
+    private SpriteSource[] SpriteSources(string captureName, int captureWidth, int captureHeight)
     {
         // Provenance is evidence of actual rendering in this capture state, not of dormant page objects.
         return view.GetComponentsInChildren<Image>(false)
@@ -246,12 +254,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
                 var spriteName = image.sprite.name;
                 if (!TryGetApprovedSource(spriteName, out var source))
                     throw new InvalidOperationException("Lobby capture uses an unmapped sprite: " + spriteName);
-                var corners = new Vector3[4];
-                image.rectTransform.GetWorldCorners(corners);
-                var minX = corners.Min(corner => corner.x);
-                var minY = corners.Min(corner => corner.y);
-                var maxX = corners.Max(corner => corner.x);
-                var maxY = corners.Max(corner => corner.y);
+                CaptureBounds(image.rectTransform, captureWidth, captureHeight, out var minX, out var minY, out var maxX, out var maxY);
                 return new SpriteSource
                 {
                     node = HierarchyPath(image.transform, view.transform),
@@ -302,7 +305,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             .ToArray();
     }
 
-    private CodeNativeGeometry[] CodeNativeGeometries()
+    private CodeNativeGeometry[] CodeNativeGeometries(int captureWidth, int captureHeight)
     {
         return view.GetComponentsInChildren<Image>(false)
             // Sprite-backed images are audited in spriteSources. Fully transparent Images are hit targets,
@@ -310,12 +313,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             .Where(image => image.isActiveAndEnabled && image.sprite == null && image.color.a > 0f)
             .Select(image =>
             {
-                var corners = new Vector3[4];
-                image.rectTransform.GetWorldCorners(corners);
-                var minX = corners.Min(corner => corner.x);
-                var minY = corners.Min(corner => corner.y);
-                var maxX = corners.Max(corner => corner.x);
-                var maxY = corners.Max(corner => corner.y);
+                CaptureBounds(image.rectTransform, captureWidth, captureHeight, out var minX, out var minY, out var maxX, out var maxY);
                 return new CodeNativeGeometry
                 {
                     name = HierarchyPath(image.transform, view.transform),
@@ -338,6 +336,35 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             })
             .OrderBy(value => value.name, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private void CaptureBounds(
+        RectTransform rect,
+        int captureWidth,
+        int captureHeight,
+        out float minX,
+        out float minY,
+        out float maxX,
+        out float maxY)
+    {
+        var corners = new Vector3[4];
+        rect.GetWorldCorners(corners);
+        var roomRoot = view.transform.Find("LanLobbyRoot/Room") as RectTransform;
+        if (roomRoot != null && (rect == roomRoot || rect.IsChildOf(roomRoot)))
+        {
+            var scaleX = (float)captureWidth / CaptureWidth;
+            var scaleY = (float)captureHeight / CaptureHeight;
+            minX = corners.Min(corner => roomRoot.InverseTransformPoint(corner).x) * scaleX;
+            minY = corners.Min(corner => roomRoot.InverseTransformPoint(corner).y) * scaleY;
+            maxX = corners.Max(corner => roomRoot.InverseTransformPoint(corner).x) * scaleX;
+            maxY = corners.Max(corner => roomRoot.InverseTransformPoint(corner).y) * scaleY;
+            return;
+        }
+
+        minX = corners.Min(corner => corner.x);
+        minY = corners.Min(corner => corner.y);
+        maxX = corners.Max(corner => corner.x);
+        maxY = corners.Max(corner => corner.y);
     }
 
     private static SourceAudit[] SourceAuditFor(

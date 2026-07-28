@@ -254,6 +254,9 @@ function Fill-RoomEvidenceFixture(
             $stateBrush = if ($isReady) { $cyan } else { $gray }
             Fill-Normalized $stateBrush $bodyX $bodyY 320.25 30
             Fill-Contour $stateBrush $bodyX $bodyY 320.25 545.25
+            # The lower-decoration pixels continue through the manifest seam at
+            # y=722.25 in screenshot top-left space.
+            Fill-Normalized $stateBrush $bodyX 721 320.25 5
             if ($isReady)
             {
                 Fill-Normalized $cyan $bodyX 630 320.25 85
@@ -294,6 +297,75 @@ function Fill-RoomEvidenceFixture(
         $dark.Dispose()
         $mutedLight.Dispose()
         $creatorCyan.Dispose()
+    }
+}
+
+function New-RoomPortraitFrameSpriteSources(
+    [ValidateSet('room-host','room-full','room-ready')] [string] $State)
+{
+    $sources = @()
+    $roots = @(199.5, 588.75, 976.5, 1365.0)
+    for ($slot = 0; $slot -lt 4; $slot++)
+    {
+        $root = $roots[$slot]
+        $prefix = "LanLobbyRoot/Room/RoomCard_$slot"
+        $isReady = $slot -eq 0 -or $State -eq 'room-ready'
+        $topBarSprite = if ($isReady) { 'bg_top_ready' } else { 'bg_top_normal' }
+        $lowerSprite = if ($isReady) { 'card_deco_self' } else { 'card_deco_bg' }
+        $sources += [ordered]@{
+            node="$prefix/CardBody";spriteName='card_bg';sourcePath='[uc]autochessouter/card_bg.png'
+            coordinateOrigin='screen-bottom-left';unit='px';x=($root+26);y=276.25;width=329;height=626;raycastTarget=$false
+        }
+        $sources += [ordered]@{
+            node="$prefix/TopBar";spriteName=$topBarSprite;sourcePath="[uc]autochessouter/$topBarSprite.png"
+            coordinateOrigin='screen-bottom-left';unit='px';x=($root+26.25);y=859.824;width=320.25;height=42.426;raycastTarget=$false
+        }
+        $sources += [ordered]@{
+            node="$prefix/LowerDecoration";spriteName=$lowerSprite;sourcePath="[uc]autochessouter/$lowerSprite.png"
+            coordinateOrigin='screen-bottom-left';unit='px';x=$root;y=237.75;width=363.75;height=120;raycastTarget=$false
+        }
+    }
+    return @($sources)
+}
+
+function New-RoomPortraitFrameRects()
+{
+    $values = @()
+    $roots = @(199.5, 588.75, 976.5, 1365.0)
+    for ($slot = 0; $slot -lt 4; $slot++)
+    {
+        $root = $roots[$slot]
+        $prefix = "LanLobbyRoot/Room/RoomCard_$slot"
+        # Preserve the long-standing smoke diagnostic root rectangles while
+        # supplying authoritative state-independent child geometry.
+        $values += [ordered]@{ name=$prefix;coordinateOrigin='screen-bottom-left';unit='px';x=(100+220*$slot);y=100;width=200;height=300 }
+        $values += [ordered]@{ name="$prefix/CardBody";coordinateOrigin='screen-bottom-left';unit='px';x=($root+26);y=276.25;width=329;height=626 }
+        $values += [ordered]@{ name="$prefix/TopBar";coordinateOrigin='screen-bottom-left';unit='px';x=($root+26.25);y=859.824;width=320.25;height=42.426 }
+        $values += [ordered]@{ name="$prefix/LowerDecoration";coordinateOrigin='screen-bottom-left';unit='px';x=$root;y=237.75;width=363.75;height=120 }
+    }
+    return @($values)
+}
+
+function Narrow-LanLobbyPortraitFrameFixture(
+    [string] $Path,
+    [int] $RightExclusive,
+    [int] $Top,
+    [int] $Height,
+    [int] $DeltaWidth)
+{
+    $source = [Drawing.Bitmap]::FromFile($Path)
+    $bitmap = New-Object Drawing.Bitmap $source
+    $source.Dispose()
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try
+    {
+        $graphics.FillRectangle([Drawing.Brushes]::Black, $RightExclusive-$DeltaWidth, $Top, $DeltaWidth, $Height)
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally
+    {
+        $graphics.Dispose()
+        $bitmap.Dispose()
     }
 }
 
@@ -614,8 +686,8 @@ function Mutate-RoomVisibleThresholdFixture([string] $CaptureDirectory)
         try
         {
             # Move only slot 2's visible left contour edge by +5 px.
-            $graphics.FillRectangle($black, 615, 208, 5, 515)
-            $graphics.FillRectangle($gray, 620, 208, 5, 515)
+            $graphics.FillRectangle($black, 615, 208, 5, 518)
+            $graphics.FillRectangle($gray, 620, 208, 5, 518)
             $full.Save($fullPath, [Drawing.Imaging.ImageFormat]::Png)
         }
         finally { $graphics.Dispose(); $full.Dispose() }
@@ -765,7 +837,10 @@ try
 
     $names = @('home', 'discovered-prefill', 'room-host', 'room-ready', 'room-full')
     $roomSpriteSha = @{}
-    foreach ($spriteName in @('bg_terrain','player_card_ready','host_top_tag','btn_match_normal','btn_match_grey','btn_topmenu_back','icon_amiy'))
+    foreach ($spriteName in @(
+        'bg_terrain','player_card_ready','host_top_tag','btn_match_normal','btn_match_grey',
+        'btn_topmenu_back','icon_amiy','card_bg','bg_top_normal','bg_top_ready',
+        'card_deco_bg','card_deco_self'))
     {
         $relative = if ($spriteName -eq 'icon_amiy') { "Assets/Resources/UI/Lobby/Home/$spriteName.png" } else { "Assets/Resources/UI/Lobby/$spriteName.png" }
         $roomSpriteSha[$spriteName] = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $projectRoot $relative)).Hash
@@ -843,8 +918,9 @@ try
                 [ordered]@{ node='LanLobbyRoot/Room/RoomCard_0/CreatorTag';spriteName='host_top_tag';sourcePath='[uc]autochessouter/host_top_tag.png';coordinateOrigin='screen-bottom-left';unit='px';x=318;y=814;width=124;height=35;raycastTarget=$false },
                 [ordered]@{ node='LanLobbyRoot/Room/PrimaryAction';spriteName=$primarySprite;sourcePath="[uc]autochessouter/$primarySprite.png";coordinateOrigin='screen-bottom-left';unit='px';x=1479;y=41;width=441;height=104;raycastTarget=$true },
                 [ordered]@{ node='LanLobbyRoot/Room/LeaveAction';spriteName='btn_topmenu_back';sourcePath='[uc]autochessouter/btn_topmenu_back.png';coordinateOrigin='screen-bottom-left';unit='px';x=36;y=989;width=134;height=69;raycastTarget=$true }
-            )
+            ) + @(New-RoomPortraitFrameSpriteSources $name)
         } else { @() }
+        $roomRects = if ($name -like 'room-*') { @(New-RoomPortraitFrameRects) } else { @() }
         $records += [ordered]@{
             name = $name
             path = $actualPath
@@ -882,12 +958,8 @@ try
                     [ordered]@{ node = 'LanLobbyRoot/Home/RoomSelect/Create/StartRoomDecoration'; spriteName = 'room_select_img_startroom'; sourcePath = '[uc]autochessouter/room_select_img_startroom.png' }
                 )
             } else { @() })) + @($(if ($name -in @('home', 'discovered-prefill')) { New-JoinDecorationSpriteSources } else { @() }))
-            rects = @(
-                [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_0'; x = 100; y = 100; width = 200; height = 300 },
-                [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_1'; x = 320; y = 100; width = 200; height = 300 },
-                [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_2'; x = 540; y = 100; width = 200; height = 300 },
-                [ordered]@{ name = 'LanLobbyRoot/Room/RoomCard_3'; x = 760; y = 100; width = 200; height = 300 }
-            ) + $actionRects
+            rects = @($roomRects) + $actionRects
+            keyRects = @($roomRects) + $actionRects
             unityText = $(if ($name -eq 'home') {
                 @(
                     [ordered]@{ node = 'LanLobbyRoot/Home/IdentityPanel/Title'; text = 'LOCAL IDENTITY'; fontName = 'Novecento wide Normal Regular'; fontResourcePath = ''; hasBitmapSource = $false; bitmapSourcePath = '' },
@@ -1234,6 +1306,16 @@ try
         'RoomReady.PrimaryAction.IconCenter',
         'RoomReady.PrimaryAction.LabelCenter',
         'RoomReady.Leave',
+        'RoomHost.Slot1.PortraitFrame',
+        'RoomHost.Slot2.PortraitFrame',
+        'RoomHost.Slot3.PortraitFrame',
+        'RoomHost.Slot4.PortraitFrame',
+        'RoomFull.Slot1.PortraitFrame',
+        'RoomFull.Slot2.PortraitFrame',
+        'RoomFull.Slot3.PortraitFrame',
+        'RoomReady.Slot1.PortraitFrame',
+        'RoomReady.Slot2.PortraitFrame',
+        'RoomReady.Slot3.PortraitFrame',
         'RoomHost.Slot1.ProfileContentAbsence',
         'RoomFull.Slot1.ProfileContentAbsence',
         'RoomReady.Slot1.ProfileContentAbsence',
@@ -1289,6 +1371,30 @@ try
         Assert-True (($excluded[0].status -ceq 'ExcludedByReferencePopup') -and ($excluded[0].passed -eq $false)) "$excludedName must be excluded, never passed"
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$excluded[0].reason)) "$excludedName exclusion reason"
     }
+    $portraitFrameGates = @($report.roomGates | Where-Object name -like '*.PortraitFrame')
+    Assert-True ($portraitFrameGates.Count -eq 10) 'the dedicated portrait-frame gate inventory must contain exactly ten non-excluded gates'
+    foreach ($portraitFrameGate in $portraitFrameGates)
+    {
+        Assert-True ($portraitFrameGate.gateKind -ceq 'PortraitFrame') "$($portraitFrameGate.name) must use its dedicated gate kind"
+        Assert-True ($portraitFrameGate.passed) "$($portraitFrameGate.name) unchanged fixture must pass"
+        Assert-True ($portraitFrameGate.portraitFrameRelation.passed) "$($portraitFrameGate.name) relation must pass"
+        Assert-True ($portraitFrameGate.sharedGeometryPassed) "$($portraitFrameGate.name) shared geometry must pass"
+        Assert-True (($portraitFrameGate.portraitFrameRelation.thresholds.maximumHorizontalCenterDeltaPx -eq 2) -and
+            ($portraitFrameGate.portraitFrameRelation.thresholds.maximumVisibleWidthErrorPx -eq 3) -and
+            ($portraitFrameGate.portraitFrameRelation.thresholds.minimumGeometricOverlapPx -eq 60) -and
+            ($portraitFrameGate.portraitFrameRelation.thresholds.maximumContinuousBackgroundGapPx -eq 1)) "$($portraitFrameGate.name) relation thresholds"
+        Assert-True ([Math]::Abs([double]$portraitFrameGate.portraitFrameRelation.geometricOverlapPx-81.5) -le 1) "$($portraitFrameGate.name) manifest overlap"
+        Assert-True (($portraitFrameGate.portraitFrameRelation.seamRoi.coordinateOrigin -ceq 'screen-top-left') -and
+            ($portraitFrameGate.portraitFrameRelation.seamRoi.height -le 6)) "$($portraitFrameGate.name) seam ROI must be a narrow screenshot band"
+        Assert-True ($portraitFrameGate.portraitFrameRelation.maskKind -in @('Cyan','Gray')) "$($portraitFrameGate.name) relation mask kind"
+        Assert-True (@($portraitFrameGate.materialEvidence.rows | Where-Object spriteName -ceq 'card_bg').Count -eq 1) "$($portraitFrameGate.name) must associate exactly one card_bg occurrence"
+        Assert-True ($portraitFrameGate.materialEvidence.portraitCardBodyPassed) "$($portraitFrameGate.name) exact CardBody/card_bg material association must be blocking"
+    }
+    Assert-True ($report.portraitFrameSharedGeometry.passed) 'unchanged manifest fixture must pass portrait-frame shared geometry'
+    Assert-True (@($report.portraitFrameSharedGeometry.records).Count -eq 12) 'shared geometry must report four slots across three capture states'
+    $roomMarkdown = Get-Content -Raw -LiteralPath (Join-Path $output 'visual-diff-report.md')
+    Assert-True ($roomMarkdown.Contains('portraitFrameRelation')) 'Markdown JSONL must expose portraitFrameRelation'
+    Assert-True ($roomMarkdown.Contains('portraitFrameSharedGeometry')) 'Markdown must expose portraitFrameSharedGeometry'
     $diagnosticOnlyGate = @($report.roomGates | Where-Object name -eq 'RoomHost.Slot1.ReadyTopBar')[0]
     Assert-True (($diagnosticOnlyGate.diagnosticRectTransform.role -eq 'diagnostic-only') -and
         ($diagnosticOnlyGate.diagnosticRectTransform.x -eq 100) -and
@@ -1297,6 +1403,58 @@ try
     Assert-True (@($report.roomExclusions | Where-Object { -not $_.protectedRegionsClear }).Count -eq 0) 'barrage/popup/fourth-slot exclusions must not overlap protected gates'
     $baselineRoomFailures = @($report.roomGates | Where-Object { $_.status -eq 'Failed' } | ForEach-Object { "$($_.name):$($_.reason):j=$($_.contour.jaccard):edges=$($_.edgeDeltaPx.left)/$($_.edgeDeltaPx.top)/$($_.edgeDeltaPx.right)/$($_.edgeDeltaPx.bottom)" })
     Assert-True ($baselineRoomFailures.Count -eq 0) "baseline room visible-pixel gates must pass; failed: $($baselineRoomFailures -join ' | ')"
+
+    $shiftedPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-horizontal-shift' {
+        param($manifest, $caseCaptureDirectory)
+        Shift-LanLobbyFixtureRegion (Join-Path $caseCaptureDirectory 'room-host.png') (New-Object Drawing.Rectangle 218,208,337,523) 5 0
+    }
+    $shiftedPortraitGate = @($shiftedPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot1.PortraitFrame')[0]
+    Assert-True (($shiftedPortraitGate.status -ceq 'Failed') -and
+        ([Math]::Abs([double]$shiftedPortraitGate.portraitFrameRelation.topBarHorizontalCenterDeltaPx) -gt 2)) 'a 5 px decoded frame shift must fail its top-bar edge relation'
+    Assert-LanLobbyFailedRoiDrawn $shiftedPortraitResult.output 'room-host' $shiftedPortraitGate.roi 'shifted portrait frame'
+    Assert-LanLobbyFailedRoiDrawn $shiftedPortraitResult.output 'room-host' $shiftedPortraitGate.portraitFrameRelation.seamRoi 'shifted portrait frame seam'
+
+    $narrowPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-width-change' {
+        param($manifest, $caseCaptureDirectory)
+        Narrow-LanLobbyPortraitFrameFixture (Join-Path $caseCaptureDirectory 'room-host.png') 935 208 523 4
+    }
+    $narrowPortraitGate = @($narrowPortraitResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    Assert-True (($narrowPortraitGate.status -ceq 'Failed') -and
+        ([Math]::Abs([double]$narrowPortraitGate.portraitFrameRelation.topBarWidthDeltaPx) -eq 4)) 'a 4 px decoded frame width change must fail its width relation'
+
+    $seamPortraitResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-seam-gap' {
+        param($manifest, $caseCaptureDirectory)
+        Add-LanLobbyFixturePixels (Join-Path $caseCaptureDirectory 'room-ready.png') ([Drawing.Color]::Black) 995 721 337 2
+    }
+    $seamPortraitGate = @($seamPortraitResult.report.roomGates | Where-Object name -ceq 'RoomReady.Slot3.PortraitFrame')[0]
+    Assert-True (($seamPortraitGate.status -ceq 'Failed') -and
+        ([int]$seamPortraitGate.portraitFrameRelation.maximumContinuousBackgroundGapPx -eq 2)) 'a 2 px erased seam band must fail the continuous-background-gap relation'
+    Assert-LanLobbyFailedRoiDrawn $seamPortraitResult.output 'room-ready' $seamPortraitGate.portraitFrameRelation.seamRoi 'portrait frame seam'
+
+    $sharedGeometryResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-shared-geometry' {
+        param($manifest, $caseCaptureDirectory)
+        $ready = @($manifest.captures | Where-Object name -ceq 'room-ready')[0]
+        $frame = @($ready.keyRects | Where-Object name -ceq 'LanLobbyRoot/Room/RoomCard_1/CardBody')[0]
+        $frame.x = [double]$frame.x + 2
+    }
+    $sharedGeometryGate = @($sharedGeometryResult.report.roomGates | Where-Object name -ceq 'RoomReady.Slot2.PortraitFrame')[0]
+    Assert-True ((-not $sharedGeometryResult.report.portraitFrameSharedGeometry.passed) -and
+        (-not $sharedGeometryGate.sharedGeometryPassed) -and
+        ($sharedGeometryGate.status -ceq 'Failed')) 'one state-specific CardBody manifest mutation must block shared geometry and its portrait-frame gate'
+
+    $cardBodyAssociationResult = Invoke-LanLobbyVisualMutation $captureDirectory $referenceDirectory 'portrait-frame-card-bg-association' {
+        param($manifest, $caseCaptureDirectory)
+        $hostCapture = @($manifest.captures | Where-Object name -ceq 'room-host')[0]
+        $cardBody = @($hostCapture.spriteSources | Where-Object node -ceq 'LanLobbyRoot/Room/RoomCard_1/CardBody')[0]
+        $cardBody.x = 10
+        $cardBody.y = 10
+        $cardBody.width = 10
+        $cardBody.height = 10
+    }
+    $cardBodyAssociationGate = @($cardBodyAssociationResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    Assert-True ((-not $cardBodyAssociationGate.materialEvidence.portraitCardBodyPassed) -and
+        ($cardBodyAssociationGate.status -ceq 'Failed')) 'a portrait-frame gate must require its exact slot CardBody/card_bg manifest association'
+    Assert-LanLobbyFailedRoiDrawn $cardBodyAssociationResult.output 'room-host' $cardBodyAssociationGate.roi 'portrait frame material association'
     foreach ($profileGate in @($report.roomGates | Where-Object name -like '*.Slot1.ProfileContentAbsence'))
     {
         Assert-True ($profileGate.maskKind -ceq 'structured-host-profile-absence') "$($profileGate.name) must not pixel-compare excluded reference profile artwork"

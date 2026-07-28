@@ -196,6 +196,9 @@ namespace ArknoNights.Lobby.Tests
                 },
                 true,
                 "btn_match_normal");
+            AssertPortraitFrameCaptureContract(parsed.captures
+                .Where(record => record.name.StartsWith("room-", StringComparison.Ordinal))
+                .ToArray());
             Assert.That(home.spriteSources.Any(sprite =>
                     sprite.spriteName.StartsWith("room_select_", StringComparison.Ordinal) &&
                     sprite.sourcePath.StartsWith("[uc]autochessouter/room_select_", StringComparison.Ordinal)),
@@ -385,6 +388,71 @@ namespace ArknoNights.Lobby.Tests
             var blocker = capture.sourceAudit.Single(item => item.node == "LanLobbyRoot/OpaqueBlocker");
             Assert.That(blocker.isBitmap, Is.False);
             Assert.That(blocker.raycastTarget, Is.False);
+        }
+
+        private static void AssertPortraitFrameCaptureContract(
+            IReadOnlyList<CaptureRecordProbe> roomCaptures)
+        {
+            Assert.That(roomCaptures.Count, Is.EqualTo(3));
+            for (var slotIndex = 0; slotIndex < LobbyRoomSnapshot.MaximumMembers; slotIndex++)
+            {
+                var slotRoot = "LanLobbyRoot/Room/RoomCard_" + slotIndex;
+                CaptureRectProbe baselineFrame = null;
+                foreach (var capture in roomCaptures)
+                {
+                    var frame = capture.keyRects.Single(rect => rect.name == slotRoot + "/CardBody");
+                    var lower = capture.keyRects.Single(rect => rect.name == slotRoot + "/LowerDecoration");
+                    Assert.That(frame.width, Is.EqualTo(329f).Within(0.01f),
+                        capture.name + " slot " + (slotIndex + 1) + " CardBody width.");
+                    Assert.That(frame.height, Is.EqualTo(626f).Within(0.01f),
+                        capture.name + " slot " + (slotIndex + 1) + " CardBody height.");
+                    Assert.That(VerticalOverlap(frame, lower), Is.EqualTo(81.5f).Within(1f),
+                        capture.name + " slot " + (slotIndex + 1) + " frame/lower overlap.");
+
+                    if (baselineFrame == null)
+                    {
+                        baselineFrame = frame;
+                    }
+                    else
+                    {
+                        Assert.That(frame.x, Is.EqualTo(baselineFrame.x).Within(0.01f),
+                            capture.name + " slot " + (slotIndex + 1) + " CardBody x must be state-independent.");
+                        Assert.That(frame.y, Is.EqualTo(baselineFrame.y).Within(0.01f),
+                            capture.name + " slot " + (slotIndex + 1) + " CardBody y must be state-independent.");
+                        Assert.That(frame.width, Is.EqualTo(baselineFrame.width).Within(0.01f),
+                            capture.name + " slot " + (slotIndex + 1) + " CardBody width must be state-independent.");
+                        Assert.That(frame.height, Is.EqualTo(baselineFrame.height).Within(0.01f),
+                            capture.name + " slot " + (slotIndex + 1) + " CardBody height must be state-independent.");
+                    }
+
+                    var renderedFrame = capture.spriteSources.Single(sprite => sprite.node == slotRoot + "/CardBody");
+                    Assert.That(renderedFrame.spriteName, Is.EqualTo("card_bg"));
+                    Assert.That(renderedFrame.isBitmap, Is.True);
+                    Assert.That(renderedFrame.raycastTarget, Is.False);
+                    Assert.That(capture.sourceAudit.Count(row =>
+                        row.node == slotRoot + "/CardBody" &&
+                        row.spriteName == "card_bg" &&
+                        row.isBitmap &&
+                        !row.raycastTarget), Is.EqualTo(1));
+                }
+            }
+
+            foreach (var capture in roomCaptures)
+            {
+                Assert.That(capture.keyRects.Count(rect => rect.name.EndsWith("/CardBody", StringComparison.Ordinal)), Is.EqualTo(4));
+                Assert.That(capture.keyRects.Count(rect => rect.name.EndsWith("/LowerDecoration", StringComparison.Ordinal)), Is.EqualTo(4));
+                Assert.That(capture.spriteSources.Count(sprite => sprite.spriteName == "card_bg"), Is.EqualTo(4));
+                Assert.That(capture.sourceAudit.Count(row => row.spriteName == "card_bg"), Is.EqualTo(4));
+            }
+        }
+
+        private static float VerticalOverlap(CaptureRectProbe frame, CaptureRectProbe lower)
+        {
+            Assert.That(frame.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+            Assert.That(lower.coordinateOrigin, Is.EqualTo("screen-bottom-left"));
+            var intersectionBottom = Mathf.Max(frame.y, lower.y);
+            var intersectionTop = Mathf.Min(frame.y + frame.height, lower.y + lower.height);
+            return Mathf.Max(0f, intersectionTop - intersectionBottom);
         }
 
         private static void AssertBitmapOccurrenceRaycast(
@@ -627,6 +695,24 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(rect.y, Is.GreaterThanOrEqualTo(0f));
             Assert.That(rect.width, Is.GreaterThan(0f));
             Assert.That(rect.height, Is.GreaterThan(0f));
+        }
+
+        [Test]
+        public void CaptureDimensions_RejectUnsupportedSizesBeforeCoordinateExport()
+        {
+            var suiteType = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("LanLobbyCaptureSuite"))
+                .FirstOrDefault(type => type != null);
+            Assert.That(suiteType, Is.Not.Null);
+            var validator = suiteType.GetMethod(
+                "IsSupportedCaptureSizeForTests",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(validator, Is.Not.Null,
+                "The capture suite must fail closed before exporting screen-bottom-left geometry at an unsupported size.");
+
+            Assert.That((bool)validator.Invoke(null, new object[] { 1920, 1080 }), Is.True);
+            Assert.That((bool)validator.Invoke(null, new object[] { 1280, 720 }), Is.False);
+            Assert.That((bool)validator.Invoke(null, new object[] { 1920, 1200 }), Is.False);
         }
 
         [Test]

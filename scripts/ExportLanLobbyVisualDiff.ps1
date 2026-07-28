@@ -159,6 +159,26 @@ public static class LanLobbyVisualDiff {
             ? Unavailable("No visible color/contrast mask pixels found.")
             : AvailableBounds(minX,minY,maxX,maxY,pixelCount);
     }
+    public static int MaximumContinuousEmptyMaskRows(
+        Bitmap bitmap, Rectangle search, string maskKind)
+    {
+        ValidateSearch(bitmap,search);
+        int longest=0,current=0;
+        for(int y=search.Y;y<search.Bottom;y++) {
+            bool hasQualifyingPixel=false;
+            for(int x=search.X;x<search.Right;x++) {
+                if(!IsVisibleMask(bitmap,x,y,maskKind)) continue;
+                hasQualifyingPixel=true;
+                break;
+            }
+            if(hasQualifyingPixel) current=0;
+            else {
+                current++;
+                longest=Math.Max(longest,current);
+            }
+        }
+        return longest;
+    }
     public static LanLobbyMaskComparison CompareVisibleMasks(
         Bitmap actual, Bitmap reference, Rectangle search, string maskKind, Rectangle[] exclusions)
     {
@@ -943,16 +963,28 @@ function New-LanLobbyRoomGateSpec(
     $Roi,
     [ValidateSet('Cyan','Gray','Dark','DarkOnCyan','Light','Contrast','CreatorTagCyan','MutedLight')] [string] $MaskKind,
     [bool] $IsContour,
-    $DiagnosticRectTransform)
+    $DiagnosticRectTransform,
+    [ValidateSet('VisiblePlacement','PortraitFrame')] [string] $GateKind = 'VisiblePlacement',
+    [int] $SlotIndex = -1,
+    $TopBarRoi = $null)
 {
     return [pscustomobject][ordered]@{
         name=$Name
         capture=$Capture
+        gateKind=$GateKind
+        slotIndex=$SlotIndex
         roi=[pscustomobject]$Roi
+        topBarRoi=$(if ($null -eq $TopBarRoi) { $null } else { [pscustomobject]$TopBarRoi })
         exclusions=@($roomExclusionsByCapture[$Capture] | ForEach-Object { [pscustomobject]$_ })
         maskKind=$MaskKind
         isContour=$IsContour
-        thresholds=$(if ($IsContour) {
+        thresholds=$(if ($GateKind -ceq 'PortraitFrame') {
+            [pscustomobject][ordered]@{
+                maximumEdgeErrorPx=4
+                minimumContourJaccard=0.95
+                maximumCenterErrorPxPerAxis=2
+            }
+        } elseif ($IsContour) {
             [pscustomobject][ordered]@{ maximumEdgeErrorPx=4; minimumContourJaccard=0.95 }
         } else {
             [pscustomobject][ordered]@{ maximumCenterErrorPxPerAxis=2; maximumVisibleSizeErrorPx=3 }
@@ -1011,6 +1043,16 @@ function Get-LanLobbyRoomGateSpecs($Capture)
             $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyCheck" $captureName @{x=($root.bodyX+79);y=655;width=55;height=45} 'DarkOnCyan' $false $diagnostic
             $gates += New-LanLobbyRoomGateSpec "RoomReady.Slot$slotNumber.ReadyLabel" $captureName @{x=($root.bodyX+134);y=655;width=110;height=45} 'DarkOnCyan' $false $diagnostic
         }
+    }
+    $lastPortraitSlot = if ($captureName -eq 'room-host') { 3 } else { 2 }
+    for ($slot=0; $slot -le $lastPortraitSlot; $slot++)
+    {
+        $root = $roomSlotRoots[$slot]
+        $slotNumber = $slot + 1
+        $maskKind = if ($captureName -eq 'room-ready' -or $slot -eq 0) { 'Cyan' } else { 'Gray' }
+        $frameRoi = @{x=($root.bodyX-8);y=208;width=337;height=523}
+        $topBarRoi = @{x=($root.bodyX-8);y=170;width=337;height=46}
+        $gates += New-LanLobbyRoomGateSpec "$prefix.Slot$slotNumber.PortraitFrame" $captureName $frameRoi $maskKind $true $diagnostic 'PortraitFrame' $slot $topBarRoi
     }
     if ($captureName -in @('room-full','room-ready'))
     {
@@ -1193,7 +1235,17 @@ function Measure-LanLobbyVisiblePlacement
         jaccard=[Math]::Round([double]$comparison.Jaccard, 6)
     }
     $isContour = [bool]$Gate.isContour
-    $passed = if ($isContour)
+    $passed = if ([string]$Gate.gateKind -ceq 'PortraitFrame')
+    {
+        [Math]::Abs($edgeDelta.left) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($edgeDelta.top) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($edgeDelta.right) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($edgeDelta.bottom) -le [double]$thresholds.maximumEdgeErrorPx -and
+        [Math]::Abs($centerDelta.deltaX) -le [double]$thresholds.maximumCenterErrorPxPerAxis -and
+        [Math]::Abs($centerDelta.deltaY) -le [double]$thresholds.maximumCenterErrorPxPerAxis -and
+        $contour.jaccard -ge [double]$thresholds.minimumContourJaccard
+    }
+    elseif ($isContour)
     {
         [Math]::Abs($edgeDelta.left) -le [double]$thresholds.maximumEdgeErrorPx -and
         [Math]::Abs($edgeDelta.top) -le [double]$thresholds.maximumEdgeErrorPx -and
@@ -1218,6 +1270,138 @@ function Measure-LanLobbyVisiblePlacement
         thresholds=$thresholds
         status=$(if ($passed) { 'Passed' } else { 'Failed' })
         reason=$(if ($passed) { 'Visible color/contrast pixels satisfy the blocking placement thresholds.' } else { 'Visible color/contrast pixels exceed a blocking placement threshold.' })
+        passed=$passed
+    }
+}
+
+function Get-LanLobbyCaptureKeyRect($Capture, [string] $Name)
+{
+    if ($null -eq $Capture.PSObject.Properties['keyRects'])
+    {
+        throw "Capture '$($Capture.name)' has no keyRects collection required for portrait-frame evidence."
+    }
+    [array]$matches = @($Capture.keyRects | Where-Object { $null -ne $_ -and [string]$_.name -ceq $Name })
+    if ($matches.Count -ne 1)
+    {
+        throw "Capture '$($Capture.name)' portrait-frame key rect '$Name' must occur exactly once."
+    }
+    $rect = $matches[0]
+    if ([string]$rect.coordinateOrigin -cne 'screen-bottom-left' -or [string]$rect.unit -cne 'px')
+    {
+        throw "Capture '$($Capture.name)' portrait-frame key rect '$Name' must declare coordinateOrigin=screen-bottom-left and unit=px."
+    }
+    foreach ($propertyName in @('x','y','width','height'))
+    {
+        if ($null -eq $rect.PSObject.Properties[$propertyName] -or
+            $null -eq $rect.$propertyName -or
+            -not ($rect.$propertyName -is [ValueType]))
+        {
+            throw "Capture '$($Capture.name)' portrait-frame key rect '$Name' must declare numeric x, y, width, and height."
+        }
+    }
+    return $rect
+}
+
+function Get-LanLobbyPortraitFrameSharedGeometry($RoomCaptures)
+{
+    $records = @()
+    for ($slot=0; $slot -lt 4; $slot++)
+    {
+        $slotRootName = "LanLobbyRoot/Room/RoomCard_$slot"
+        $frameName = "$slotRootName/CardBody"
+        $slotRecords = @(
+            foreach ($capture in @($RoomCaptures | Sort-Object name))
+            {
+                $root = Get-LanLobbyCaptureKeyRect $capture $slotRootName
+                $frame = Get-LanLobbyCaptureKeyRect $capture $frameName
+                [pscustomobject][ordered]@{
+                    capture=[string]$capture.name
+                    slotNumber=$slot+1
+                    widthPx=[double]$frame.width
+                    heightPx=[double]$frame.height
+                    localOffsetPx=[pscustomobject][ordered]@{
+                        x=[double]$frame.x-[double]$root.x
+                        y=[double]$frame.y-[double]$root.y
+                    }
+                }
+            }
+        )
+        $baseline = @($slotRecords | Where-Object capture -ceq 'room-host')[0]
+        foreach ($record in $slotRecords)
+        {
+            $matches = [Math]::Abs([double]$record.widthPx-[double]$baseline.widthPx) -le 0.01 -and
+                [Math]::Abs([double]$record.heightPx-[double]$baseline.heightPx) -le 0.01 -and
+                [Math]::Abs([double]$record.localOffsetPx.x-[double]$baseline.localOffsetPx.x) -le 0.01 -and
+                [Math]::Abs([double]$record.localOffsetPx.y-[double]$baseline.localOffsetPx.y) -le 0.01
+            $records += [pscustomobject][ordered]@{
+                capture=$record.capture
+                slotNumber=$record.slotNumber
+                widthPx=$record.widthPx
+                heightPx=$record.heightPx
+                localOffsetPx=$record.localOffsetPx
+                baselineCapture='room-host'
+                matchesBaseline=$matches
+                passed=$matches
+            }
+        }
+    }
+    return [pscustomobject][ordered]@{
+        acceptanceRole='blocking'
+        comparisonSource='manifest-keyRects'
+        coordinateOrigin='screen-bottom-left'
+        unit='px'
+        thresholds=[pscustomobject][ordered]@{ maximumWidthHeightOrLocalOffsetDeltaPx=0.01 }
+        records=@($records)
+        passed=(@($records | Where-Object { -not $_.passed }).Count -eq 0)
+    }
+}
+
+function Measure-LanLobbyPortraitFrameRelation
+{
+    param(
+        [Parameter(Mandatory)] $FramePlacement,
+        [Parameter(Mandatory)] $TopBarPlacement,
+        [Parameter(Mandatory)] $FrameRect,
+        [Parameter(Mandatory)] $LowerDecorationRect,
+        [Parameter(Mandatory)] [Drawing.Bitmap] $ActualImage,
+        [Parameter(Mandatory)] $SeamRoi,
+        [Parameter(Mandatory)] [ValidateSet('Cyan','Gray')] [string] $MaskKind
+    )
+
+    $thresholds = [pscustomobject][ordered]@{
+        maximumHorizontalCenterDeltaPx=2
+        maximumVisibleWidthErrorPx=3
+        minimumGeometricOverlapPx=60
+        maximumContinuousBackgroundGapPx=1
+    }
+    $centerDelta = if ($FramePlacement.available -and $TopBarPlacement.available) {
+        [double]$FramePlacement.center.x-[double]$TopBarPlacement.center.x
+    } else { $null }
+    $widthDelta = if ($FramePlacement.available -and $TopBarPlacement.available) {
+        [double]$FramePlacement.bounds.width-[double]$TopBarPlacement.bounds.width
+    } else { $null }
+    $intersectionBottom = [Math]::Max([double]$FrameRect.y,[double]$LowerDecorationRect.y)
+    $intersectionTop = [Math]::Min(
+        [double]$FrameRect.y+[double]$FrameRect.height,
+        [double]$LowerDecorationRect.y+[double]$LowerDecorationRect.height)
+    $geometricOverlap = [Math]::Max(0.0,$intersectionTop-$intersectionBottom)
+    $maximumGap = [LanLobbyVisualDiff]::MaximumContinuousEmptyMaskRows(
+        $ActualImage,
+        (ConvertTo-LanLobbyRectangle $SeamRoi),
+        $MaskKind)
+    $passed = $null -ne $centerDelta -and $null -ne $widthDelta -and
+        [Math]::Abs($centerDelta) -le [double]$thresholds.maximumHorizontalCenterDeltaPx -and
+        [Math]::Abs($widthDelta) -le [double]$thresholds.maximumVisibleWidthErrorPx -and
+        $geometricOverlap -ge [double]$thresholds.minimumGeometricOverlapPx -and
+        $maximumGap -le [int]$thresholds.maximumContinuousBackgroundGapPx
+    return [pscustomobject][ordered]@{
+        topBarHorizontalCenterDeltaPx=$centerDelta
+        topBarWidthDeltaPx=$widthDelta
+        geometricOverlapPx=$geometricOverlap
+        maximumContinuousBackgroundGapPx=$maximumGap
+        seamRoi=[pscustomobject]$SeamRoi
+        maskKind=$MaskKind
+        thresholds=$thresholds
         passed=$passed
     }
 }
@@ -2147,6 +2331,9 @@ $joinDecorationReport = $null
 $createFrameReport = $null
 $roomGates = @()
 $roomExclusionReports = @()
+$portraitFrameSharedGeometry = Get-LanLobbyPortraitFrameSharedGeometry @(
+    $manifest.captures | Where-Object { [string]$_.name -in @('room-host','room-full','room-ready') }
+)
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 try
 {
@@ -2248,14 +2435,69 @@ try
                 {
                     $measurement = Measure-LanLobbyVisiblePlacement $actual $normalizedReference $gateSpec
                     $gateMaterialEvidence = Get-LanLobbyGateMaterialEvidence $captureMaterialEvidence $gateSpec.roi $false
-                    $gatePassed = $measurement.passed -and $gateMaterialEvidence.passed
+                    $portraitFrameRelation = $null
+                    $sharedGeometryPassed = $null
+                    $portraitCardBodyPassed = $null
+                    if ([string]$gateSpec.gateKind -ceq 'PortraitFrame')
+                    {
+                        $slotIndex = [int]$gateSpec.slotIndex
+                        $slotRoot = "LanLobbyRoot/Room/RoomCard_$slotIndex"
+                        $requiredCardBodyNode = "$slotRoot/CardBody"
+                        [array]$portraitCardBodyRows = @($gateMaterialEvidence.rows | Where-Object {
+                            [string]$_.node -ceq $requiredCardBodyNode -and
+                            [string]$_.spriteName -ceq 'card_bg' -and
+                            [string]$_.resourcesPath -ceq 'UI/Lobby/card_bg' -and
+                            [string]$_.sourcePath -ceq '[uc]autochessouter/card_bg.png' -and
+                            [string]$_.sha256 -ceq '050B347451BBEBC74F5E3B09A2470931D9B2A85DEF707A4AAC42B5CE1B0BCEE2' -and
+                            [int]$_.occurrenceCount -eq 1 -and
+                            @($_.captures).Count -eq 1 -and
+                            [string]$_.captures[0] -ceq $captureName
+                        })
+                        $portraitCardBodyPassed = $portraitCardBodyRows.Count -eq 1
+                        $gateMaterialEvidence | Add-Member -NotePropertyName requiredPortraitCardBodyNode -NotePropertyValue $requiredCardBodyNode
+                        $gateMaterialEvidence | Add-Member -NotePropertyName portraitCardBodyPassed -NotePropertyValue $portraitCardBodyPassed
+                        $frameRect = Get-LanLobbyCaptureKeyRect $capture "$slotRoot/CardBody"
+                        $lowerRect = Get-LanLobbyCaptureKeyRect $capture "$slotRoot/LowerDecoration"
+                        $lowerTopInScreenshot = [double]$capture.height-([double]$lowerRect.y+[double]$lowerRect.height)
+                        $seamRoi = [pscustomobject][ordered]@{
+                            coordinateOrigin='screen-top-left'
+                            unit='px'
+                            x=[int][Math]::Floor([double]$frameRect.x)
+                            y=[int][Math]::Floor($lowerTopInScreenshot)-2
+                            width=[int][Math]::Ceiling([double]$frameRect.width)
+                            height=5
+                        }
+                        $topBarPlacement = Get-LanLobbyVisibleBounds -Image $actual -Roi $gateSpec.topBarRoi -MaskKind $gateSpec.maskKind -Exclusions $gateSpec.exclusions
+                        $portraitFrameRelation = Measure-LanLobbyPortraitFrameRelation `
+                            -FramePlacement $measurement.actual `
+                            -TopBarPlacement $topBarPlacement `
+                            -FrameRect $frameRect `
+                            -LowerDecorationRect $lowerRect `
+                            -ActualImage $actual `
+                            -SeamRoi $seamRoi `
+                            -MaskKind $gateSpec.maskKind
+                        $sharedRecord = @($portraitFrameSharedGeometry.records | Where-Object {
+                            [string]$_.capture -ceq $captureName -and [int]$_.slotNumber -eq ($slotIndex+1)
+                        })
+                        $sharedGeometryPassed = $sharedRecord.Count -eq 1 -and [bool]$sharedRecord[0].passed
+                    }
+                    $gateMaterialPassed = $gateMaterialEvidence.passed -and
+                        ($null -eq $portraitCardBodyPassed -or $portraitCardBodyPassed)
+                    $gatePassed = $measurement.passed -and $gateMaterialPassed -and
+                        ($null -eq $portraitFrameRelation -or $portraitFrameRelation.passed) -and
+                        ($null -eq $sharedGeometryPassed -or $sharedGeometryPassed)
                     $gateStatus = if ($gatePassed) { 'Passed' } else { 'Failed' }
-                    $gateReason = if (-not $gateMaterialEvidence.passed) {
-                        'Blocking bitmap manifest bijection, identity, approved path, SHA-256, capture list, or occurrence evidence failed.'
+                    $gateReason = if (-not $gateMaterialPassed) {
+                        'Blocking bitmap manifest bijection, identity, approved path, SHA-256, capture list, occurrence, or exact portrait CardBody/card_bg association evidence failed.'
+                    } elseif ($null -ne $portraitFrameRelation -and -not $portraitFrameRelation.passed) {
+                        'Visible portrait-frame relation exceeds a blocking center, width, overlap, or seam threshold.'
+                    } elseif ($null -ne $sharedGeometryPassed -and -not $sharedGeometryPassed) {
+                        'Manifest CardBody width, height, or local slot offset differs across room capture states.'
                     } else { $measurement.reason }
                     $gateRow = [pscustomobject][ordered]@{
                         name=$gateSpec.name
                         capture=$captureName
+                        gateKind=$gateSpec.gateKind
                         referenceFigure=[IO.Path]::GetFileName($referencePath)
                         roi=[pscustomobject][ordered]@{ coordinateOrigin='screen-top-left';unit='px';x=$gateSpec.roi.x;y=$gateSpec.roi.y;width=$gateSpec.roi.width;height=$gateSpec.roi.height }
                         exclusions=@($gateSpec.exclusions | ForEach-Object {
@@ -2275,6 +2517,8 @@ try
                         sizeDeltaPx=$measurement.sizeDeltaPx
                         contour=$measurement.contour
                         thresholds=$measurement.thresholds
+                        portraitFrameRelation=$portraitFrameRelation
+                        sharedGeometryPassed=$sharedGeometryPassed
                         materialEvidence=$gateMaterialEvidence
                         status=$gateStatus
                         reason=$gateReason
@@ -2375,7 +2619,17 @@ try
                     {
                         $diagnosticGraphics = [Drawing.Graphics]::FromImage($diagnosticBitmap)
                         $diagnosticPen = New-Object Drawing.Pen ([Drawing.Color]::Red), 3
-                        try { $diagnosticGraphics.DrawRectangle($diagnosticPen, (ConvertTo-LanLobbyRectangle $failedGate.roi)) }
+                        try
+                        {
+                            $diagnosticGraphics.DrawRectangle($diagnosticPen, (ConvertTo-LanLobbyRectangle $failedGate.roi))
+                            $failedRelationProperty = $failedGate.PSObject.Properties['portraitFrameRelation']
+                            if ($null -ne $failedRelationProperty -and $null -ne $failedRelationProperty.Value)
+                            {
+                                $diagnosticGraphics.DrawRectangle(
+                                    $diagnosticPen,
+                                    (ConvertTo-LanLobbyRectangle $failedRelationProperty.Value.seamRoi))
+                            }
+                        }
                         finally { $diagnosticPen.Dispose(); $diagnosticGraphics.Dispose() }
                     }
                 }
@@ -2974,6 +3228,7 @@ try
         createFrame=$createFrameReport
         roomExclusions=$roomExclusionReports
         roomGates=$roomGates
+        portraitFrameSharedGeometry=$portraitFrameSharedGeometry
         assets=$assets
         materialUsage=[ordered]@{
             bitmapSprites=$assets
@@ -2990,6 +3245,19 @@ try
     foreach ($item in $reportCaptures) { $markdown += "| $($item.name) | $($item.referenceFigure) | $([Math]::Round($item.pixelDifferenceRatio, 4)) | $([Math]::Round($item.averageAbsoluteRgbError, 2)) | $(if($item.attention){'ATTENTION'}else{'OK'}) |" }
     $markdown += @(
         '',
+        '## Portrait-frame shared geometry',
+        '',
+        "portraitFrameSharedGeometry: acceptanceRole=$($portraitFrameSharedGeometry.acceptanceRole); source=$($portraitFrameSharedGeometry.comparisonSource); passed=$($portraitFrameSharedGeometry.passed).",
+        '',
+        '| Capture | Slot | CardBody width/height | Local offset from slot root | Matches room-host | Passed |',
+        '| --- | ---: | --- | --- | --- | --- |'
+    )
+    foreach ($record in @($portraitFrameSharedGeometry.records))
+    {
+        $markdown += "| $($record.capture) | $($record.slotNumber) | $($record.widthPx)x$($record.heightPx) px | $($record.localOffsetPx.x),$($record.localOffsetPx.y) px | $($record.matchesBaseline) | $($record.passed) |"
+    }
+    $markdown += @(
+        '',
         '## LAN room named visible-pixel gates',
         '',
         'Blocking placement uses decoded opaque screenshot color/contrast masks measured directly from rendered RGB values. Diagnostic RectTransform rectangles do not override visible-pixel results.',
@@ -3004,7 +3272,13 @@ try
         $exclusionText = if (@($gate.exclusions).Count -eq 0) { 'none' } else { @($gate.exclusions | ForEach-Object { "$($_.name)[$($_.x),$($_.y),$($_.width),$($_.height)]:$($_.reason)" }) -join '; ' }
         $centerText = "actual=$($gate.actualVisibleCenter | ConvertTo-Json -Depth 8 -Compress); reference=$($gate.referenceVisibleCenter | ConvertTo-Json -Depth 8 -Compress)"
         $pixelText = "actual=$($gate.actualVisiblePixelCount | ConvertTo-Json -Depth 8 -Compress); reference=$($gate.referenceVisiblePixelCount | ConvertTo-Json -Depth 8 -Compress)"
-        $deltaText = "center=$($gate.centerDeltaPx | ConvertTo-Json -Depth 8 -Compress); size=$($gate.sizeDeltaPx | ConvertTo-Json -Depth 8 -Compress); edge=$($gate.edgeDeltaPx | ConvertTo-Json -Depth 8 -Compress); contour=$($gate.contour | ConvertTo-Json -Depth 8 -Compress)"
+        $portraitFrameRelationText = if ($null -ne $gate.PSObject.Properties['portraitFrameRelation']) {
+            $gate.PSObject.Properties['portraitFrameRelation'].Value | ConvertTo-Json -Depth 8 -Compress
+        } else { 'null' }
+        $sharedGeometryText = if ($null -ne $gate.PSObject.Properties['sharedGeometryPassed']) {
+            [string]$gate.PSObject.Properties['sharedGeometryPassed'].Value
+        } else { 'n/a' }
+        $deltaText = "center=$($gate.centerDeltaPx | ConvertTo-Json -Depth 8 -Compress); size=$($gate.sizeDeltaPx | ConvertTo-Json -Depth 8 -Compress); edge=$($gate.edgeDeltaPx | ConvertTo-Json -Depth 8 -Compress); contour=$($gate.contour | ConvertTo-Json -Depth 8 -Compress); portraitFrameRelation=$portraitFrameRelationText; sharedGeometryPassed=$sharedGeometryText"
         $thresholdText = $gate.thresholds | ConvertTo-Json -Depth 8 -Compress
         $provenanceRows = @($gate.materialEvidence.rows | Where-Object { $null -ne $_ })
         if (@($provenanceRows | Where-Object { $null -eq $_.PSObject.Properties['node'] }).Count -gt 0)
