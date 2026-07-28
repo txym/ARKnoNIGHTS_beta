@@ -31,26 +31,79 @@ function Assert-Condition {
     }
 }
 
+function Get-UnitJsonSnapshot {
+    param(
+        [Parameter(Mandatory = $true)][string]$StagingRoot,
+        [Parameter(Mandatory = $true)][string[]]$ResourceDirectories
+    )
+
+    $snapshot = [System.Collections.Generic.List[object]]::new()
+    foreach ($resourceDirectory in $ResourceDirectories | Sort-Object -Unique) {
+        $directoryPath = Join-Path $StagingRoot $resourceDirectory
+        $directory = Get-Item -LiteralPath $directoryPath -ErrorAction Stop
+        Assert-Condition (-not [bool]($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) "Resource directory '$directoryPath' must not be a reparse point."
+        foreach ($fileName in @('unit-levels.json', 'unit-source-v1.json')) {
+            $filePath = Join-Path $directoryPath $fileName
+            $file = Get-Item -LiteralPath $filePath -ErrorAction Stop
+            Assert-Condition (-not [bool]($file.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) "Resource file '$filePath' must not be a reparse point."
+            $snapshot.Add([pscustomobject][ordered]@{
+                    RelativePath = (Join-Path $resourceDirectory $fileName)
+                    Length = $file.Length
+                    Sha256 = (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash
+                })
+        }
+    }
+    return @($snapshot | Sort-Object RelativePath)
+}
+
+function Assert-UnitJsonSnapshotsEqual {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Expected,
+        [Parameter(Mandatory = $true)][object[]]$Actual,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    Assert-Equal $Expected.Count $Actual.Count "$Name file count"
+    for ($index = 0; $index -lt $Expected.Count; $index++) {
+        Assert-Equal $Expected[$index].RelativePath $Actual[$index].RelativePath "$Name file $index path"
+        Assert-Equal $Expected[$index].Length $Actual[$index].Length "$Name file $index length"
+        Assert-Equal $Expected[$index].Sha256 $Actual[$index].Sha256 "$Name file $index SHA-256"
+    }
+}
+
+function Get-UnitJsonSnapshotHash {
+    param([Parameter(Mandatory = $true)][object[]]$Snapshot)
+
+    $content = [string]::Join("`n", @($Snapshot | ForEach-Object { "$($_.RelativePath)|$($_.Length)|$($_.Sha256)" }))
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($algorithm.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($content)))).Replace('-', '')
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
+
 function New-InvalidDamageTypeStagingRoot {
     param(
         [Parameter(Mandatory = $true)][string]$SourceStagingRoot,
-        [Parameter(Mandatory = $true)][string]$DestinationRoot
+        [Parameter(Mandatory = $true)][string]$DestinationRoot,
+        [Parameter(Mandatory = $true)][object[]]$SourceSnapshot,
+        [Parameter(Mandatory = $true)][string]$DamageType
     )
 
     [System.IO.Directory]::CreateDirectory($DestinationRoot) | Out-Null
-    foreach ($sourceDirectory in Get-ChildItem -LiteralPath $SourceStagingRoot -Directory) {
-        $destinationDirectory = Join-Path $DestinationRoot $sourceDirectory.Name
-        if ($sourceDirectory.Name -ceq '1238_ltmob') {
-            Copy-Item -LiteralPath $sourceDirectory.FullName -Destination $destinationDirectory -Recurse
-        }
-        else {
-            New-Item -ItemType Junction -Path $destinationDirectory -Target $sourceDirectory.FullName | Out-Null
-        }
+    foreach ($sourceFile in $SourceSnapshot) {
+        $destinationPath = Join-Path $DestinationRoot $sourceFile.RelativePath
+        [System.IO.Directory]::CreateDirectory((Split-Path -Parent $destinationPath)) | Out-Null
+        [System.IO.File]::Copy((Join-Path $SourceStagingRoot $sourceFile.RelativePath), $destinationPath, $false)
     }
+    $fixtureSnapshot = Get-UnitJsonSnapshot -StagingRoot $DestinationRoot -ResourceDirectories @($SourceSnapshot | ForEach-Object { Split-Path -Parent $_.RelativePath } | Sort-Object -Unique)
+    Assert-UnitJsonSnapshotsEqual -Expected $SourceSnapshot -Actual $fixtureSnapshot -Name 'fixture copy'
 
     $sourcePath = Join-Path $DestinationRoot '1238_ltmob\unit-source-v1.json'
     $sourceDocument = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $sourceDocument.damageType = 'InvalidDamageType'
+    $sourceDocument.damageType = $DamageType
     [System.IO.File]::WriteAllText($sourcePath, ($sourceDocument | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
 }
 
@@ -70,11 +123,15 @@ function Test-InvalidOverrideDamageType {
         [Parameter(Mandatory = $true)][string]$TestRoot,
         [Parameter(Mandatory = $true)][string]$ExporterPath,
         [Parameter(Mandatory = $true)][string]$PowerShellPath,
-        [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Failures
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Failures,
+        [Parameter(Mandatory = $true)][string[]]$FixtureResourceDirectories,
+        [Parameter(Mandatory = $true)][string]$FixtureDamageType,
+        [Parameter(Mandatory = $true)][string]$FailureMessage
     )
 
     $fixtureRoot = Join-Path $TestRoot ('invalid-damage-staging-' + [guid]::NewGuid().ToString('N'))
-    New-InvalidDamageTypeStagingRoot -SourceStagingRoot $StagingRoot -DestinationRoot $fixtureRoot
+    $externalSnapshotBefore = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $FixtureResourceDirectories
+    New-InvalidDamageTypeStagingRoot -SourceStagingRoot $StagingRoot -DestinationRoot $fixtureRoot -SourceSnapshot $externalSnapshotBefore -DamageType $FixtureDamageType
     $outputCsv = Join-Path $TestRoot 'invalid-damage.csv'
     $analysisOutput = Join-Path $TestRoot 'invalid-damage.json'
     & $PowerShellPath -NoProfile -ExecutionPolicy Bypass -File $ExporterPath `
@@ -82,8 +139,11 @@ function Test-InvalidOverrideDamageType {
         -StagingRoot $fixtureRoot `
         -OutputCsvPath $outputCsv `
         -AnalysisOutputPath $analysisOutput
+    $externalSnapshotAfter = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $FixtureResourceDirectories
+    Assert-UnitJsonSnapshotsEqual -Expected $externalSnapshotBefore -Actual $externalSnapshotAfter -Name 'external staging after invalid damageType regression test'
+    Write-Host "Verified external staging snapshot unchanged after invalid damageType regression test: $($externalSnapshotAfter.Count) JSON files, SHA-256 snapshot $(Get-UnitJsonSnapshotHash -Snapshot $externalSnapshotAfter)."
     if ($LASTEXITCODE -eq 0) {
-        Add-RegressionFailure -Failures $Failures -Message 'Illegal non-empty damageType for TypeId 1238 was accepted instead of rejected.'
+        Add-RegressionFailure -Failures $Failures -Message $FailureMessage
     }
 }
 
@@ -95,6 +155,7 @@ function Test-BondSpecOutputCollision {
         [Parameter(Mandatory = $true)][string]$ExporterPath,
         [Parameter(Mandatory = $true)][string]$PowerShellPath,
         [Parameter(Mandatory = $true)][string]$OutputParameterName,
+        [Parameter(Mandatory = $true)][string[]]$FixtureResourceDirectories,
         [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Failures
     )
 
@@ -110,11 +171,15 @@ function Test-BondSpecOutputCollision {
         $analysisOutput = $fixtureBondSpecPath
     }
 
+    $externalSnapshotBefore = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $FixtureResourceDirectories
     & $PowerShellPath -NoProfile -ExecutionPolicy Bypass -File $ExporterPath `
         -BondSpecPath $fixtureBondSpecPath `
         -StagingRoot $StagingRoot `
         -OutputCsvPath $outputCsv `
         -AnalysisOutputPath $analysisOutput
+    $externalSnapshotAfter = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $FixtureResourceDirectories
+    Assert-UnitJsonSnapshotsEqual -Expected $externalSnapshotBefore -Actual $externalSnapshotAfter -Name "external staging after $OutputParameterName collision regression test"
+    Write-Host "Verified external staging snapshot unchanged after $OutputParameterName collision regression test: $($externalSnapshotAfter.Count) JSON files, SHA-256 snapshot $(Get-UnitJsonSnapshotHash -Snapshot $externalSnapshotAfter)."
     if ($LASTEXITCODE -eq 0) {
         Add-RegressionFailure -Failures $Failures -Message "$OutputParameterName equal to BondSpecPath was accepted instead of rejected."
     }
@@ -176,9 +241,13 @@ try {
     Assert-Condition (Test-Path -LiteralPath $analysisOutput -PathType Leaf) "Missing analysis output '$analysisOutput'."
 
     $regressionFailures = [System.Collections.Generic.List[string]]::new()
-    Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures
+    $fixtureResourceDirectories = @($rows.ResourceDirectory | Sort-Object -Unique)
+    $fixtureResourceDirectories += '1322_wdgyht'
+    Assert-Equal 89 @($fixtureResourceDirectories | Sort-Object -Unique).Count 'fixture resource directory count'
+    Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures -FixtureResourceDirectories $fixtureResourceDirectories -FixtureDamageType 'InvalidDamageType' -FailureMessage 'Illegal non-empty damageType for TypeId 1238 was accepted instead of rejected.'
+    Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures -FixtureResourceDirectories $fixtureResourceDirectories -FixtureDamageType 'Magic' -FailureMessage 'Conflicting allowed damageType Magic for TypeId 1238 was accepted instead of rejected.'
     foreach ($outputParameterName in @('OutputCsvPath', 'AnalysisOutputPath')) {
-        Test-BondSpecOutputCollision -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -OutputParameterName $outputParameterName -Failures $regressionFailures
+        Test-BondSpecOutputCollision -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -OutputParameterName $outputParameterName -FixtureResourceDirectories $fixtureResourceDirectories -Failures $regressionFailures
     }
     $regressionFailureMessage = if ($regressionFailures.Count -eq 0) { 'No regression failures.' } else { $regressionFailures -join [Environment]::NewLine }
     Assert-Condition ($regressionFailures.Count -eq 0) $regressionFailureMessage

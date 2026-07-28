@@ -255,6 +255,9 @@ try {
         }
         else {
             Assert-Condition ($allowedDamageTypes.Contains($stagingDamageType)) "TypeId '$typeId' has invalid damageType '$stagingDamageType'."
+            if ($damageTypeOverrides.ContainsKey($typeId)) {
+                Assert-Condition ($stagingDamageType -ceq $damageTypeOverrides[$typeId]) "TypeId '$typeId' has conflicting damageType '$stagingDamageType'; confirmed damageType is '$($damageTypeOverrides[$typeId])'."
+            }
             $damageType = $stagingDamageType
             $damageTypeSource = 'Staging'
         }
