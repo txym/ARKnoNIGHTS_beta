@@ -1531,9 +1531,18 @@ function Get-LanLobbyRoomMaterialEvidence($Capture, $SpriteUsage)
         {
             [array]$rendered = @($renderedRows | Where-Object { [string]$_.node -ceq [string]$auditRow.node -and [string]$_.spriteName -ceq [string]$auditRow.spriteName })
             $visibleRoi = $null
+            $captureRect = $null
             if ($rendered.Count -eq 1)
             {
                 $sprite = $rendered[0]
+                $captureRect = [pscustomobject][ordered]@{
+                    coordinateOrigin=[string]$sprite.coordinateOrigin
+                    unit=[string]$sprite.unit
+                    x=[double]$sprite.x
+                    y=[double]$sprite.y
+                    width=[double]$sprite.width
+                    height=[double]$sprite.height
+                }
                 $visibleRoi = [pscustomobject][ordered]@{
                     coordinateOrigin='screen-top-left'
                     unit='px'
@@ -1551,6 +1560,7 @@ function Get-LanLobbyRoomMaterialEvidence($Capture, $SpriteUsage)
                 sha256=[string]$auditRow.sha256
                 captures=@($auditRow.captures)
                 occurrenceCount=[int]$auditRow.occurrenceCount
+                captureRect=$captureRect
                 visibleRoi=$visibleRoi
             }
         }
@@ -2443,7 +2453,9 @@ try
                         $slotIndex = [int]$gateSpec.slotIndex
                         $slotRoot = "LanLobbyRoot/Room/RoomCard_$slotIndex"
                         $requiredCardBodyNode = "$slotRoot/CardBody"
+                        $frameRect = Get-LanLobbyCaptureKeyRect $capture "$slotRoot/CardBody"
                         [array]$portraitCardBodyRows = @($gateMaterialEvidence.rows | Where-Object {
+                            $sourceRect = $_.captureRect
                             [string]$_.node -ceq $requiredCardBodyNode -and
                             [string]$_.spriteName -ceq 'card_bg' -and
                             [string]$_.resourcesPath -ceq 'UI/Lobby/card_bg' -and
@@ -2451,12 +2463,20 @@ try
                             [string]$_.sha256 -ceq '050B347451BBEBC74F5E3B09A2470931D9B2A85DEF707A4AAC42B5CE1B0BCEE2' -and
                             [int]$_.occurrenceCount -eq 1 -and
                             @($_.captures).Count -eq 1 -and
-                            [string]$_.captures[0] -ceq $captureName
+                            [string]$_.captures[0] -ceq $captureName -and
+                            $null -ne $sourceRect -and
+                            [string]$sourceRect.coordinateOrigin -ceq 'screen-bottom-left' -and
+                            [string]$sourceRect.unit -ceq 'px' -and
+                            [string]$frameRect.coordinateOrigin -ceq 'screen-bottom-left' -and
+                            [string]$frameRect.unit -ceq 'px' -and
+                            [double]$sourceRect.x -eq [double]$frameRect.x -and
+                            [double]$sourceRect.y -eq [double]$frameRect.y -and
+                            [double]$sourceRect.width -eq [double]$frameRect.width -and
+                            [double]$sourceRect.height -eq [double]$frameRect.height
                         })
                         $portraitCardBodyPassed = $portraitCardBodyRows.Count -eq 1
                         $gateMaterialEvidence | Add-Member -NotePropertyName requiredPortraitCardBodyNode -NotePropertyValue $requiredCardBodyNode
                         $gateMaterialEvidence | Add-Member -NotePropertyName portraitCardBodyPassed -NotePropertyValue $portraitCardBodyPassed
-                        $frameRect = Get-LanLobbyCaptureKeyRect $capture "$slotRoot/CardBody"
                         $lowerRect = Get-LanLobbyCaptureKeyRect $capture "$slotRoot/LowerDecoration"
                         $lowerTopInScreenshot = [double]$capture.height-([double]$lowerRect.y+[double]$lowerRect.height)
                         $seamRoi = [pscustomobject][ordered]@{

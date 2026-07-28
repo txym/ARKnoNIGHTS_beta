@@ -1446,12 +1446,13 @@ try
         param($manifest, $caseCaptureDirectory)
         $hostCapture = @($manifest.captures | Where-Object name -ceq 'room-host')[0]
         $cardBody = @($hostCapture.spriteSources | Where-Object node -ceq 'LanLobbyRoot/Room/RoomCard_1/CardBody')[0]
-        $cardBody.x = 10
-        $cardBody.y = 10
-        $cardBody.width = 10
-        $cardBody.height = 10
+        $cardBody.x = [double]$cardBody.x + 7
+        $cardBody.y = [double]$cardBody.y + 5
+        $cardBody.width = [double]$cardBody.width + 13
+        $cardBody.height = [double]$cardBody.height + 11
     }
     $cardBodyAssociationGate = @($cardBodyAssociationResult.report.roomGates | Where-Object name -ceq 'RoomHost.Slot2.PortraitFrame')[0]
+    Assert-True (@($cardBodyAssociationGate.materialEvidence.rows | Where-Object node -ceq 'LanLobbyRoot/Room/RoomCard_1/CardBody').Count -eq 1) 'the malformed CardBody ROI must still partially overlap and remain associated with its portrait-frame gate'
     Assert-True ((-not $cardBodyAssociationGate.materialEvidence.portraitCardBodyPassed) -and
         ($cardBodyAssociationGate.status -ceq 'Failed')) 'a portrait-frame gate must require its exact slot CardBody/card_bg manifest association'
     Assert-LanLobbyFailedRoiDrawn $cardBodyAssociationResult.output 'room-host' $cardBodyAssociationGate.roi 'portrait frame material association'
