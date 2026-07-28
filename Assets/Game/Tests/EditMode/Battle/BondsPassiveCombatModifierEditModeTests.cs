@@ -280,6 +280,222 @@ namespace ArknoNights.Battle.Tests
                     && item.Tick == reaction.Tick));
         }
 
+        [Test]
+        public void ContinuousHealthThreshold_DoublesLaterAttacksAtHalfHealth()
+        {
+            var input = CreateInput(
+                7,
+                new[]
+                {
+                    Attacker(
+                        "threshold",
+                        0,
+                        0,
+                        "LOW_HP_ATTACK",
+                        attackIntervalTicks: 4,
+                        maxHitPoints: 1000,
+                        attack: 100),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        attack: 600)
+                },
+                new[]
+                {
+                    PassiveThreshold(
+                        "LOW_HP_ATTACK",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: true,
+                        triggerOnce: false,
+                        attackMultiplierPermille: 2000)
+                },
+                new[] { Unit("threshold", "threshold", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Damage
+                        && item.UnitId == "threshold"
+                        && item.RelatedUnitId == "enemy")
+                    .Select(item => item.DamageAmount)
+                    .ToArray(),
+                Is.EqualTo(new[] { 100, 200 }));
+        }
+
+        [Test]
+        public void ContinuousHealthThreshold_UpdatesDefenseAndBlockCapacity()
+        {
+            var input = CreateInput(
+                3,
+                new[]
+                {
+                    Attacker(
+                        "threshold",
+                        0,
+                        1,
+                        "LOW_HP_DEFENSE",
+                        attackIntervalTicks: 100,
+                        maxHitPoints: 1000,
+                        defense: 100),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 100,
+                        attack: 1000)
+                },
+                new[]
+                {
+                    PassiveThreshold(
+                        "LOW_HP_DEFENSE",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: false,
+                        triggerOnce: false,
+                        defenseMultiplierPermille: 4000,
+                        blockCapacityAdditive: 1)
+                },
+                new[] { Unit("threshold", "threshold", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+            runner.Step();
+
+            var threshold = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "threshold");
+            Assert.That(threshold.CurrentHitPoints, Is.EqualTo(100));
+            Assert.That(threshold.EffectiveDefense, Is.EqualTo(400));
+            Assert.That(threshold.EffectiveBlockCapacity, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void OneShotHealthThreshold_ExpiresAfterConfiguredDuration()
+        {
+            var input = CreateInput(
+                20,
+                new[]
+                {
+                    Attacker(
+                        "threshold",
+                        100,
+                        0,
+                        "FIRST_DAMAGE_BOOST",
+                        attackIntervalTicks: 20,
+                        maxHitPoints: 100000,
+                        attack: 1),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        0,
+                        attackIntervalTicks: 1000,
+                        attack: 1)
+                },
+                new[]
+                {
+                    PassiveThreshold(
+                        "FIRST_DAMAGE_BOOST",
+                        thresholdHitPointsPermille: 1000,
+                        inclusiveThreshold: false,
+                        triggerOnce: true,
+                        durationTicks: 3,
+                        attackSpeedAdditive: 100,
+                        moveSpeedMultiplierPermille: 2000)
+                },
+                new[] { Unit("threshold", "threshold", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+            runner.Step();
+            var threshold = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "threshold");
+            Assert.That(
+                threshold.EffectiveAttackIntervalTicks,
+                Is.EqualTo(10));
+            Assert.That(
+                threshold.EffectiveMoveSpeedCentimetresPerSecond,
+                Is.EqualTo(200));
+
+            runner.Step();
+            runner.Step();
+            runner.Step();
+            runner.Step();
+
+            Assert.That(
+                threshold.EffectiveAttackIntervalTicks,
+                Is.EqualTo(20));
+            Assert.That(
+                threshold.EffectiveMoveSpeedCentimetresPerSecond,
+                Is.EqualTo(100));
+        }
+
+        [Test]
+        public void ContinuousBlockThreshold_ReleasesExcessBlockWhenHealingDisablesIt()
+        {
+            var threshold = new UnitDefinition(
+                "threshold",
+                1000,
+                1,
+                0,
+                0,
+                0,
+                1000,
+                1,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                1,
+                0,
+                true,
+                new[] { "LOW_HP_BLOCK", "REGEN_400" });
+            var input = CreateInput(
+                10,
+                new[]
+                {
+                    threshold,
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        attack: 300)
+                },
+                new[]
+                {
+                    PassiveThreshold(
+                        "LOW_HP_BLOCK",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: false,
+                        triggerOnce: false,
+                        blockCapacityAdditive: 1),
+                    PassiveLifecycle(
+                        "REGEN_400",
+                        hitPointsPerSecond: 400)
+                },
+                new[] { Unit("threshold", "threshold", 5, 4) },
+                new[]
+                {
+                    Unit("enemy-a", "enemy", 5, 4),
+                    Unit("enemy-b", "enemy", 6, 4)
+                });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 4)
+                runner.Step();
+            var runtime = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "threshold");
+            Assert.That(runtime.BlockedUnitIds.Count, Is.EqualTo(2));
+
+            while (runner.CurrentTick < 7)
+                runner.Step();
+            Assert.That(runtime.EffectiveBlockCapacity, Is.EqualTo(1));
+            Assert.That(runtime.BlockedUnitIds, Is.EqualTo(new[] { "enemy-a" }));
+        }
+
         private static BattleEvent RunSingleDamage(
             DamageType damageType,
             PassiveCombatModifierDefinition modifier)
@@ -400,6 +616,52 @@ namespace ArknoNights.Battle.Tests
                 0);
         }
 
+        private static AbilityDefinition PassiveThreshold(
+            string abilityId,
+            int thresholdHitPointsPermille,
+            bool inclusiveThreshold,
+            bool triggerOnce,
+            int durationTicks = 0,
+            int attackMultiplierPermille =
+                HealthThresholdCombatModifierDefinition
+                    .NeutralMultiplierPermille,
+            int defenseMultiplierPermille =
+                HealthThresholdCombatModifierDefinition
+                    .NeutralMultiplierPermille,
+            int blockCapacityAdditive = 0,
+            int attackSpeedAdditive = 0,
+            int moveSpeedMultiplierPermille =
+                HealthThresholdCombatModifierDefinition
+                    .NeutralMultiplierPermille)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new HealthThresholdCombatModifierDefinition(
+                    thresholdHitPointsPermille,
+                    inclusiveThreshold,
+                    triggerOnce,
+                    durationTicks,
+                    attackMultiplierPermille,
+                    defenseMultiplierPermille,
+                    blockCapacityAdditive,
+                    attackSpeedAdditive,
+                    moveSpeedMultiplierPermille),
+                string.Empty,
+                0);
+        }
+
         private static UnitDefinition Attacker(
             string typeId,
             int speed,
@@ -407,13 +669,16 @@ namespace ArknoNights.Battle.Tests
             string abilityId = null,
             DamageType damageType = DamageType.Physical,
             int attackIntervalTicks = 1000,
-            int magicResistance = 0)
+            int magicResistance = 0,
+            int maxHitPoints = 100000,
+            int attack = 1000,
+            int defense = 0)
         {
             return new UnitDefinition(
                 typeId,
-                100000,
-                1000,
-                0,
+                maxHitPoints,
+                attack,
+                defense,
                 magicResistance,
                 speed,
                 attackIntervalTicks,

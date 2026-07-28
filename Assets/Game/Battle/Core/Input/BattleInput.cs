@@ -219,6 +219,17 @@ namespace ArknoNights.Battle.Core
                     builder.Append("|R:")
                         .Append((int)ability.OnDamageReactionEffect.DamageType).Append(',')
                         .Append(ability.OnDamageReactionEffect.DamageAmount);
+                if (ability.HealthThresholdCombatModifier != null)
+                    builder.Append("|H:")
+                        .Append(ability.HealthThresholdCombatModifier.ThresholdHitPointsPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.InclusiveThreshold ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.TriggerOnce ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.DurationTicks).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.DefenseMultiplierPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.BlockCapacityAdditive).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.AttackSpeedAdditive).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -288,6 +299,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.PassiveCombatModifier != null) validationErrors.Add(new ValidationError("ability.combatModifier.unexpected", "Timed ability cannot define a passive combat modifier: " + ability.AbilityId));
                     if (ability.PassiveLifecycleEffect != null) validationErrors.Add(new ValidationError("ability.lifecycle.unexpected", "Timed ability cannot define a passive lifecycle effect: " + ability.AbilityId));
                     if (ability.OnDamageReactionEffect != null) validationErrors.Add(new ValidationError("ability.damageReaction.unexpected", "Timed ability cannot define an on-damage reaction: " + ability.AbilityId));
+                    if (ability.HealthThresholdCombatModifier != null) validationErrors.Add(new ValidationError("ability.healthThreshold.unexpected", "Timed ability cannot define a health-threshold modifier: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -310,7 +322,8 @@ namespace ArknoNights.Battle.Core
                         (ability.UnitTraitEffect == null ? 0 : 1)
                         + (ability.PassiveCombatModifier == null ? 0 : 1)
                         + (ability.PassiveLifecycleEffect == null ? 0 : 1)
-                        + (ability.OnDamageReactionEffect == null ? 0 : 1);
+                        + (ability.OnDamageReactionEffect == null ? 0 : 1)
+                        + (ability.HealthThresholdCombatModifier == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -336,6 +349,19 @@ namespace ArknoNights.Battle.Core
                             || ability.OnDamageReactionEffect.DamageType == DamageType.None
                             || !Enum.IsDefined(typeof(DamageType), ability.OnDamageReactionEffect.DamageType)))
                         validationErrors.Add(new ValidationError("ability.damageReaction.invalid", "On-damage reaction is invalid: " + ability.AbilityId));
+                    if (ability.HealthThresholdCombatModifier != null
+                        && (ability.HealthThresholdCombatModifier.IsNeutral
+                            || ability.HealthThresholdCombatModifier.ThresholdHitPointsPermille <= 0
+                            || ability.HealthThresholdCombatModifier.ThresholdHitPointsPermille > 1000
+                            || ability.HealthThresholdCombatModifier.DurationTicks < 0
+                            || (!ability.HealthThresholdCombatModifier.TriggerOnce
+                                && ability.HealthThresholdCombatModifier.DurationTicks != 0)
+                            || ability.HealthThresholdCombatModifier.AttackMultiplierPermille <= 0
+                            || ability.HealthThresholdCombatModifier.DefenseMultiplierPermille <= 0
+                            || ability.HealthThresholdCombatModifier.BlockCapacityAdditive < 0
+                            || ability.HealthThresholdCombatModifier.AttackSpeedAdditive <= -100
+                            || ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.healthThreshold.invalid", "Health-threshold combat modifier is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)
