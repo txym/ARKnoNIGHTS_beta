@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -11,7 +12,8 @@ using UnityEngine;
 public static class AbilityCatalogGenerator
 {
     private const string SourceDirectory = "Assets/GameData/Abilities/Json";
-    private const string UnitSourceDirectory = "Assets/GameData/Units/Json";
+    private const string UnitSourceDirectory =
+        "Assets/GameData/Units/EliteVariants/Json";
     private const string OutputPath = "Assets/Resources/BattleData/ability-catalog-v1.json";
 
     [MenuItem("ARKnoNIGHTS/Battle/Regenerate Ability Catalog v1")]
@@ -53,18 +55,15 @@ public static class AbilityCatalogGenerator
 
     private static ISet<string> LoadKnownUnitTypeIds()
     {
-        if (!Directory.Exists(UnitSourceDirectory)) throw new InvalidOperationException("ABILITY_CATALOG_UNIT_SOURCE_MISSING path=" + UnitSourceDirectory);
-        var ids = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
-        foreach (var path in Directory.GetFiles(UnitSourceDirectory, "*.json", SearchOption.TopDirectoryOnly).OrderBy(path => Path.GetFileName(path), StringComparer.Ordinal))
-        {
-            UnitTypeSource source;
-            try { source = JsonUtility.FromJson<UnitTypeSource>(File.ReadAllText(path)); }
-            catch (Exception exception) { throw new InvalidOperationException("ABILITY_CATALOG_UNIT_SOURCE_INVALID path=" + path, exception); }
-            if (source == null || !string.Equals(source.schemaVersion, "unit-source-v1", StringComparison.Ordinal) || source.typeId <= 0) throw new InvalidOperationException("ABILITY_CATALOG_UNIT_SOURCE_INVALID path=" + path);
-            if (!ids.Add(source.typeId.ToString(System.Globalization.CultureInfo.InvariantCulture))) throw new InvalidOperationException("ABILITY_CATALOG_UNIT_TYPEID_DUPLICATE typeId=" + source.typeId);
-        }
-        if (ids.Count == 0) throw new InvalidOperationException("ABILITY_CATALOG_UNIT_SOURCE_EMPTY path=" + UnitSourceDirectory);
-        return ids;
+        var sources = UnitEliteVariantResolver.LoadDirectory(UnitSourceDirectory);
+        if (sources.Count == 0)
+            throw new InvalidOperationException(
+                "ABILITY_CATALOG_UNIT_SOURCE_EMPTY path=" + UnitSourceDirectory);
+
+        return new HashSet<string>(
+            sources.Keys.Select(id =>
+                id.ToString(CultureInfo.InvariantCulture)),
+            StringComparer.Ordinal);
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
@@ -73,5 +72,4 @@ public static class AbilityCatalogGenerator
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
     [Serializable] private sealed class SummonEffect { public string kind; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
-    [Serializable] private sealed class UnitTypeSource { public string schemaVersion; public int typeId; }
 }

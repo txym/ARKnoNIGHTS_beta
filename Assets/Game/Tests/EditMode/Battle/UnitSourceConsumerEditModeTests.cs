@@ -93,6 +93,31 @@ namespace ArknoNights.Battle.Tests
                 "UNIT_CATALOG_SOURCE_ABILITY_UNKNOWN");
         }
 
+        [Test]
+        public void AbilityCatalogGenerator_UsesV2TypeIdsAndPreservesUnknownSummonFailure()
+        {
+            var output = TempFileWith("must-not-change");
+            var exception = InvokeAbilityGenerator(
+                UnknownSummonSourceDirectory,
+                output);
+
+            StringAssert.Contains(
+                "ABILITY_CATALOG_SOURCE_SUMMON_TYPE_UNKNOWN",
+                exception.InnerException.Message);
+            Assert.That(File.ReadAllText(output), Is.EqualTo("must-not-change"));
+        }
+
+        [Test]
+        public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
+        {
+            var ids = InvokeDeclaredAbilityCollector(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Units/EliteVariants/Json"));
+
+            Assert.That(ids, Is.EqualTo(new[] { "SUMMON_JELLY_MINIONS" }));
+        }
+
         private static void AssertAtomicFailure(
             string sourceDirectory,
             string expectedErrorCode)
@@ -199,6 +224,90 @@ namespace ArknoNights.Battle.Tests
                 Is.Not.Null,
                 "Generate(string, string) must exist and remain private.");
             generate.Invoke(null, new object[] { sourceDirectory, outputPath });
+        }
+
+        private static TargetInvocationException InvokeAbilityGenerator(
+            string sourceDirectory,
+            string outputPath)
+        {
+            var generator = Type.GetType(
+                "AbilityCatalogGenerator, Assembly-CSharp-Editor");
+            Assert.That(
+                generator,
+                Is.Not.Null,
+                "Ability catalog generator type must exist.");
+            var generate = generator.GetMethod(
+                "Generate",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string), typeof(string) },
+                null);
+            Assert.That(
+                generate,
+                Is.Not.Null,
+                "Generate(string, string) must exist and remain private.");
+            return Assert.Throws<TargetInvocationException>(
+                () => generate.Invoke(
+                    null,
+                    new object[] { sourceDirectory, outputPath }));
+        }
+
+        private static IReadOnlyList<string> InvokeDeclaredAbilityCollector(
+            string sourceDirectory)
+        {
+            var bakeTool = Type.GetType(
+                "UnitJsonBake, Assembly-CSharp-Editor");
+            Assert.That(bakeTool, Is.Not.Null, "Unit JSON bake tool must exist.");
+            var collect = bakeTool.GetMethod(
+                "CollectDeclaredAbilityIds",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string) },
+                null);
+            Assert.That(
+                collect,
+                Is.Not.Null,
+                "CollectDeclaredAbilityIds(string) must exist and remain private.");
+            return (IReadOnlyList<string>)collect.Invoke(
+                null,
+                new object[] { sourceDirectory });
+        }
+
+        private static string UnknownSummonSourceDirectory
+        {
+            get
+            {
+                var sourceDirectory = NewIsolatedPath(
+                    "ability-unknown-summon",
+                    "sources");
+                Directory.CreateDirectory(sourceDirectory);
+                File.WriteAllText(
+                    Path.Combine(sourceDirectory, "unknown-summon.json"),
+                    "{\"schemaVersion\":\"ability-source-v1\","
+                    + "\"abilityId\":\"UNKNOWN_SUMMON\","
+                    + "\"displayNameZhHans\":\"\","
+                    + "\"descriptionZhHans\":\"\","
+                    + "\"activationKind\":\"Timed\","
+                    + "\"silencePolicy\":\"Unaffected\","
+                    + "\"skillPoints\":{\"initial\":0,\"required\":1,"
+                    + "\"generation\":\"Automatic\"},"
+                    + "\"effects\":[{\"kind\":\"Summon\","
+                    + "\"summonTypeId\":\"does-not-exist\",\"count\":1,"
+                    + "\"spawnArea\":{\"shape\":\"Square\","
+                    + "\"center\":\"CasterPosition\","
+                    + "\"sideLengthMetres\":1.0},"
+                    + "\"inheritPathFromCaster\":false}]}");
+                return sourceDirectory;
+            }
+        }
+
+        private static string TempFileWith(string contents)
+        {
+            var path = NewIsolatedPath(
+                "ability-output",
+                "ability-catalog-v1.json");
+            File.WriteAllText(path, contents);
+            return path;
         }
 
         private static string RealSourceDirectory()

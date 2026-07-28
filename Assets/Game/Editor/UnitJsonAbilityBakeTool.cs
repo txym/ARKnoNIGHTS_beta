@@ -1,23 +1,19 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using Bitsets;
 
 static class BakePaths
 {
-    public const string UnitsJsonDir = "Assets/GameData/Units/Json";
+    public const string UnitsJsonDir =
+        "Assets/GameData/Units/EliteVariants/Json";
     public const string InnateRegistryPath = "Assets/GameData/Units/Unit_Innate_Ability_Database.asset";
     public const string UnitsIconImagePath = "Assets/GameData/UIIconImage";
     public static string UnitAssetPathById(int id) => $"Assets/Game/Data/Units/Unit_{id}.asset"; // 如无 Template，可忽略
-}
-
-[System.Serializable]
-class UnitJsonLite
-{
-    public int typeId;
-    public List<string> innateAbilityIds;
 }
 
 public static class UnitJsonBake
@@ -32,30 +28,26 @@ public static class UnitJsonBake
             return;
         }
 
-        var jsonPaths = Directory.GetFiles(BakePaths.UnitsJsonDir, "*.json", SearchOption.AllDirectories);
-        var units = new List<(string path, UnitJsonLite data)>(jsonPaths.Length);
-
         // 1) 读取 JSON，汇总 tag 并只追加到 Registry
-        foreach (var p in jsonPaths)
+        var declaredAbilityIds = CollectDeclaredAbilityIds(BakePaths.UnitsJsonDir);
+        foreach (var abilityId in declaredAbilityIds)
         {
-            var text = File.ReadAllText(p);
-            var u = JsonUtility.FromJson<UnitJsonLite>(text);
-            if (u == null) continue;
-            units.Add((p, u));
-
-            if (u.innateAbilityIds == null) continue;
-            foreach (var tag in u.innateAbilityIds)
-                if (!string.IsNullOrWhiteSpace(tag)) reg.TryGetOrAdd(tag.Trim());
+            reg.TryGetOrAdd(abilityId);
         }
 
         EditorUtility.SetDirty(reg);
         AssetDatabase.SaveAssets();
 
         // 2) 回写到 UnitTemplate（若存在）
+        var unitTypeIds = UnitEliteVariantResolver
+            .LoadDirectory(BakePaths.UnitsJsonDir)
+            .Keys
+            .OrderBy(id => id)
+            .ToArray();
         int baked = 0;
-        foreach (var (_, u) in units)
+        foreach (var typeId in unitTypeIds)
         {
-            var assetPath = BakePaths.UnitAssetPathById(u.typeId);
+            var assetPath = BakePaths.UnitAssetPathById(typeId);
             var ut = AssetDatabase.LoadAssetAtPath<UnitTemplate>(assetPath);
             if (ut == null) continue;
 
@@ -65,7 +57,21 @@ public static class UnitJsonBake
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[Bake] 扫描 {units.Count} 个 JSON；注册表大小={reg.Count}；回写 {baked} 个 UnitTemplate。");
+        Debug.Log($"[Bake] 扫描 {unitTypeIds.Length} 个 JSON；注册表大小={reg.Count}；回写 {baked} 个 UnitTemplate。");
+    }
+
+    private static IReadOnlyList<string> CollectDeclaredAbilityIds(
+        string unitSourceDirectory)
+    {
+        return UnitEliteVariantResolver
+            .LoadDirectory(unitSourceDirectory)
+            .Values
+            .SelectMany(UnitEliteVariantResolver.GetDeclaredInnateAbilityIds)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
     }
 }
 #endif

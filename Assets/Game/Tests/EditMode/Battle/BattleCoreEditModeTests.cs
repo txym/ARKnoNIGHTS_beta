@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -126,7 +127,10 @@ namespace ArknoNights.Battle.Tests
             var generate = generatorType.GetMethod("Generate", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(string) }, null);
             Assert.That(generate, Is.Not.Null, "The generator must expose a path-scoped implementation for source validation tests.");
 
-            var evidenceDirectory = Path.Combine(UnityEngine.Application.dataPath, "..", ".superpowers", "sdd", "2026-07-26-mainline-jelly-summon", "evidence", "task2", "fix-round-1", "generator-negative");
+            var evidenceDirectory = Path.GetFullPath(Path.Combine(
+                UnityEngine.Application.dataPath,
+                "../Temp/UnitEliteVariantsV2/BattleCoreAbilityGenerator",
+                Guid.NewGuid().ToString("N")));
             var sourceDirectory = Path.Combine(evidenceDirectory, "source");
             var outputDirectory = Path.Combine(evidenceDirectory, "output");
             Directory.CreateDirectory(sourceDirectory);
@@ -590,30 +594,36 @@ namespace ArknoNights.Battle.Tests
             Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/5504_arcslmi/enemy_5504_arcslmi_SkeletonData"));
             Assert.That(arcslmi.PortraitResourcePath, Is.EqualTo("ProfilePicture/UIImage_5504_arcslmi"));
 
-            var sourceGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/1000_gopro.json"));
-            var sourceArcslma = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/5503_arcslma.json"));
-            var sourceArcslmi = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/Json/5504_arcslmi.json"));
-            var eliteGopro = File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "GameData/Units/EliteVariants/Json/1000_gopro.json"));
-            StringAssert.Contains("\"schemaVersion\": \"unit-source-v1\"", sourceGopro);
-            StringAssert.Contains("\"resourceKey\": \"gopro\"", sourceGopro);
-            StringAssert.Contains("\"schemaVersion\": \"unit-elite-variants-v1\"", eliteGopro);
-            StringAssert.Contains("\"minEliteLevel\": 0", eliteGopro);
-            StringAssert.Contains("\"statsLevel\": 0", eliteGopro);
-            StringAssert.Contains("\"displayNameZhHans\": \"猎狗\"", eliteGopro);
-            StringAssert.Contains("\"resourceFolderName\": \"1000_gopro_2\"", eliteGopro);
-            StringAssert.Contains("\"resourceFolderName\": \"1000_gopro_3\"", eliteGopro);
-            StringAssert.Contains("\"skillDescriptionZhHans\": \"\"", sourceArcslma);
-            StringAssert.Contains("\"attackAnimationDurationSeconds\": 1.0", sourceGopro);
-            StringAssert.Contains("\"attackAnimationDurationSeconds\": 2.666667", sourceArcslma);
-            StringAssert.Contains("\"damageType\": \"Physical\"", sourceGopro);
-            StringAssert.Contains("\"blockCapacity\": 1", sourceArcslma);
-            StringAssert.Contains("\"tauntLevel\": 0", sourceGopro);
-            StringAssert.Contains("\"lifeDeduct\": 1", sourceArcslma);
-            StringAssert.Contains("\"innateAbilityIds\": [", sourceArcslma);
-            StringAssert.Contains("\"resourceKey\": \"arcslmi\"", sourceArcslmi);
-            StringAssert.DoesNotContain("\"uintName\"", sourceGopro);
-            StringAssert.DoesNotContain("\"HP\"", sourceGopro);
-            StringAssert.DoesNotContain("\"FixedAbility\"", sourceArcslma);
+            var sourceRoot = Path.Combine(
+                UnityEngine.Application.dataPath,
+                "GameData/Units/EliteVariants/Json");
+            var resolvedGopro = ResolveV2Source(sourceRoot, 1000, 0);
+            var resolvedArcslma = ResolveV2Source(sourceRoot, 5503, 0);
+            var resolvedArcslmi = ResolveV2Source(sourceRoot, 5504, 0);
+
+            Assert.That(
+                Field<string>(resolvedGopro, "resourceKey"),
+                Is.EqualTo("gopro"));
+            Assert.That(
+                Field<int>(resolvedGopro, "maxHitPoints"),
+                Is.EqualTo(820));
+            Assert.That(
+                Field<string>(resolvedArcslma, "resourceKey"),
+                Is.EqualTo("arcslma"));
+            Assert.That(
+                Animation(resolvedArcslma, "skill", "name"),
+                Is.EqualTo("Skill"));
+            Assert.That(
+                Animation(resolvedArcslma, "skill", "durationSeconds"),
+                Is.EqualTo(1.5f));
+            Assert.That(
+                Field<string>(resolvedArcslmi, "resourceKey"),
+                Is.EqualTo("arcslmi"));
+            Assert.That(
+                Directory.Exists(Path.Combine(
+                    UnityEngine.Application.dataPath,
+                    "GameData/Units/Json")),
+                Is.False);
 
         }
 
@@ -1159,6 +1169,70 @@ namespace ArknoNights.Battle.Tests
                 source.Players);
             Assert.That(BattleInputFactory.TryCreate(specification, out var input, out var errors), Is.True, Errors(errors));
             return input;
+        }
+
+        private static object ResolveV2Source(
+            string sourceDirectory,
+            int typeId,
+            int eliteLevel)
+        {
+            var resolver = Type.GetType(
+                "UnitEliteVariantResolver, Assembly-CSharp");
+            Assert.That(resolver, Is.Not.Null, "Runtime resolver type must exist.");
+            var loadDirectory = resolver.GetMethod(
+                "LoadDirectory",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string) },
+                null);
+            Assert.That(
+                loadDirectory,
+                Is.Not.Null,
+                "LoadDirectory(string) must exist.");
+            var sources = loadDirectory.Invoke(
+                null,
+                new object[] { sourceDirectory }) as IDictionary;
+            Assert.That(sources, Is.Not.Null, "LoadDirectory must return a dictionary.");
+            Assert.That(sources.Contains(typeId), Is.True, "Missing source: " + typeId);
+
+            var source = sources[typeId];
+            var resolve = resolver.GetMethod(
+                "Resolve",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { source.GetType(), typeof(int) },
+                null);
+            Assert.That(
+                resolve,
+                Is.Not.Null,
+                "Resolve(source, int) must exist.");
+            return resolve.Invoke(null, new[] { source, (object)eliteLevel });
+        }
+
+        private static T Field<T>(object target, string fieldName)
+        {
+            Assert.That(target, Is.Not.Null);
+            var field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, "Missing field: " + fieldName);
+            return (T)field.GetValue(target);
+        }
+
+        private static object Animation(
+            object resolved,
+            string key,
+            string fieldName)
+        {
+            var animations = Field<IEnumerable>(resolved, "animations");
+            var animation = animations
+                .Cast<object>()
+                .Single(item => Field<string>(item, "key") == key);
+            var field = animation.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, "Missing animation field: " + fieldName);
+            return field.GetValue(animation);
         }
 
         private static BattleInput CreateInput(int maxTicks, UnitDefinition[] definitions, UnitSnapshot[] homeUnits, UnitSnapshot[] awayUnits)
