@@ -12,7 +12,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class UnitSourceConsumerEditModeTests
     {
         private const string ExpectedRuntimeCatalogHash =
-            "359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA";
+            "BE09A6CE835369A52040B76F967AA0D853CD481D83CE909D0DCDFD3C033C1BD8";
 
         [Test]
         public void Generate_ProjectsResolvedEliteZeroVariantsToIsolatedV1Catalog()
@@ -67,15 +67,28 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void Generate_RejectsUnrepresentableV2SourceWithoutTouchingOutput()
+        public void Generate_ProjectsNonAttackerWithoutAttackTimingOrAnimation()
         {
             var sourceDirectory = CopyRealSources(
-                "unrepresentable",
+                "non-attacker",
                 "5504_arcslmi.json",
                 MakeNonAttacker);
-            AssertAtomicFailure(
-                sourceDirectory,
-                "UNIT_CATALOG_V1_SOURCE_UNREPRESENTABLE");
+            var outputPath = NewIsolatedPath(
+                "non-attacker-output",
+                "unit-catalog-v1.json");
+            var hashBefore = RuntimeCatalogHash();
+
+            InvokeGenerator(sourceDirectory, outputPath);
+
+            Assert.That(RuntimeCatalogHash(), Is.EqualTo(hashBefore));
+            var document = JsonUtility.FromJson<CatalogProjectionDocument>(
+                File.ReadAllText(outputPath));
+            var projected = document.units.Single(unit => unit.typeId == "5504");
+            Assert.That(projected.attackMethod, Is.EqualTo("None"));
+            Assert.That(projected.actionMethod, Is.EqualTo(1));
+            Assert.That(projected.attackIntervalTicks, Is.Zero);
+            Assert.That(projected.attackAnimationDurationTicks, Is.Zero);
+            Assert.That(projected.attackAnimation, Is.Empty);
         }
 
         [Test]
@@ -366,8 +379,12 @@ namespace ArknoNights.Battle.Tests
             public int deploymentCost;
             public int rarity;
             public int attackAnimationDurationTicks;
+            public int attackIntervalTicks;
             public int unitSkelType;
+            public int actionMethod;
+            public string attackMethod;
             public string moveAnimation;
+            public string attackAnimation;
             public string hitAnimation;
         }
     }

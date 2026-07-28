@@ -47,7 +47,7 @@ namespace ArknoNights.Battle.Tests
             var loaded = AbilityCatalogLoader.LoadFromResources(AbilityCatalogPath, unitCatalog.Catalog);
 
             Assert.That(loaded.Success, Is.True, Errors(loaded.Errors));
-            var ability = loaded.Catalog.Abilities.Single();
+            var ability = loaded.Catalog.Abilities.Single(candidate => candidate.AbilityId == "SUMMON_JELLY_MINIONS");
             Assert.That(ability.AbilityId, Is.EqualTo("SUMMON_JELLY_MINIONS"));
             Assert.That(ability.DisplayNameZhHans, Is.Empty);
             Assert.That(ability.DescriptionZhHans, Is.EqualTo("每隔一段时间，分裂出三个<果冻丁>。"));

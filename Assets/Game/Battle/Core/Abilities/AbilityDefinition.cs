@@ -2,9 +2,20 @@ using System;
 
 namespace ArknoNights.Battle.Core
 {
-    public enum AbilityActivationKind { Timed }
+    public enum AbilityActivationKind { Timed, Passive }
     public enum SilencePolicy { Unaffected }
-    public enum SkillPointGeneration { Automatic }
+    public enum SkillPointGeneration { Automatic, None }
+    public enum UnitTraitEffectKind { Untargetable }
+
+    public sealed class UnitTraitEffectDefinition
+    {
+        public UnitTraitEffectDefinition(UnitTraitEffectKind kind)
+        {
+            Kind = kind;
+        }
+
+        public UnitTraitEffectKind Kind { get; }
+    }
 
     public sealed class SummonEffectDefinition
     {
@@ -25,6 +36,21 @@ namespace ArknoNights.Battle.Core
     public sealed class AbilityDefinition
     {
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                null)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -35,6 +61,7 @@ namespace ArknoNights.Battle.Core
             RequiredSkillPoints = requiredSkillPoints;
             SkillPointGeneration = skillPointGeneration;
             SummonEffect = summonEffect;
+            UnitTraitEffect = unitTraitEffect;
         }
 
         public string AbilityId { get; }
@@ -46,5 +73,6 @@ namespace ArknoNights.Battle.Core
         public int RequiredSkillPoints { get; }
         public SkillPointGeneration SkillPointGeneration { get; }
         public SummonEffectDefinition SummonEffect { get; }
+        public UnitTraitEffectDefinition UnitTraitEffect { get; }
     }
 }

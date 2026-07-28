@@ -87,13 +87,18 @@ namespace ArknoNights.Battle.Infrastructure
                 source.initialSkillPoints,
                 source.requiredSkillPoints,
                 ParseEnum<SkillPointGeneration>(source.skillPointGeneration),
-                new SummonEffectDefinition(source.summonTypeId, source.count, source.sideLengthCentimetres, source.inheritPathFromCaster));
+                string.IsNullOrWhiteSpace(source.summonTypeId)
+                    ? null
+                    : new SummonEffectDefinition(source.summonTypeId, source.count, source.sideLengthCentimetres, source.inheritPathFromCaster),
+                string.IsNullOrWhiteSpace(source.unitTrait)
+                    ? null
+                    : new UnitTraitEffectDefinition(ParseEnum<UnitTraitEffectKind>(source.unitTrait)));
         }
 
         private static T ParseEnum<T>(string value) where T : struct => Enum.TryParse(value, true, out T parsed) && Enum.IsDefined(typeof(T), parsed) ? parsed : (T)Enum.ToObject(typeof(T), -1);
         private static AbilityCatalogLoadResult Failure(string code, string message) => new AbilityCatalogLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class AbilityCatalogDto { public string schemaVersion; public string catalogId; public AbilityDto[] abilities; }
-        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; }
+        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; }
     }
 }

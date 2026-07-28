@@ -9,8 +9,8 @@ namespace ArknoNights.Battle.Core
 {
     public enum BattleSide { Home, Away }
     public enum UnitZone { Deployed, Staging, Shop }
-    public enum DamageType { Physical, Magic, True }
-    public enum AttackMethod { Melee, Ranged }
+    public enum DamageType { Physical = 0, Magic = 1, True = 2, None = 3 }
+    public enum AttackMethod { Melee = 0, Ranged = 1, None = 2 }
 
     public sealed class ValidationError
     {
@@ -58,6 +58,26 @@ namespace ArknoNights.Battle.Core
         }
 
         public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds)
+            : this(
+                typeId,
+                maxHitPoints,
+                attack,
+                defense,
+                magicResistance,
+                moveSpeedCentimetresPerSecond,
+                attackIntervalTicks,
+                attackAnimationDurationTicks,
+                damageType,
+                attackMethod,
+                blockCapacity,
+                tauntLevel,
+                isSyntheticFixtureData,
+                innateAbilityIds,
+                1)
+        {
+        }
+
+        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod)
         {
             TypeId = typeId;
             MaxHitPoints = maxHitPoints;
@@ -73,6 +93,7 @@ namespace ArknoNights.Battle.Core
             TauntLevel = tauntLevel;
             IsSyntheticFixtureData = isSyntheticFixtureData;
             InnateAbilityIds = new ReadOnlyCollection<string>((innateAbilityIds ?? Enumerable.Empty<string>()).ToArray());
+            ActionMethod = actionMethod;
         }
 
         public string TypeId { get; }
@@ -89,6 +110,8 @@ namespace ArknoNights.Battle.Core
         public int TauntLevel { get; }
         public bool IsSyntheticFixtureData { get; }
         public IReadOnlyList<string> InnateAbilityIds { get; }
+        public int ActionMethod { get; }
+        public bool CanAttack => AttackMethod != AttackMethod.None;
     }
 
     public readonly struct BuffPlaceholder : IEquatable<BuffPlaceholder>
@@ -172,10 +195,16 @@ namespace ArknoNights.Battle.Core
             foreach (var definition in UnitDefinitions.OrderBy(item => item.TypeId, StringComparer.Ordinal))
             {
                 builder.Append("|T:").Append(definition.TypeId).Append(',').Append(definition.MaxHitPoints).Append(',').Append(definition.Attack).Append(',').Append(definition.Defense).Append(',').Append(definition.MagicResistance).Append(',').Append(definition.MoveSpeedCentimetresPerSecond).Append(',').Append(definition.AttackIntervalTicks).Append(',').Append(definition.AttackAnimationDurationTicks).Append(',').Append((int)definition.DamageType).Append(',').Append((int)definition.AttackMethod).Append(',').Append(definition.BlockCapacity).Append(',').Append(definition.TauntLevel).Append(',').Append(definition.IsSyntheticFixtureData ? 1 : 0);
+                if (definition.ActionMethod != 1)
+                    builder.Append("|M:").Append(definition.ActionMethod);
                 foreach (var innateId in definition.InnateAbilityIds.OrderBy(item => item, StringComparer.Ordinal)) builder.Append("|I:").Append(innateId);
             }
             foreach (var ability in AbilityDefinitions.OrderBy(item => item.AbilityId, StringComparer.Ordinal))
+            {
                 builder.Append("|A:").Append(ability.AbilityId).Append(',').Append((int)ability.ActivationKind).Append(',').Append((int)ability.SilencePolicy).Append(',').Append(ability.InitialSkillPoints).Append(',').Append(ability.RequiredSkillPoints).Append(',').Append((int)ability.SkillPointGeneration).Append(',').Append(ability.SummonEffect == null ? string.Empty : ability.SummonEffect.SummonTypeId).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.Count).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.SideLengthCentimetres).Append(',').Append(ability.SummonEffect != null && ability.SummonEffect.InheritPathFromCaster ? 1 : 0);
+                if (ability.UnitTraitEffect != null)
+                    builder.Append("|G:").Append((int)ability.UnitTraitEffect.Kind);
+            }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
                 builder.Append("|P:").Append((int)player.Side).Append(',').Append(player.PlayerId);
@@ -214,9 +243,18 @@ namespace ArknoNights.Battle.Core
                 if (definition == null) { validationErrors.Add(new ValidationError("type.missing", "Unit definition is missing.")); continue; }
                 if (string.IsNullOrWhiteSpace(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.invalid", "Type ID is required."));
                 else if (!typeIds.Add(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.duplicate", "Duplicate type ID: " + definition.TypeId));
-                if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.AttackIntervalTicks <= 0 || definition.AttackAnimationDurationTicks <= 0 || definition.BlockCapacity <= 0 || definition.TauntLevel < 0)
+                if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.BlockCapacity < 0 || definition.TauntLevel < 0 || definition.ActionMethod < 1 || definition.ActionMethod > 4)
                     validationErrors.Add(new ValidationError("type.values.invalid", "Unit definition has invalid numeric values: " + (definition.TypeId ?? "<missing>")));
                 if (!Enum.IsDefined(typeof(DamageType), definition.DamageType) || !Enum.IsDefined(typeof(AttackMethod), definition.AttackMethod)) validationErrors.Add(new ValidationError("type.enum.invalid", "Unit definition has invalid enum values: " + (definition.TypeId ?? "<missing>")));
+                else if (definition.CanAttack)
+                {
+                    if (definition.DamageType == DamageType.None || definition.AttackIntervalTicks <= 0 || definition.AttackAnimationDurationTicks <= 0)
+                        validationErrors.Add(new ValidationError("type.attack.values.invalid", "Attacking unit requires damage and positive attack timings: " + (definition.TypeId ?? "<missing>")));
+                }
+                else if (definition.DamageType != DamageType.None || definition.Attack != 0 || definition.AttackIntervalTicks != 0 || definition.AttackAnimationDurationTicks != 0)
+                {
+                    validationErrors.Add(new ValidationError("type.nonAttacker.values.invalid", "Non-attacking unit must use None damage, zero attack and zero attack timings: " + (definition.TypeId ?? "<missing>")));
+                }
             }
 
             var abilityIds = new HashSet<string>(StringComparer.Ordinal);
@@ -226,15 +264,30 @@ namespace ArknoNights.Battle.Core
                 if (string.IsNullOrWhiteSpace(ability.AbilityId)) validationErrors.Add(new ValidationError("ability.id.invalid", "Ability ID is required."));
                 else if (!abilityIds.Add(ability.AbilityId)) validationErrors.Add(new ValidationError("ability.id.duplicate", "Duplicate ability ID: " + ability.AbilityId));
                 if (!Enum.IsDefined(typeof(AbilityActivationKind), ability.ActivationKind) || !Enum.IsDefined(typeof(SilencePolicy), ability.SilencePolicy) || !Enum.IsDefined(typeof(SkillPointGeneration), ability.SkillPointGeneration)) validationErrors.Add(new ValidationError("ability.enum.invalid", "Ability has an invalid enum value: " + ability.AbilityId));
-                if (ability.RequiredSkillPoints <= 0) validationErrors.Add(new ValidationError("ability.skillPoints.required.invalid", "Required skill points must be positive: " + ability.AbilityId));
-                if (ability.InitialSkillPoints < 0) validationErrors.Add(new ValidationError("ability.skillPoints.initial.invalid", "Initial skill points cannot be negative: " + ability.AbilityId));
-                if (ability.InitialSkillPoints > ability.RequiredSkillPoints) validationErrors.Add(new ValidationError("ability.skillPoints.order.invalid", "Initial skill points cannot exceed required skill points: " + ability.AbilityId));
-                if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
-                else
+                if (ability.ActivationKind == AbilityActivationKind.Timed)
                 {
-                    if (string.IsNullOrWhiteSpace(ability.SummonEffect.SummonTypeId) || !typeIds.Contains(ability.SummonEffect.SummonTypeId)) validationErrors.Add(new ValidationError("ability.summon.type.unknown", "Summon type is unknown: " + ability.SummonEffect.SummonTypeId));
-                    if (ability.SummonEffect.Count <= 0) validationErrors.Add(new ValidationError("ability.summon.count.invalid", "Summon count must be positive: " + ability.AbilityId));
-                    if (ability.SummonEffect.SideLengthCentimetres <= 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be positive: " + ability.AbilityId));
+                    if (ability.RequiredSkillPoints <= 0) validationErrors.Add(new ValidationError("ability.skillPoints.required.invalid", "Required skill points must be positive: " + ability.AbilityId));
+                    if (ability.InitialSkillPoints < 0) validationErrors.Add(new ValidationError("ability.skillPoints.initial.invalid", "Initial skill points cannot be negative: " + ability.AbilityId));
+                    if (ability.InitialSkillPoints > ability.RequiredSkillPoints) validationErrors.Add(new ValidationError("ability.skillPoints.order.invalid", "Initial skill points cannot exceed required skill points: " + ability.AbilityId));
+                    if (ability.UnitTraitEffect != null) validationErrors.Add(new ValidationError("ability.trait.unexpected", "Timed ability cannot define a unit trait: " + ability.AbilityId));
+                    if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
+                    else
+                    {
+                        if (string.IsNullOrWhiteSpace(ability.SummonEffect.SummonTypeId) || !typeIds.Contains(ability.SummonEffect.SummonTypeId)) validationErrors.Add(new ValidationError("ability.summon.type.unknown", "Summon type is unknown: " + ability.SummonEffect.SummonTypeId));
+                        if (ability.SummonEffect.Count <= 0) validationErrors.Add(new ValidationError("ability.summon.count.invalid", "Summon count must be positive: " + ability.AbilityId));
+                        if (ability.SummonEffect.SideLengthCentimetres <= 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be positive: " + ability.AbilityId));
+                    }
+                }
+                else if (ability.ActivationKind == AbilityActivationKind.Passive)
+                {
+                    if (ability.InitialSkillPoints != 0 || ability.RequiredSkillPoints != 0)
+                        validationErrors.Add(new ValidationError("ability.passive.skillPoints.invalid", "Passive ability cannot define skill points: " + ability.AbilityId));
+                    if (ability.SkillPointGeneration != SkillPointGeneration.None)
+                        validationErrors.Add(new ValidationError("ability.passive.generation.invalid", "Passive ability must use None skill-point generation: " + ability.AbilityId));
+                    if (ability.SummonEffect != null)
+                        validationErrors.Add(new ValidationError("ability.passive.summon.unexpected", "Passive ability cannot define a summon effect: " + ability.AbilityId));
+                    if (ability.UnitTraitEffect == null || !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
+                        validationErrors.Add(new ValidationError("ability.trait.invalid", "Passive ability requires a valid unit trait: " + ability.AbilityId));
                 }
             }
             foreach (var definition in specification.UnitDefinitions.Where(item => item != null))

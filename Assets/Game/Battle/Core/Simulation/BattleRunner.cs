@@ -126,6 +126,9 @@ namespace ArknoNights.Battle.Core
         internal int MoveYNumeratorRemainder { get; set; }
         internal UnitDefinition Definition { get; }
         internal IReadOnlyList<RuntimeAbilityState> AbilityStates { get; }
+        internal bool IsTargetable => abilityStates.All(item =>
+            item.Definition.UnitTraitEffect == null
+            || item.Definition.UnitTraitEffect.Kind != UnitTraitEffectKind.Untargetable);
         internal bool HasBlockingCapacity => blockedUnitIds.Count < Definition.BlockCapacity;
         internal bool IsBlocked => blockedUnitIds.Count != 0;
         internal bool HasBlockWith(string unitId) => blockedUnitIds.Contains(unitId);
@@ -331,8 +334,13 @@ namespace ArknoNights.Battle.Core
         {
             foreach (var unit in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
+                if (!unit.Definition.CanAttack)
+                {
+                    SetTarget(unit, null);
+                    continue;
+                }
                 if (HasLiveTarget(unit)) continue;
-                var selected = runtimeUnits.Where(candidate => IsActive(candidate) && candidate.Side != unit.Side)
+                var selected = runtimeUnits.Where(candidate => IsActive(candidate) && candidate.IsTargetable && candidate.Side != unit.Side)
                     .OrderBy(candidate => DistanceSquared(unit.Position, candidate.Position))
                     .ThenBy(candidate => DistanceSquared(candidate.Position, GatePosition(unit.Side)))
                     .ThenBy(candidate => candidate.UnitId, StringComparer.Ordinal).FirstOrDefault();
@@ -343,17 +351,27 @@ namespace ArknoNights.Battle.Core
         private void ApplyMovement()
         {
             var intents = new List<MoveIntent>();
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && !item.IsBlocked && !HasTargetDeathAnimationLock(item) && HasLiveTarget(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.ActionMethod != 4 && !item.IsBlocked && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
+                if (!unit.Definition.CanAttack)
+                {
+                    var gate = OpposingGatePosition(unit.Side);
+                    var nextGatePosition = MoveTowards(unit, gate, 0);
+                    if (!nextGatePosition.Equals(unit.Position))
+                        intents.Add(new MoveIntent(unit, unit.Position, nextGatePosition, null));
+                    continue;
+                }
+
+                if (!HasLiveTarget(unit)) continue;
                 var target = FindUnit(unit.TargetUnitId);
                 if (IsInAttackRange(unit.Position, target.Position)) continue;
                 var next = MoveTowards(unit, target);
-                if (!next.Equals(unit.Position)) intents.Add(new MoveIntent(unit, unit.Position, next));
+                if (!next.Equals(unit.Position)) intents.Add(new MoveIntent(unit, unit.Position, next, unit.TargetUnitId));
             }
             foreach (var intent in intents)
             {
                 intent.Unit.Position = intent.To;
-                Emit(BattleEventType.Move, intent.Unit.UnitId, null, intent.Unit.TargetUnitId, intent.From, intent.To, null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None);
+                Emit(BattleEventType.Move, intent.Unit.UnitId, null, intent.RelatedUnitId, intent.From, intent.To, null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None);
             }
         }
 
@@ -390,7 +408,7 @@ namespace ArknoNights.Battle.Core
 
         private void StartAttacks()
         {
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.CanAttack && item.NextAttackAllowedTick <= CurrentTick).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 var target = GetAttackTarget(unit);
                 if (target == null) continue;
@@ -449,6 +467,7 @@ namespace ArknoNights.Battle.Core
             foreach (var caster in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray())
             foreach (var abilityState in caster.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal))
             {
+                if (abilityState.Definition.ActivationKind != AbilityActivationKind.Timed) continue;
                 if (abilityState.Definition.SkillPointGeneration != SkillPointGeneration.Automatic) continue;
                 if (!abilityState.RecoverAndTryCast(out var castOrdinal)) continue;
                 CastSummonAbility(caster, abilityState.Definition, castOrdinal);
@@ -600,6 +619,7 @@ namespace ArknoNights.Battle.Core
         private bool HasTargetDeathAnimationLock(RuntimeUnitState unit) => pendingAttacks.Any(item => string.Equals(item.AttackerUnitId, unit.UnitId, StringComparison.Ordinal) && item.DamageTick >= CurrentTick && !FindUnit(item.TargetUnitId).IsAlive);
         private RuntimeUnitState FindUnit(string unitId) => runtimeUnits.FirstOrDefault(item => string.Equals(item.UnitId, unitId, StringComparison.Ordinal));
         private static FixedPosition GatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.BlueGate : BattlefieldRules.RedGate);
+        private static FixedPosition OpposingGatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.RedGate : BattlefieldRules.BlueGate);
         private static long DistanceSquared(FixedPosition first, FixedPosition second) { var x = (long)first.XUnits - second.XUnits; var y = (long)first.YUnits - second.YUnits; return x * x + y * y; }
         private static bool IsInAttackRange(FixedPosition first, FixedPosition second) => DistanceSquared(first, second) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre;
         private static int CalculateDamage(PendingAttack attack, RuntimeUnitState target)
@@ -624,7 +644,11 @@ namespace ArknoNights.Battle.Core
 
         private static FixedPosition MoveTowards(RuntimeUnitState unit, RuntimeUnitState targetUnit)
         {
-            var target = targetUnit.Position;
+            return MoveTowards(unit, targetUnit.Position, FixedPosition.QuarterMetre - 1);
+        }
+
+        private static FixedPosition MoveTowards(RuntimeUnitState unit, FixedPosition target, int stopDistanceUnits)
+        {
             var dx = target.XUnits - unit.Position.XUnits;
             var dy = target.YUnits - unit.Position.YUnits;
             var distance = IntegerSquareRootCeiling((long)dx * dx + (long)dy * dy);
@@ -633,9 +657,9 @@ namespace ArknoNights.Battle.Core
             var budget = unit.MoveRemainder / BattleInput.TicksPerSecond;
             unit.MoveRemainder %= BattleInput.TicksPerSecond;
             if (budget <= 0) return unit.Position;
-            // Attack and blocking share the same strict range. Do not let a large
-            // single-tick movement skip it and land on the target centre.
-            var maximumEntryBudget = Math.Max(0, distance - (FixedPosition.QuarterMetre - 1));
+            // Attack/block pursuit stops inside the shared strict range. Gate
+            // movement instead passes zero and reaches the exact gate position.
+            var maximumEntryBudget = Math.Max(0, distance - stopDistanceUnits);
             budget = Math.Min(budget, maximumEntryBudget);
             if (budget <= 0) return unit.Position;
             if (budget >= distance) { unit.MoveXNumeratorRemainder = 0; unit.MoveYNumeratorRemainder = 0; return target; }
@@ -660,7 +684,7 @@ namespace ArknoNights.Battle.Core
             events.Add(new BattleEvent(BattleEventType.Spawn, CurrentTick, ++eventSequence, unit.UnitId, unit.TypeId, unit.Side, null, null, unit.Position, null, 0, unit.CurrentHitPoints, unit.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None, snapshot));
         }
 
-        private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to) { Unit = unit; From = from; To = to; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } }
+        private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to, string relatedUnitId) { Unit = unit; From = from; To = to; RelatedUnitId = relatedUnitId; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } public string RelatedUnitId { get; } }
         private readonly struct BlockProposal { public BlockProposal(RuntimeUnitState actor, RuntimeUnitState target) { Actor = actor; Target = target; } public RuntimeUnitState Actor { get; } public RuntimeUnitState Target { get; } }
         private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
