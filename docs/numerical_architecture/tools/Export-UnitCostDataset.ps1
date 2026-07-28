@@ -159,6 +159,8 @@ try {
     $OutputCsvPath = [System.IO.Path]::GetFullPath($OutputCsvPath)
     $AnalysisOutputPath = [System.IO.Path]::GetFullPath($AnalysisOutputPath)
     Assert-Condition ($OutputCsvPath -cne $AnalysisOutputPath) 'OutputCsvPath and AnalysisOutputPath must be different files.'
+    Assert-Condition (-not [string]::Equals($OutputCsvPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'OutputCsvPath must not overwrite BondSpecPath.'
+    Assert-Condition (-not [string]::Equals($AnalysisOutputPath, $BondSpecPath, [System.StringComparison]::OrdinalIgnoreCase)) 'AnalysisOutputPath must not overwrite BondSpecPath.'
 
     $shopHeader = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '88', [char]0xFF09)
     $nonShopHeader = [string]::Concat('## ', [char]0x975E, [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '5', [char]0xFF09)
@@ -245,14 +247,15 @@ try {
         Assert-Condition ([string]$sourceDocument.typeId -ceq $typeId) "Resource directory '$($resourceDirectory.Name)' source typeId '$($sourceDocument.typeId)' does not match '$typeId'."
         $levelZero = Get-RequiredLevelZero -LevelsDocument $levelsDocument -DirectoryName $resourceDirectory.Name
 
-        if ($damageTypeOverrides.ContainsKey($typeId)) {
+        $stagingDamageType = [string]$sourceDocument.damageType
+        if ([string]::IsNullOrWhiteSpace($stagingDamageType)) {
+            Assert-Condition ($damageTypeOverrides.ContainsKey($typeId)) "TypeId '$typeId' is missing a damageType."
             $damageType = $damageTypeOverrides[$typeId]
             $damageTypeSource = 'ConfirmedOverride'
         }
         else {
-            $damageType = [string]$sourceDocument.damageType
-            Assert-Condition (-not [string]::IsNullOrWhiteSpace($damageType)) "TypeId '$typeId' is missing a damageType."
-            Assert-Condition ($allowedDamageTypes.Contains($damageType)) "TypeId '$typeId' has invalid damageType '$damageType'."
+            Assert-Condition ($allowedDamageTypes.Contains($stagingDamageType)) "TypeId '$typeId' has invalid damageType '$stagingDamageType'."
+            $damageType = $stagingDamageType
             $damageTypeSource = 'Staging'
         }
 

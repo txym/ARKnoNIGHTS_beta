@@ -31,6 +31,98 @@ function Assert-Condition {
     }
 }
 
+function New-InvalidDamageTypeStagingRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceStagingRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot
+    )
+
+    [System.IO.Directory]::CreateDirectory($DestinationRoot) | Out-Null
+    foreach ($sourceDirectory in Get-ChildItem -LiteralPath $SourceStagingRoot -Directory) {
+        $destinationDirectory = Join-Path $DestinationRoot $sourceDirectory.Name
+        if ($sourceDirectory.Name -ceq '1238_ltmob') {
+            Copy-Item -LiteralPath $sourceDirectory.FullName -Destination $destinationDirectory -Recurse
+        }
+        else {
+            New-Item -ItemType Junction -Path $destinationDirectory -Target $sourceDirectory.FullName | Out-Null
+        }
+    }
+
+    $sourcePath = Join-Path $DestinationRoot '1238_ltmob\unit-source-v1.json'
+    $sourceDocument = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $sourceDocument.damageType = 'InvalidDamageType'
+    [System.IO.File]::WriteAllText($sourcePath, ($sourceDocument | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
+}
+
+function Add-RegressionFailure {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Failures,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+
+    $Failures.Add($Message)
+}
+
+function Test-InvalidOverrideDamageType {
+    param(
+        [Parameter(Mandatory = $true)][string]$BondSpecPath,
+        [Parameter(Mandatory = $true)][string]$StagingRoot,
+        [Parameter(Mandatory = $true)][string]$TestRoot,
+        [Parameter(Mandatory = $true)][string]$ExporterPath,
+        [Parameter(Mandatory = $true)][string]$PowerShellPath,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Failures
+    )
+
+    $fixtureRoot = Join-Path $TestRoot ('invalid-damage-staging-' + [guid]::NewGuid().ToString('N'))
+    New-InvalidDamageTypeStagingRoot -SourceStagingRoot $StagingRoot -DestinationRoot $fixtureRoot
+    $outputCsv = Join-Path $TestRoot 'invalid-damage.csv'
+    $analysisOutput = Join-Path $TestRoot 'invalid-damage.json'
+    & $PowerShellPath -NoProfile -ExecutionPolicy Bypass -File $ExporterPath `
+        -BondSpecPath $BondSpecPath `
+        -StagingRoot $fixtureRoot `
+        -OutputCsvPath $outputCsv `
+        -AnalysisOutputPath $analysisOutput
+    if ($LASTEXITCODE -eq 0) {
+        Add-RegressionFailure -Failures $Failures -Message 'Illegal non-empty damageType for TypeId 1238 was accepted instead of rejected.'
+    }
+}
+
+function Test-BondSpecOutputCollision {
+    param(
+        [Parameter(Mandatory = $true)][string]$BondSpecPath,
+        [Parameter(Mandatory = $true)][string]$StagingRoot,
+        [Parameter(Mandatory = $true)][string]$TestRoot,
+        [Parameter(Mandatory = $true)][string]$ExporterPath,
+        [Parameter(Mandatory = $true)][string]$PowerShellPath,
+        [Parameter(Mandatory = $true)][string]$OutputParameterName,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Failures
+    )
+
+    $fixtureBondSpecPath = Join-Path $TestRoot ('bond-spec-collision-' + $OutputParameterName + '-' + [guid]::NewGuid().ToString('N') + '.md')
+    [System.IO.File]::Copy($BondSpecPath, $fixtureBondSpecPath)
+    $originalContent = [System.IO.File]::ReadAllText($fixtureBondSpecPath)
+    $outputCsv = Join-Path $TestRoot ('collision-' + [guid]::NewGuid().ToString('N') + '.csv')
+    $analysisOutput = Join-Path $TestRoot ('collision-' + [guid]::NewGuid().ToString('N') + '.json')
+    if ($OutputParameterName -ceq 'OutputCsvPath') {
+        $outputCsv = $fixtureBondSpecPath
+    }
+    else {
+        $analysisOutput = $fixtureBondSpecPath
+    }
+
+    & $PowerShellPath -NoProfile -ExecutionPolicy Bypass -File $ExporterPath `
+        -BondSpecPath $fixtureBondSpecPath `
+        -StagingRoot $StagingRoot `
+        -OutputCsvPath $outputCsv `
+        -AnalysisOutputPath $analysisOutput
+    if ($LASTEXITCODE -eq 0) {
+        Add-RegressionFailure -Failures $Failures -Message "$OutputParameterName equal to BondSpecPath was accepted instead of rejected."
+    }
+    if ([System.IO.File]::ReadAllText($fixtureBondSpecPath) -cne $originalContent) {
+        Add-RegressionFailure -Failures $Failures -Message "$OutputParameterName equal to BondSpecPath modified the input fixture."
+    }
+}
+
 try {
     $testRoot = Join-Path $TempRoot 'UnitCostModel'
     [System.IO.Directory]::CreateDirectory($testRoot) | Out-Null
@@ -82,6 +174,15 @@ try {
     }
 
     Assert-Condition (Test-Path -LiteralPath $analysisOutput -PathType Leaf) "Missing analysis output '$analysisOutput'."
+
+    $regressionFailures = [System.Collections.Generic.List[string]]::new()
+    Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures
+    foreach ($outputParameterName in @('OutputCsvPath', 'AnalysisOutputPath')) {
+        Test-BondSpecOutputCollision -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -OutputParameterName $outputParameterName -Failures $regressionFailures
+    }
+    $regressionFailureMessage = if ($regressionFailures.Count -eq 0) { 'No regression failures.' } else { $regressionFailures -join [Environment]::NewLine }
+    Assert-Condition ($regressionFailures.Count -eq 0) $regressionFailureMessage
+
     Write-Host "PASS: Unit Cost model self-test validated $($rows.Count) shop rows."
     exit 0
 }
