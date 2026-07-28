@@ -1581,8 +1581,34 @@ rg -n `
 
 git diff --check
 git status --short
-git diff --stat 7e658b4..HEAD
-git diff --name-status 7e658b4..HEAD
+
+$migrationCommits = @(
+  '7e658b4',
+  '76a7fbc',
+  '98e55b1',
+  '4c603aa',
+  'aefd415',
+  'fb34027',
+  'eb99edc',
+  'd53df52',
+  '73a8e24',
+  '2b98c76',
+  '0516c3f',
+  '22f6e9f',
+  '1392142',
+  '198d5ee',
+  '9b75bc8',
+  'ddf4bf4'
+)
+
+foreach ($commit in $migrationCommits) {
+  git show --check --format= $commit
+  if ($LASTEXITCODE -ne 0) {
+    throw "Migration commit diff-check failed: $commit"
+  }
+  git show --stat --oneline $commit
+  git show --name-status --format= $commit
+}
 ```
 
 Expected:
@@ -1591,7 +1617,8 @@ Expected:
 - old directory result `False`;
 - forbidden-field scan has zero matches;
 - `git diff --check` has zero diagnostics;
-- the commit range contains only files listed in this plan;
+- the explicit migration commit list contains only files listed in this plan
+  (including its design/plan amendments);
 - unrelated dirty-worktree changes remain unstaged and unmodified by these commits.
 
 - [ ] **Step 7: Inspect final serialization and runtime logs**
