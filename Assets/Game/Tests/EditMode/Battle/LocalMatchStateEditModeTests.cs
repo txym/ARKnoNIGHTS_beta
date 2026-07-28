@@ -136,6 +136,11 @@ namespace ArknoNights.Battle.Tests
 
             Assert.AreEqual(LocalMatchOperationCode.InsufficientGold, state.TryRefresh().Code);
             Assert.AreEqual(beforeInsufficientRefresh, state.Snapshot.CanonicalSummary);
+            var passiveRefresh = state.RefreshAllShopsAfterBattle();
+            Assert.IsTrue(passiveRefresh.Success);
+            CollectionAssert.AreEqual(
+                new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
+                passiveRefresh.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
         }
 
         [Test]
