@@ -190,7 +190,7 @@ private static string SourceUnitKey(string unitKey)
 11. Set `exactNameSignature` to the ordered animation names joined with the
     unit-separator character `\u001f`.
 12. Tokenize names with
-    `Regex.Matches(name, @"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+")`,
+    `Regex.Matches(name, @"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|[A-Z]+|\d+")`,
     lower-case with `InvariantCulture`, de-duplicate per variant, and sort.
 13. Group exact signatures in ordinal order and aggregate token counts in
     ordinal order.

@@ -114,7 +114,8 @@ InvariantCulture 的 round-trip 格式序列化；本阶段不换算 Tick、不�
 `signatures` 按完整、区分大小写的动画名称集合分组，记录该组包含的变体键。
 `tokenSummary` 只做字面统计，例如名称中出现
 `idle/run/move/walk/attack/atk/hit/die/death/skill/begin/loop/end/a/b`
-等不区分大小写的词段；它不宣称某个动画已经被选为游戏动作。
+等不区分大小写的词段；单字母状态段同时覆盖 `A_Attack` 和 `Attack_A`
+这类前、后缀形式。它不宣称某个动画已经被选为游戏动作。
 
 ## 实现边界
 

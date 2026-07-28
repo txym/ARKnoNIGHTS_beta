@@ -27,7 +27,7 @@ internal static class BondsUnitAnimationAudit
         new Regex(@"^(?<typeId>\d+)_", RegexOptions.CultureInvariant);
     private static readonly Regex AnimationTokenPattern =
         new Regex(
-            @"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+",
+            @"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|[A-Z]+|\d+",
             RegexOptions.CultureInvariant);
 
     internal static BondsUnitAnimationAuditDocument BuildDocument()

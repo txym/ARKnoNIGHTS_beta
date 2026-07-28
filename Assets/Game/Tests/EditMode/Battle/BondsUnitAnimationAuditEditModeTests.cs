@@ -121,6 +121,26 @@ namespace ArknoNights.Battle.Tests
             }
         }
 
+        [Test]
+        public void BuildDocument_TokenizesLeadingAndTrailingStateSegments()
+        {
+            var variants = GetArrayField(BuildDocument(), "variants");
+
+            var leadingStateTokens = GetField<string[]>(
+                FindVariant(variants, "10126_rkbomb"),
+                "caseFoldedTokenSummary");
+            Assert.That(leadingStateTokens, Does.Contain("a"));
+            Assert.That(leadingStateTokens, Does.Contain("b"));
+            Assert.That(leadingStateTokens, Does.Contain("attack"));
+            Assert.That(leadingStateTokens, Does.Contain("move"));
+
+            var trailingStateTokens = GetField<string[]>(
+                FindVariant(variants, "10001_trslim"),
+                "caseFoldedTokenSummary");
+            Assert.That(trailingStateTokens, Does.Contain("a"));
+            Assert.That(trailingStateTokens, Does.Contain("b"));
+        }
+
         private static object BuildDocument()
         {
             var auditType = Type.GetType("BondsUnitAnimationAudit, Assembly-CSharp-Editor");
