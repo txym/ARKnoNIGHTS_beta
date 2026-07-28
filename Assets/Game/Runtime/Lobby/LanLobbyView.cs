@@ -24,6 +24,7 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         public RectTransform Root;
         public Image CardBody;
+        public LanLobbyRect CardBodyLayout;
         public Image TopBar;
         public LanLobbyRect WaitingTopBarLayout;
         public LanLobbyRect ReadyTopBarLayout;
@@ -509,6 +510,7 @@ public sealed class LanLobbyView : MonoBehaviour
         roomPrimaryActionButton.transition = Selectable.Transition.None;
         roomPrimaryActionLabel = roomPrimaryActionButton.GetComponentInChildren<Text>();
         roomPrimaryActionLabel.fontSize = 38;
+        roomPrimaryActionLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
         roomPrimaryActionIcon = Image("ActionIcon", roomPrimaryActionButton.transform, "btn_match_host_normal");
         roomPrimaryActionIcon.preserveAspect = false;
         PositionBottomLeft(roomPrimaryActionIcon.rectTransform, RelativeTo(layout.PrimaryIcon, layout.PrimaryAction));
@@ -600,6 +602,7 @@ public sealed class LanLobbyView : MonoBehaviour
         {
             Root = root,
             CardBody = cardBody,
+            CardBodyLayout = layout.CardBody,
             TopBar = topBar,
             WaitingTopBarLayout = layout.TopBar,
             ReadyTopBarLayout = layout.ReadyTopBar,
@@ -626,8 +629,16 @@ public sealed class LanLobbyView : MonoBehaviour
         var isReady = state == RoomSlotPresentationState.Ready;
         slot.CardBody.sprite = Sprite("card_bg");
         slot.CardBody.color = isReady
-            ? new Color(9f / 255f, 187f / 255f, 151f / 255f, 1f)
+            ? new Color(0f, 220f / 255f, 220f / 255f, 1f)
             : Color.white;
+        PositionBottomLeft(slot.CardBody.rectTransform, slot.CardBodyLayout);
+        slot.CardBody.rectTransform.localScale = isReady
+            ? new Vector3(1f, -1f, 1f)
+            : Vector3.one;
+        if (isReady)
+        {
+            slot.CardBody.rectTransform.anchoredPosition += Vector2.up * slot.CardBodyLayout.Height;
+        }
         slot.TopBar.sprite = Sprite(isReady ? "bg_top_ready" : "bg_top_normal");
         PositionBottomLeft(slot.TopBar.rectTransform, isReady ? slot.ReadyTopBarLayout : slot.WaitingTopBarLayout);
         slot.TopBar.preserveAspect = !isReady;
@@ -648,7 +659,7 @@ public sealed class LanLobbyView : MonoBehaviour
         slot.OccupiedContent.SetActive(isReady);
         slot.ReadyIcon.gameObject.SetActive(isReady);
         slot.ReadyLabel.gameObject.SetActive(isReady);
-        slot.LowerDecoration.gameObject.SetActive(isReady);
+        slot.LowerDecoration.gameObject.SetActive(true);
         slot.CreatorTag.gameObject.SetActive(member != null && isHostSlot);
         ResizeToPreferredText(slot.ReadyLabel);
     }

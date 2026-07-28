@@ -408,7 +408,7 @@ namespace ArknoNights.Lobby.Tests
                         { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
                         { "player_card_self_frame", 1 }, { "card_empty", 3 }, { "bg_plus", 3 },
-                        { "player_card_ready", 1 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
+                        { "player_card_ready", 1 }, { "card_deco_self", 4 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_normal", 1 }, { "btn_match_host_normal", 1 }
                     };
                 case "room-full":
@@ -417,7 +417,7 @@ namespace ArknoNights.Lobby.Tests
                         { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
                         { "player_card_self_frame", 1 }, { "player_card_ready", 1 },
-                        { "card_deco_self", 1 }, { "host_top_tag", 1 },
+                        { "card_deco_self", 4 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_grey", 1 }, { "btn_match_host_grey", 1 }
                     };
                 case "room-ready":

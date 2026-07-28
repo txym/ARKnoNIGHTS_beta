@@ -212,15 +212,19 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             if (rect == null) continue;
             var corners = new Vector3[4];
             rect.GetWorldCorners(corners);
+            var minX = corners.Min(corner => corner.x);
+            var minY = corners.Min(corner => corner.y);
+            var maxX = corners.Max(corner => corner.x);
+            var maxY = corners.Max(corner => corner.y);
             values.Add(new CaptureRect
             {
                 name = name,
                 coordinateOrigin = "screen-bottom-left",
                 unit = "px",
-                x = corners[0].x,
-                y = corners[0].y,
-                width = corners[2].x - corners[0].x,
-                height = corners[2].y - corners[0].y
+                x = minX,
+                y = minY,
+                width = maxX - minX,
+                height = maxY - minY
             });
         }
         return values.ToArray();

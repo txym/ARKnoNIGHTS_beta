@@ -662,6 +662,7 @@ namespace ArknoNights.Lobby.Tests
             AssertResourceSprite(RequireChild(primary.transform, "ActionIcon").GetComponent<Image>(), "btn_match_host_normal");
             Assert.That(primary.GetComponentInChildren<Text>().color,
                 Is.EqualTo(new Color(33f / 255f, 33f / 255f, 33f / 255f, 1f)));
+            Assert.That(primary.GetComponentInChildren<Text>().horizontalOverflow, Is.EqualTo(HorizontalWrapMode.Overflow));
             Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("协议启动"));
             Assert.That(primary.interactable, Is.True);
             Click(primary);
@@ -686,6 +687,7 @@ namespace ArknoNights.Lobby.Tests
             AssertResourceSprite(RequireChild(primary.transform, "ActionIcon").GetComponent<Image>(), "btn_match_host_grey");
             Assert.That(primary.GetComponentInChildren<Text>().color,
                 Is.EqualTo(new Color(157f / 255f, 157f / 255f, 157f / 255f, 1f)));
+            Assert.That(primary.GetComponentInChildren<Text>().horizontalOverflow, Is.EqualTo(HorizontalWrapMode.Overflow));
             Assert.That(primary.GetComponentInChildren<Text>().text, Is.EqualTo("协议启动"));
             Assert.That(primary.interactable, Is.False);
             Assert.That(primary.GetComponent<CanvasRenderer>().GetColor(), Is.EqualTo(Color.white),
@@ -842,7 +844,7 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(RequireChild(emptyContent, "EmptyInviteHint").GetComponent<Text>().text, Is.Not.Empty);
                 Assert.That(RequireChild(slot, "ReadyOverlay").gameObject.activeSelf, Is.False);
                 Assert.That(RequireChild(slot, "OccupiedContent").gameObject.activeSelf, Is.False);
-                Assert.That(RequireChild(slot, "LowerDecoration").gameObject.activeSelf, Is.False);
+                Assert.That(RequireChild(slot, "LowerDecoration").gameObject.activeSelf, Is.True);
                 Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
                 Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
                     Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
@@ -862,7 +864,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(RequireChild(slot, "ReadyOverlay").gameObject.activeSelf, Is.False);
             Assert.That(RequireChild(slot, "EmptyContent").gameObject.activeSelf, Is.False);
             Assert.That(RequireChild(slot, "OccupiedContent").gameObject.activeSelf, Is.False);
-            Assert.That(RequireChild(slot, "LowerDecoration").gameObject.activeSelf, Is.False);
+            Assert.That(RequireChild(slot, "LowerDecoration").gameObject.activeSelf, Is.True);
             Assert.That(RequireChild(slot, "CreatorTag").gameObject.activeSelf, Is.False);
             Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
                 Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
@@ -916,7 +918,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(RequireChild(hostSlot, "CreatorTag").gameObject.activeSelf, Is.True);
             var hostLayout = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
             Assert.That(RequireChild(hostSlot, "CardBody").GetComponent<Image>().color,
-                Is.EqualTo(new Color(9f / 255f, 187f / 255f, 151f / 255f, 1f)));
+                Is.EqualTo(new Color(0f, 220f / 255f, 220f / 255f, 1f)));
             AssertBottomLeftRect(RequireChild(hostSlot, "TopBar").GetComponent<RectTransform>(), hostLayout.ReadyTopBar);
             AssertBottomLeftRect(RequireChild(hostSlot, "CreatorTag").GetComponent<RectTransform>(), hostLayout.CreatorTag);
             Assert.That(RequireChild(RequireChild(hostSlot, "OccupiedContent"), "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
@@ -1434,6 +1436,7 @@ namespace ArknoNights.Lobby.Tests
             AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
             AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
             Assert.That(RequireChild(slot, "CardBody").GetComponent<Image>().color, Is.EqualTo(Color.white));
+            Assert.That(RequireChild(slot, "CardBody").localScale, Is.EqualTo(Vector3.one));
             AssertBottomLeftRect(RequireChild(slot, "TopBar").GetComponent<RectTransform>(), slotLayout.TopBar);
             Assert.That(RequireChild(slot, "TopBar").GetComponent<Image>().preserveAspect, Is.True);
             AssertActiveResourceSprite(RequireChild(slot, "ReadyOverlay"), "player_card_self_frame", false);
@@ -1453,7 +1456,7 @@ namespace ArknoNights.Lobby.Tests
             AssertActiveResourceSprite(RequireChild(occupiedContent, "ReadyIcon"), "player_card_ready", false);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").gameObject.activeSelf, Is.False);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
-            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", false);
+            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", true);
             AssertActiveResourceSprite(RequireChild(slot, "CreatorTag"), "host_top_tag", false);
             Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
                 Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
@@ -1468,6 +1471,7 @@ namespace ArknoNights.Lobby.Tests
             AssertActiveResourceSprite(RequireChild(slot, "CardBody"), "card_bg", true);
             AssertActiveResourceSprite(RequireChild(slot, "TopBar"), "bg_top_normal", true);
             Assert.That(RequireChild(slot, "CardBody").GetComponent<Image>().color, Is.EqualTo(Color.white));
+            Assert.That(RequireChild(slot, "CardBody").localScale, Is.EqualTo(Vector3.one));
             AssertBottomLeftRect(RequireChild(slot, "TopBar").GetComponent<RectTransform>(), slotLayout.TopBar);
             Assert.That(RequireChild(slot, "TopBar").GetComponent<Image>().preserveAspect, Is.True);
             AssertActiveResourceSprite(RequireChild(slot, "ReadyOverlay"), "player_card_self_frame", false);
@@ -1489,7 +1493,7 @@ namespace ArknoNights.Lobby.Tests
             AssertActiveResourceSprite(RequireChild(occupiedContent, "ReadyIcon"), "player_card_ready", false);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").gameObject.activeSelf, Is.False);
             Assert.That(RequireChild(occupiedContent, "ReadyLabel").GetComponent<Text>().text, Is.EqualTo("已就绪"));
-            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", false);
+            AssertActiveResourceSprite(RequireChild(slot, "LowerDecoration"), "card_deco_self", true);
             AssertActiveResourceSprite(RequireChild(slot, "CreatorTag"), "host_top_tag", false);
             Assert.That(slot.GetComponentsInChildren<Text>(true).Select(text => text.text),
                 Has.None.EqualTo("OPEN SLOT").And.None.EqualTo("WAITING"));
@@ -1507,7 +1511,9 @@ namespace ArknoNights.Lobby.Tests
             var cardBody = RequireChild(slot, "CardBody").GetComponent<Image>();
             var topBar = RequireChild(slot, "TopBar").GetComponent<Image>();
             AssertResourceSprite(cardBody, "card_bg");
-            Assert.That(cardBody.color, Is.EqualTo(new Color(9f / 255f, 187f / 255f, 151f / 255f, 1f)));
+            Assert.That(cardBody.color, Is.EqualTo(new Color(0f, 220f / 255f, 220f / 255f, 1f)));
+            Assert.That(cardBody.rectTransform.localScale, Is.EqualTo(new Vector3(1f, -1f, 1f)),
+                "Ready cards flip the source gradient so its light cyan region sits behind the ready status.");
             AssertResourceSprite(topBar, "bg_top_ready");
             AssertBottomLeftRect(topBar.rectTransform, slotLayout.ReadyTopBar);
             Assert.That(topBar.preserveAspect, Is.False,

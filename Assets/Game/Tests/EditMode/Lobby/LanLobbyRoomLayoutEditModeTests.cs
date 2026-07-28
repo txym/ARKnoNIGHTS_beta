@@ -37,7 +37,7 @@ namespace ArknoNights.Lobby.Tests
             {
                 AssertContained(slot.CardBody, slot.Root);
                 AssertContained(slot.LowerDecoration, slot.Root);
-                Assert.That(slot.LowerDecoration.Top - slot.CardBody.Bottom, Is.EqualTo(0.75f).Within(0.01f));
+                Assert.That(slot.LowerDecoration.Top - slot.CardBody.Bottom, Is.EqualTo(8.75f).Within(0.01f));
             }
         }
 
@@ -75,8 +75,8 @@ namespace ArknoNights.Lobby.Tests
             var slot = global::LanLobbyRoomLayout.ForSize(1920, 1080).Slots[0];
 
             AssertRect(slot.ReadyTopBar, 26.25f, 621.5f, 320.25f, 51f);
-            AssertRect(slot.ReadyIcon, 114.5f, 148.25f, 38f, 38f);
-            AssertRect(slot.ReadyLabel, 139.5f, 148.25f, 0f, 0f);
+            AssertRect(slot.ReadyIcon, 114.5f, 144.25f, 38f, 38f);
+            AssertRect(slot.ReadyLabel, 168.5f, 148.25f, 0f, 0f);
             AssertRect(slot.CreatorTag, 123.5f, 576.25f, 124f, 35f);
         }
 
@@ -108,14 +108,14 @@ namespace ArknoNights.Lobby.Tests
             var layout = global::LanLobbyRoomLayout.ForSize(1920, 1080);
 
             AssertRect(layout.PrimaryAction, 1487.25f, 42.75f, 436f, 95.5f);
-            AssertRect(layout.DisabledPrimaryAction, 1487.25f, 41.25f, 435f, 105f);
+            AssertRect(layout.DisabledPrimaryAction, 1487.25f, 41.25f, 435f, 114f);
             // btn_match_host_normal's DarkOnCyan source-visible height is
             // 38/41 of its RectTransform, so 56 px produces the measured
             // 52 px Player foreground without shifting its visible top.
             AssertRect(layout.PrimaryIcon, 1573f, 60f, 62f, 56f);
-            AssertRect(layout.DisabledPrimaryIcon, 1571f, 64f, 63f, 52f);
-            AssertRect(layout.PrimaryLabel, 1645f, 71f, 150f, 38f);
-            AssertRect(layout.DisabledPrimaryLabel, 1645f, 69f, 150f, 38f);
+            AssertRect(layout.DisabledPrimaryIcon, 1571f, 60f, 63f, 56f);
+            AssertRect(layout.PrimaryLabel, 1627.5f, 71f, 190f, 38f);
+            AssertRect(layout.DisabledPrimaryLabel, 1627.5f, 72f, 190f, 38f);
             // The 54x56 img_return source has a blended light core near
             // x=15,y=8,w=28,h=28; compensate the source-visible inset so that
             // the decoded Player core lands on reference x=58,y=40,w=39,h=40.
