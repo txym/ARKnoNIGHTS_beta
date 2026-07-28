@@ -324,6 +324,11 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.TriggeredSpawnEffect.SummonTypeId).Append(',')
                         .Append(ability.TriggeredSpawnEffect.SideLengthCentimetres).Append(',')
                         .Append(ability.TriggeredSpawnEffect.MaxActiveSameType);
+                if (ability.HealthThresholdAdjacentSpawnEffect != null)
+                    builder.Append("|G:")
+                        .Append(ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille).Append(',')
+                        .Append(ability.HealthThresholdAdjacentSpawnEffect.InclusiveThreshold ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdAdjacentSpawnEffect.SummonTypeId);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -407,6 +412,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.OnHitDamageOverTimeEffect != null) validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.unexpected", "Timed ability cannot define an on-hit damage-over-time effect: " + ability.AbilityId));
                     if (ability.UnblockedAttackCharge != null) validationErrors.Add(new ValidationError("ability.unblockedAttackCharge.unexpected", "Timed ability cannot define an unblocked attack-charge effect: " + ability.AbilityId));
                     if (ability.TriggeredSpawnEffect != null) validationErrors.Add(new ValidationError("ability.triggeredSpawn.unexpected", "Timed ability cannot define a triggered-spawn effect: " + ability.AbilityId));
+                    if (ability.HealthThresholdAdjacentSpawnEffect != null) validationErrors.Add(new ValidationError("ability.healthThresholdAdjacentSpawn.unexpected", "Timed ability cannot define a health-threshold adjacent-spawn effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
@@ -443,7 +449,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.AttackAreaDamageModifier == null ? 0 : 1)
                         + (ability.OnHitDamageOverTimeEffect == null ? 0 : 1)
                         + (ability.UnblockedAttackCharge == null ? 0 : 1)
-                        + (ability.TriggeredSpawnEffect == null ? 0 : 1);
+                        + (ability.TriggeredSpawnEffect == null ? 0 : 1)
+                        + (ability.HealthThresholdAdjacentSpawnEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -598,6 +605,12 @@ namespace ArknoNights.Battle.Core
                             || ability.TriggeredSpawnEffect.SideLengthCentimetres < 0
                             || ability.TriggeredSpawnEffect.MaxActiveSameType < 0))
                         validationErrors.Add(new ValidationError("ability.triggeredSpawn.invalid", "Triggered-spawn effect is invalid: " + ability.AbilityId));
+                    if (ability.HealthThresholdAdjacentSpawnEffect != null
+                        && (ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille <= 0
+                            || ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille > 1000
+                            || string.IsNullOrWhiteSpace(ability.HealthThresholdAdjacentSpawnEffect.SummonTypeId)
+                            || !typeIds.Contains(ability.HealthThresholdAdjacentSpawnEffect.SummonTypeId)))
+                        validationErrors.Add(new ValidationError("ability.healthThresholdAdjacentSpawn.invalid", "Health-threshold adjacent-spawn effect is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

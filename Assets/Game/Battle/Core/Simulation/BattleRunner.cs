@@ -20,6 +20,7 @@ namespace ArknoNights.Battle.Core
         private int unblockedAttackChargeStacks;
         private bool attackCountStateForceUnlocked;
         private int damageReceivedCount;
+        private bool healthThresholdAdjacentSpawnTriggered;
 
         internal RuntimeAbilityState(AbilityDefinition definition)
         {
@@ -164,6 +165,29 @@ namespace ArknoNights.Battle.Core
                     : int.MaxValue;
         }
 
+        internal bool TryTriggerHealthThresholdAdjacentSpawn(
+            int currentHitPoints,
+            int maxHitPoints)
+        {
+            var effect =
+                Definition.HealthThresholdAdjacentSpawnEffect;
+            if (effect == null
+                || healthThresholdAdjacentSpawnTriggered)
+                return false;
+            var scaledCurrent =
+                (long)currentHitPoints * 1000;
+            var scaledThreshold =
+                (long)maxHitPoints
+                * effect.ThresholdHitPointsPermille;
+            var condition = effect.InclusiveThreshold
+                ? scaledCurrent <= scaledThreshold
+                : scaledCurrent < scaledThreshold;
+            if (!condition)
+                return false;
+            healthThresholdAdjacentSpawnTriggered = true;
+            return true;
+        }
+
         internal void AppendStableSummary(StringBuilder builder)
         {
             builder.Append(',')
@@ -190,6 +214,13 @@ namespace ArknoNights.Battle.Core
                 == TriggeredSpawnKind.DamageReceived)
                 builder.Append(":received:")
                     .Append(damageReceivedCount);
+            if (Definition.HealthThresholdAdjacentSpawnEffect
+                != null)
+                builder.Append(":adjacent-spawn:")
+                    .Append(
+                        healthThresholdAdjacentSpawnTriggered
+                            ? 1
+                            : 0);
         }
     }
 
@@ -1312,6 +1343,49 @@ namespace ArknoNights.Battle.Core
             EmitSpawn(summoned, snapshot);
         }
 
+        private void SpawnHealthThresholdAdjacentUnits(
+            RuntimeUnitState owner,
+            HealthThresholdAdjacentSpawnEffectDefinition effect)
+        {
+            var centre =
+                NearestBattlefieldCoordinate(owner.Position);
+            var candidates = new[]
+            {
+                new[] { centre.X - 1, centre.Y },
+                new[] { centre.X + 1, centre.Y },
+                new[] { centre.X, centre.Y - 1 },
+                new[] { centre.X, centre.Y + 1 }
+            };
+            var definition =
+                unitDefinitions[effect.SummonTypeId];
+            foreach (var candidate in candidates)
+            {
+                if (!BattlefieldCoordinate.TryCreate(
+                        candidate[0],
+                        candidate[1],
+                        out var coordinate)
+                    || !BattlefieldRules.IsDeployable(coordinate))
+                    continue;
+                var summoned = new RuntimeUnitState(
+                    dynamicUnitIdAllocator.Allocate(),
+                    owner.PlayerId,
+                    owner.Side,
+                    definition,
+                    FixedPosition.FromCell(coordinate),
+                    0,
+                    Array.Empty<BuffPlaceholder>(),
+                    CurrentTick + 1,
+                    CreateAbilityStates(
+                        definition,
+                        abilityDefinitions));
+                runtimeUnits.Add(summoned);
+                var snapshot =
+                    CreateSpawnSnapshot(summoned, true);
+                unitSnapshots.Add(summoned.UnitId, snapshot);
+                EmitSpawn(summoned, snapshot);
+            }
+        }
+
         private IEnumerable<PendingAttack> ExpandAttackAreaDamage(
             PendingAttack attack)
         {
@@ -1685,12 +1759,25 @@ namespace ArknoNights.Battle.Core
         {
             foreach (var unit in runtimeUnits
                          .Where(IsActive)
-                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
-            foreach (var ability in unit.AbilityStates)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                         .ToArray())
+            foreach (var ability in unit.AbilityStates
+                         .OrderBy(
+                             item => item.Definition.AbilityId,
+                             StringComparer.Ordinal))
+            {
                 ability.UpdateHealthThresholdState(
                     unit.CurrentHitPoints,
                     unit.Definition.MaxHitPoints,
                     CurrentTick);
+                if (ability.TryTriggerHealthThresholdAdjacentSpawn(
+                        unit.CurrentHitPoints,
+                        unit.Definition.MaxHitPoints))
+                    SpawnHealthThresholdAdjacentUnits(
+                        unit,
+                        ability.Definition
+                            .HealthThresholdAdjacentSpawnEffect);
+            }
         }
 
         private void UpdateUnblockedAttackCharges()

@@ -1315,6 +1315,72 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void HealthThresholdAdjacentSpawn_UsesFourNonGateCellCentresOnce()
+        {
+            var input = CreateInput(
+                5,
+                new[]
+                {
+                    Attacker(
+                        "attacker",
+                        2000,
+                        0,
+                        attackIntervalTicks: 100,
+                        attack: 600),
+                    NonAttacker(
+                        "golem",
+                        1000,
+                        "HALF_HEALTH_DROP"),
+                    NonAttacker("berry", 1000)
+                },
+                new[]
+                {
+                    PassiveHealthThresholdAdjacentSpawn(
+                        "HALF_HEALTH_DROP",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: false,
+                        summonTypeId: "berry")
+                },
+                new[] { Unit("attacker", "attacker", 5, 4) },
+                new[] { Unit("golem", "golem", 5, 4) });
+
+            var result =
+                new BattleRunner(input).RunToCompletion();
+            var spawns = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Spawn
+                    && item.UnitTypeId == "berry")
+                .ToArray();
+
+            Assert.That(spawns.Length, Is.EqualTo(4));
+            Assert.That(
+                spawns.Select(item => item.Tick).Distinct(),
+                Is.EqualTo(new[] { 2 }));
+            Assert.That(
+                spawns.Select(item =>
+                        item.ToPosition.Value.ToString())
+                    .OrderBy(item => item, StringComparer.Ordinal),
+                Is.EqualTo(new[]
+                {
+                    "400,500",
+                    "500,400",
+                    "500,600",
+                    "600,500"
+                }));
+            Assert.That(
+                spawns.Select(item =>
+                        item.SpawnSnapshot.ActivationTick)
+                    .Distinct(),
+                Is.EqualTo(new[] { 3 }));
+            Assert.That(
+                spawns.All(item =>
+                    !BattlefieldRules.IsGate(
+                        NearestCoordinate(
+                            item.ToPosition.Value))),
+                Is.True);
+        }
+
+        [Test]
         public void RadiusAura_ExcludesSourceAndDoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -2218,6 +2284,57 @@ namespace ArknoNights.Battle.Tests
                     maxActiveSameType),
                 string.Empty,
                 0);
+        }
+
+        private static AbilityDefinition
+            PassiveHealthThresholdAdjacentSpawn(
+                string abilityId,
+                int thresholdHitPointsPermille,
+                bool inclusiveThreshold,
+                string summonTypeId)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new HealthThresholdAdjacentSpawnEffectDefinition(
+                    thresholdHitPointsPermille,
+                    inclusiveThreshold,
+                    summonTypeId),
+                string.Empty,
+                0);
+        }
+
+        private static BattlefieldCoordinate NearestCoordinate(
+            FixedPosition position)
+        {
+            return new BattlefieldCoordinate(
+                position.XUnits / FixedPosition.UnitsPerMetre,
+                position.YUnits / FixedPosition.UnitsPerMetre);
         }
 
         private static AbilityDefinition PassiveAura(
