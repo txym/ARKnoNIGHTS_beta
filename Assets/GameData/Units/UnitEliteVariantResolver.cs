@@ -650,7 +650,8 @@ internal static class UnitEliteVariantResolver
                     "UNIT_ELITE_VARIANT_ANIMATION_SHAPE_INVALID context=" + context);
             }
 
-            if (string.Equals(animation.key, "Default", StringComparison.Ordinal))
+            if (string.Equals(animation.key, "Default", StringComparison.Ordinal)
+                || string.Equals(animation.name, "Default", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     "UNIT_ELITE_VARIANT_LEGACY_FIELD_FORBIDDEN"
