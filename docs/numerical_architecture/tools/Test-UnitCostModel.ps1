@@ -43,6 +43,34 @@ function Get-NormalizedUtf8Text {
     return ($text -replace "`r`n", "`n" -replace "`r", "`n")
 }
 
+function Test-PathEqualOrUnderRootCaseInsensitive {
+    param(
+        [Parameter(Mandatory = $true)][string]$CandidatePath,
+        [Parameter(Mandatory = $true)][string]$RootPath
+    )
+
+    $normalizedCandidate = [System.IO.Path]::GetFullPath($CandidatePath)
+    $normalizedRoot = [System.IO.Path]::GetFullPath($RootPath)
+    if ([string]::Equals($normalizedCandidate, $normalizedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+    $trimCharacters = [char[]]@([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $rootWithSeparator = $normalizedRoot.TrimEnd($trimCharacters) + [System.IO.Path]::DirectorySeparatorChar
+    return $normalizedCandidate.StartsWith($rootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-ExpectedCsvOutsideTestRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExpectedCsvPath,
+        [Parameter(Mandatory = $true)][string]$TestRoot
+    )
+
+    $normalizedExpectedCsvPath = [System.IO.Path]::GetFullPath($ExpectedCsvPath)
+    $normalizedTestRoot = [System.IO.Path]::GetFullPath($TestRoot)
+    Assert-Condition (-not (Test-PathEqualOrUnderRootCaseInsensitive -CandidatePath $normalizedExpectedCsvPath -RootPath $normalizedTestRoot)) "Expected formal CSV '$normalizedExpectedCsvPath' must not equal or be contained by test output root '$normalizedTestRoot'."
+    return $normalizedExpectedCsvPath
+}
+
 function Get-ExpectedAnalysisPath {
     param([Parameter(Mandatory = $true)][string]$ExpectedCsvPath)
 
@@ -79,6 +107,39 @@ function Assert-MarkdownMarkerRowCount {
         }
     ).Count
     Assert-Equal $ExpectedCount $rowCount "$MarkerName Markdown data row count"
+}
+
+function Test-ExpectedCsvPathGuard {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceExpectedCsvPath,
+        [Parameter(Mandatory = $true)][string]$TempRoot
+    )
+
+    $fixtureRoot = Join-Path $TempRoot ('ExpectedCsvPathGuard-' + [guid]::NewGuid().ToString('N'))
+    $collisionTestRoot = Join-Path $fixtureRoot 'UnitCostModel'
+    [System.IO.Directory]::CreateDirectory($collisionTestRoot) | Out-Null
+    $collisionExpectedCsv = Join-Path $collisionTestRoot 'unit-cost-dataset.csv'
+    [System.IO.File]::Copy($SourceExpectedCsvPath, $collisionExpectedCsv, $false)
+    $collisionSnapshot = Get-FileIntegritySnapshot -Path $collisionExpectedCsv
+
+    Assert-Throws {
+        Assert-ExpectedCsvOutsideTestRoot -ExpectedCsvPath $collisionExpectedCsv -TestRoot $collisionTestRoot
+    } 'ExpectedCsvPath equal to the test output CSV'
+    Assert-Throws {
+        Assert-ExpectedCsvOutsideTestRoot -ExpectedCsvPath $collisionExpectedCsv.ToUpperInvariant() -TestRoot $collisionTestRoot.ToLowerInvariant()
+    } 'case-insensitive ExpectedCsvPath under the test output root'
+    Assert-FileIntegritySnapshotEqual -Expected $collisionSnapshot -Actual (Get-FileIntegritySnapshot -Path $collisionExpectedCsv) -Name 'rejected ExpectedCsvPath collision input'
+    Assert-Equal 1 @(Get-ChildItem -LiteralPath $collisionTestRoot -File).Count 'rejected ExpectedCsvPath collision output file count'
+    Assert-Equal 0 @(Get-ChildItem -LiteralPath $collisionTestRoot -Directory).Count 'rejected ExpectedCsvPath collision output directory count'
+
+    $siblingRoot = Join-Path $fixtureRoot 'UnitCostModel-sibling'
+    [System.IO.Directory]::CreateDirectory($siblingRoot) | Out-Null
+    $siblingExpectedCsv = Join-Path $siblingRoot 'expected.csv'
+    [System.IO.File]::Copy($SourceExpectedCsvPath, $siblingExpectedCsv, $false)
+    $siblingSnapshot = Get-FileIntegritySnapshot -Path $siblingExpectedCsv
+    $acceptedSiblingPath = Assert-ExpectedCsvOutsideTestRoot -ExpectedCsvPath $siblingExpectedCsv -TestRoot $collisionTestRoot
+    Assert-Equal ([System.IO.Path]::GetFullPath($siblingExpectedCsv)) $acceptedSiblingPath 'similar-prefix ExpectedCsvPath sibling'
+    Assert-FileIntegritySnapshotEqual -Expected $siblingSnapshot -Actual (Get-FileIntegritySnapshot -Path $siblingExpectedCsv) -Name 'accepted ExpectedCsvPath sibling input'
 }
 
 function Assert-Throws {
@@ -1030,12 +1091,14 @@ function Test-AbilityInputOutputCollision {
 }
 
 try {
+    $testRoot = [System.IO.Path]::GetFullPath((Join-Path $TempRoot 'UnitCostModel'))
     if (-not [string]::IsNullOrWhiteSpace($ExpectedCsvPath)) {
         Assert-Condition (Test-Path -LiteralPath $ExpectedCsvPath -PathType Leaf) "Expected formal CSV '$ExpectedCsvPath' does not exist."
         $ExpectedCsvPath = (Resolve-Path -LiteralPath $ExpectedCsvPath).Path
+        $ExpectedCsvPath = Assert-ExpectedCsvOutsideTestRoot -ExpectedCsvPath $ExpectedCsvPath -TestRoot $testRoot
+        Test-ExpectedCsvPathGuard -SourceExpectedCsvPath $ExpectedCsvPath -TempRoot $TempRoot
     }
 
-    $testRoot = Join-Path $TempRoot 'UnitCostModel'
     [System.IO.Directory]::CreateDirectory($testRoot) | Out-Null
 
     $outputCsv = Join-Path $testRoot 'unit-cost-dataset.csv'
