@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$BondSpecPath,
     [Parameter(Mandatory = $true)][string]$StagingRoot,
+    [string]$ExpectedCsvPath,
     [string]$TempRoot = (Join-Path (Get-Location) 'Temp')
 )
 
@@ -29,6 +30,55 @@ function Assert-Condition {
     if (-not $Condition) {
         throw $Message
     }
+}
+
+function Get-NormalizedUtf8Text {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+    $text = [System.IO.File]::ReadAllText($Path, $utf8)
+    if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) {
+        $text = $text.Substring(1)
+    }
+    return ($text -replace "`r`n", "`n" -replace "`r", "`n")
+}
+
+function Get-ExpectedAnalysisPath {
+    param([Parameter(Mandatory = $true)][string]$ExpectedCsvPath)
+
+    $directory = Split-Path -Parent $ExpectedCsvPath
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($ExpectedCsvPath)
+    $analysisBaseName = if ($baseName.EndsWith('_dataset', [System.StringComparison]::Ordinal)) {
+        $baseName.Substring(0, $baseName.Length - '_dataset'.Length) + '_analysis'
+    }
+    else {
+        $baseName + '_analysis'
+    }
+    return Join-Path $directory ($analysisBaseName + '.md')
+}
+
+function Assert-MarkdownMarkerRowCount {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines,
+        [Parameter(Mandatory = $true)][string]$MarkerName,
+        [Parameter(Mandatory = $true)][int]$ExpectedCount
+    )
+
+    $startMarker = "<!-- ${MarkerName}_START -->"
+    $endMarker = "<!-- ${MarkerName}_END -->"
+    $startIndexes = @(for ($index = 0; $index -lt $Lines.Count; $index++) { if ($Lines[$index] -ceq $startMarker) { $index } })
+    $endIndexes = @(for ($index = 0; $index -lt $Lines.Count; $index++) { if ($Lines[$index] -ceq $endMarker) { $index } })
+    Assert-Equal 1 $startIndexes.Count "$MarkerName start marker count"
+    Assert-Equal 1 $endIndexes.Count "$MarkerName end marker count"
+    Assert-Condition ($endIndexes[0] -gt $startIndexes[0]) "$MarkerName markers are reversed."
+    $rowCount = @(
+        for ($index = $startIndexes[0] + 1; $index -lt $endIndexes[0]; $index++) {
+            if ($Lines[$index].StartsWith('| ', [System.StringComparison]::Ordinal)) {
+                $Lines[$index]
+            }
+        }
+    ).Count
+    Assert-Equal $ExpectedCount $rowCount "$MarkerName Markdown data row count"
 }
 
 function Assert-Throws {
@@ -980,6 +1030,11 @@ function Test-AbilityInputOutputCollision {
 }
 
 try {
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedCsvPath)) {
+        Assert-Condition (Test-Path -LiteralPath $ExpectedCsvPath -PathType Leaf) "Expected formal CSV '$ExpectedCsvPath' does not exist."
+        $ExpectedCsvPath = (Resolve-Path -LiteralPath $ExpectedCsvPath).Path
+    }
+
     $testRoot = Join-Path $TempRoot 'UnitCostModel'
     [System.IO.Directory]::CreateDirectory($testRoot) | Out-Null
 
@@ -1046,6 +1101,58 @@ try {
             'Elite3TotalCost', 'Elite3PowerPerCostRatio', 'EliteEfficiencyRisk'
         )) {
         Assert-Condition ($rows[0].PSObject.Properties.Name -contains $property) "CSV is missing combat metric column '$property'."
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedCsvPath)) {
+        $expectedRows = @(Import-Csv -LiteralPath $ExpectedCsvPath -Encoding UTF8)
+        Assert-Equal 94 $expectedRows.Count 'formal CSV shop row count'
+        Assert-Equal 94 @($expectedRows.TypeId | Sort-Object -Unique).Count 'formal CSV unique TypeId count'
+        Assert-Equal ($rows[0].PSObject.Properties.Name -join '/') ($expectedRows[0].PSObject.Properties.Name -join '/') 'formal CSV complete ordered columns'
+
+        $expectedNumericOrder = @($expectedRows | Sort-Object { [int]$_.TypeId } | ForEach-Object { [string]$_.TypeId })
+        Assert-Equal ($expectedNumericOrder -join '/') (@($expectedRows | ForEach-Object { [string]$_.TypeId }) -join '/') 'formal CSV stable numeric TypeId ordering'
+        $temporaryNumericOrder = @($rows | Sort-Object { [int]$_.TypeId } | ForEach-Object { [string]$_.TypeId })
+        Assert-Equal ($temporaryNumericOrder -join '/') (@($rows | ForEach-Object { [string]$_.TypeId }) -join '/') 'temporary CSV stable numeric TypeId ordering'
+        $bondShopSet = @($shopTypeIds | Sort-Object { [int]$_ })
+        Assert-Equal ($bondShopSet -join '/') (@($expectedRows.TypeId | Sort-Object { [int]$_ }) -join '/') 'formal CSV current BONDS shop TypeId set'
+
+        $expectedNormalizedText = Get-NormalizedUtf8Text -Path $ExpectedCsvPath
+        $temporaryNormalizedText = Get-NormalizedUtf8Text -Path $outputCsv
+        Assert-Condition ([string]::Equals($expectedNormalizedText, $temporaryNormalizedText, [System.StringComparison]::Ordinal)) 'Formal CSV differs from the independently recomputed Temp CSV after UTF-8 BOM and newline normalization.'
+
+        $expectedAnalysisPath = Get-ExpectedAnalysisPath -ExpectedCsvPath $ExpectedCsvPath
+        Assert-Condition (Test-Path -LiteralPath $expectedAnalysisPath -PathType Leaf) "Expected formal analysis '$expectedAnalysisPath' does not exist."
+        $formalAnalysisLines = @(Get-Content -LiteralPath $expectedAnalysisPath -Encoding UTF8)
+        foreach ($heading in @(
+                '## 1. Data integrity',
+                '## 2. R2-R6 adjacent power and Cost growth',
+                '## 3. R1 kappa and 72-match calibration',
+                '### All 72 match details',
+                '## 4. Cost distributions',
+                '## 5. Cost > 30 audit',
+                '## 6. Elite efficiency risks',
+                '## 7. Unquantified abilities',
+                '## 8. Economy pressure grid',
+                '## 9. Verification scope'
+            )) {
+            Assert-Equal 1 @($formalAnalysisLines | Where-Object { $_ -ceq $heading }).Count "formal analysis heading '$heading'"
+        }
+        Assert-MarkdownMarkerRowCount -Lines $formalAnalysisLines -MarkerName 'R1_MATCH_ROWS' -ExpectedCount 72
+        Assert-MarkdownMarkerRowCount -Lines $formalAnalysisLines -MarkerName 'HIGH_COST_ROWS' -ExpectedCount @($rows | Where-Object { [int]$_.FinalBaseCost -gt 30 }).Count
+        Assert-MarkdownMarkerRowCount -Lines $formalAnalysisLines -MarkerName 'ELITE_RISK_ROWS' -ExpectedCount @($rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.EliteEfficiencyRisk) }).Count
+        Assert-MarkdownMarkerRowCount -Lines $formalAnalysisLines -MarkerName 'UNQUANTIFIED_ROWS' -ExpectedCount @($rows | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.RiskFlags) }).Count
+        Assert-MarkdownMarkerRowCount -Lines $formalAnalysisLines -MarkerName 'ECONOMY_ROWS' -ExpectedCount 144
+        $formalAnalysisText = $formalAnalysisLines -join "`n"
+        foreach ($requiredText in @(
+                'R6/R2 median final Cost ratio:',
+                'Permanent Cost income is unconfirmed.',
+                'Unity compilation was not run.',
+                'Unity EditMode tests were not run.',
+                'Unity PlayMode tests were not run.',
+                'A Unity player/platform build was not run.'
+            )) {
+            Assert-Condition ($formalAnalysisText.Contains($requiredText)) "Formal analysis is missing required text '$requiredText'."
+        }
     }
 
     foreach ($row in $rows) {
