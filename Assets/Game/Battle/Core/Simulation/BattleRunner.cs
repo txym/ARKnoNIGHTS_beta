@@ -213,7 +213,9 @@ namespace ArknoNights.Battle.Core
                 100,
                 Definition.MagicResistance
                 + PassiveCombatModifiers.Sum(item =>
-                    item.MagicResistanceAdditive)));
+                    item.MagicResistanceAdditive)
+                + ActiveUnlockedAttackCountStateModifiers.Sum(item =>
+                    item.UnlockedMagicResistanceAdditive)));
         public int EffectiveAttackIntervalTicks
         {
             get
@@ -222,7 +224,9 @@ namespace ArknoNights.Battle.Core
                     + PassiveCombatModifiers.Sum(item =>
                         item.AttackSpeedAdditive)
                     + ActiveHealthThresholdModifiers.Sum(item =>
-                        item.AttackSpeedAdditive);
+                        item.AttackSpeedAdditive)
+                    + ActiveLockedAttackCountStateModifiers.Sum(item =>
+                        item.LockedAttackSpeedAdditive);
                 if (finalAttackSpeed <= 0)
                     return 0;
                 var numerator =
@@ -237,11 +241,25 @@ namespace ArknoNights.Battle.Core
         }
         internal bool HasBlockingCapacity =>
             blockedUnitIds.Count < EffectiveBlockCapacity;
-        public int EffectiveAttack => ApplyThresholdMultiplier(
-            Definition.Attack,
-            item => item.AttackMultiplierPermille);
+        public int EffectiveAttack
+        {
+            get
+            {
+                var attack = ApplyThresholdMultiplier(
+                    Definition.Attack,
+                    item => item.AttackMultiplierPermille);
+                foreach (var modifier in
+                         ActiveUnlockedAttackCountStateModifiers)
+                    attack = ApplyMultiplier(
+                        attack,
+                        modifier.UnlockedAttackMultiplierPermille);
+                return attack;
+            }
+        }
         public int EffectiveDefense => ApplyThresholdMultiplier(
-            Definition.Defense,
+            Definition.Defense
+            + ActiveLockedAttackCountStateModifiers.Sum(item =>
+                item.LockedDefenseAdditive),
             item => item.DefenseMultiplierPermille);
         public int EffectiveMoveSpeedCentimetresPerSecond =>
             ApplyThresholdMultiplier(
@@ -264,6 +282,22 @@ namespace ArknoNights.Battle.Core
                     * modifier.AttackMultiplierPermille
                     / 1000);
             return attack;
+        }
+        internal int EffectiveTargetDefenseMultiplierPermille
+        {
+            get
+            {
+                var multiplier =
+                    AttackCountStateModifierDefinition
+                        .NeutralMultiplierPermille;
+                foreach (var modifier in
+                         ActiveUnlockedAttackCountStateModifiers)
+                    multiplier = ApplyMultiplier(
+                        multiplier,
+                        modifier
+                            .UnlockedTargetDefenseMultiplierPermille);
+                return multiplier;
+            }
         }
         internal bool IsBlocked => blockedUnitIds.Count != 0;
         internal bool HasBlockWith(string unitId) => blockedUnitIds.Contains(unitId);
@@ -323,7 +357,9 @@ namespace ArknoNights.Battle.Core
                     item.Definition.PassiveLifecycleEffect != null)
                 .Sum(item =>
                     item.Definition.PassiveLifecycleEffect
-                        .HitPointsPerSecond);
+                        .HitPointsPerSecond)
+            + ActiveUnlockedAttackCountStateModifiers.Sum(item =>
+                item.UnlockedHitPointsPerSecond);
         internal int PassiveLifetimeTicks
         {
             get
@@ -356,10 +392,37 @@ namespace ArknoNights.Battle.Core
         {
             foreach (var modifier in
                      ActiveHealthThresholdModifiers)
-                value = (int)Math.Min(
-                    int.MaxValue,
-                    (long)value * selector(modifier) / 1000);
+                value = ApplyMultiplier(value, selector(modifier));
             return value;
+        }
+
+        private IEnumerable<AttackCountStateModifierDefinition>
+            ActiveLockedAttackCountStateModifiers =>
+            abilityStates
+                .Select(item =>
+                    item.Definition.AttackCountStateModifier)
+                .Where(item =>
+                    item != null
+                    && StartedAttackCount
+                    < item.TransitionBeforeAttackOrdinal);
+
+        private IEnumerable<AttackCountStateModifierDefinition>
+            ActiveUnlockedAttackCountStateModifiers =>
+            abilityStates
+                .Select(item =>
+                    item.Definition.AttackCountStateModifier)
+                .Where(item =>
+                    item != null
+                    && StartedAttackCount
+                    >= item.TransitionBeforeAttackOrdinal);
+
+        private static int ApplyMultiplier(
+            int value,
+            int multiplierPermille)
+        {
+            return (int)Math.Min(
+                int.MaxValue,
+                (long)value * multiplierPermille / 1000);
         }
     }
 
@@ -651,6 +714,7 @@ namespace ArknoNights.Battle.Core
                 var target = GetAttackTarget(unit);
                 if (target == null) continue;
                 if (DistanceSquared(unit.Position, target.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) continue;
+                var attack = unit.BeginAttackAndGetEffectiveAttack();
                 var attackIntervalTicks =
                     unit.EffectiveAttackIntervalTicks;
                 var effectiveTicks = Math.Min(
@@ -662,8 +726,7 @@ namespace ArknoNights.Battle.Core
                         ? int.MaxValue
                         : CurrentTick + attackIntervalTicks;
                 unit.AttackAnimationLockUntilTick = Math.Max(unit.AttackAnimationLockUntilTick, damageTick);
-                var attack = unit.BeginAttackAndGetEffectiveAttack();
-                pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
+                pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.EffectiveTargetDefenseMultiplierPermille, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
                 Emit(BattleEventType.Attack, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, unit.Definition.AttackAnimationDurationTicks, effectiveTicks, null, BattleStopReason.None);
             }
         }
@@ -1040,7 +1103,9 @@ namespace ArknoNights.Battle.Core
             var damage = DamageCalculator.Calculate(
                 attack.DamageType,
                 attack.Attack,
-                target.EffectiveDefense,
+                ApplyDefenseMultiplier(
+                    target.EffectiveDefense,
+                    attack.TargetDefenseMultiplierPermille),
                 target.EffectiveMagicResistance);
             return target.ApplyDamageTakenModifiers(
                 attack.DamageType,
@@ -1059,6 +1124,13 @@ namespace ArknoNights.Battle.Core
             return target.ApplyDamageTakenModifiers(
                 reaction.DamageType,
                 damage);
+        }
+
+        private static int ApplyDefenseMultiplier(
+            int defense,
+            int multiplierPermille)
+        {
+            return (int)((long)defense * multiplierPermille / 1000);
         }
 
         private static int IntegerSquareRootCeiling(long value)
@@ -1121,7 +1193,7 @@ namespace ArknoNights.Battle.Core
 
         private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to, string relatedUnitId) { Unit = unit; From = from; To = to; RelatedUnitId = relatedUnitId; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } public string RelatedUnitId { get; } }
         private readonly struct BlockProposal { public BlockProposal(RuntimeUnitState actor, RuntimeUnitState target) { Actor = actor; Target = target; } public RuntimeUnitState Actor { get; } public RuntimeUnitState Target { get; } }
-        private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
+        private readonly struct PendingAttack { public PendingAttack(string attackerUnitId, string targetUnitId, int damageTick, DamageType damageType, int attack, int targetDefenseMultiplierPermille, int originalTicks, int effectiveTicks) { AttackerUnitId = attackerUnitId; TargetUnitId = targetUnitId; DamageTick = damageTick; DamageType = damageType; Attack = attack; TargetDefenseMultiplierPermille = targetDefenseMultiplierPermille; OriginalTicks = originalTicks; EffectiveTicks = effectiveTicks; } public string AttackerUnitId { get; } public string TargetUnitId { get; } public int DamageTick { get; } public DamageType DamageType { get; } public int Attack { get; } public int TargetDefenseMultiplierPermille { get; } public int OriginalTicks { get; } public int EffectiveTicks { get; } }
         private readonly struct DamageHit { public DamageHit(PendingAttack attack, int amount) { Attack = attack; Amount = amount; } public PendingAttack Attack { get; } public int Amount { get; } }
         private readonly struct DamageReaction { public DamageReaction(string ownerUnitId, string targetUnitId, OnDamageReactionEffectDefinition effect) { OwnerUnitId = ownerUnitId; TargetUnitId = targetUnitId; Effect = effect; } public string OwnerUnitId { get; } public string TargetUnitId { get; } public OnDamageReactionEffectDefinition Effect { get; } }
         private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
@@ -1196,7 +1268,8 @@ namespace ArknoNights.Battle.Core
             {
                 builder.Append("|R:").Append(unit.UnitId).Append(',').Append(unit.PlayerId).Append(',').Append((int)unit.Side).Append(',').Append(unit.TypeId).Append(',').Append(unit.CurrentHitPoints).Append(',').Append(unit.Position.XUnits).Append(',').Append(unit.Position.YUnits).Append(',').Append(unit.ActivationTick);
                 if (unit.AbilityStates.Any(item =>
-                        item.Definition.AttackSequenceModifier != null))
+                        item.Definition.AttackSequenceModifier != null
+                        || item.Definition.AttackCountStateModifier != null))
                     builder.Append(",attacks:")
                         .Append(unit.StartedAttackCount);
                 foreach (var ability in unit.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal)) ability.AppendStableSummary(builder);

@@ -187,6 +187,55 @@ namespace ArknoNights.Battle.Core
         }
     }
 
+    public sealed class AttackCountStateModifierDefinition
+    {
+        public const int NeutralMultiplierPermille = 1000;
+
+        public AttackCountStateModifierDefinition(
+            int transitionBeforeAttackOrdinal,
+            int lockedAttackSpeedAdditive,
+            int lockedDefenseAdditive,
+            int unlockedAttackMultiplierPermille,
+            int unlockedMagicResistanceAdditive,
+            int unlockedHitPointsPerSecond,
+            int unlockedTargetDefenseMultiplierPermille)
+        {
+            TransitionBeforeAttackOrdinal =
+                transitionBeforeAttackOrdinal;
+            LockedAttackSpeedAdditive =
+                lockedAttackSpeedAdditive;
+            LockedDefenseAdditive = lockedDefenseAdditive;
+            UnlockedAttackMultiplierPermille =
+                unlockedAttackMultiplierPermille;
+            UnlockedMagicResistanceAdditive =
+                unlockedMagicResistanceAdditive;
+            UnlockedHitPointsPerSecond =
+                unlockedHitPointsPerSecond;
+            UnlockedTargetDefenseMultiplierPermille =
+                unlockedTargetDefenseMultiplierPermille;
+        }
+
+        public int TransitionBeforeAttackOrdinal { get; }
+        public int LockedAttackSpeedAdditive { get; }
+        public int LockedDefenseAdditive { get; }
+        public int UnlockedAttackMultiplierPermille { get; }
+        public int UnlockedMagicResistanceAdditive { get; }
+        public int UnlockedHitPointsPerSecond { get; }
+        public int UnlockedTargetDefenseMultiplierPermille
+        {
+            get;
+        }
+        public bool IsNeutral =>
+            LockedAttackSpeedAdditive == 0
+            && LockedDefenseAdditive == 0
+            && UnlockedAttackMultiplierPermille
+                == NeutralMultiplierPermille
+            && UnlockedMagicResistanceAdditive == 0
+            && UnlockedHitPointsPerSecond == 0
+            && UnlockedTargetDefenseMultiplierPermille
+                == NeutralMultiplierPermille;
+    }
+
     public sealed class SummonEffectDefinition
     {
         public SummonEffectDefinition(string summonTypeId, int count, int sideLengthCentimetres, bool inheritPathFromCaster)
@@ -378,6 +427,30 @@ namespace ArknoNights.Battle.Core
         }
 
         public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, string animationKey, int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId,
+                displayNameZhHans,
+                descriptionZhHans,
+                activationKind,
+                silencePolicy,
+                initialSkillPoints,
+                requiredSkillPoints,
+                skillPointGeneration,
+                summonEffect,
+                unitTraitEffect,
+                passiveCombatModifier,
+                passiveLifecycleEffect,
+                onDamageReactionEffect,
+                healthThresholdCombatModifier,
+                unblockedDamageTakenModifier,
+                attackSequenceModifier,
+                null,
+                animationKey,
+                skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, string animationKey, int skillAnimationOriginalDurationTicks)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -397,6 +470,8 @@ namespace ArknoNights.Battle.Core
             UnblockedDamageTakenModifier =
                 unblockedDamageTakenModifier;
             AttackSequenceModifier = attackSequenceModifier;
+            AttackCountStateModifier =
+                attackCountStateModifier;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -420,6 +495,8 @@ namespace ArknoNights.Battle.Core
             UnblockedDamageTakenModifier { get; }
         public AttackSequenceModifierDefinition
             AttackSequenceModifier { get; }
+        public AttackCountStateModifierDefinition
+            AttackCountStateModifier { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

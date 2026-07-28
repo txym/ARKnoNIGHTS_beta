@@ -545,6 +545,131 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(new[] { 100, 100, 130, 100, 100, 130 }));
         }
 
+        [Test]
+        public void AttackCountState_TransitionsImmediatelyBeforeFourthAttack()
+        {
+            var input = CreateInput(
+                16,
+                new[]
+                {
+                    Attacker(
+                        "prisoner",
+                        2000,
+                        0,
+                        "PRISONER_STATE",
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    NonAttacker("target", 100000)
+                },
+                new[]
+                {
+                    PassiveAttackCountState(
+                        lockedAttackSpeedAdditive: -50,
+                        unlockedAttackMultiplierPermille: 1500)
+                },
+                new[] { Unit("prisoner", "prisoner", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+            var result = new BattleRunner(input).RunToCompletion();
+
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Attack
+                        && item.UnitId == "prisoner")
+                    .Select(item => item.Tick)
+                    .ToArray(),
+                Is.EqualTo(new[] { 1, 5, 9, 13, 15 }));
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Damage
+                        && item.UnitId == "prisoner")
+                    .Select(item => item.DamageAmount)
+                    .ToArray(),
+                Is.EqualTo(new[] { 100, 100, 100, 150, 150 }));
+        }
+
+        [Test]
+        public void AttackCountState_ChangesAllConfiguredSelfModifiers()
+        {
+            var input = CreateInput(
+                12,
+                new[]
+                {
+                    Attacker(
+                        "prisoner",
+                        2000,
+                        0,
+                        "PRISONER_STATE",
+                        damageType: DamageType.Physical,
+                        attackIntervalTicks: 1,
+                        maxHitPoints: 5000,
+                        attack: 200),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        0,
+                        damageType: DamageType.Magic,
+                        attackIntervalTicks: 2,
+                        maxHitPoints: 100000,
+                        attack: 100,
+                        defense: 100)
+                },
+                new[]
+                {
+                    PassiveAttackCountState(
+                        lockedAttackSpeedAdditive: -50,
+                        lockedDefenseAdditive: 300,
+                        unlockedAttackMultiplierPermille: 1500,
+                        unlockedMagicResistanceAdditive: 40,
+                        unlockedHitPointsPerSecond: 300,
+                        unlockedTargetDefenseMultiplierPermille: 400)
+                },
+                new[] { Unit("prisoner", "prisoner", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 6)
+                runner.Step();
+            var prisoner = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "prisoner");
+            Assert.That(prisoner.StartedAttackCount, Is.EqualTo(3));
+            Assert.That(prisoner.EffectiveDefense, Is.EqualTo(300));
+            Assert.That(prisoner.EffectiveMagicResistance, Is.EqualTo(0));
+
+            while (prisoner.StartedAttackCount < 4
+                   && runner.Status != BattleRunnerStatus.Stopped)
+                runner.Step();
+            Assert.That(prisoner.StartedAttackCount, Is.EqualTo(4));
+            Assert.That(prisoner.EffectiveAttack, Is.EqualTo(300));
+            Assert.That(prisoner.EffectiveDefense, Is.EqualTo(0));
+            Assert.That(prisoner.EffectiveMagicResistance, Is.EqualTo(40));
+            Assert.That(
+                prisoner.EffectiveTargetDefenseMultiplierPermille,
+                Is.EqualTo(400));
+            var hitPointsAfterUnlock = prisoner.CurrentHitPoints;
+
+            runner.Step();
+            var damageAfterUnlock = runner.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.Tick == runner.CurrentTick
+                    && item.RelatedUnitId == "prisoner")
+                .Sum(item => item.DamageAmount);
+            Assert.That(
+                prisoner.CurrentHitPoints,
+                Is.EqualTo(
+                    hitPointsAfterUnlock
+                    - damageAfterUnlock
+                    + 15));
+            Assert.That(
+                runner.Events.Single(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.Tick == runner.CurrentTick
+                    && item.UnitId == "prisoner").DamageAmount,
+                Is.EqualTo(260));
+        }
+
         private static int[] RunAttackSequence(
             int firstEnhancedAttackOrdinal,
             int repeatInterval,
@@ -845,6 +970,47 @@ namespace ArknoNights.Battle.Tests
                     firstEnhancedAttackOrdinal,
                     repeatInterval,
                     attackMultiplierPermille),
+                string.Empty,
+                0);
+        }
+
+        private static AbilityDefinition PassiveAttackCountState(
+            int lockedAttackSpeedAdditive = 0,
+            int lockedDefenseAdditive = 0,
+            int unlockedAttackMultiplierPermille =
+                AttackCountStateModifierDefinition
+                    .NeutralMultiplierPermille,
+            int unlockedMagicResistanceAdditive = 0,
+            int unlockedHitPointsPerSecond = 0,
+            int unlockedTargetDefenseMultiplierPermille =
+                AttackCountStateModifierDefinition
+                    .NeutralMultiplierPermille)
+        {
+            return new AbilityDefinition(
+                "PRISONER_STATE",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new AttackCountStateModifierDefinition(
+                    4,
+                    lockedAttackSpeedAdditive,
+                    lockedDefenseAdditive,
+                    unlockedAttackMultiplierPermille,
+                    unlockedMagicResistanceAdditive,
+                    unlockedHitPointsPerSecond,
+                    unlockedTargetDefenseMultiplierPermille),
                 string.Empty,
                 0);
         }
