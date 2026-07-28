@@ -169,6 +169,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
         LastBattleSummary = "summary=" + multiBattle.StableSummary + "; playersUnchangedDuringBattle=" + statesUnchangedDuringBattle;
         Debug.Log("[UI-009][battle.completed] " + LastBattleSummary, this);
 
+        matchState.RefreshAllShopsAfterBattle();
         multiBattle.Reset();
         demo.ResetRuntimeBattle();
         deployment.SetPreparationViewsVisible(true);

@@ -24,6 +24,11 @@ namespace ArknoNights.Battle.Tests
             var loopType = loop.GetType();
             Assert.AreEqual("Preparation", loopType.GetProperty("Phase").GetValue(loop).ToString());
             Assert.That((float)loopType.GetProperty("RemainingPreparationSeconds").GetValue(loop), Is.InRange(29f, 30f));
+            var match = (LocalMatchState)loopType.GetProperty("MatchState").GetValue(loop);
+            Assert.NotNull(match);
+            Assert.IsTrue(match.TryRefresh().Success);
+            Assert.IsTrue(match.TryToggleFrozen(0).Success);
+            var goldBeforeBattle = match.Snapshot.LocalPlayer.Gold;
 
             loopType.GetMethod("AdvanceForTests").Invoke(loop, new object[] { 30f });
             yield return null;
@@ -56,11 +61,20 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(87, hud.PlayerState.DeploymentCost);
             Assert.IsFalse(hud.PlayerState.Snapshot.Units.Any(unit => unit.UnitId == "local-1000-overflow"));
 
+            var shopsBeforeTerminalPresentation = match.Snapshot.Players.ToDictionary(
+                player => player.PlayerId,
+                player => string.Join(",", player.ShopSlots.Select(slot =>
+                    slot.ShopSlotId + ":" + slot.UnitTypeId + ":" + (slot.IsFrozen ? "1" : "0"))));
             loopType.GetMethod("AdvanceForTests").Invoke(loop, new object[] { 1200f });
             Assert.AreEqual("Battle", loopType.GetProperty("Phase").GetValue(loop).ToString(),
                 "The formal round must remain active while terminal death presentation is still playing.");
             Assert.AreEqual("Playing", multi.GetType().GetProperty("State").GetValue(multi).ToString(),
                 "The multi-battle coordinator must not complete in the same frame that it dispatches terminal Death.");
+            Assert.AreEqual(goldBeforeBattle, match.Snapshot.LocalPlayer.Gold);
+            foreach (var player in match.Snapshot.Players)
+                Assert.AreEqual(shopsBeforeTerminalPresentation[player.PlayerId],
+                    string.Join(",", player.ShopSlots.Select(slot =>
+                        slot.ShopSlotId + ":" + slot.UnitTypeId + ":" + (slot.IsFrozen ? "1" : "0"))));
 
             var completionDeadline = Time.realtimeSinceStartup + 5f;
             while (loopType.GetProperty("Phase").GetValue(loop).ToString() == "Battle" &&
@@ -73,6 +87,18 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(87, hud.PlayerState.DeploymentCost, "Combat death/HP/winner must not write back to persistent player state.");
             Assert.AreEqual(1, hud.PlayerState.GetUnits(PlayerUnitZone.Deployed).Count);
             Assert.NotNull(GameObject.Find("PreparationUnitViews"));
+
+            var afterRound = match.Snapshot;
+            Assert.AreEqual(goldBeforeBattle, afterRound.LocalPlayer.Gold);
+            CollectionAssert.AreEqual(
+                new[] { "5503", "1000", "1000", "5503", "5503", "5503" },
+                afterRound.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
+            Assert.IsTrue(afterRound.LocalPlayer.ShopSlots[0].IsFrozen);
+            Assert.IsTrue(afterRound.LocalPlayer.ShopSlots.Skip(1).All(slot => !slot.IsFrozen));
+            foreach (var remote in afterRound.Players.Where(player => player.PlayerId != match.LocalPlayerId))
+                CollectionAssert.AreEqual(
+                    new[] { "1000", "1000", "1000", "5503", "5503", "5503" },
+                    remote.ShopSlots.Select(slot => slot.UnitTypeId));
         }
     }
 }
