@@ -81,12 +81,60 @@ function Test-CombatMetricHelpers {
     Assert-Equal ([decimal]2.35) $winsorized[0] 'synthetic winsorized low value'
     Assert-Equal ([decimal]865) $winsorized[3] 'synthetic winsorized high value'
     Assert-Equal ([decimal]55) (Get-Median -Values ([decimal[]]$winsorized)) 'synthetic winsorized median'
+    # These are unit-level raw medians, not attacker-by-defender pair values.
+    # A pair-level population with uneven matchup counts would have different
+    # bounds, so this verifies the intended scoring axis explicitly.
+    $unitAxis = Get-WinsorizedUnitAxis -RawMedians ([decimal[]]@(10, 20, 30, 1000))
+    Assert-Equal ([decimal]11.5) $unitAxis.P5 'unit-axis P5 uses unit raw medians'
+    Assert-Equal ([decimal]854.5) $unitAxis.P95 'unit-axis P95 uses unit raw medians'
+    Assert-Equal ([decimal]11.5) $unitAxis.WinsorizedValues[0] 'unit-axis low clamp'
+    Assert-Equal ([decimal]854.5) $unitAxis.WinsorizedValues[3] 'unit-axis high clamp'
     Assert-Equal ([decimal]6) (Get-GeometricCombinedValue -Output ([decimal]4) -Defense ([decimal]9)) 'synthetic geometric combination'
     Assert-Equal ([decimal]18) (Get-GeometricCombinedValue -Output ([decimal]12) -Defense ([decimal]27)) 'duplicated population geometric combination'
 
     Assert-Throws { Get-PhysicalDamage -Attack -1 -Defense 0 } 'negative attack'
     Assert-Throws { Get-EffectiveAttackInterval -Attacker ([pscustomobject]@{ TypeId = 1; EffectiveAttackIntervalSeconds = 0 }) } 'nonpositive attack interval'
     Assert-Throws { Get-OrdinaryAttackDamage -Attacker ([pscustomobject]@{ TypeId = 1; DamageType = 'Unknown'; Attack = 100; EffectiveAttackIntervalSeconds = 1 }) -Defender ([pscustomobject]@{ Defense = 0; MagicResistance = 0 }) } 'unknown damage type'
+}
+
+function Get-ShopFixtureResourceDirectories {
+    param(
+        [Parameter(Mandatory = $true)][string]$BondSpecPath,
+        [Parameter(Mandatory = $true)][string]$StagingRoot
+    )
+
+    $shopHeader = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '88', [char]0xFF09)
+    $lines = @(Get-Content -LiteralPath $BondSpecPath -Encoding UTF8)
+    $headerIndexes = @(for ($index = 0; $index -lt $lines.Count; $index++) { if ($lines[$index] -ceq $shopHeader) { $index } })
+    Assert-Equal 1 $headerIndexes.Count 'shop header count for external snapshot'
+    $index = $headerIndexes[0] + 1
+    while ([string]::IsNullOrWhiteSpace($lines[$index])) { $index++ }
+    Assert-Equal '```text' $lines[$index] 'shop code block marker for external snapshot'
+    $index++
+    $typeIds = [System.Collections.Generic.List[string]]::new()
+    while ($lines[$index] -cne '```') {
+        foreach ($typeId in $lines[$index].Split(',')) {
+            if (-not [string]::IsNullOrWhiteSpace($typeId)) {
+                $typeIds.Add($typeId.Trim())
+            }
+        }
+        $index++
+    }
+    Assert-Equal 88 $typeIds.Count 'shop TypeId count for external snapshot'
+
+    $directories = [System.Collections.Generic.List[string]]::new()
+    foreach ($typeId in $typeIds) {
+        if ($typeId -ceq '1322') {
+            $directories.Add('1322_wdgyht_2')
+            continue
+        }
+        $matches = @(Get-ChildItem -LiteralPath $StagingRoot -Directory -Filter "${typeId}_*" | Where-Object { $_.Name -notmatch '_[23]$' })
+        Assert-Equal 1 $matches.Count "base resource directory count for TypeId $typeId external snapshot"
+        $directories.Add($matches[0].Name)
+    }
+    $directories.Add('1322_wdgyht')
+    Assert-Equal 89 @($directories | Sort-Object -Unique).Count 'external snapshot resource directory count'
+    return @($directories | Sort-Object -Unique)
 }
 
 function Get-UnitJsonSnapshot {
@@ -257,6 +305,9 @@ try {
     $exporterPath = Join-Path $PSScriptRoot 'Export-UnitCostDataset.ps1'
     $powershellPath = Join-Path $PSHOME 'powershell.exe'
     Test-CombatMetricHelpers -ExporterPath $exporterPath
+    $fixtureResourceDirectories = Get-ShopFixtureResourceDirectories -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot
+    $externalSnapshotBeforeWorkflow = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $fixtureResourceDirectories
+    Assert-Equal 178 $externalSnapshotBeforeWorkflow.Count 'external staging workflow snapshot JSON file count'
     & $powershellPath -NoProfile -ExecutionPolicy Bypass -File $exporterPath `
         -BondSpecPath $BondSpecPath `
         -StagingRoot $StagingRoot `
@@ -265,6 +316,9 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Export-UnitCostDataset.ps1 failed with exit code $LASTEXITCODE."
     }
+    $externalSnapshotAfterMainExport = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $fixtureResourceDirectories
+    Assert-UnitJsonSnapshotsEqual -Expected $externalSnapshotBeforeWorkflow -Actual $externalSnapshotAfterMainExport -Name 'external staging after main successful export'
+    Write-Host "Verified external staging snapshot unchanged after main successful export: $($externalSnapshotAfterMainExport.Count) JSON files, SHA-256 snapshot $(Get-UnitJsonSnapshotHash -Snapshot $externalSnapshotAfterMainExport)."
 
     $rows = @(Import-Csv -LiteralPath $outputCsv -Encoding UTF8)
     Assert-Equal 88 $rows.Count 'shop row count'
@@ -299,7 +353,9 @@ try {
     foreach ($typeId in @('1017', '1042', '1146', '1355', '1008', '1026', '1333')) {
         $row = @($rows | Where-Object TypeId -eq $typeId)
         Assert-Equal 1 $row.Count "special combat TypeId $typeId count"
-        Assert-Condition ([string]::IsNullOrWhiteSpace([string]$row[0].PanelPower)) "Type ID $typeId must not receive a fabricated PanelPower."
+        foreach ($property in @('RawMedianDps', 'WinsorizedMedianDps', 'RawMedianTtdSeconds', 'WinsorizedMedianTtdSeconds', 'OutputReference', 'DefenseReference', 'PanelPower')) {
+            Assert-Condition ([string]::IsNullOrWhiteSpace([string]$row[0].$property)) "Type ID $typeId must leave $property empty before an ability scenario is modeled."
+        }
     }
 
     $expectedRows = @{
@@ -320,9 +376,6 @@ try {
     Assert-Condition (Test-Path -LiteralPath $analysisOutput -PathType Leaf) "Missing analysis output '$analysisOutput'."
 
     $regressionFailures = [System.Collections.Generic.List[string]]::new()
-    $fixtureResourceDirectories = @($rows.ResourceDirectory | Sort-Object -Unique)
-    $fixtureResourceDirectories += '1322_wdgyht'
-    Assert-Equal 89 @($fixtureResourceDirectories | Sort-Object -Unique).Count 'fixture resource directory count'
     Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures -FixtureResourceDirectories $fixtureResourceDirectories -FixtureDamageType 'InvalidDamageType' -FailureMessage 'Illegal non-empty damageType for TypeId 1238 was accepted instead of rejected.'
     Test-InvalidOverrideDamageType -BondSpecPath $BondSpecPath -StagingRoot $StagingRoot -TestRoot $testRoot -ExporterPath $exporterPath -PowerShellPath $powershellPath -Failures $regressionFailures -FixtureResourceDirectories $fixtureResourceDirectories -FixtureDamageType 'Magic' -FailureMessage 'Conflicting allowed damageType Magic for TypeId 1238 was accepted instead of rejected.'
     foreach ($outputParameterName in @('OutputCsvPath', 'AnalysisOutputPath')) {
@@ -330,6 +383,9 @@ try {
     }
     $regressionFailureMessage = if ($regressionFailures.Count -eq 0) { 'No regression failures.' } else { $regressionFailures -join [Environment]::NewLine }
     Assert-Condition ($regressionFailures.Count -eq 0) $regressionFailureMessage
+    $externalSnapshotAfterWorkflow = Get-UnitJsonSnapshot -StagingRoot $StagingRoot -ResourceDirectories $fixtureResourceDirectories
+    Assert-UnitJsonSnapshotsEqual -Expected $externalSnapshotBeforeWorkflow -Actual $externalSnapshotAfterWorkflow -Name 'external staging after complete workflow'
+    Write-Host "Verified external staging snapshot unchanged after complete workflow: $($externalSnapshotAfterWorkflow.Count) JSON files, SHA-256 snapshot $(Get-UnitJsonSnapshotHash -Snapshot $externalSnapshotAfterWorkflow)."
 
     Write-Host "PASS: Unit Cost model self-test validated $($rows.Count) shop rows."
     exit 0

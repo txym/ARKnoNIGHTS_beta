@@ -260,6 +260,18 @@ function Get-ClampedCombatValues {
     return [decimal[]]@($Values | ForEach-Object { [decimal][Math]::Min([double]$UpperBound, [Math]::Max([double]$LowerBound, [double]$_)) })
 }
 
+function Get-WinsorizedUnitAxis {
+    param([Parameter(Mandatory = $true)][decimal[]]$RawMedians)
+
+    $p5 = Get-Percentile -Values $RawMedians -Percentile ([decimal]0.05)
+    $p95 = Get-Percentile -Values $RawMedians -Percentile ([decimal]0.95)
+    return [pscustomobject]@{
+        P5 = $p5
+        P95 = $p95
+        WinsorizedValues = Get-ClampedCombatValues -Values $RawMedians -LowerBound $p5 -UpperBound $p95
+    }
+}
+
 function Get-GeometricCombinedValue {
     param(
         [Parameter(Mandatory = $true)][decimal]$Output,
@@ -432,8 +444,13 @@ try {
         [void]$pathUnitTypeIds.Add($typeId)
     }
 
-    $defenderRows = @($rows | Where-Object { -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) })
-    $attackingRows = @($rows | Where-Object { $_.DamageType -ne 'None' -and -not $ordinaryAttackExcludedTypeIds.Contains([int]$_.TypeId) })
+    $ordinaryCombatRows = @($rows | Where-Object {
+            $_.DamageType -ne 'None' -and
+            -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) -and
+            -not $ordinaryAttackExcludedTypeIds.Contains([int]$_.TypeId)
+        })
+    $defenderRows = $ordinaryCombatRows
+    $attackingRows = $ordinaryCombatRows
     Assert-Condition ($defenderRows.Count -gt 0) 'The defender sample is empty.'
     Assert-Condition ($attackingRows.Count -gt 0) 'The ordinary attacker sample is empty.'
     foreach ($attacker in $attackingRows) {
@@ -442,8 +459,6 @@ try {
 
     $dpsValuesByAttacker = @{}
     $ttdValuesByDefender = @{}
-    $allDpsValues = [System.Collections.Generic.List[decimal]]::new()
-    $allTtdValues = [System.Collections.Generic.List[decimal]]::new()
     foreach ($attacker in $attackingRows) {
         $dpsValues = [System.Collections.Generic.List[decimal]]::new()
         $effectiveInterval = Get-EffectiveAttackInterval -Attacker $attacker
@@ -452,7 +467,6 @@ try {
             Assert-Condition ($damagePerHit -gt 0) "Type ID $($attacker.TypeId) produced nonpositive damage '$damagePerHit'."
             $dps = $damagePerHit / $effectiveInterval
             [void]$dpsValues.Add($dps)
-            [void]$allDpsValues.Add($dps)
         }
         $dpsValuesByAttacker[[int]$attacker.TypeId] = $dpsValues.ToArray()
     }
@@ -464,29 +478,38 @@ try {
             $ttd = [decimal][Math]::Ceiling([double]([decimal]$defender.MaxHitPoints / $damagePerHit)) * $effectiveInterval
             Assert-Condition ($ttd -ge 0) "Type ID $($defender.TypeId) produced negative TTD '$ttd'."
             [void]$ttdValues.Add($ttd)
-            [void]$allTtdValues.Add($ttd)
         }
         $ttdValuesByDefender[[int]$defender.TypeId] = $ttdValues.ToArray()
     }
 
-    $dpsP5 = Get-Percentile -Values $allDpsValues.ToArray() -Percentile ([decimal]0.05)
-    $dpsP95 = Get-Percentile -Values $allDpsValues.ToArray() -Percentile ([decimal]0.95)
-    $ttdP5 = Get-Percentile -Values $allTtdValues.ToArray() -Percentile ([decimal]0.05)
-    $ttdP95 = Get-Percentile -Values $allTtdValues.ToArray() -Percentile ([decimal]0.95)
-    $outputMetricsByTypeId = @{}
+    $rawDpsMediansByTypeId = @{}
     foreach ($typeId in $dpsValuesByAttacker.Keys) {
-        $values = [decimal[]]$dpsValuesByAttacker[$typeId]
+        $rawDpsMediansByTypeId[$typeId] = Get-Median -Values ([decimal[]]$dpsValuesByAttacker[$typeId])
+    }
+    $rawTtdMediansByTypeId = @{}
+    foreach ($typeId in $ttdValuesByDefender.Keys) {
+        $rawTtdMediansByTypeId[$typeId] = Get-Median -Values ([decimal[]]$ttdValuesByDefender[$typeId])
+    }
+    $dpsUnitAxis = Get-WinsorizedUnitAxis -RawMedians ([decimal[]]@($rawDpsMediansByTypeId.Values))
+    $ttdUnitAxis = Get-WinsorizedUnitAxis -RawMedians ([decimal[]]@($rawTtdMediansByTypeId.Values))
+    $dpsP5 = $dpsUnitAxis.P5
+    $dpsP95 = $dpsUnitAxis.P95
+    $ttdP5 = $ttdUnitAxis.P5
+    $ttdP95 = $ttdUnitAxis.P95
+    $outputMetricsByTypeId = @{}
+    foreach ($typeId in $rawDpsMediansByTypeId.Keys) {
+        $rawMedian = [decimal]$rawDpsMediansByTypeId[$typeId]
         $outputMetricsByTypeId[$typeId] = [pscustomobject]@{
-            RawMedian = Get-Median -Values $values
-            WinsorizedMedian = Get-Median -Values (Get-ClampedCombatValues -Values $values -LowerBound $dpsP5 -UpperBound $dpsP95)
+            RawMedian = $rawMedian
+            WinsorizedMedian = (Get-ClampedCombatValues -Values ([decimal[]]@($rawMedian)) -LowerBound $dpsP5 -UpperBound $dpsP95)[0]
         }
     }
     $defenseMetricsByTypeId = @{}
-    foreach ($typeId in $ttdValuesByDefender.Keys) {
-        $values = [decimal[]]$ttdValuesByDefender[$typeId]
+    foreach ($typeId in $rawTtdMediansByTypeId.Keys) {
+        $rawMedian = [decimal]$rawTtdMediansByTypeId[$typeId]
         $defenseMetricsByTypeId[$typeId] = [pscustomobject]@{
-            RawMedian = Get-Median -Values $values
-            WinsorizedMedian = Get-Median -Values (Get-ClampedCombatValues -Values $values -LowerBound $ttdP5 -UpperBound $ttdP95)
+            RawMedian = $rawMedian
+            WinsorizedMedian = (Get-ClampedCombatValues -Values ([decimal[]]@($rawMedian)) -LowerBound $ttdP5 -UpperBound $ttdP95)[0]
         }
     }
     $scorableTypeIds = @($rows | Where-Object {
@@ -546,7 +569,9 @@ try {
             Assert-Condition ($null -ne $row.PanelPower -and $row.PanelPower -gt 0) "Type ID $($row.TypeId) must have a positive PanelPower."
         }
         else {
-            Assert-Condition ($null -eq $row.PanelPower) "Type ID $($row.TypeId) must not have a PanelPower before an ability scenario is modeled."
+            foreach ($property in @('RawMedianDps', 'WinsorizedMedianDps', 'RawMedianTtdSeconds', 'WinsorizedMedianTtdSeconds', 'OutputReference', 'DefenseReference', 'PanelPower')) {
+                Assert-Condition ($null -eq $row.$property) "Type ID $($row.TypeId) must leave $property empty before an ability scenario is modeled."
+            }
         }
     }
 
