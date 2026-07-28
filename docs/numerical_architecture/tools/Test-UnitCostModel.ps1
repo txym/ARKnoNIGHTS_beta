@@ -142,6 +142,396 @@ function Test-ExpectedCsvPathGuard {
     Assert-FileIntegritySnapshotEqual -Expected $siblingSnapshot -Actual (Get-FileIntegritySnapshot -Path $siblingExpectedCsv) -Name 'accepted ExpectedCsvPath sibling input'
 }
 
+function Assert-TestGeneratedCostMarkerRegion {
+    param(
+        [Parameter(Mandatory = $true)][string]$RegionText,
+        [Parameter(Mandatory = $true)][string]$Newline,
+        [Parameter(Mandatory = $true)][string]$StartMarker,
+        [Parameter(Mandatory = $true)][string]$EndMarker,
+        [Parameter(Mandatory = $true)][string]$CostHeading,
+        [Parameter(Mandatory = $true)][string]$CostColumns,
+        [Parameter(Mandatory = $true)][string[]]$ShopTypeIds,
+        [Parameter(Mandatory = $true)][string[]]$NonShopTypeIds,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $lines = @($RegionText -split [regex]::Escape($Newline))
+    Assert-Equal 99 $lines.Count "$Name line count"
+    Assert-Equal $StartMarker $lines[0] "$Name start marker"
+    Assert-Equal $CostHeading $lines[1] "$Name heading"
+    Assert-Equal $CostColumns $lines[2] "$Name columns"
+    Assert-Equal '| ---: | --- | ---: | ---: |' $lines[3] "$Name separator"
+    Assert-Equal $EndMarker $lines[-1] "$Name end marker"
+
+    $typeIds = [System.Collections.Generic.List[string]]::new()
+    for ($index = 4; $index -lt $lines.Count - 1; $index++) {
+        Assert-Condition ($lines[$index] -match '^\| (?<TypeId>[1-9][0-9]*) \| (?<DisplayName>(?:\\\||[^|])+?) \| (?<Rarity>[1-6]) \| (?<Cost>[0-9]+) \|$') "$Name data line '$($lines[$index])' has an invalid shape."
+        $typeId = [string]$Matches.TypeId
+        $displayName = [string]$Matches.DisplayName
+        $rarity = [int]$Matches.Rarity
+        $cost = [int]$Matches.Cost
+        Assert-Condition (-not [string]::IsNullOrWhiteSpace($displayName)) "$Name TypeId '$typeId' has an empty display name."
+        if ($rarity -eq 1) {
+            Assert-Condition ($cost -ge 2 -and $cost -le 40) "$Name R1 TypeId '$typeId' Cost '$cost' is outside 2..40."
+        }
+        else {
+            Assert-Condition ($cost -ge 5 -and $cost -le 40) "$Name R$rarity TypeId '$typeId' Cost '$cost' is outside 5..40."
+        }
+        Assert-Condition ($typeId -notin $NonShopTypeIds) "$Name contains non-shop TypeId '$typeId'."
+        $typeIds.Add($typeId)
+    }
+
+    Assert-Equal 94 $typeIds.Count "$Name data row count"
+    Assert-Equal 94 @($typeIds | Sort-Object -Unique).Count "$Name unique TypeId count"
+    $numericOrder = @($typeIds | Sort-Object { [int64]$_ })
+    Assert-Equal ($numericOrder -join '/') (@($typeIds) -join '/') "$Name numeric TypeId order"
+    Assert-Equal (@($ShopTypeIds | Sort-Object { [int64]$_ }) -join '/') ($numericOrder -join '/') "$Name BONDS shop TypeId set"
+}
+
+function Test-BondsUnitCostTableUpdater {
+    param(
+        [Parameter(Mandatory = $true)][string]$BondSpecPath,
+        [Parameter(Mandatory = $true)][string]$CostCsvPath,
+        [Parameter(Mandatory = $true)][string]$TempRoot
+    )
+
+    $startMarker = '<!-- UNIT-COST-TABLE:START -->'
+    $endMarker = '<!-- UNIT-COST-TABLE:END -->'
+    $shopHeader = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '94', [char]0xFF09)
+    $nonShopHeader = [string]::Concat('## ', [char]0x975E, [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0xFF08, '5', [char]0xFF09)
+    $costHeading = [string]::Concat('## ', [char]0x5546, [char]0x5E97, [char]0x5355, [char]0x4F4D, [char]0x7CBE, [char]0x82F1, ' 0 ', [char]0x57FA, [char]0x7840, [char]0x90E8, [char]0x7F72, ' Cost')
+    $costColumns = [string]::Concat('| TypeId | ', [char]0x540D, [char]0x79F0, ' | ', [char]0x7A00, [char]0x6709, [char]0x5EA6, ' | ', [char]0x7CBE, [char]0x82F1, '0', [char]0x57FA, [char]0x7840, 'Cost C0 |')
+    $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+    $realBondSnapshot = Get-FileIntegritySnapshot -Path $BondSpecPath
+    $realBondBytes = [System.IO.File]::ReadAllBytes($BondSpecPath)
+    $realBondText = $utf8.GetString($realBondBytes)
+    $realShopPattern = '(?ms)^' + [regex]::Escape($shopHeader) + '\r?\n\s*\r?\n```text\r?\n(?<Ids>.*?)\r?\n```'
+    $realShopMatch = [regex]::Match($realBondText, $realShopPattern)
+    Assert-Condition $realShopMatch.Success 'Real BONDS shop TypeId block is missing or malformed.'
+    $realShopTypeIds = @($realShopMatch.Groups['Ids'].Value -split '[,\s]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    Assert-Equal 94 $realShopTypeIds.Count 'Real BONDS shop TypeId count before marker normalization'
+    Assert-Equal 94 @($realShopTypeIds | Sort-Object -Unique).Count 'Real BONDS unique shop TypeId count before marker normalization'
+    $realNonShopPattern = '(?ms)^' + [regex]::Escape($nonShopHeader) + '\r?\n\s*\r?\n```text\r?\n(?<Ids>.*?)\r?\n```'
+    $realNonShopMatch = [regex]::Match($realBondText, $realNonShopPattern)
+    Assert-Condition $realNonShopMatch.Success 'Real BONDS non-shop TypeId block is missing or malformed.'
+    $realNonShopTypeIds = @($realNonShopMatch.Groups['Ids'].Value -split '[,\s]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    Assert-Equal '1137/1138/2033/5504/10002' ($realNonShopTypeIds -join '/') 'Real BONDS non-shop TypeId set before marker normalization'
+    $realStartCount = [regex]::Matches($realBondText, [regex]::Escape($startMarker)).Count
+    $realEndCount = [regex]::Matches($realBondText, [regex]::Escape($endMarker)).Count
+    $realMarkerStateIsValid = ($realStartCount -eq 0 -and $realEndCount -eq 0) -or ($realStartCount -eq 1 -and $realEndCount -eq 1)
+    Assert-Condition $realMarkerStateIsValid 'Real BONDS must contain either no Cost-table markers or one exact marker pair.'
+
+    $fixtureSourceBytes = $realBondBytes
+    if ($realStartCount -eq 1) {
+        $realStartIndex = $realBondText.IndexOf($startMarker, [System.StringComparison]::Ordinal)
+        $realEndIndex = $realBondText.IndexOf($endMarker, [System.StringComparison]::Ordinal)
+        Assert-Condition ($realStartIndex -ge 0 -and $realEndIndex -gt $realStartIndex) 'Real BONDS Cost-table markers are reversed.'
+        $realRegionEnd = $realEndIndex + $endMarker.Length
+        $realRegionText = $realBondText.Substring($realStartIndex, $realRegionEnd - $realStartIndex)
+        $realNewline = if ($realBondText.Contains("`r`n")) { "`r`n" } else { "`n" }
+        Assert-Condition ($realBondText.Substring($realRegionEnd).StartsWith($realNewline, [System.StringComparison]::Ordinal)) 'Real BONDS Cost-table end marker is not followed by the source newline.'
+        $realRegionEnd += $realNewline.Length
+        $realNonShopIndex = $realBondText.IndexOf($nonShopHeader, [System.StringComparison]::Ordinal)
+        Assert-Equal $realRegionEnd $realNonShopIndex 'Real BONDS Cost-table marker immediate non-shop boundary'
+        Assert-TestGeneratedCostMarkerRegion `
+            -RegionText $realRegionText `
+            -Newline $realNewline `
+            -StartMarker $startMarker `
+            -EndMarker $endMarker `
+            -CostHeading $costHeading `
+            -CostColumns $costColumns `
+            -ShopTypeIds $realShopTypeIds `
+            -NonShopTypeIds $realNonShopTypeIds `
+            -Name 'Real BONDS existing Cost marker region'
+        $fixtureSourceText = $realBondText.Remove($realStartIndex, $realRegionEnd - $realStartIndex)
+        $fixtureSourceBytes = $utf8.GetBytes($fixtureSourceText)
+    }
+
+    $fixtureRoot = Join-Path $TempRoot ('BondsUnitCostTable-' + [guid]::NewGuid().ToString('N'))
+    [System.IO.Directory]::CreateDirectory($fixtureRoot) | Out-Null
+    $fixtureBondSpecPath = Join-Path $fixtureRoot 'BONDS_SPEC.md'
+    [System.IO.File]::WriteAllBytes($fixtureBondSpecPath, $fixtureSourceBytes)
+    $fixtureText = [System.IO.File]::ReadAllText($fixtureBondSpecPath, $utf8)
+    Assert-Equal 0 ([regex]::Matches($fixtureText, '<!-- UNIT-COST-TABLE:START -->').Count) 'initial Temp BONDS Cost-table start marker count'
+    Assert-Equal 0 ([regex]::Matches($fixtureText, '<!-- UNIT-COST-TABLE:END -->').Count) 'initial Temp BONDS Cost-table end marker count'
+
+    $updaterPath = Join-Path $PSScriptRoot 'Update-BondsUnitCostTable.ps1'
+    Assert-Condition (Test-Path -LiteralPath $updaterPath -PathType Leaf) "Missing BONDS Cost-table updater '$updaterPath'."
+
+    $powerShellPath = Join-Path $PSHOME 'powershell.exe'
+    $originalBytes = [System.IO.File]::ReadAllBytes($fixtureBondSpecPath)
+    $originalSnapshot = Get-FileIntegritySnapshot -Path $fixtureBondSpecPath
+    foreach ($path in @($fixtureRoot, $fixtureBondSpecPath)) {
+        $item = Get-Item -LiteralPath $path -Force
+        Assert-Condition (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0) "Task 8 fixture '$path' must be an ordinary file or directory, not a reparse point."
+    }
+
+    Assert-Condition ($originalBytes.Length -lt 3 -or -not ($originalBytes[0] -eq 0xEF -and $originalBytes[1] -eq 0xBB -and $originalBytes[2] -eq 0xBF)) 'Source Temp BONDS must be UTF-8 without BOM.'
+    Assert-Condition (-not $fixtureText.Contains("`r`n") -and $fixtureText.Contains("`n")) 'Formal Temp BONDS baseline must use LF-only newlines.'
+
+    $shopBlockPattern = '(?ms)^' + [regex]::Escape($shopHeader) + '\r?\n\s*\r?\n```text\r?\n(?<Ids>.*?)\r?\n```'
+    $shopBlockMatch = [regex]::Match($fixtureText, $shopBlockPattern)
+    Assert-Condition $shopBlockMatch.Success 'Temp BONDS shop TypeId block is missing or malformed.'
+    $bondShopTypeIds = @($shopBlockMatch.Groups['Ids'].Value -split '[,\s]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    Assert-Equal 94 $bondShopTypeIds.Count 'Temp BONDS shop TypeId count'
+    Assert-Equal 94 @($bondShopTypeIds | Sort-Object -Unique).Count 'Temp BONDS unique shop TypeId count'
+
+    $nonShopBlockPattern = '(?ms)^' + [regex]::Escape($nonShopHeader) + '\r?\n\s*\r?\n```text\r?\n(?<Ids>.*?)\r?\n```'
+    $nonShopBlockMatch = [regex]::Match($fixtureText, $nonShopBlockPattern)
+    Assert-Condition $nonShopBlockMatch.Success 'Temp BONDS non-shop TypeId block is missing or malformed.'
+    $bondNonShopTypeIds = @($nonShopBlockMatch.Groups['Ids'].Value -split '[,\s]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    Assert-Equal '1137/1138/2033/5504/10002' ($bondNonShopTypeIds -join '/') 'Temp BONDS non-shop TypeId set'
+
+    $csvRows = @(Import-Csv -LiteralPath $CostCsvPath -Encoding UTF8)
+    Assert-Equal 94 $csvRows.Count 'formal CSV Cost row count for updater'
+    Assert-Equal (@($bondShopTypeIds | Sort-Object { [int]$_ }) -join '/') (@($csvRows.TypeId | Sort-Object { [int]$_ }) -join '/') 'formal CSV and Temp BONDS shop TypeId sets'
+    foreach ($nonShopTypeId in $bondNonShopTypeIds) {
+        Assert-Condition ($nonShopTypeId -notin $csvRows.TypeId) "Formal CSV contains non-shop TypeId '$nonShopTypeId'."
+    }
+
+    & $powerShellPath -NoProfile -ExecutionPolicy Bypass -File $updaterPath `
+        -BondSpecPath $fixtureBondSpecPath `
+        -CostCsvPath $CostCsvPath | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'first Temp BONDS Cost-table updater exit code'
+    $firstBytes = [System.IO.File]::ReadAllBytes($fixtureBondSpecPath)
+    $firstText = $utf8.GetString($firstBytes)
+    Assert-Condition ($firstBytes.Length -lt 3 -or -not ($firstBytes[0] -eq 0xEF -and $firstBytes[1] -eq 0xBB -and $firstBytes[2] -eq 0xBF)) 'Generated Temp BONDS must be UTF-8 without BOM.'
+    Assert-Condition (-not $firstText.Contains("`r`n") -and $firstText.Contains("`n")) 'Generated Temp BONDS must preserve LF-only newlines.'
+    Assert-Equal 1 ([regex]::Matches($firstText, [regex]::Escape($startMarker)).Count) 'first Temp BONDS Cost-table start marker count'
+    Assert-Equal 1 ([regex]::Matches($firstText, [regex]::Escape($endMarker)).Count) 'first Temp BONDS Cost-table end marker count'
+
+    $startIndex = $firstText.IndexOf($startMarker, [System.StringComparison]::Ordinal)
+    $endIndex = $firstText.IndexOf($endMarker, [System.StringComparison]::Ordinal)
+    Assert-Condition ($startIndex -ge 0 -and $endIndex -gt $startIndex) 'Generated Temp BONDS Cost-table markers are missing or reversed.'
+    $regionEnd = $endIndex + $endMarker.Length
+    $newline = if ($firstText.Contains("`r`n")) { "`r`n" } else { "`n" }
+    Assert-Condition ($firstText.Substring($regionEnd).StartsWith($newline, [System.StringComparison]::Ordinal)) 'Generated Temp BONDS Cost-table end marker must be followed by the source newline.'
+    $regionEnd += $newline.Length
+    $normalizedOutsideText = $firstText.Remove($startIndex, $regionEnd - $startIndex)
+    Assert-Condition ([string]::Equals($fixtureText, $normalizedOutsideText, [System.StringComparison]::Ordinal)) 'Temp BONDS content outside the generated marker region changed.'
+    $normalizedOutsideBytes = $utf8.GetBytes($normalizedOutsideText)
+    Assert-Equal ([System.Convert]::ToBase64String($originalBytes)) ([System.Convert]::ToBase64String($normalizedOutsideBytes)) 'Temp BONDS byte content outside marker region'
+
+    $nonShopIndex = $firstText.IndexOf($nonShopHeader, [System.StringComparison]::Ordinal)
+    Assert-Equal $regionEnd $nonShopIndex 'Generated Temp BONDS Cost table immediate non-shop boundary'
+
+    $regionText = $firstText.Substring($startIndex, ($endIndex + $endMarker.Length) - $startIndex)
+    $regionLines = @($regionText -split '\r?\n')
+    Assert-Equal 99 $regionLines.Count 'generated Cost marker block line count'
+    Assert-Equal $startMarker $regionLines[0] 'generated Cost start marker'
+    Assert-Equal $costHeading $regionLines[1] 'generated Cost heading'
+    Assert-Equal $costColumns $regionLines[2] 'generated Cost table columns'
+    Assert-Equal '| ---: | --- | ---: | ---: |' $regionLines[3] 'generated Cost table separator'
+    Assert-Equal $endMarker $regionLines[-1] 'generated Cost end marker'
+    Assert-TestGeneratedCostMarkerRegion `
+        -RegionText $regionText `
+        -Newline $newline `
+        -StartMarker $startMarker `
+        -EndMarker $endMarker `
+        -CostHeading $costHeading `
+        -CostColumns $costColumns `
+        -ShopTypeIds $bondShopTypeIds `
+        -NonShopTypeIds $bondNonShopTypeIds `
+        -Name 'Generated Temp BONDS Cost marker region'
+
+    $csvByTypeId = @{}
+    foreach ($csvRow in $csvRows) {
+        $csvByTypeId[[string]$csvRow.TypeId] = $csvRow
+    }
+    $tableTypeIds = [System.Collections.Generic.List[string]]::new()
+    for ($index = 4; $index -lt $regionLines.Count - 1; $index++) {
+        Assert-Condition ($regionLines[$index] -match '^\| (?<TypeId>\d+) \| (?<Name>.*?) \| (?<Rarity>[1-6]) \| (?<Cost>\d+) \|$') "Generated Cost data line '$($regionLines[$index])' has an invalid shape."
+        $typeId = [string]$Matches.TypeId
+        $rarity = [int]$Matches.Rarity
+        $cost = [int]$Matches.Cost
+        Assert-Condition ($csvByTypeId.ContainsKey($typeId)) "Generated Cost table contains TypeId '$typeId' absent from the formal CSV."
+        Assert-Equal (([string]$csvByTypeId[$typeId].DisplayName).Replace('|', '\|')) ([string]$Matches.Name) "generated Cost display name $typeId"
+        Assert-Equal ([int]$csvByTypeId[$typeId].Rarity) $rarity "generated Cost rarity $typeId"
+        Assert-Equal ([int]$csvByTypeId[$typeId].FinalBaseCost) $cost "generated Cost value $typeId"
+        if ($rarity -eq 1) {
+            Assert-Condition ($cost -ge 2 -and $cost -le 40) "Generated R1 TypeId '$typeId' Cost '$cost' is outside 2..40."
+        }
+        else {
+            Assert-Condition ($cost -ge 5 -and $cost -le 40) "Generated R$rarity TypeId '$typeId' Cost '$cost' is outside 5..40."
+        }
+        $tableTypeIds.Add($typeId)
+    }
+    Assert-Equal 94 $tableTypeIds.Count 'generated Cost data row count'
+    Assert-Equal 94 @($tableTypeIds | Sort-Object -Unique).Count 'generated Cost unique TypeId count'
+    Assert-Equal (@($csvRows.TypeId | Sort-Object { [int]$_ }) -join '/') (@($tableTypeIds) -join '/') 'generated Cost numeric TypeId order and formal CSV set'
+    foreach ($nonShopTypeId in @('1137', '1138', '2033', '5504', '10002')) {
+        Assert-Condition ($nonShopTypeId -notin $tableTypeIds) "Generated Cost table contains non-shop TypeId '$nonShopTypeId'."
+    }
+
+    $firstSnapshot = Get-FileIntegritySnapshot -Path $fixtureBondSpecPath
+    & $powerShellPath -NoProfile -ExecutionPolicy Bypass -File $updaterPath `
+        -BondSpecPath $fixtureBondSpecPath `
+        -CostCsvPath $CostCsvPath | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'second Temp BONDS Cost-table updater exit code'
+    Assert-FileIntegritySnapshotEqual -Expected $firstSnapshot -Actual (Get-FileIntegritySnapshot -Path $fixtureBondSpecPath) -Name 'second Temp BONDS Cost-table byte idempotence'
+
+    $crlfSourcePath = Join-Path $fixtureRoot 'BONDS_SPEC_CRLF.md'
+    $crlfOutputPath = Join-Path $fixtureRoot 'BONDS_SPEC_CRLF_OUTPUT.md'
+    $crlfSourceText = $fixtureText.Replace("`n", "`r`n")
+    [System.IO.File]::WriteAllText($crlfSourcePath, $crlfSourceText, $utf8)
+    $crlfSourceSnapshot = Get-FileIntegritySnapshot -Path $crlfSourcePath
+    & $powerShellPath -NoProfile -ExecutionPolicy Bypass -File $updaterPath `
+        -BondSpecPath $crlfSourcePath `
+        -CostCsvPath $CostCsvPath `
+        -OutputPath $crlfOutputPath | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'CRLF OutputPath Temp BONDS updater exit code'
+    Assert-FileIntegritySnapshotEqual -Expected $crlfSourceSnapshot -Actual (Get-FileIntegritySnapshot -Path $crlfSourcePath) -Name 'CRLF OutputPath source BONDS'
+    $crlfOutputBytes = [System.IO.File]::ReadAllBytes($crlfOutputPath)
+    $crlfOutputText = $utf8.GetString($crlfOutputBytes)
+    Assert-Condition ($crlfOutputText.Contains("`r`n") -and -not [regex]::IsMatch($crlfOutputText, '(?<!\r)\n')) 'OutputPath Temp BONDS must preserve CRLF-only newlines.'
+    Assert-Condition ($crlfOutputBytes.Length -lt 3 -or -not ($crlfOutputBytes[0] -eq 0xEF -and $crlfOutputBytes[1] -eq 0xBB -and $crlfOutputBytes[2] -eq 0xBF)) 'OutputPath Temp BONDS must be UTF-8 without BOM.'
+    foreach ($path in @($crlfSourcePath, $crlfOutputPath)) {
+        $item = Get-Item -LiteralPath $path -Force
+        Assert-Condition (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0) "OutputPath fixture '$path' must be an ordinary file, not a reparse point."
+    }
+
+    $markerBlockWithTrailingNewline = $firstText.Substring($startIndex, $regionEnd - $startIndex)
+    $firstDataLine = $regionLines[4]
+    $secondDataLine = $regionLines[5]
+    $arbitraryRegion = $startMarker + $newline + 'arbitrary text' + $newline + $endMarker
+    $extraRowRegion = $regionText.Replace($endMarker, $firstDataLine + $newline + $endMarker)
+    $missingRowRegion = $regionText.Replace($firstDataLine + $newline, '')
+    $duplicateTypeIdRegion = $regionText.Replace($secondDataLine, $firstDataLine)
+    $outOfOrderRegion = $regionText.Replace($firstDataLine, '__FIRST_DATA_LINE__').Replace($secondDataLine, $firstDataLine).Replace('__FIRST_DATA_LINE__', $secondDataLine)
+    Assert-Condition ($firstDataLine -match '^\| (?<TypeId>[1-9][0-9]*) \|') 'Generated first Cost data row is malformed before the legacy-value fixture.'
+    $legacyValueDataLine = "| $([string]$Matches.TypeId) | Legacy Display Name | 4 | 30 |"
+    $legacyValueRoot = Join-Path $fixtureRoot ('LegacyValues-' + [guid]::NewGuid().ToString('N'))
+    [System.IO.Directory]::CreateDirectory($legacyValueRoot) | Out-Null
+    $legacyValueBondPath = Join-Path $legacyValueRoot 'BONDS_SPEC.md'
+    [System.IO.File]::WriteAllText($legacyValueBondPath, $firstText.Replace($firstDataLine, $legacyValueDataLine), $utf8)
+    & $powerShellPath -NoProfile -ExecutionPolicy Bypass -File $updaterPath `
+        -BondSpecPath $legacyValueBondPath `
+        -CostCsvPath $CostCsvPath | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'legal legacy-value existing Cost-table updater exit code'
+    Assert-Equal ([System.Convert]::ToBase64String($firstBytes)) ([System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($legacyValueBondPath))) 'legal legacy-value existing Cost-table normalized output'
+    Assert-Equal 1 @(Get-ChildItem -LiteralPath $legacyValueRoot -File).Count 'legal legacy-value existing Cost-table output file count'
+
+    $invalidCases = [ordered]@{
+        DuplicateStart = $firstText.Replace($startMarker, $startMarker + $newline + $startMarker)
+        DuplicateEnd = $firstText.Replace($endMarker, $endMarker + $newline + $endMarker)
+        MissingStart = $firstText.Replace($startMarker, '')
+        MissingEnd = $firstText.Replace($endMarker, '')
+        Reversed = $fixtureText.Insert($fixtureText.IndexOf($nonShopHeader, [System.StringComparison]::Ordinal), $endMarker + $newline + $startMarker + $newline)
+        Malformed = $firstText.Replace($startMarker, '<!-- UNIT-COST-TABLE:STAR -->')
+        OutsideBoundary = $fixtureText + $newline + $markerBlockWithTrailingNewline
+        ArbitraryText = $firstText.Replace($regionText, $arbitraryRegion)
+        WrongHeading = $firstText.Replace($costHeading, '## Wrong Cost Heading')
+        WrongColumns = $firstText.Replace($costColumns, '| Wrong | Cost | Columns | Here |')
+        ExtraRow = $firstText.Replace($regionText, $extraRowRegion)
+        MissingRow = $firstText.Replace($regionText, $missingRowRegion)
+        DuplicateTypeId = $firstText.Replace($regionText, $duplicateTypeIdRegion)
+        OutOfOrderTypeId = $firstText.Replace($regionText, $outOfOrderRegion)
+    }
+    foreach ($caseName in $invalidCases.Keys) {
+        $caseRoot = Join-Path $fixtureRoot ($caseName + '-' + [guid]::NewGuid().ToString('N'))
+        [System.IO.Directory]::CreateDirectory($caseRoot) | Out-Null
+        $caseBondSpecPath = Join-Path $caseRoot 'BONDS_SPEC.md'
+        [System.IO.File]::WriteAllText($caseBondSpecPath, [string]$invalidCases[$caseName], $utf8)
+        $caseSnapshot = Get-FileIntegritySnapshot -Path $caseBondSpecPath
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & $powerShellPath -NoProfile -ExecutionPolicy Bypass -File $updaterPath `
+                -BondSpecPath $caseBondSpecPath `
+                -CostCsvPath $CostCsvPath 2>$null | Out-Null
+            $caseExitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        Assert-Condition ($caseExitCode -ne 0) "Malformed marker case '$caseName' was accepted."
+        Assert-FileIntegritySnapshotEqual -Expected $caseSnapshot -Actual (Get-FileIntegritySnapshot -Path $caseBondSpecPath) -Name "malformed marker case $caseName"
+        Assert-Equal 1 @(Get-ChildItem -LiteralPath $caseRoot -File).Count "malformed marker case $caseName output file count"
+    }
+
+    $invalidCsvCases = [ordered]@{}
+    $invalidCsvCases['Duplicate'] = @($csvRows | ForEach-Object { $_ | Select-Object * }) + @($csvRows[0] | Select-Object *)
+    $invalidCsvCases['Missing'] = @($csvRows | Select-Object -First 93 | ForEach-Object { $_ | Select-Object * })
+    $nonShopRows = @($csvRows | ForEach-Object { $_ | Select-Object * })
+    $nonShopRows[-1].TypeId = '1137'
+    $invalidCsvCases['NonShop'] = $nonShopRows
+    foreach ($caseDefinition in @(
+            [pscustomobject]@{ Name = 'R1BelowMinimum'; TypeId = '1008'; Value = '1' },
+            [pscustomobject]@{ Name = 'R2BelowMinimum'; TypeId = '1026'; Value = '4' },
+            [pscustomobject]@{ Name = 'AboveMaximum'; TypeId = '10039'; Value = '41' },
+            [pscustomobject]@{ Name = 'NonInteger'; TypeId = '1001'; Value = '5.5' }
+        )) {
+        $caseRows = @($csvRows | ForEach-Object { $_ | Select-Object * })
+        @($caseRows | Where-Object TypeId -eq $caseDefinition.TypeId)[0].FinalBaseCost = $caseDefinition.Value
+        $invalidCsvCases[$caseDefinition.Name] = $caseRows
+    }
+    foreach ($caseName in $invalidCsvCases.Keys) {
+        $caseRoot = Join-Path $fixtureRoot ('Csv-' + $caseName + '-' + [guid]::NewGuid().ToString('N'))
+        [System.IO.Directory]::CreateDirectory($caseRoot) | Out-Null
+        $caseBondSpecPath = Join-Path $caseRoot 'BONDS_SPEC.md'
+        $caseCsvPath = Join-Path $caseRoot 'cost.csv'
+        [System.IO.File]::WriteAllBytes($caseBondSpecPath, $originalBytes)
+        [System.IO.File]::WriteAllLines($caseCsvPath, @($invalidCsvCases[$caseName] | ConvertTo-Csv -NoTypeInformation), $utf8)
+        $caseBondSnapshot = Get-FileIntegritySnapshot -Path $caseBondSpecPath
+        $caseCsvSnapshot = Get-FileIntegritySnapshot -Path $caseCsvPath
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & $powerShellPath -NoProfile -ExecutionPolicy Bypass -File $updaterPath `
+                -BondSpecPath $caseBondSpecPath `
+                -CostCsvPath $caseCsvPath 2>$null | Out-Null
+            $caseExitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        Assert-Condition ($caseExitCode -ne 0) "Invalid CSV case '$caseName' was accepted."
+        Assert-FileIntegritySnapshotEqual -Expected $caseBondSnapshot -Actual (Get-FileIntegritySnapshot -Path $caseBondSpecPath) -Name "invalid CSV case $caseName BONDS"
+        Assert-FileIntegritySnapshotEqual -Expected $caseCsvSnapshot -Actual (Get-FileIntegritySnapshot -Path $caseCsvPath) -Name "invalid CSV case $caseName CSV"
+        Assert-Equal 2 @(Get-ChildItem -LiteralPath $caseRoot -File).Count "invalid CSV case $caseName output file count"
+    }
+
+    foreach ($collisionCase in @(
+            [pscustomobject]@{
+                Name = 'CostCsvEqualsBondSpec'
+                BondSpecPath = $fixtureBondSpecPath
+                CostCsvPath = $fixtureBondSpecPath
+                OutputPath = $null
+            },
+            [pscustomobject]@{
+                Name = 'CostCsvEqualsOutput'
+                BondSpecPath = $fixtureBondSpecPath
+                CostCsvPath = $CostCsvPath
+                OutputPath = $CostCsvPath
+            }
+        )) {
+        $collisionBondSnapshot = Get-FileIntegritySnapshot -Path $collisionCase.BondSpecPath
+        $collisionCsvSnapshot = Get-FileIntegritySnapshot -Path $collisionCase.CostCsvPath
+        $collisionArguments = @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $updaterPath,
+            '-BondSpecPath', $collisionCase.BondSpecPath,
+            '-CostCsvPath', $collisionCase.CostCsvPath
+        )
+        if (-not [string]::IsNullOrWhiteSpace($collisionCase.OutputPath)) {
+            $collisionArguments += @('-OutputPath', $collisionCase.OutputPath)
+        }
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & $powerShellPath @collisionArguments 2>$null | Out-Null
+            $caseExitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        Assert-Condition ($caseExitCode -ne 0) "Input collision case '$($collisionCase.Name)' was accepted."
+        Assert-FileIntegritySnapshotEqual -Expected $collisionBondSnapshot -Actual (Get-FileIntegritySnapshot -Path $collisionCase.BondSpecPath) -Name "input collision case $($collisionCase.Name) BONDS"
+        Assert-FileIntegritySnapshotEqual -Expected $collisionCsvSnapshot -Actual (Get-FileIntegritySnapshot -Path $collisionCase.CostCsvPath) -Name "input collision case $($collisionCase.Name) CSV"
+    }
+
+    Assert-FileIntegritySnapshotEqual -Expected $realBondSnapshot -Actual (Get-FileIntegritySnapshot -Path $BondSpecPath) -Name 'real BONDS after all Temp Cost-table updater tests'
+}
+
 function Assert-Throws {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$Action,
@@ -1097,6 +1487,7 @@ try {
         $ExpectedCsvPath = (Resolve-Path -LiteralPath $ExpectedCsvPath).Path
         $ExpectedCsvPath = Assert-ExpectedCsvOutsideTestRoot -ExpectedCsvPath $ExpectedCsvPath -TestRoot $testRoot
         Test-ExpectedCsvPathGuard -SourceExpectedCsvPath $ExpectedCsvPath -TempRoot $TempRoot
+        Test-BondsUnitCostTableUpdater -BondSpecPath $BondSpecPath -CostCsvPath $ExpectedCsvPath -TempRoot $TempRoot
     }
 
     [System.IO.Directory]::CreateDirectory($testRoot) | Out-Null
