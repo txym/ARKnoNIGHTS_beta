@@ -31,6 +31,64 @@ function Assert-Condition {
     }
 }
 
+function Assert-Throws {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Action,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    try {
+        & $Action
+    }
+    catch {
+        return
+    }
+    throw "${Name}: expected an explicit failure."
+}
+
+function Get-UnitCostHelperScript {
+    param([Parameter(Mandatory = $true)][string]$ExporterPath)
+
+    # The exporter keeps its reusable calculation helpers before its main try
+    # block.  Load that real code without running its external-data workflow.
+    $source = [System.IO.File]::ReadAllText($ExporterPath)
+    $mainBlockIndex = [regex]::Match($source, '(?m)^try \{').Index
+    Assert-Condition ($mainBlockIndex -gt 0) "Exporter '$ExporterPath' does not expose a helper section before its main workflow."
+    return [scriptblock]::Create($source.Substring(0, $mainBlockIndex))
+}
+
+function Test-CombatMetricHelpers {
+    param([Parameter(Mandatory = $true)][string]$ExporterPath)
+
+    $helperScript = Get-UnitCostHelperScript -ExporterPath $ExporterPath
+    . $helperScript `
+        -BondSpecPath 'test-only' `
+        -StagingRoot 'test-only' `
+        -OutputCsvPath 'test-only.csv' `
+        -AnalysisOutputPath 'test-only.json'
+
+    Assert-Equal 5 (Get-PhysicalDamage -Attack 100 -Defense 500) 'physical 5% floor'
+    Assert-Equal 60 (Get-PhysicalDamage -Attack 100 -Defense 40) 'physical subtraction'
+    Assert-Equal 5 (Get-MagicDamage -Attack 100 -MagicResistance 100) 'magic 5% floor'
+    Assert-Equal 75 (Get-MagicDamage -Attack 100 -MagicResistance 25) 'magic resistance'
+    Assert-Equal 100 (Get-TrueDamage -Attack 100) 'true damage'
+
+    $sample = [decimal[]]@(1, 10, 100, 1000)
+    Assert-Equal ([decimal]55) (Get-Median -Values $sample) 'synthetic raw median'
+    Assert-Equal ([decimal]2.35) (Get-Percentile -Values $sample -Percentile ([decimal]0.05)) 'synthetic P5'
+    Assert-Equal ([decimal]865) (Get-Percentile -Values $sample -Percentile ([decimal]0.95)) 'synthetic P95'
+    $winsorized = @(Get-WinsorizedValues -Values $sample -LowerPercentile ([decimal]0.05) -UpperPercentile ([decimal]0.95))
+    Assert-Equal ([decimal]2.35) $winsorized[0] 'synthetic winsorized low value'
+    Assert-Equal ([decimal]865) $winsorized[3] 'synthetic winsorized high value'
+    Assert-Equal ([decimal]55) (Get-Median -Values ([decimal[]]$winsorized)) 'synthetic winsorized median'
+    Assert-Equal ([decimal]6) (Get-GeometricCombinedValue -Output ([decimal]4) -Defense ([decimal]9)) 'synthetic geometric combination'
+    Assert-Equal ([decimal]18) (Get-GeometricCombinedValue -Output ([decimal]12) -Defense ([decimal]27)) 'duplicated population geometric combination'
+
+    Assert-Throws { Get-PhysicalDamage -Attack -1 -Defense 0 } 'negative attack'
+    Assert-Throws { Get-EffectiveAttackInterval -Attacker ([pscustomobject]@{ TypeId = 1; EffectiveAttackIntervalSeconds = 0 }) } 'nonpositive attack interval'
+    Assert-Throws { Get-OrdinaryAttackDamage -Attacker ([pscustomobject]@{ TypeId = 1; DamageType = 'Unknown'; Attack = 100; EffectiveAttackIntervalSeconds = 1 }) -Defender ([pscustomobject]@{ Defense = 0; MagicResistance = 0 }) } 'unknown damage type'
+}
+
 function Get-UnitJsonSnapshot {
     param(
         [Parameter(Mandatory = $true)][string]$StagingRoot,
@@ -198,6 +256,7 @@ try {
 
     $exporterPath = Join-Path $PSScriptRoot 'Export-UnitCostDataset.ps1'
     $powershellPath = Join-Path $PSHOME 'powershell.exe'
+    Test-CombatMetricHelpers -ExporterPath $exporterPath
     & $powershellPath -NoProfile -ExecutionPolicy Bypass -File $exporterPath `
         -BondSpecPath $BondSpecPath `
         -StagingRoot $StagingRoot `
@@ -212,6 +271,12 @@ try {
     Assert-Equal 88 @($rows.TypeId | Sort-Object -Unique).Count 'unique shop TypeId count'
     Assert-Equal 0 @($rows | Where-Object { $_.TypeId -in '1137', '1138', '2033', '5504', '10002' }).Count 'non-shop Cost rows'
     Assert-Equal 1 @($rows | Where-Object TypeId -eq '1000').Count 'known TypeId 1000'
+    foreach ($property in @(
+            'RawMedianDps', 'WinsorizedMedianDps', 'RawMedianTtdSeconds', 'WinsorizedMedianTtdSeconds',
+            'OutputReference', 'DefenseReference', 'PanelPower', 'PanelModelStatus'
+        )) {
+        Assert-Condition ($rows[0].PSObject.Properties.Name -contains $property) "CSV is missing combat metric column '$property'."
+    }
 
     foreach ($row in $rows) {
         foreach ($property in @(
@@ -221,6 +286,20 @@ try {
             )) {
             Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$row.$property)) "Type ID $($row.TypeId) has an empty $property."
         }
+    }
+
+    $scorableRows = @($rows | Where-Object PanelModelStatus -eq 'BaseOrdinaryCombat')
+    Assert-Condition ($scorableRows.Count -gt 0) 'No base ordinary-combat rows were scored.'
+    foreach ($row in $scorableRows) {
+        $panelPower = [decimal]$row.PanelPower
+        Assert-Condition ($panelPower -gt 0) "Type ID $($row.TypeId) has nonpositive PanelPower '$panelPower'."
+        Assert-Condition (-not [double]::IsNaN([double]$panelPower) -and -not [double]::IsInfinity([double]$panelPower)) "Type ID $($row.TypeId) has invalid PanelPower '$panelPower'."
+        Assert-Condition ([decimal]$row.OutputReference -gt 0 -and [decimal]$row.DefenseReference -gt 0) "Type ID $($row.TypeId) has invalid combat references."
+    }
+    foreach ($typeId in @('1017', '1042', '1146', '1355', '1008', '1026', '1333')) {
+        $row = @($rows | Where-Object TypeId -eq $typeId)
+        Assert-Equal 1 $row.Count "special combat TypeId $typeId count"
+        Assert-Condition ([string]::IsNullOrWhiteSpace([string]$row[0].PanelPower)) "Type ID $typeId must not receive a fabricated PanelPower."
     }
 
     $expectedRows = @{

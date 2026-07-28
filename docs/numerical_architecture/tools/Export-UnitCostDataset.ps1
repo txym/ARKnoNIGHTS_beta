@@ -140,6 +140,137 @@ function Get-DirectoryByName {
     return $matches[0]
 }
 
+function Get-NonNegativeCombatValue {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$Value,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    Assert-Condition ($Value -ge 0) "$Name '$Value' must not be negative."
+    return $Value
+}
+
+function Get-PhysicalDamage {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$Attack,
+        [Parameter(Mandatory = $true)][decimal]$Defense
+    )
+
+    $Attack = Get-NonNegativeCombatValue -Value $Attack -Name 'Attack'
+    $Defense = Get-NonNegativeCombatValue -Value $Defense -Name 'Defense'
+    return [decimal][Math]::Max(
+        [double]($Attack - $Defense),
+        [Math]::Floor([double]($Attack * [decimal]0.05))
+    )
+}
+
+function Get-MagicDamage {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$Attack,
+        [Parameter(Mandatory = $true)][decimal]$MagicResistance
+    )
+
+    $Attack = Get-NonNegativeCombatValue -Value $Attack -Name 'Attack'
+    $MagicResistance = Get-NonNegativeCombatValue -Value $MagicResistance -Name 'MagicResistance'
+    return [decimal][Math]::Max(
+        [Math]::Floor([double]($Attack * ([decimal]100 - $MagicResistance) / [decimal]100)),
+        [Math]::Floor([double]($Attack * [decimal]0.05))
+    )
+}
+
+function Get-TrueDamage {
+    param([Parameter(Mandatory = $true)][decimal]$Attack)
+
+    return Get-NonNegativeCombatValue -Value $Attack -Name 'Attack'
+}
+
+function Get-OrdinaryAttackDamage {
+    param(
+        [Parameter(Mandatory = $true)]$Attacker,
+        [Parameter(Mandatory = $true)]$Defender
+    )
+
+    Assert-Condition ($null -ne $Attacker.Attack) "Type ID $($Attacker.TypeId) is missing Attack."
+    Assert-Condition ([decimal]$Attacker.Attack -gt 0) "Type ID $($Attacker.TypeId) must have positive Attack for an ordinary attack."
+    switch ([string]$Attacker.DamageType) {
+        'Physical' { return Get-PhysicalDamage -Attack $Attacker.Attack -Defense $Defender.Defense }
+        'Magic' { return Get-MagicDamage -Attack $Attacker.Attack -MagicResistance $Defender.MagicResistance }
+        'True' { return Get-TrueDamage -Attack $Attacker.Attack }
+        default { throw "Cannot calculate ordinary attack damage for type ID $($Attacker.TypeId) with damage type '$($Attacker.DamageType)'." }
+    }
+}
+
+function Get-EffectiveAttackInterval {
+    param([Parameter(Mandatory = $true)]$Attacker)
+
+    Assert-Condition ($null -ne $Attacker.EffectiveAttackIntervalSeconds) "Type ID $($Attacker.TypeId) is missing EffectiveAttackIntervalSeconds."
+    $interval = [decimal]$Attacker.EffectiveAttackIntervalSeconds
+    Assert-Condition ($interval -gt 0) "Type ID $($Attacker.TypeId) has nonpositive effective attack interval '$interval'."
+    return $interval
+}
+
+function Get-Percentile {
+    param(
+        [Parameter(Mandatory = $true)][decimal[]]$Values,
+        [Parameter(Mandatory = $true)][decimal]$Percentile
+    )
+
+    Assert-Condition ($Values.Count -gt 0) 'Cannot calculate a percentile from an empty sample.'
+    Assert-Condition ($Percentile -ge 0 -and $Percentile -le 1) "Invalid percentile '$Percentile'."
+    $sortedValues = @($Values | Sort-Object)
+    $position = ([decimal]($sortedValues.Count - 1)) * $Percentile
+    $lowerIndex = [int][Math]::Floor([double]$position)
+    $upperIndex = [int][Math]::Ceiling([double]$position)
+    if ($lowerIndex -eq $upperIndex) {
+        return $sortedValues[$lowerIndex]
+    }
+
+    $fraction = $position - $lowerIndex
+    return $sortedValues[$lowerIndex] + (($sortedValues[$upperIndex] - $sortedValues[$lowerIndex]) * $fraction)
+}
+
+function Get-Median {
+    param([Parameter(Mandatory = $true)][decimal[]]$Values)
+
+    return Get-Percentile -Values $Values -Percentile ([decimal]0.5)
+}
+
+function Get-WinsorizedValues {
+    param(
+        [Parameter(Mandatory = $true)][decimal[]]$Values,
+        [Parameter(Mandatory = $true)][decimal]$LowerPercentile,
+        [Parameter(Mandatory = $true)][decimal]$UpperPercentile
+    )
+
+    Assert-Condition ($LowerPercentile -ge 0 -and $LowerPercentile -le $UpperPercentile -and $UpperPercentile -le 1) "Invalid winsorization range $LowerPercentile/$UpperPercentile."
+    $lowerBound = Get-Percentile -Values $Values -Percentile $LowerPercentile
+    $upperBound = Get-Percentile -Values $Values -Percentile $UpperPercentile
+    return Get-ClampedCombatValues -Values $Values -LowerBound $lowerBound -UpperBound $upperBound
+}
+
+function Get-ClampedCombatValues {
+    param(
+        [Parameter(Mandatory = $true)][decimal[]]$Values,
+        [Parameter(Mandatory = $true)][decimal]$LowerBound,
+        [Parameter(Mandatory = $true)][decimal]$UpperBound
+    )
+
+    Assert-Condition ($Values.Count -gt 0) 'Cannot clamp an empty sample.'
+    Assert-Condition ($LowerBound -le $UpperBound) "Invalid clamp bounds $LowerBound/$UpperBound."
+    return [decimal[]]@($Values | ForEach-Object { [decimal][Math]::Min([double]$UpperBound, [Math]::Max([double]$LowerBound, [double]$_)) })
+}
+
+function Get-GeometricCombinedValue {
+    param(
+        [Parameter(Mandatory = $true)][decimal]$Output,
+        [Parameter(Mandatory = $true)][decimal]$Defense
+    )
+
+    Assert-Condition ($Output -gt 0) "Output '$Output' must be positive."
+    Assert-Condition ($Defense -gt 0) "Defense '$Defense' must be positive."
+    return [decimal][Math]::Sqrt([double]($Output * $Defense))
+}
+
 function Write-Utf8File {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -217,7 +348,7 @@ try {
     $directories = @(Get-ChildItem -LiteralPath $StagingRoot -Directory)
     $damageTypeOverrides = @{ '1238' = 'Physical'; '1243' = 'Physical'; '10039' = 'Physical' }
     $allowedDamageTypes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($damageType in @('Physical', 'Magic', 'None')) {
+    foreach ($damageType in @('Physical', 'Magic', 'True', 'None')) {
         [void]$allowedDamageTypes.Add($damageType)
     }
     $eliteEvidence = [System.Collections.Generic.List[object]]::new()
@@ -286,11 +417,153 @@ try {
         Assert-Condition ($row.TypeId -notin @(1137, 1138, 2033, 5504, 10002)) "Non-shop TypeId '$($row.TypeId)' was exported."
     }
 
+    # BONDS_SPEC.md confirms these drones cannot be attacked.  It also confirms
+    # that the path units and traffic police do not make ordinary attacks.
+    $unattackableDroneTypeIds = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($typeId in @(1017, 1042, 1146, 1355)) {
+        [void]$unattackableDroneTypeIds.Add($typeId)
+    }
+    $ordinaryAttackExcludedTypeIds = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($typeId in @(1008, 1026, 1333)) {
+        [void]$ordinaryAttackExcludedTypeIds.Add($typeId)
+    }
+    $pathUnitTypeIds = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($typeId in @(1008, 1026)) {
+        [void]$pathUnitTypeIds.Add($typeId)
+    }
+
+    $defenderRows = @($rows | Where-Object { -not $unattackableDroneTypeIds.Contains([int]$_.TypeId) })
+    $attackingRows = @($rows | Where-Object { $_.DamageType -ne 'None' -and -not $ordinaryAttackExcludedTypeIds.Contains([int]$_.TypeId) })
+    Assert-Condition ($defenderRows.Count -gt 0) 'The defender sample is empty.'
+    Assert-Condition ($attackingRows.Count -gt 0) 'The ordinary attacker sample is empty.'
+    foreach ($attacker in $attackingRows) {
+        [void](Get-EffectiveAttackInterval -Attacker $attacker)
+    }
+
+    $dpsValuesByAttacker = @{}
+    $ttdValuesByDefender = @{}
+    $allDpsValues = [System.Collections.Generic.List[decimal]]::new()
+    $allTtdValues = [System.Collections.Generic.List[decimal]]::new()
+    foreach ($attacker in $attackingRows) {
+        $dpsValues = [System.Collections.Generic.List[decimal]]::new()
+        $effectiveInterval = Get-EffectiveAttackInterval -Attacker $attacker
+        foreach ($defender in $defenderRows) {
+            $damagePerHit = Get-OrdinaryAttackDamage -Attacker $attacker -Defender $defender
+            Assert-Condition ($damagePerHit -gt 0) "Type ID $($attacker.TypeId) produced nonpositive damage '$damagePerHit'."
+            $dps = $damagePerHit / $effectiveInterval
+            [void]$dpsValues.Add($dps)
+            [void]$allDpsValues.Add($dps)
+        }
+        $dpsValuesByAttacker[[int]$attacker.TypeId] = $dpsValues.ToArray()
+    }
+    foreach ($defender in $defenderRows) {
+        $ttdValues = [System.Collections.Generic.List[decimal]]::new()
+        foreach ($attacker in $attackingRows) {
+            $damagePerHit = Get-OrdinaryAttackDamage -Attacker $attacker -Defender $defender
+            $effectiveInterval = Get-EffectiveAttackInterval -Attacker $attacker
+            $ttd = [decimal][Math]::Ceiling([double]([decimal]$defender.MaxHitPoints / $damagePerHit)) * $effectiveInterval
+            Assert-Condition ($ttd -ge 0) "Type ID $($defender.TypeId) produced negative TTD '$ttd'."
+            [void]$ttdValues.Add($ttd)
+            [void]$allTtdValues.Add($ttd)
+        }
+        $ttdValuesByDefender[[int]$defender.TypeId] = $ttdValues.ToArray()
+    }
+
+    $dpsP5 = Get-Percentile -Values $allDpsValues.ToArray() -Percentile ([decimal]0.05)
+    $dpsP95 = Get-Percentile -Values $allDpsValues.ToArray() -Percentile ([decimal]0.95)
+    $ttdP5 = Get-Percentile -Values $allTtdValues.ToArray() -Percentile ([decimal]0.05)
+    $ttdP95 = Get-Percentile -Values $allTtdValues.ToArray() -Percentile ([decimal]0.95)
+    $outputMetricsByTypeId = @{}
+    foreach ($typeId in $dpsValuesByAttacker.Keys) {
+        $values = [decimal[]]$dpsValuesByAttacker[$typeId]
+        $outputMetricsByTypeId[$typeId] = [pscustomobject]@{
+            RawMedian = Get-Median -Values $values
+            WinsorizedMedian = Get-Median -Values (Get-ClampedCombatValues -Values $values -LowerBound $dpsP5 -UpperBound $dpsP95)
+        }
+    }
+    $defenseMetricsByTypeId = @{}
+    foreach ($typeId in $ttdValuesByDefender.Keys) {
+        $values = [decimal[]]$ttdValuesByDefender[$typeId]
+        $defenseMetricsByTypeId[$typeId] = [pscustomobject]@{
+            RawMedian = Get-Median -Values $values
+            WinsorizedMedian = Get-Median -Values (Get-ClampedCombatValues -Values $values -LowerBound $ttdP5 -UpperBound $ttdP95)
+        }
+    }
+    $scorableTypeIds = @($rows | Where-Object {
+            $outputMetricsByTypeId.ContainsKey([int]$_.TypeId) -and
+            $defenseMetricsByTypeId.ContainsKey([int]$_.TypeId) -and
+            -not $unattackableDroneTypeIds.Contains([int]$_.TypeId)
+        } | ForEach-Object { [int]$_.TypeId })
+    Assert-Condition ($scorableTypeIds.Count -gt 0) 'The scorable ordinary-combat population is empty.'
+    $outputReference = Get-Median -Values ([decimal[]]@($scorableTypeIds | ForEach-Object { $outputMetricsByTypeId[$_].WinsorizedMedian }))
+    $defenseReference = Get-Median -Values ([decimal[]]@($scorableTypeIds | ForEach-Object { $defenseMetricsByTypeId[$_].WinsorizedMedian }))
+    Assert-Condition ($outputReference -gt 0) "Output reference '$outputReference' must be positive."
+    Assert-Condition ($defenseReference -gt 0) "Defense reference '$defenseReference' must be positive."
+
+    $rows = foreach ($row in $rows) {
+        $typeId = [int]$row.TypeId
+        $outputMetrics = if ($outputMetricsByTypeId.ContainsKey($typeId)) { $outputMetricsByTypeId[$typeId] } else { $null }
+        $defenseMetrics = if ($defenseMetricsByTypeId.ContainsKey($typeId)) { $defenseMetricsByTypeId[$typeId] } else { $null }
+        $isScorable = $scorableTypeIds -contains $typeId
+        $status = if ($unattackableDroneTypeIds.Contains($typeId)) { 'UnattackableDrone' } elseif ($pathUnitTypeIds.Contains($typeId)) { 'PathUnit' } elseif ($ordinaryAttackExcludedTypeIds.Contains($typeId) -or $row.DamageType -eq 'None') { 'NoOrdinaryAttack' } else { 'BaseOrdinaryCombat' }
+        [pscustomobject][ordered]@{
+            TypeId = $row.TypeId
+            DisplayName = $row.DisplayName
+            Rarity = $row.Rarity
+            ResourceDirectory = $row.ResourceDirectory
+            DamageType = $row.DamageType
+            DamageTypeSource = $row.DamageTypeSource
+            MaxHitPoints = $row.MaxHitPoints
+            Attack = $row.Attack
+            Defense = $row.Defense
+            MagicResistance = $row.MagicResistance
+            AttackIntervalSeconds = $row.AttackIntervalSeconds
+            EffectiveAttackIntervalSeconds = $row.EffectiveAttackIntervalSeconds
+            MoveSpeedMetresPerSecond = $row.MoveSpeedMetresPerSecond
+            LifeDeduct = $row.LifeDeduct
+            RawMedianDps = if ($null -ne $outputMetrics) { $outputMetrics.RawMedian } else { $null }
+            WinsorizedMedianDps = if ($null -ne $outputMetrics) { $outputMetrics.WinsorizedMedian } else { $null }
+            RawMedianTtdSeconds = if ($null -ne $defenseMetrics) { $defenseMetrics.RawMedian } else { $null }
+            WinsorizedMedianTtdSeconds = if ($null -ne $defenseMetrics) { $defenseMetrics.WinsorizedMedian } else { $null }
+            OutputReference = if ($isScorable) { $outputReference } else { $null }
+            DefenseReference = if ($isScorable) { $defenseReference } else { $null }
+            PanelPower = if ($isScorable) { Get-GeometricCombinedValue -Output ($outputMetrics.WinsorizedMedian / $outputReference) -Defense ($defenseMetrics.WinsorizedMedian / $defenseReference) } else { $null }
+            PanelModelStatus = $status
+        }
+    }
+    foreach ($row in $rows) {
+        foreach ($property in @('RawMedianDps', 'WinsorizedMedianDps', 'RawMedianTtdSeconds', 'WinsorizedMedianTtdSeconds', 'OutputReference', 'DefenseReference', 'PanelPower')) {
+            if ($null -ne $row.$property) {
+                Assert-Condition (-not [double]::IsNaN([double]$row.$property) -and -not [double]::IsInfinity([double]$row.$property)) "Type ID $($row.TypeId) has invalid $property=$($row.$property)."
+            }
+        }
+        foreach ($property in @('RawMedianTtdSeconds', 'WinsorizedMedianTtdSeconds')) {
+            if ($null -ne $row.$property) {
+                Assert-Condition ($row.$property -ge 0) "Type ID $($row.TypeId) has negative $property=$($row.$property)."
+            }
+        }
+        if ($row.PanelModelStatus -eq 'BaseOrdinaryCombat') {
+            Assert-Condition ($null -ne $row.PanelPower -and $row.PanelPower -gt 0) "Type ID $($row.TypeId) must have a positive PanelPower."
+        }
+        else {
+            Assert-Condition ($null -eq $row.PanelPower) "Type ID $($row.TypeId) must not have a PanelPower before an ability scenario is modeled."
+        }
+    }
+
     $analysis = [ordered]@{
-        SchemaVersion = 'unit-cost-analysis-v1'
+        SchemaVersion = 'unit-cost-analysis-v2'
         ShopRowCount = $rows.Count
         RarityDistribution = [ordered]@{ R1 = 9; R2 = 18; R3 = 12; R4 = 23; R5 = 20; R6 = 6 }
         EliteEvidence = @($eliteEvidence)
+        CombatModel = [ordered]@{
+            DefenderCount = $defenderRows.Count
+            OrdinaryAttackerCount = $attackingRows.Count
+            ScorableOrdinaryCombatCount = $scorableTypeIds.Count
+            DpsWinsorization = [ordered]@{ P5 = $dpsP5; P95 = $dpsP95 }
+            TtdWinsorization = [ordered]@{ P5 = $ttdP5; P95 = $ttdP95 }
+            OutputReference = $outputReference
+            DefenseReference = $defenseReference
+        }
     }
 
     $outputDirectory = Split-Path -Parent $OutputCsvPath
