@@ -978,7 +978,11 @@ namespace ArknoNights.Battle.Core
             TimedBlinkEffectDefinition timedBlinkEffect = null,
             ProximityEntryDamageEffectDefinition
                 proximityEntryDamageEffect = null,
-            TriggeredSpawnEffectDefinition triggeredSpawnEffect = null)
+            TriggeredSpawnEffectDefinition triggeredSpawnEffect = null,
+            HealthThresholdCombatModifierDefinition
+                healthThresholdCombatModifier = null,
+            HealthThresholdAdjacentSpawnEffectDefinition
+                healthThresholdAdjacentSpawnEffect = null)
             : this(
                 abilityId: abilityId,
                 displayNameZhHans: displayNameZhHans,
@@ -993,7 +997,8 @@ namespace ArknoNights.Battle.Core
                 passiveCombatModifier: passiveCombatModifier,
                 passiveLifecycleEffect: null,
                 onDamageReactionEffect: null,
-                healthThresholdCombatModifier: null,
+                healthThresholdCombatModifier:
+                    healthThresholdCombatModifier,
                 unblockedDamageTakenModifier: null,
                 attackSequenceModifier: null,
                 attackCountStateModifier: null,
@@ -1007,7 +1012,8 @@ namespace ArknoNights.Battle.Core
                 onHitDamageOverTimeEffect: null,
                 unblockedAttackCharge: null,
                 triggeredSpawnEffect: triggeredSpawnEffect,
-                healthThresholdAdjacentSpawnEffect: null,
+                healthThresholdAdjacentSpawnEffect:
+                    healthThresholdAdjacentSpawnEffect,
                 healthThresholdFullHealEffect: null,
                 onHitDefenseDebuffEffect: onHitDefenseDebuffEffect,
                 animationKey: animationKey,

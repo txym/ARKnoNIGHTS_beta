@@ -214,13 +214,41 @@ namespace ArknoNights.Battle.Infrastructure
                             : string.Empty,
                         hasSkillAnimation
                             ? skillAnimation.OriginalAnimationTicks
-                            : 0));
+                            : 0),
+                source.healthThresholdCombatHitPointsPermille == 0
+                    ? null
+                    : new HealthThresholdCombatModifierDefinition(
+                        source
+                            .healthThresholdCombatHitPointsPermille,
+                        source.healthThresholdCombatInclusive,
+                        source.healthThresholdCombatTriggerOnce,
+                        source.healthThresholdCombatDurationTicks,
+                        source
+                            .healthThresholdCombatAttackMultiplierPermille,
+                        source
+                            .healthThresholdCombatDefenseMultiplierPermille,
+                        source
+                            .healthThresholdCombatBlockCapacityAdditive,
+                        source
+                            .healthThresholdCombatAttackSpeedAdditive,
+                        source
+                            .healthThresholdCombatMoveSpeedMultiplierPermille,
+                        source
+                            .healthThresholdCombatMakesUnblockable),
+                source.healthThresholdAdjacentSpawnHitPointsPermille == 0
+                    ? null
+                    : new HealthThresholdAdjacentSpawnEffectDefinition(
+                        source
+                            .healthThresholdAdjacentSpawnHitPointsPermille,
+                        source
+                            .healthThresholdAdjacentSpawnInclusive,
+                        source.healthThresholdAdjacentSpawnTypeId));
         }
 
         private static T ParseEnum<T>(string value) where T : struct => Enum.TryParse(value, true, out T parsed) && Enum.IsDefined(typeof(T), parsed) ? parsed : (T)Enum.ToObject(typeof(T), -1);
         private static AbilityCatalogLoadResult Failure(string code, string message) => new AbilityCatalogLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class AbilityCatalogDto { public string schemaVersion; public string catalogId; public AbilityDto[] abilities; }
-        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; }
+        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable; public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId; }
     }
 }

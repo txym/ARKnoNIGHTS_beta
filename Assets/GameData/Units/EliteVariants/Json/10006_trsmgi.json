@@ -63,7 +63,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
+                                                  "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED"
                                               ]
                      },
                      {
@@ -115,7 +116,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
+                                                  "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED"
                                               ]
                      }
                  ]

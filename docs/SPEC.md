@@ -713,6 +713,13 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 三种召唤均以触发 Tick 的 owner 位置为中心，在 `40cm × 40cm` 方形内使用确定性偏移。项目没有路径点，生成体不继承路径、目标、阻挡或攻击状态；Spawn Tick 只创建实例，从下一 Tick 起按普通单位规则行动。
 - 第三击 Skill 是本次普通攻击的动画替代，只会在既有 Attack/Skill 占用均结束后开始，不会打断正在进行的攻击；普通攻击间隔继续从该次攻击开始 Tick 计算。
 
+## 23. `10006` 首次半血召唤与移速提升（2026-07-29）
+
+- `10006` 的当前生命值首次严格低于最大生命值 `50%` 时，同时触发一次四邻格召唤和永久移动速度提升；恰好等于 `50%` 不触发，后续恢复并再次跌破也不重复触发。
+- 召唤以触发 Tick 的 `10006` 位置所对应最近战场格为中心，按左、右、下、上的稳定顺序检查四个正交相邻格。越界格及 Home/Away 门格跳过，其余每个格点中心各生成 `1` 只 `10002`；生成 Tick 只建立实例，从下一 Tick 起按普通单位规则行动。
+- 移动速度“增加 `150%`”表达为基础及其他既有结算后速度乘 `2500/1000`，永久生效。该效果不改变攻击、阻挡、防御或攻速，也不播放 Skill、不占用或打断 Attack/Skill。
+- `10006` 的两个 v2 精英变体均显式引用召唤和移速两条单效果被动能力。能力源由生成器投影至运行时阈值定义；冻结的 v1 目录不在本批次重新生成。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

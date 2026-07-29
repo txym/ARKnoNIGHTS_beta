@@ -539,6 +539,76 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsAndWiresCorruptedGolemThresholdAbilities()
+        {
+            var output = NewIsolatedPath(
+                "ability-corrupted-golem-threshold-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var spawn = document.abilities.Single(item =>
+                item.abilityId
+                == "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN");
+            Assert.That(
+                spawn.healthThresholdAdjacentSpawnHitPointsPermille,
+                Is.EqualTo(500));
+            Assert.That(
+                spawn.healthThresholdAdjacentSpawnInclusive,
+                Is.False);
+            Assert.That(
+                spawn.healthThresholdAdjacentSpawnTypeId,
+                Is.EqualTo("10002"));
+
+            var moveSpeed = document.abilities.Single(item =>
+                item.abilityId
+                == "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED");
+            Assert.That(
+                moveSpeed.healthThresholdCombatHitPointsPermille,
+                Is.EqualTo(500));
+            Assert.That(
+                moveSpeed.healthThresholdCombatInclusive,
+                Is.False);
+            Assert.That(
+                moveSpeed.healthThresholdCombatTriggerOnce,
+                Is.True);
+            Assert.That(
+                moveSpeed.healthThresholdCombatDurationTicks,
+                Is.Zero);
+            Assert.That(
+                moveSpeed.healthThresholdCombatAttackMultiplierPermille,
+                Is.EqualTo(1000));
+            Assert.That(
+                moveSpeed.healthThresholdCombatDefenseMultiplierPermille,
+                Is.EqualTo(1000));
+            Assert.That(
+                moveSpeed.healthThresholdCombatMoveSpeedMultiplierPermille,
+                Is.EqualTo(2500));
+
+            var unit = JsonUtility.FromJson<UnitAbilitySourceDocument>(
+                File.ReadAllText(Path.Combine(
+                    RealSourceDirectory(),
+                    "10006_trsmgi.json")));
+            Assert.That(unit.typeId, Is.EqualTo(10006));
+            Assert.That(unit.variants, Has.Length.EqualTo(2));
+            foreach (var variant in unit.variants)
+                Assert.That(
+                    variant.innateAbilityIds,
+                    Is.EqualTo(new[]
+                    {
+                        "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
+                        "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED"
+                    }),
+                    variant.sourceVariant);
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -550,6 +620,8 @@ namespace ArknoNights.Battle.Tests
             {
                 "BLOCKED_BLINK_FORWARD",
                 "CHARGED_DRINK_AREA_ATTACK",
+                "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
+                "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED",
                 "FORTIFIED_CATERING_VEHICLE",
                 "GREY_HAT_THIRD_ATTACK_DASH",
                 "GROUND_PROXIMITY_COLLISION_DAMAGE",
@@ -915,6 +987,33 @@ namespace ArknoNights.Battle.Tests
             public string triggeredSpawnSummonTypeId;
             public int triggeredSpawnSideLengthCentimetres;
             public int triggeredSpawnMaxActiveSameType;
+            public int healthThresholdCombatHitPointsPermille;
+            public bool healthThresholdCombatInclusive;
+            public bool healthThresholdCombatTriggerOnce;
+            public int healthThresholdCombatDurationTicks;
+            public int healthThresholdCombatAttackMultiplierPermille;
+            public int healthThresholdCombatDefenseMultiplierPermille;
+            public int healthThresholdCombatBlockCapacityAdditive;
+            public int healthThresholdCombatAttackSpeedAdditive;
+            public int healthThresholdCombatMoveSpeedMultiplierPermille;
+            public bool healthThresholdCombatMakesUnblockable;
+            public int healthThresholdAdjacentSpawnHitPointsPermille;
+            public bool healthThresholdAdjacentSpawnInclusive;
+            public string healthThresholdAdjacentSpawnTypeId;
+        }
+
+        [Serializable]
+        private sealed class UnitAbilitySourceDocument
+        {
+            public int typeId;
+            public UnitAbilitySourceVariant[] variants;
+        }
+
+        [Serializable]
+        private sealed class UnitAbilitySourceVariant
+        {
+            public string sourceVariant;
+            public string[] innateAbilityIds;
         }
     }
 }

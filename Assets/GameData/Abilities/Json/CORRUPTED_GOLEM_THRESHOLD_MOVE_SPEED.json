@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "生命值首次低于50%后，移动速度永久增加150%。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "HealthThresholdCombatModifier",
+      "thresholdHitPointsPermille": 500,
+      "inclusiveThreshold": false,
+      "triggerOnce": true,
+      "durationTicks": 0,
+      "attackMultiplierPermille": 1000,
+      "defenseMultiplierPermille": 1000,
+      "blockCapacityAdditive": 0,
+      "attackSpeedAdditive": 0,
+      "moveSpeedMultiplierPermille": 2500,
+      "makesUnblockable": false
+    }
+  ]
+}

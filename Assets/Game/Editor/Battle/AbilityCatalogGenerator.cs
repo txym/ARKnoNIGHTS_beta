@@ -260,6 +260,64 @@ public static class AbilityCatalogGenerator
                 effect.maxActiveSameType;
             return entry;
         }
+        if (effect.kind == "HealthThresholdCombatModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.thresholdHitPointsPermille <= 0
+                || effect.thresholdHitPointsPermille > 1000
+                || effect.durationTicks < 0
+                || (!effect.triggerOnce
+                    && effect.durationTicks != 0)
+                || effect.attackMultiplierPermille <= 0
+                || effect.defenseMultiplierPermille <= 0
+                || effect.blockCapacityAdditive < 0
+                || effect.attackSpeedAdditive <= -100
+                || effect.moveSpeedMultiplierPermille <= 0
+                || (effect.attackMultiplierPermille == 1000
+                    && effect.defenseMultiplierPermille == 1000
+                    && effect.blockCapacityAdditive == 0
+                    && effect.attackSpeedAdditive == 0
+                    && effect.moveSpeedMultiplierPermille == 1000
+                    && !effect.makesUnblockable))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_HEALTH_THRESHOLD_COMBAT_MODIFIER_INVALID path=" + sourcePath);
+            entry.healthThresholdCombatHitPointsPermille =
+                effect.thresholdHitPointsPermille;
+            entry.healthThresholdCombatInclusive =
+                effect.inclusiveThreshold;
+            entry.healthThresholdCombatTriggerOnce =
+                effect.triggerOnce;
+            entry.healthThresholdCombatDurationTicks =
+                effect.durationTicks;
+            entry.healthThresholdCombatAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            entry.healthThresholdCombatDefenseMultiplierPermille =
+                effect.defenseMultiplierPermille;
+            entry.healthThresholdCombatBlockCapacityAdditive =
+                effect.blockCapacityAdditive;
+            entry.healthThresholdCombatAttackSpeedAdditive =
+                effect.attackSpeedAdditive;
+            entry.healthThresholdCombatMoveSpeedMultiplierPermille =
+                effect.moveSpeedMultiplierPermille;
+            entry.healthThresholdCombatMakesUnblockable =
+                effect.makesUnblockable;
+            return entry;
+        }
+        if (effect.kind == "HealthThresholdAdjacentSpawn")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.thresholdHitPointsPermille <= 0
+                || effect.thresholdHitPointsPermille > 1000
+                || string.IsNullOrWhiteSpace(effect.summonTypeId)
+                || !knownUnitTypeIds.Contains(effect.summonTypeId))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_HEALTH_THRESHOLD_ADJACENT_SPAWN_INVALID path=" + sourcePath);
+            entry.healthThresholdAdjacentSpawnHitPointsPermille =
+                effect.thresholdHitPointsPermille;
+            entry.healthThresholdAdjacentSpawnInclusive =
+                effect.inclusiveThreshold;
+            entry.healthThresholdAdjacentSpawnTypeId =
+                effect.summonTypeId;
+            return entry;
+        }
         if (effect.kind == "TimedBlink")
         {
             if (activationKind != AbilityActivationKind.Timed
@@ -310,9 +368,9 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; }
+    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable; public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId; }
     [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public string animationKey; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
-    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; public string triggerKind; public int maxActiveSameType; }
+    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; public string triggerKind; public int maxActiveSameType; public int thresholdHitPointsPermille; public bool inclusiveThreshold; public bool triggerOnce; public int durationTicks; public int defenseMultiplierPermille; public int moveSpeedMultiplierPermille; public bool makesUnblockable; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
 }
