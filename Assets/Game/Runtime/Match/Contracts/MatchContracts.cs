@@ -63,7 +63,9 @@ namespace ArknoNights.Match
         HostMissing = 13,
         HostNotHuman = 14,
         InvalidInitialValues = 15,
-        InternalInvariantViolation = 16
+        InternalInvariantViolation = 16,
+        InvalidShopCatalog = 17,
+        ShopCatalogCompatibilityMismatch = 18
     }
 
     public enum MatchCommandCode
@@ -81,7 +83,17 @@ namespace ArknoNights.Match
         Eliminated = 10,
         InvalidPayload = 11,
         InvalidTransition = 12,
-        InternalInvariantViolation = 13
+        InternalInvariantViolation = 13,
+        ShopSlotInvalid = 14,
+        ShopOfferMissing = 15,
+        ShopOfferChanged = 16,
+        InsufficientGold = 17,
+        StagingFull = 18,
+        LevelMax = 19,
+        UpgradeLevelChanged = 20,
+        UpgradePriceChanged = 21,
+        PoolExhaustedDiagnostic = 22,
+        NaturalRefreshAlreadyApplied = 23
     }
 
     public static class MatchInitialValues
@@ -160,12 +172,14 @@ namespace ArknoNights.Match
             string matchSeed,
             string hostPlayerId,
             MatchCompatibilityManifest compatibilityManifest,
+            MatchShopCatalog shopCatalog,
             IEnumerable<MatchSeatInitialization> seats)
             : this(
                 sessionId,
                 matchSeed,
                 hostPlayerId,
                 compatibilityManifest,
+                shopCatalog,
                 MatchInitialPlayerValues.Standard,
                 seats)
         {
@@ -176,6 +190,24 @@ namespace ArknoNights.Match
             string matchSeed,
             string hostPlayerId,
             MatchCompatibilityManifest compatibilityManifest,
+            IEnumerable<MatchSeatInitialization> seats)
+            : this(
+                sessionId,
+                matchSeed,
+                hostPlayerId,
+                compatibilityManifest,
+                null,
+                MatchInitialPlayerValues.Standard,
+                seats)
+        {
+        }
+
+        public MatchInitializationRequest(
+            string sessionId,
+            string matchSeed,
+            string hostPlayerId,
+            MatchCompatibilityManifest compatibilityManifest,
+            MatchShopCatalog shopCatalog,
             MatchInitialPlayerValues initialPlayerValues,
             IEnumerable<MatchSeatInitialization> seats)
         {
@@ -183,15 +215,35 @@ namespace ArknoNights.Match
             MatchSeed = matchSeed;
             HostPlayerId = hostPlayerId;
             CompatibilityManifest = compatibilityManifest;
+            ShopCatalog = shopCatalog;
             InitialPlayerValues = initialPlayerValues;
             Seats = new ReadOnlyCollection<MatchSeatInitialization>(
                 (seats ?? Enumerable.Empty<MatchSeatInitialization>()).ToArray());
+        }
+
+        public MatchInitializationRequest(
+            string sessionId,
+            string matchSeed,
+            string hostPlayerId,
+            MatchCompatibilityManifest compatibilityManifest,
+            MatchInitialPlayerValues initialPlayerValues,
+            IEnumerable<MatchSeatInitialization> seats)
+            : this(
+                sessionId,
+                matchSeed,
+                hostPlayerId,
+                compatibilityManifest,
+                null,
+                initialPlayerValues,
+                seats)
+        {
         }
 
         public string SessionId { get; }
         public string MatchSeed { get; }
         public string HostPlayerId { get; }
         public MatchCompatibilityManifest CompatibilityManifest { get; }
+        public MatchShopCatalog ShopCatalog { get; }
         public MatchInitialPlayerValues InitialPlayerValues { get; }
         public IReadOnlyList<MatchSeatInitialization> Seats { get; }
     }
@@ -201,17 +253,20 @@ namespace ArknoNights.Match
         internal MatchInitializationResult(
             MatchInitializationCode code,
             string diagnosticCode,
-            MatchAuthority authority)
+            MatchAuthority authority,
+            bool poolExhaustedDiagnostic = false)
         {
             Code = code;
             DiagnosticCode = diagnosticCode ?? string.Empty;
             Authority = authority;
+            PoolExhaustedDiagnostic = poolExhaustedDiagnostic;
         }
 
         public bool Success => Code == MatchInitializationCode.Accepted && Authority != null;
         public MatchInitializationCode Code { get; }
         public string DiagnosticCode { get; }
         public MatchAuthority Authority { get; }
+        public bool PoolExhaustedDiagnostic { get; }
     }
 
     public sealed class MatchTransactionResult
@@ -241,6 +296,10 @@ namespace ArknoNights.Match
         }
 
         public MatchCommandCode Code { get; }
+        public bool Accepted =>
+            Code == MatchCommandCode.Accepted
+            || Code == MatchCommandCode.AcceptedNoChange
+            || Code == MatchCommandCode.PoolExhaustedDiagnostic;
         public long CurrentStateRevision { get; }
         public long? AcceptedStateRevision { get; }
         public bool ChangedState { get; }

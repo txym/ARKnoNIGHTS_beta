@@ -33,7 +33,8 @@ namespace ArknoNights.Match.Tests
                 Assert.That(seat.Placement, Is.Null);
                 Assert.That(seat.ConnectionState, Is.EqualTo(MatchConnectionState.Connected));
                 Assert.That(seat.Units, Is.Empty);
-                Assert.That(seat.ShopOffers, Is.Empty);
+                Assert.That(seat.ShopOffers.Count, Is.EqualTo(6));
+                Assert.That(seat.ShopOffers.All(offer => !string.IsNullOrEmpty(offer.UnitId)), Is.True);
             }
         }
 
@@ -114,6 +115,7 @@ namespace ArknoNights.Match.Tests
                 "seed-1",
                 "player-1",
                 MatchTestData.Manifest(),
+                MatchTestData.Catalog(),
                 new MatchInitialPlayerValues(-1, 7, 1, 16, 16),
                 MatchTestData.OneHumanSeats());
             AssertRejected(invalidInitialValues, MatchInitializationCode.InvalidInitialValues);

@@ -24,6 +24,8 @@ namespace ArknoNights.Match.Tests
             Assert.That(typeof(PublicMatchSeatSnapshot).GetProperty("ControllerKind"), Is.Null);
             Assert.That(typeof(PublicMatchSeatSnapshot).GetProperty("ShopOffers"), Is.Null);
             Assert.That(typeof(PublicMatchSeatSnapshot).GetProperty("OverflowUnits"), Is.Null);
+            Assert.That(typeof(PublicMatchSnapshot).GetProperty("Pool"), Is.Null);
+            Assert.That(typeof(PublicMatchSnapshot).GetProperty("RandomState"), Is.Null);
         }
 
         [Test]
@@ -37,9 +39,13 @@ namespace ArknoNights.Match.Tests
             Assert.That(playerTwo.Owner.PlayerId, Is.EqualTo("player-2"));
             Assert.That(playerTwo.Owner.Gold, Is.EqualTo(7));
             Assert.That(playerTwo.Owner.TotalDeploymentCost, Is.EqualTo(16));
-            Assert.That(playerTwo.Owner.ShopOffers, Is.Empty);
+            Assert.That(playerTwo.Owner.ShopOffers.Count, Is.EqualTo(MatchEconomyRules.ShopSlotCount));
+            Assert.That(playerTwo.Owner.ShopOffers, Has.All.Matches<MatchShopOfferState>(
+                offer => !offer.IsEmpty));
             Assert.That(hostPlayer.Owner.PlayerId, Is.EqualTo("player-1"));
             Assert.That(typeof(PlayerMatchSnapshot).GetProperty("AllPrivateSeats"), Is.Null);
+            Assert.That(typeof(PlayerMatchSnapshot).GetProperty("Pool"), Is.Null);
+            Assert.That(typeof(OwnerPrivateSnapshot).GetProperty("RandomState"), Is.Null);
             Assert.That(playerTwo.Public.CanonicalSummary, Is.EqualTo(hostPlayer.Public.CanonicalSummary));
         }
 
@@ -59,6 +65,9 @@ namespace ArknoNights.Match.Tests
             Assert.That(host.CommandRecords[0].PlayerId, Is.EqualTo("player-2"));
             Assert.That(host.CommandRecords[0].CommandId, Is.EqualTo("ready-record"));
             Assert.That(host.CommandRecords[0].Result.Code, Is.EqualTo(MatchCommandCode.Accepted));
+            Assert.That(host.Pool.Entities, Is.Not.Empty);
+            Assert.That(host.Pool.RandomState, Is.Not.Null);
+            Assert.That(host.Pool.RemainingByType, Is.Not.Empty);
         }
 
         [Test]

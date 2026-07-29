@@ -119,16 +119,28 @@ namespace ArknoNights.Match
             string unitId,
             string typeId,
             bool isFrozen)
+            : this(slotIndex, unitId, typeId, null, isFrozen)
+        {
+        }
+
+        public MatchShopOfferState(
+            int slotIndex,
+            string unitId,
+            string typeId,
+            int? rarity,
+            bool isFrozen)
         {
             SlotIndex = slotIndex;
             UnitId = unitId;
             TypeId = typeId;
+            Rarity = rarity;
             IsFrozen = isFrozen;
 
             var writer = new CanonicalSummaryWriter(nameof(MatchShopOfferState));
             writer.Integer("slotIndex", SlotIndex);
             writer.String("unitId", UnitId);
             writer.String("typeId", TypeId);
+            writer.NullableInteger("rarity", Rarity);
             writer.Boolean("isFrozen", IsFrozen);
             CanonicalSummary = writer.ToString();
         }
@@ -136,7 +148,10 @@ namespace ArknoNights.Match
         public int SlotIndex { get; }
         public string UnitId { get; }
         public string TypeId { get; }
+        public int? Rarity { get; }
+        public int? Price => Rarity;
         public bool IsFrozen { get; }
+        public bool IsEmpty => string.IsNullOrEmpty(UnitId);
         public string CanonicalSummary { get; }
     }
 
@@ -152,6 +167,8 @@ namespace ArknoNights.Match
             int level,
             int totalDeploymentCost,
             int availableDeploymentCost,
+            int upgradeDiscountCountAtThisLevel,
+            MatchPreparationBehaviorState preparationBehavior,
             bool ready,
             bool eliminated,
             int? placement,
@@ -169,6 +186,8 @@ namespace ArknoNights.Match
             Level = level;
             TotalDeploymentCost = totalDeploymentCost;
             AvailableDeploymentCost = availableDeploymentCost;
+            UpgradeDiscountCountAtThisLevel = upgradeDiscountCountAtThisLevel;
+            PreparationBehavior = preparationBehavior ?? MatchPreparationBehaviorState.Empty;
             Ready = ready;
             Eliminated = eliminated;
             Placement = placement;
@@ -194,6 +213,10 @@ namespace ArknoNights.Match
         public int Level { get; }
         public int TotalDeploymentCost { get; }
         public int AvailableDeploymentCost { get; }
+        public int UpgradeDiscountCountAtThisLevel { get; }
+        public int CurrentUpgradePrice =>
+            MatchUpgradePricing.GetCurrentPrice(Level, UpgradeDiscountCountAtThisLevel);
+        public MatchPreparationBehaviorState PreparationBehavior { get; }
         public bool Ready { get; }
         public bool Eliminated { get; }
         public int? Placement { get; }
@@ -209,7 +232,13 @@ namespace ArknoNights.Match
             int? placement = null,
             bool preservePlacement = true,
             MatchControllerKind? controllerKind = null,
-            MatchConnectionState? connectionState = null)
+            MatchConnectionState? connectionState = null,
+            int? gold = null,
+            int? level = null,
+            int? upgradeDiscountCountAtThisLevel = null,
+            MatchPreparationBehaviorState preparationBehavior = null,
+            IEnumerable<MatchUnitState> units = null,
+            IEnumerable<MatchShopOfferState> shopOffers = null)
         {
             return new MatchSeatState(
                 SeatIndex,
@@ -217,17 +246,19 @@ namespace ArknoNights.Match
                 DisplayName,
                 AvatarId,
                 Life,
-                Gold,
-                Level,
+                gold ?? Gold,
+                level ?? Level,
                 TotalDeploymentCost,
                 AvailableDeploymentCost,
+                upgradeDiscountCountAtThisLevel ?? UpgradeDiscountCountAtThisLevel,
+                preparationBehavior ?? PreparationBehavior,
                 ready ?? Ready,
                 eliminated ?? Eliminated,
                 preservePlacement ? Placement : placement,
                 controllerKind ?? ControllerKind,
                 connectionState ?? ConnectionState,
-                Units,
-                ShopOffers);
+                units ?? Units,
+                shopOffers ?? ShopOffers);
         }
 
         internal MatchSeatState WithElimination(int? placement)
@@ -242,6 +273,8 @@ namespace ArknoNights.Match
                 Level,
                 TotalDeploymentCost,
                 AvailableDeploymentCost,
+                UpgradeDiscountCountAtThisLevel,
+                PreparationBehavior,
                 false,
                 true,
                 placement,
@@ -263,6 +296,8 @@ namespace ArknoNights.Match
             writer.Integer("level", Level);
             writer.Integer("totalCost", TotalDeploymentCost);
             writer.Integer("availableCost", AvailableDeploymentCost);
+            writer.Integer("upgradeDiscount", UpgradeDiscountCountAtThisLevel);
+            writer.Summary("preparationBehavior", PreparationBehavior.CanonicalSummary);
             writer.Boolean("ready", Ready);
             writer.Boolean("eliminated", Eliminated);
             writer.NullableInteger("placement", Placement);
@@ -291,6 +326,7 @@ namespace ArknoNights.Match
             string hostPlayerId,
             MatchCompatibilityManifest compatibilityManifest,
             IEnumerable<MatchSeatState> seats,
+            MatchPoolState pool,
             string endReason)
         {
             SessionId = sessionId;
@@ -300,6 +336,7 @@ namespace ArknoNights.Match
             RoundNumber = roundNumber;
             HostPlayerId = hostPlayerId;
             CompatibilityManifest = compatibilityManifest;
+            Pool = pool;
             Seats = new ReadOnlyCollection<MatchSeatState>(
                 (seats ?? Enumerable.Empty<MatchSeatState>())
                     .OrderBy(seat => seat == null ? int.MinValue : seat.SeatIndex)
@@ -315,6 +352,7 @@ namespace ArknoNights.Match
         public int RoundNumber { get; }
         public string HostPlayerId { get; }
         public MatchCompatibilityManifest CompatibilityManifest { get; }
+        internal MatchPoolState Pool { get; }
         public IReadOnlyList<MatchSeatState> Seats { get; }
         public string EndReason { get; }
         public string CanonicalSummary { get; }
@@ -338,6 +376,7 @@ namespace ArknoNights.Match
                 HostPlayerId,
                 CompatibilityManifest,
                 seats,
+                Pool,
                 EndReason);
         }
 
@@ -356,6 +395,7 @@ namespace ArknoNights.Match
                 HostPlayerId,
                 CompatibilityManifest,
                 seats,
+                Pool,
                 endReason);
         }
 
@@ -370,7 +410,26 @@ namespace ArknoNights.Match
                 HostPlayerId,
                 CompatibilityManifest,
                 Seats,
+                Pool,
                 endReason);
+        }
+
+        internal MatchState WithEconomy(
+            IEnumerable<MatchSeatState> seats,
+            MatchPoolState pool,
+            bool incrementRevision)
+        {
+            return new MatchState(
+                SessionId,
+                MatchSeed,
+                incrementRevision ? StateRevision + 1 : StateRevision,
+                Phase,
+                RoundNumber,
+                HostPlayerId,
+                CompatibilityManifest,
+                seats,
+                pool,
+                EndReason);
         }
 
         private string BuildCanonicalSummary()
@@ -385,6 +444,7 @@ namespace ArknoNights.Match
             writer.Summary(
                 "compatibility",
                 CompatibilityManifest == null ? string.Empty : CompatibilityManifest.CanonicalSummary);
+            writer.Summary("pool", Pool == null ? string.Empty : Pool.CanonicalSummary);
             writer.String("endReason", EndReason);
             foreach (var seat in Seats)
             {
@@ -398,6 +458,19 @@ namespace ArknoNights.Match
     {
         internal static bool TryValidate(MatchState state, out string diagnosticCode)
         {
+            return TryValidate(state, new StrictStagingSlotPolicy(), out diagnosticCode);
+        }
+
+        internal static bool TryValidate(
+            MatchState state,
+            IStagingSlotPolicy stagingSlotPolicy,
+            out string diagnosticCode)
+        {
+            if (stagingSlotPolicy == null)
+            {
+                diagnosticCode = "match.invariant.stagingSlotPolicy.null";
+                return false;
+            }
             if (state == null)
             {
                 diagnosticCode = "match.invariant.state.null";
@@ -428,6 +501,20 @@ namespace ArknoNights.Match
                 diagnosticCode = "match.invariant.compatibility.invalid";
                 return false;
             }
+            if (state.Pool == null
+                || state.Pool.Catalog == null
+                || !state.Pool.Catalog.TryValidate(out _, out _)
+                || !state.Pool.Catalog.IsCompatibleWith(state.CompatibilityManifest)
+                || state.Pool.RandomState == null
+                || !state.Pool.RandomState.IsValid
+                || state.Pool.NextNaturalRefreshStartSeat < 1
+                || state.Pool.NextNaturalRefreshStartSeat > 4
+                || state.Pool.NextAcquisitionOrdinal < 0
+                || state.Pool.AppliedPostBattleRefreshRounds.Any(round => round <= 0))
+            {
+                diagnosticCode = "match.invariant.pool.header";
+                return false;
+            }
             if (state.Seats.Count != 4)
             {
                 diagnosticCode = "match.invariant.seat.count";
@@ -438,6 +525,11 @@ namespace ArknoNights.Match
             var playerIds = new HashSet<string>(StringComparer.Ordinal);
             var unitIds = new HashSet<string>(StringComparer.Ordinal);
             var shopUnitIds = new HashSet<string>(StringComparer.Ordinal);
+            var unitOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+            var ownedTypeIds = new Dictionary<string, string>(StringComparer.Ordinal);
+            var shopLocations = new Dictionary<string, string>(StringComparer.Ordinal);
+            var shopTypeIds = new Dictionary<string, string>(StringComparer.Ordinal);
+            var acquisitionOrdinals = new HashSet<long>();
             MatchSeatState host = null;
             foreach (var seat in state.Seats)
             {
@@ -464,12 +556,24 @@ namespace ArknoNights.Match
                 }
                 if (seat.Life < 0
                     || seat.Gold < 0
-                    || seat.Level < 0
+                    || seat.Level < MatchEconomyRules.MinimumLevel
+                    || seat.Level > MatchEconomyRules.MaximumLevel
                     || seat.TotalDeploymentCost < 0
                     || seat.AvailableDeploymentCost < 0
                     || seat.AvailableDeploymentCost > seat.TotalDeploymentCost)
                 {
                     diagnosticCode = "match.invariant.numeric";
+                    return false;
+                }
+                var maximumDiscount = seat.Level == MatchEconomyRules.MaximumLevel
+                    ? 0
+                    : MatchUpgradePricing.GetBasePrice(seat.Level);
+                if (seat.UpgradeDiscountCountAtThisLevel < 0
+                    || seat.UpgradeDiscountCountAtThisLevel > maximumDiscount
+                    || seat.PreparationBehavior == null
+                    || seat.PreparationBehavior.SuccessfulShopPurchaseCount < 0)
+                {
+                    diagnosticCode = "match.invariant.economy";
                     return false;
                 }
                 if (seat.Ready
@@ -510,11 +614,15 @@ namespace ArknoNights.Match
                         || !Enum.IsDefined(typeof(MatchUnitZone), unit.Zone)
                         || unit.EliteLevel < 0
                         || unit.AcquisitionOrdinal < 0
-                        || !unitIds.Add(unit.UnitId))
+                        || !unitIds.Add(unit.UnitId)
+                        || !acquisitionOrdinals.Add(unit.AcquisitionOrdinal)
+                        || unitOwners.ContainsKey(unit.UnitId))
                     {
                         diagnosticCode = "match.invariant.unit";
                         return false;
                     }
+                    unitOwners.Add(unit.UnitId, seat.PlayerId);
+                    ownedTypeIds.Add(unit.UnitId, unit.TypeId);
                     if (unit.Zone == MatchUnitZone.Deployed)
                     {
                         if (!unit.Formation.HasValue
@@ -540,21 +648,58 @@ namespace ArknoNights.Match
                     }
                 }
 
+                if (seat.ShopOffers.Count != MatchEconomyRules.ShopSlotCount)
+                {
+                    diagnosticCode = "match.invariant.shop.count";
+                    return false;
+                }
+                var stagingSlotUsage = stagingSlotPolicy.CountOccupiedSlots(seat.Units);
+                if (stagingSlotUsage < 0
+                    || stagingSlotUsage > MatchEconomyRules.StagingSlotCapacity)
+                {
+                    diagnosticCode = "match.invariant.staging.capacity";
+                    return false;
+                }
                 var slotIndexes = new HashSet<int>();
                 foreach (var offer in seat.ShopOffers)
                 {
                     var hasUnitId = offer != null && !string.IsNullOrWhiteSpace(offer.UnitId);
                     var hasTypeId = offer != null && !string.IsNullOrWhiteSpace(offer.TypeId);
+                    var hasRarity = offer != null && offer.Rarity.HasValue;
                     if (offer == null
-                        || offer.SlotIndex < 0
+                        || offer.SlotIndex < 1
+                        || offer.SlotIndex > MatchEconomyRules.ShopSlotCount
                         || !slotIndexes.Add(offer.SlotIndex)
                         || hasUnitId != hasTypeId
+                        || hasUnitId != hasRarity
                         || (!hasUnitId && offer.IsFrozen)
-                        || (hasUnitId && (!shopUnitIds.Add(offer.UnitId) || unitIds.Contains(offer.UnitId))))
+                        || (hasUnitId && (!shopUnitIds.Add(offer.UnitId)
+                            || unitIds.Contains(offer.UnitId)
+                            || shopLocations.ContainsKey(offer.UnitId))))
                     {
                         diagnosticCode = "match.invariant.shop";
                         return false;
                     }
+                    if (hasUnitId)
+                    {
+                        shopLocations.Add(
+                            offer.UnitId,
+                            seat.PlayerId + ":" + offer.SlotIndex.ToString(CultureInfo.InvariantCulture));
+                        shopTypeIds.Add(offer.UnitId, offer.TypeId);
+                    }
+                    if (hasUnitId
+                        && (!state.Pool.Catalog.TryGet(offer.TypeId, out var catalogEntry)
+                            || !catalogEntry.IsShopEligible
+                            || catalogEntry.Rarity != offer.Rarity.Value))
+                    {
+                        diagnosticCode = "match.invariant.shop.catalog";
+                        return false;
+                    }
+                }
+                if (!slotIndexes.SetEquals(Enumerable.Range(1, MatchEconomyRules.ShopSlotCount)))
+                {
+                    diagnosticCode = "match.invariant.shop.slotSet";
+                    return false;
                 }
             }
 
@@ -572,6 +717,88 @@ namespace ArknoNights.Match
             {
                 diagnosticCode = "match.invariant.shop.unitIdOwned";
                 return false;
+            }
+            if (acquisitionOrdinals.Count > 0
+                && state.Pool.NextAcquisitionOrdinal <= acquisitionOrdinals.Max())
+            {
+                diagnosticCode = "match.invariant.acquisitionOrdinal.next";
+                return false;
+            }
+            var poolIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entity in state.Pool.Entities)
+            {
+                if (entity == null
+                    || !MatchPoolUnitId.IsValid(entity.UnitId)
+                    || !poolIds.Add(entity.UnitId)
+                    || !Enum.IsDefined(typeof(MatchPoolEntityLocation), entity.Location)
+                    || !state.Pool.Catalog.TryGet(entity.TypeId, out var entry)
+                    || !entry.IsShopEligible
+                    || entry.Rarity != entity.Rarity
+                    || entity.CopyIndex < 1
+                    || entity.CopyIndex > MatchPoolCopyCounts.GetForRarity(entity.Rarity))
+                {
+                    diagnosticCode = "match.invariant.pool.entity";
+                    return false;
+                }
+
+                switch (entity.Location)
+                {
+                    case MatchPoolEntityLocation.AvailablePool:
+                        if (!string.IsNullOrEmpty(entity.PlayerId)
+                            || entity.ShopSlotIndex.HasValue
+                            || unitIds.Contains(entity.UnitId)
+                            || shopUnitIds.Contains(entity.UnitId))
+                        {
+                            diagnosticCode = "match.invariant.pool.availableLocation";
+                            return false;
+                        }
+                        break;
+                    case MatchPoolEntityLocation.ShopOffer:
+                        var expectedShopLocation = entity.PlayerId + ":"
+                            + (entity.ShopSlotIndex.HasValue
+                                ? entity.ShopSlotIndex.Value.ToString(CultureInfo.InvariantCulture)
+                                : string.Empty);
+                        if (!entity.ShopSlotIndex.HasValue
+                            || !shopLocations.TryGetValue(entity.UnitId, out var actualShopLocation)
+                            || !string.Equals(expectedShopLocation, actualShopLocation, StringComparison.Ordinal)
+                            || !shopTypeIds.TryGetValue(entity.UnitId, out var shopTypeId)
+                            || !string.Equals(entity.TypeId, shopTypeId, StringComparison.Ordinal))
+                        {
+                            diagnosticCode = "match.invariant.pool.shopLocation";
+                            return false;
+                        }
+                        break;
+                    case MatchPoolEntityLocation.OwnedUnit:
+                        if (entity.ShopSlotIndex.HasValue
+                            || !unitOwners.TryGetValue(entity.UnitId, out var ownerPlayerId)
+                            || !string.Equals(entity.PlayerId, ownerPlayerId, StringComparison.Ordinal)
+                            || !ownedTypeIds.TryGetValue(entity.UnitId, out var ownedTypeId)
+                            || !string.Equals(entity.TypeId, ownedTypeId, StringComparison.Ordinal))
+                        {
+                            diagnosticCode = "match.invariant.pool.ownedLocation";
+                            return false;
+                        }
+                        break;
+                }
+            }
+            if (!poolIds.SetEquals(unitIds.Concat(shopUnitIds).Concat(
+                state.Pool.Entities
+                    .Where(entity => entity.Location == MatchPoolEntityLocation.AvailablePool)
+                    .Select(entity => entity.UnitId))))
+            {
+                diagnosticCode = "match.invariant.pool.conservation";
+                return false;
+            }
+            foreach (var entry in state.Pool.Catalog.Entries.Where(entry => entry.IsShopEligible))
+            {
+                var entities = state.Pool.Entities.Where(
+                    entity => string.Equals(entity.TypeId, entry.TypeId, StringComparison.Ordinal)).ToArray();
+                if (entities.Length != MatchPoolCopyCounts.GetForRarity(entry.Rarity)
+                    || entities.Select(entity => entity.CopyIndex).Distinct().Count() != entities.Length)
+                {
+                    diagnosticCode = "match.invariant.pool.copyCount";
+                    return false;
+                }
             }
             if (state.Phase == MatchPhase.Ended && string.IsNullOrWhiteSpace(state.EndReason))
             {

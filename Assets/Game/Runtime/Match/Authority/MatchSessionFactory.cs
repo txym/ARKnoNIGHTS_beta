@@ -8,9 +8,22 @@ namespace ArknoNights.Match
     {
         public static MatchInitializationResult Create(MatchInitializationRequest request)
         {
+            return Create(request, new StrictStagingSlotPolicy());
+        }
+
+        public static MatchInitializationResult Create(
+            MatchInitializationRequest request,
+            IStagingSlotPolicy stagingSlotPolicy)
+        {
             if (request == null)
             {
                 return Rejected(MatchInitializationCode.InvalidRequest, "match.initialize.request.null");
+            }
+            if (stagingSlotPolicy == null)
+            {
+                return Rejected(
+                    MatchInitializationCode.InvalidRequest,
+                    "match.initialize.stagingSlotPolicy.null");
             }
             if (string.IsNullOrWhiteSpace(request.SessionId))
             {
@@ -25,6 +38,24 @@ namespace ArknoNights.Match
                 return Rejected(
                     MatchInitializationCode.InvalidCompatibilityManifest,
                     "match.initialize.compatibility.invalid");
+            }
+            if (request.ShopCatalog == null)
+            {
+                return Rejected(
+                    MatchInitializationCode.InvalidShopCatalog,
+                    "match.initialize.shopCatalog.invalid");
+            }
+            if (!request.ShopCatalog.TryValidate(out _, out var catalogDiagnostic))
+            {
+                return Rejected(
+                    MatchInitializationCode.InvalidShopCatalog,
+                    catalogDiagnostic);
+            }
+            if (!request.ShopCatalog.IsCompatibleWith(request.CompatibilityManifest))
+            {
+                return Rejected(
+                    MatchInitializationCode.ShopCatalogCompatibilityMismatch,
+                    "match.initialize.shopCatalog.compatibilityMismatch");
             }
             if (request.InitialPlayerValues == null
                 || !request.InitialPlayerValues.IsConfirmedStandard)
@@ -93,6 +124,10 @@ namespace ArknoNights.Match
                 .OrderBy(seat => seat.SeatIndex)
                 .Select(seat => CreateSeat(seat, request.InitialPlayerValues))
                 .ToArray();
+            var pool = MatchPoolState.CreateInitial(
+                request.SessionId,
+                request.MatchSeed,
+                request.ShopCatalog);
             var state = new MatchState(
                 request.SessionId,
                 request.MatchSeed,
@@ -102,8 +137,14 @@ namespace ArknoNights.Match
                 request.HostPlayerId,
                 request.CompatibilityManifest,
                 seats,
+                pool,
                 string.Empty);
-            if (!MatchStateInvariant.TryValidate(state, out var diagnosticCode))
+            var initializedShop = MatchInitialShopBuilder.Apply(state.Seats, state.Pool);
+            state = state.WithEconomy(
+                initializedShop.Seats,
+                initializedShop.Pool,
+                false);
+            if (!MatchStateInvariant.TryValidate(state, stagingSlotPolicy, out var diagnosticCode))
             {
                 return Rejected(MatchInitializationCode.InternalInvariantViolation, diagnosticCode);
             }
@@ -111,7 +152,8 @@ namespace ArknoNights.Match
             return new MatchInitializationResult(
                 MatchInitializationCode.Accepted,
                 "match.initialize.accepted",
-                new MatchAuthority(state));
+                new MatchAuthority(state, stagingSlotPolicy),
+                initializedShop.PoolExhausted);
         }
 
         private static MatchSeatState CreateSeat(
@@ -128,13 +170,21 @@ namespace ArknoNights.Match
                 initialValues.Level,
                 initialValues.TotalDeploymentCost,
                 initialValues.AvailableDeploymentCost,
+                0,
+                MatchPreparationBehaviorState.Empty,
                 false,
                 false,
                 null,
                 initialization.InitialControllerKind,
                 MatchConnectionState.Connected,
                 Array.Empty<MatchUnitState>(),
-                Array.Empty<MatchShopOfferState>());
+                Enumerable.Range(1, MatchEconomyRules.ShopSlotCount)
+                    .Select(slotIndex => new MatchShopOfferState(
+                        slotIndex,
+                        string.Empty,
+                        string.Empty,
+                        null,
+                        false)));
         }
 
         private static MatchInitializationResult Rejected(

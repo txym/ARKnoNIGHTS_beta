@@ -24,6 +24,11 @@ namespace ArknoNights.Match
             String(name, value.ToString(CultureInfo.InvariantCulture));
         }
 
+        internal void UnsignedInteger(string name, ulong value)
+        {
+            String(name, value.ToString(CultureInfo.InvariantCulture));
+        }
+
         internal void Boolean(string name, bool value)
         {
             Integer(name, value ? 1 : 0);

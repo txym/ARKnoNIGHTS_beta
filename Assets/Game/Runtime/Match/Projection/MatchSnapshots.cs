@@ -136,6 +136,9 @@ namespace ArknoNights.Match
             PlayerId = seat.PlayerId;
             Gold = seat.Gold;
             Level = seat.Level;
+            UpgradeDiscountCountAtThisLevel = seat.UpgradeDiscountCountAtThisLevel;
+            CurrentUpgradePrice = seat.CurrentUpgradePrice;
+            PreparationBehavior = seat.PreparationBehavior;
             TotalDeploymentCost = seat.TotalDeploymentCost;
             AvailableDeploymentCost = seat.AvailableDeploymentCost;
             Units = new ReadOnlyCollection<MatchUnitState>(
@@ -151,6 +154,9 @@ namespace ArknoNights.Match
             writer.String("playerId", PlayerId);
             writer.Integer("gold", Gold);
             writer.Integer("level", Level);
+            writer.Integer("upgradeDiscount", UpgradeDiscountCountAtThisLevel);
+            writer.Integer("currentUpgradePrice", CurrentUpgradePrice);
+            writer.Summary("preparationBehavior", PreparationBehavior.CanonicalSummary);
             writer.Integer("totalCost", TotalDeploymentCost);
             writer.Integer("availableCost", AvailableDeploymentCost);
             foreach (var unit in Units)
@@ -167,6 +173,9 @@ namespace ArknoNights.Match
         public string PlayerId { get; }
         public int Gold { get; }
         public int Level { get; }
+        public int UpgradeDiscountCountAtThisLevel { get; }
+        public int CurrentUpgradePrice { get; }
+        public MatchPreparationBehaviorState PreparationBehavior { get; }
         public int TotalDeploymentCost { get; }
         public int AvailableDeploymentCost { get; }
         public IReadOnlyList<MatchUnitState> Units { get; }
@@ -233,6 +242,7 @@ namespace ArknoNights.Match
             RoundNumber = state.RoundNumber;
             HostPlayerId = state.HostPlayerId;
             CompatibilityManifest = state.CompatibilityManifest;
+            Pool = state.Pool;
             EndReason = state.EndReason;
             Seats = new ReadOnlyCollection<MatchSeatState>(
                 state.Seats.OrderBy(seat => seat.SeatIndex).ToArray());
@@ -259,6 +269,7 @@ namespace ArknoNights.Match
         public int RoundNumber { get; }
         public string HostPlayerId { get; }
         public MatchCompatibilityManifest CompatibilityManifest { get; }
+        public MatchPoolState Pool { get; }
         public string EndReason { get; }
         public IReadOnlyList<MatchSeatState> Seats { get; }
         public IReadOnlyList<MatchCommandRecordSnapshot> CommandRecords { get; }

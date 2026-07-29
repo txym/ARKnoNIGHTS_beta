@@ -8,11 +8,16 @@ namespace ArknoNights.Match
     {
         private readonly Dictionary<CommandKey, CommandRecord> commandRecords =
             new Dictionary<CommandKey, CommandRecord>();
+        private readonly IStagingSlotPolicy stagingSlotPolicy;
         private MatchState state;
 
-        internal MatchAuthority(MatchState initialState)
+        internal MatchAuthority(
+            MatchState initialState,
+            IStagingSlotPolicy stagingSlotPolicy)
         {
             state = initialState ?? throw new ArgumentNullException(nameof(initialState));
+            this.stagingSlotPolicy = stagingSlotPolicy
+                ?? throw new ArgumentNullException(nameof(stagingSlotPolicy));
         }
 
         public event Action<MatchChangedEvent> Changed;
@@ -159,18 +164,60 @@ namespace ArknoNights.Match
                     "match.command.revision.future");
                 return Cache(key, envelope, result);
             }
-            if (!(envelope.Payload is SetPreparationReadyCommand readyCommand))
+            if (envelope.Payload is SetPreparationReadyCommand readyCommand)
             {
-                result = CommandResult(
-                    envelope.CommandId,
-                    MatchCommandCode.InvalidPayload,
-                    false,
-                    null,
-                    "match.command.payload.unsupported");
-                return Cache(key, envelope, result);
+                return ExecuteReady(key, envelope, seat, readyCommand);
+            }
+            if (envelope.Payload is RefreshShopCommand)
+            {
+                return ExecuteRefreshShop(key, envelope, seat);
+            }
+            if (envelope.Payload is ToggleShopFreezeCommand)
+            {
+                return ExecuteToggleShopFreeze(key, envelope, seat);
+            }
+            if (envelope.Payload is PurchaseShopOfferCommand purchaseCommand)
+            {
+                return ExecutePurchaseShopOffer(key, envelope, seat, purchaseCommand);
+            }
+            if (envelope.Payload is PurchaseLevelUpgradeCommand upgradeCommand)
+            {
+                return ExecutePurchaseLevelUpgrade(key, envelope, seat, upgradeCommand);
+            }
+            result = CommandResult(
+                envelope.CommandId,
+                MatchCommandCode.InvalidPayload,
+                false,
+                null,
+                "match.command.payload.unsupported");
+            return Cache(key, envelope, result);
+        }
+
+        public MatchTransactionResult TryApplyPostBattleNaturalRefresh(int roundNumber)
+        {
+            if (state.Phase != MatchPhase.Settlement || roundNumber != state.RoundNumber)
+            {
+                return TransactionRejected(
+                    MatchCommandCode.InvalidTransition,
+                    "match.shop.naturalRefresh.phaseOrRound.invalid");
+            }
+            if (state.Pool.AppliedPostBattleRefreshRounds.Contains(roundNumber))
+            {
+                return TransactionRejected(
+                    MatchCommandCode.NaturalRefreshAlreadyApplied,
+                    "match.shop.naturalRefresh.alreadyApplied");
             }
 
-            return ExecuteReady(key, envelope, seat, readyCommand);
+            var draft = new MatchEconomyTransactionDraft(state);
+            var poolExhausted = draft.ApplyPostBattleNaturalRefresh(roundNumber);
+            return CommitHost(
+                draft.BuildState(true),
+                poolExhausted
+                    ? "match.shop.naturalRefresh.poolExhausted"
+                    : "match.shop.naturalRefresh.accepted",
+                poolExhausted
+                    ? MatchCommandCode.PoolExhaustedDiagnostic
+                    : MatchCommandCode.Accepted);
         }
 
         public MatchTransactionResult TryEnterPreparation(int roundNumber)
@@ -434,7 +481,7 @@ namespace ArknoNights.Match
             }
 
             var nextState = state.WithSeat(seat.With(ready: command.DesiredReady));
-            if (!MatchStateInvariant.TryValidate(nextState, out var diagnosticCode))
+            if (!MatchStateInvariant.TryValidate(nextState, stagingSlotPolicy, out var diagnosticCode))
             {
                 result = CommandResult(
                     envelope.CommandId,
@@ -458,9 +505,266 @@ namespace ArknoNights.Match
             return result;
         }
 
-        private MatchTransactionResult CommitHost(MatchState nextState, string diagnosticCode)
+        private MatchCommandResult ExecuteRefreshShop(
+            CommandKey key,
+            MatchCommandEnvelope envelope,
+            MatchSeatState seat)
         {
-            if (!MatchStateInvariant.TryValidate(nextState, out var invariantDiagnostic))
+            var rejection = ValidateEconomyCommand(envelope, seat, "refresh");
+            if (rejection != null)
+            {
+                return Cache(key, envelope, rejection);
+            }
+            if (seat.Gold < MatchEconomyRules.RefreshCost)
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.InsufficientGold,
+                        false,
+                        null,
+                        "match.shop.refresh.gold.insufficient"));
+            }
+
+            var draft = new MatchEconomyTransactionDraft(state);
+            var poolExhausted = draft.RefreshPlayerShop(seat.PlayerId);
+            draft.SpendGold(seat.PlayerId, MatchEconomyRules.RefreshCost);
+            return CommitCommand(
+                key,
+                envelope,
+                draft.BuildState(true),
+                poolExhausted
+                    ? MatchCommandCode.PoolExhaustedDiagnostic
+                    : MatchCommandCode.Accepted,
+                poolExhausted
+                    ? "match.shop.refresh.poolExhausted"
+                    : "match.shop.refresh.accepted");
+        }
+
+        private MatchCommandResult ExecuteToggleShopFreeze(
+            CommandKey key,
+            MatchCommandEnvelope envelope,
+            MatchSeatState seat)
+        {
+            var rejection = ValidateEconomyCommand(envelope, seat, "freeze");
+            if (rejection != null)
+            {
+                return Cache(key, envelope, rejection);
+            }
+
+            var draft = new MatchEconomyTransactionDraft(state);
+            if (!draft.ToggleFreeze(seat.PlayerId, state.Phase))
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.AcceptedNoChange,
+                        false,
+                        state.StateRevision,
+                        "match.shop.freeze.noChange"));
+            }
+            return CommitCommand(
+                key,
+                envelope,
+                draft.BuildState(true),
+                MatchCommandCode.Accepted,
+                "match.shop.freeze.accepted");
+        }
+
+        private MatchCommandResult ExecutePurchaseShopOffer(
+            CommandKey key,
+            MatchCommandEnvelope envelope,
+            MatchSeatState seat,
+            PurchaseShopOfferCommand command)
+        {
+            var rejection = ValidateEconomyCommand(envelope, seat, "purchase");
+            if (rejection != null)
+            {
+                return Cache(key, envelope, rejection);
+            }
+
+            var draft = new MatchEconomyTransactionDraft(state);
+            if (!draft.TryPurchaseShopOffer(
+                seat.PlayerId,
+                command.SlotIndex,
+                command.ExpectedUnitId,
+                stagingSlotPolicy,
+                out var code,
+                out var diagnosticCode))
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        code,
+                        false,
+                        null,
+                        diagnosticCode));
+            }
+            return CommitCommand(
+                key,
+                envelope,
+                draft.BuildState(true),
+                MatchCommandCode.Accepted,
+                diagnosticCode);
+        }
+
+        private MatchCommandResult ExecutePurchaseLevelUpgrade(
+            CommandKey key,
+            MatchCommandEnvelope envelope,
+            MatchSeatState seat,
+            PurchaseLevelUpgradeCommand command)
+        {
+            var rejection = ValidateEconomyCommand(envelope, seat, "upgrade");
+            if (rejection != null)
+            {
+                return Cache(key, envelope, rejection);
+            }
+            if (seat.Level == MatchEconomyRules.MaximumLevel)
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.LevelMax,
+                        false,
+                        null,
+                        "match.upgrade.level.max"));
+            }
+            if (command.ExpectedCurrentLevel != seat.Level)
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.UpgradeLevelChanged,
+                        false,
+                        null,
+                        "match.upgrade.level.changed"));
+            }
+            if (command.ExpectedCurrentPrice != seat.CurrentUpgradePrice)
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.UpgradePriceChanged,
+                        false,
+                        null,
+                        "match.upgrade.price.changed"));
+            }
+            if (seat.Gold < seat.CurrentUpgradePrice)
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.InsufficientGold,
+                        false,
+                        null,
+                        "match.upgrade.gold.insufficient"));
+            }
+
+            var draft = new MatchEconomyTransactionDraft(state);
+            draft.PurchaseLevelUpgrade(seat.PlayerId);
+            return CommitCommand(
+                key,
+                envelope,
+                draft.BuildState(true),
+                MatchCommandCode.Accepted,
+                "match.upgrade.accepted");
+        }
+
+        private MatchCommandResult ValidateEconomyCommand(
+            MatchCommandEnvelope envelope,
+            MatchSeatState seat,
+            string operation)
+        {
+            if (state.Phase != MatchPhase.Preparation && state.Phase != MatchPhase.Battle)
+            {
+                return CommandResult(
+                    envelope.CommandId,
+                    MatchCommandCode.PhaseRejected,
+                    false,
+                    null,
+                    "match.economy." + operation + ".phase.rejected");
+            }
+            if (seat.Eliminated)
+            {
+                return CommandResult(
+                    envelope.CommandId,
+                    MatchCommandCode.Eliminated,
+                    false,
+                    null,
+                    "match.economy." + operation + ".eliminated");
+            }
+            if (seat.ControllerKind == MatchControllerKind.Human
+                && seat.ConnectionState != MatchConnectionState.Connected)
+            {
+                return CommandResult(
+                    envelope.CommandId,
+                    MatchCommandCode.ConnectionRejected,
+                    false,
+                    null,
+                    "match.economy." + operation + ".connection.rejected");
+            }
+            return null;
+        }
+
+        private MatchCommandResult CommitCommand(
+            CommandKey key,
+            MatchCommandEnvelope envelope,
+            MatchState nextState,
+            MatchCommandCode code,
+            string diagnosticCode)
+        {
+            if (!MatchStateInvariant.TryValidate(
+                nextState,
+                stagingSlotPolicy,
+                out var invariantDiagnostic))
+            {
+                return Cache(
+                    key,
+                    envelope,
+                    CommandResult(
+                        envelope.CommandId,
+                        MatchCommandCode.InternalInvariantViolation,
+                        false,
+                        null,
+                        invariantDiagnostic));
+            }
+
+            state = nextState;
+            var result = new MatchCommandResult(
+                envelope.CommandId,
+                code,
+                state.StateRevision,
+                state.StateRevision,
+                true,
+                diagnosticCode);
+            Cache(key, envelope, result);
+            PublishChanged();
+            return result;
+        }
+
+        private MatchTransactionResult CommitHost(
+            MatchState nextState,
+            string diagnosticCode,
+            MatchCommandCode code = MatchCommandCode.Accepted)
+        {
+            if (!MatchStateInvariant.TryValidate(
+                nextState,
+                stagingSlotPolicy,
+                out var invariantDiagnostic))
             {
                 return TransactionRejected(
                     MatchCommandCode.InternalInvariantViolation,
@@ -469,7 +773,7 @@ namespace ArknoNights.Match
 
             state = nextState;
             var result = new MatchTransactionResult(
-                MatchCommandCode.Accepted,
+                code,
                 state.StateRevision,
                 state.StateRevision,
                 true,

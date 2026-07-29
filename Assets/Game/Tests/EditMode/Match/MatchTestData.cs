@@ -24,14 +24,51 @@ namespace ArknoNights.Match.Tests
             string sessionId = "session-1",
             string matchSeed = "seed-1",
             string hostPlayerId = "player-1",
-            MatchCompatibilityManifest manifest = null)
+            MatchCompatibilityManifest manifest = null,
+            MatchShopCatalog shopCatalog = null)
         {
             return new MatchInitializationRequest(
                 sessionId,
                 matchSeed,
                 hostPlayerId,
                 manifest ?? Manifest(),
+                shopCatalog ?? Catalog(),
                 seats ?? OneHumanSeats());
+        }
+
+        internal static MatchShopCatalog Catalog(params MatchShopCatalogEntry[] entries)
+        {
+            return new MatchShopCatalog(
+                "rules-1",
+                new string('a', 64),
+                entries == null || entries.Length == 0
+                    ? new[]
+                    {
+                        Entry("1001", 1),
+                        Entry("2001", 2),
+                        Entry("3001", 3),
+                        Entry("4001", 4),
+                        Entry("5001", 5),
+                        Entry("6001", 6)
+                    }
+                    : entries);
+        }
+
+        internal static MatchShopCatalogEntry Entry(
+            string typeId,
+            int rarity,
+            bool isShopEligible = true,
+            int maxEliteLevel = 3,
+            int baseDeploymentCost = 2,
+            long? numericTypeId = null)
+        {
+            return new MatchShopCatalogEntry(
+                typeId,
+                rarity,
+                isShopEligible,
+                maxEliteLevel,
+                baseDeploymentCost,
+                numericTypeId ?? long.Parse(typeId, System.Globalization.CultureInfo.InvariantCulture));
         }
 
         internal static MatchSeatInitialization[] OneHumanSeats()

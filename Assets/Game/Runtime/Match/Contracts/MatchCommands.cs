@@ -22,6 +22,62 @@ namespace ArknoNights.Match
         public override string CanonicalSummary { get; }
     }
 
+    public sealed class RefreshShopCommand : MatchCommandPayload
+    {
+        public RefreshShopCommand()
+        {
+            var writer = new CanonicalSummaryWriter(nameof(RefreshShopCommand));
+            CanonicalSummary = writer.ToString();
+        }
+
+        public override string CanonicalSummary { get; }
+    }
+
+    public sealed class ToggleShopFreezeCommand : MatchCommandPayload
+    {
+        public ToggleShopFreezeCommand()
+        {
+            var writer = new CanonicalSummaryWriter(nameof(ToggleShopFreezeCommand));
+            CanonicalSummary = writer.ToString();
+        }
+
+        public override string CanonicalSummary { get; }
+    }
+
+    public sealed class PurchaseShopOfferCommand : MatchCommandPayload
+    {
+        public PurchaseShopOfferCommand(int slotIndex, string expectedUnitId)
+        {
+            SlotIndex = slotIndex;
+            ExpectedUnitId = expectedUnitId;
+            var writer = new CanonicalSummaryWriter(nameof(PurchaseShopOfferCommand));
+            writer.Integer("slotIndex", SlotIndex);
+            writer.String("expectedUnitId", ExpectedUnitId);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public int SlotIndex { get; }
+        public string ExpectedUnitId { get; }
+        public override string CanonicalSummary { get; }
+    }
+
+    public sealed class PurchaseLevelUpgradeCommand : MatchCommandPayload
+    {
+        public PurchaseLevelUpgradeCommand(int expectedCurrentLevel, int expectedCurrentPrice)
+        {
+            ExpectedCurrentLevel = expectedCurrentLevel;
+            ExpectedCurrentPrice = expectedCurrentPrice;
+            var writer = new CanonicalSummaryWriter(nameof(PurchaseLevelUpgradeCommand));
+            writer.Integer("expectedCurrentLevel", ExpectedCurrentLevel);
+            writer.Integer("expectedCurrentPrice", ExpectedCurrentPrice);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public int ExpectedCurrentLevel { get; }
+        public int ExpectedCurrentPrice { get; }
+        public override string CanonicalSummary { get; }
+    }
+
     public sealed class MatchCommandEnvelope
     {
         public MatchCommandEnvelope(
@@ -90,6 +146,10 @@ namespace ArknoNights.Match
 
         public string CommandId { get; }
         public MatchCommandCode Code { get; }
+        public bool Accepted =>
+            Code == MatchCommandCode.Accepted
+            || Code == MatchCommandCode.AcceptedNoChange
+            || Code == MatchCommandCode.PoolExhaustedDiagnostic;
         public long CurrentStateRevision { get; }
         public long? AcceptedStateRevision { get; }
         public bool ChangedState { get; }
