@@ -1388,6 +1388,97 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void SuccessfulAttackTriggeredSpawn_UsesDoubleSpeedSkillAttack()
+        {
+            var input = CreateInput(
+                8,
+                new[]
+                {
+                    Attacker(
+                        "builder",
+                        2000,
+                        0,
+                        "ATTACK_SPAWN",
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    NonAttacker("target", 10000),
+                    NonAttacker("fragment", 1000)
+                },
+                new[]
+                {
+                    PassiveTriggeredSpawn(
+                        "ATTACK_SPAWN",
+                        TriggeredSpawnKind.SuccessfulAttack,
+                        firstTriggerOrdinal: 3,
+                        repeatInterval: 3,
+                        summonTypeId: "fragment",
+                        sideLengthCentimetres: 40,
+                        maxActiveSameType: 12,
+                        skillAttackAnimationKey: "Skill",
+                        skillAttackAnimationOriginalDurationTicks: 5)
+                },
+                new[] { Unit("builder", "builder", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var skill = result.Events.Single(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "builder");
+
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Attack
+                        && item.UnitId == "builder")
+                    .Select(item => item.Tick),
+                Is.EqualTo(new[] { 1, 3 }));
+            Assert.That(skill.Tick, Is.EqualTo(5));
+            Assert.That(skill.RelatedUnitId, Is.EqualTo("target"));
+            Assert.That(skill.AnimationKey, Is.EqualTo("Skill"));
+            Assert.That(skill.OriginalAnimationTicks, Is.EqualTo(5));
+            Assert.That(skill.EffectiveAnimationTicks, Is.EqualTo(3));
+            Assert.That(skill.PlannedDamageTick, Is.EqualTo(8));
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Damage
+                        && item.UnitId == "builder")
+                    .Select(item => item.Tick),
+                Is.EqualTo(new[] { 2, 4, 8 }));
+            Assert.That(
+                result.Events.Single(item =>
+                    item.Type == BattleEventType.Spawn
+                    && item.UnitTypeId == "fragment").Tick,
+                Is.EqualTo(8));
+
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(
+                compiler.TryCompile(
+                    result,
+                    out var track,
+                    out var diagnostics),
+                Is.True,
+                string.Join(
+                    "; ",
+                    diagnostics.Select(item =>
+                        item.ToString())));
+            Assert.That(
+                track.TryGetUnit(
+                    "builder",
+                    out var builderTrack),
+                Is.True);
+            Assert.That(
+                builderTrack.Sample(5).Action,
+                Is.EqualTo(UnitPresentationAction.Skill));
+            Assert.That(
+                builderTrack.Sample(5).AnimationSpeedMultiplier,
+                Is.EqualTo(2f));
+            Assert.That(
+                builderTrack.Sample(8).Action,
+                Is.EqualTo(UnitPresentationAction.Skill));
+        }
+
+        [Test]
         public void DamageReceivedTriggeredSpawn_RespectsFriendlyTypeCap()
         {
             Assert.That(
@@ -2501,7 +2592,9 @@ namespace ArknoNights.Battle.Tests
             int repeatInterval,
             string summonTypeId,
             int sideLengthCentimetres,
-            int maxActiveSameType)
+            int maxActiveSameType,
+            string skillAttackAnimationKey = null,
+            int skillAttackAnimationOriginalDurationTicks = 0)
         {
             return new AbilityDefinition(
                 abilityId,
@@ -2536,7 +2629,9 @@ namespace ArknoNights.Battle.Tests
                     repeatInterval,
                     summonTypeId,
                     sideLengthCentimetres,
-                    maxActiveSameType),
+                    maxActiveSameType,
+                    skillAttackAnimationKey,
+                    skillAttackAnimationOriginalDurationTicks),
                 string.Empty,
                 0);
         }

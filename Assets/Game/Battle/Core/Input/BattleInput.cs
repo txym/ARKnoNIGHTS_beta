@@ -318,6 +318,7 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.UnblockedAttackCharge.AttackAdditivePerStack).Append(',')
                         .Append(ability.UnblockedAttackCharge.MaxStacks);
                 if (ability.TriggeredSpawnEffect != null)
+                {
                     builder.Append("|F:")
                         .Append((int)ability.TriggeredSpawnEffect.TriggerKind).Append(',')
                         .Append(ability.TriggeredSpawnEffect.FirstTriggerOrdinal).Append(',')
@@ -325,6 +326,15 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.TriggeredSpawnEffect.SummonTypeId).Append(',')
                         .Append(ability.TriggeredSpawnEffect.SideLengthCentimetres).Append(',')
                         .Append(ability.TriggeredSpawnEffect.MaxActiveSameType);
+                    if (ability.TriggeredSpawnEffect
+                        .UsesSkillAttackAnimation)
+                        builder.Append(',')
+                            .Append(ability.TriggeredSpawnEffect
+                                .SkillAttackAnimationKey)
+                            .Append(',')
+                            .Append(ability.TriggeredSpawnEffect
+                                .SkillAttackAnimationOriginalDurationTicks);
+                }
                 if (ability.HealthThresholdAdjacentSpawnEffect != null)
                     builder.Append("|G:")
                         .Append(ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille).Append(',')
@@ -612,7 +622,20 @@ namespace ArknoNights.Battle.Core
                             || string.IsNullOrWhiteSpace(ability.TriggeredSpawnEffect.SummonTypeId)
                             || !typeIds.Contains(ability.TriggeredSpawnEffect.SummonTypeId)
                             || ability.TriggeredSpawnEffect.SideLengthCentimetres < 0
-                            || ability.TriggeredSpawnEffect.MaxActiveSameType < 0))
+                            || ability.TriggeredSpawnEffect.MaxActiveSameType < 0
+                            || (ability.TriggeredSpawnEffect
+                                    .UsesSkillAttackAnimation
+                                && (ability.TriggeredSpawnEffect.TriggerKind
+                                        != TriggeredSpawnKind
+                                            .SuccessfulAttack
+                                    || ability.TriggeredSpawnEffect
+                                        .SkillAttackAnimationOriginalDurationTicks
+                                        <= 0))
+                            || (!ability.TriggeredSpawnEffect
+                                    .UsesSkillAttackAnimation
+                                && ability.TriggeredSpawnEffect
+                                    .SkillAttackAnimationOriginalDurationTicks
+                                    != 0)))
                         validationErrors.Add(new ValidationError("ability.triggeredSpawn.invalid", "Triggered-spawn effect is invalid: " + ability.AbilityId));
                     if (ability.HealthThresholdAdjacentSpawnEffect != null
                         && (ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille <= 0

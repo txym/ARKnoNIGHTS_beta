@@ -601,6 +601,27 @@ namespace ArknoNights.Battle.Core
             string summonTypeId,
             int sideLengthCentimetres,
             int maxActiveSameType)
+            : this(
+                triggerKind,
+                firstTriggerOrdinal,
+                repeatInterval,
+                summonTypeId,
+                sideLengthCentimetres,
+                maxActiveSameType,
+                string.Empty,
+                0)
+        {
+        }
+
+        public TriggeredSpawnEffectDefinition(
+            TriggeredSpawnKind triggerKind,
+            int firstTriggerOrdinal,
+            int repeatInterval,
+            string summonTypeId,
+            int sideLengthCentimetres,
+            int maxActiveSameType,
+            string skillAttackAnimationKey,
+            int skillAttackAnimationOriginalDurationTicks)
         {
             TriggerKind = triggerKind;
             FirstTriggerOrdinal = firstTriggerOrdinal;
@@ -608,6 +629,10 @@ namespace ArknoNights.Battle.Core
             SummonTypeId = summonTypeId;
             SideLengthCentimetres = sideLengthCentimetres;
             MaxActiveSameType = maxActiveSameType;
+            SkillAttackAnimationKey =
+                skillAttackAnimationKey ?? string.Empty;
+            SkillAttackAnimationOriginalDurationTicks =
+                skillAttackAnimationOriginalDurationTicks;
         }
 
         public TriggeredSpawnKind TriggerKind { get; }
@@ -616,6 +641,12 @@ namespace ArknoNights.Battle.Core
         public string SummonTypeId { get; }
         public int SideLengthCentimetres { get; }
         public int MaxActiveSameType { get; }
+        public string SkillAttackAnimationKey { get; }
+        public int SkillAttackAnimationOriginalDurationTicks { get; }
+        public int SkillAttackAnimationEffectiveDurationTicks =>
+            (SkillAttackAnimationOriginalDurationTicks + 1) / 2;
+        public bool UsesSkillAttackAnimation =>
+            !string.IsNullOrWhiteSpace(SkillAttackAnimationKey);
 
         public bool IsTriggered(int ordinal)
         {

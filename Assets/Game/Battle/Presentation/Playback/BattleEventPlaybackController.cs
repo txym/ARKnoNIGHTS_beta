@@ -257,6 +257,18 @@ namespace ArknoNights.Battle.Presentation
                     caster.MarkAttackAnimationStarted(
                         item.Tick,
                         item.EffectiveAnimationTicks);
+                    if (!string.IsNullOrEmpty(item.RelatedUnitId))
+                    {
+                        if (!TryGetView(
+                                item.RelatedUnitId,
+                                item,
+                                out var skillTarget))
+                            return false;
+                        caster.MarkAttackFacing(
+                            item.Tick,
+                            caster.PositionAt(item.Tick),
+                            skillTarget.PositionAt(item.Tick));
+                    }
                     break;
 
                 case BattleEventType.Damage:

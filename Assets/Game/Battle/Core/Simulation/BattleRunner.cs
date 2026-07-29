@@ -623,6 +623,20 @@ namespace ArknoNights.Battle.Core
             foreach (var ability in abilityStates)
                 ability.ForceUnlockAttackCountState();
         }
+        internal TriggeredSpawnEffectDefinition
+            GetTriggeredAttackSkillAnimation(int attackOrdinal)
+        {
+            return abilityStates
+                .Select(item =>
+                    item.Definition.TriggeredSpawnEffect)
+                .Where(item =>
+                    item != null
+                    && item.TriggerKind
+                    == TriggeredSpawnKind.SuccessfulAttack
+                    && item.UsesSkillAttackAnimation
+                    && item.IsTriggered(attackOrdinal))
+                .FirstOrDefault();
+        }
         internal int EffectiveTargetDefenseMultiplierPermille
         {
             get
@@ -1236,17 +1250,42 @@ namespace ArknoNights.Battle.Core
                 }
                 var attackIntervalTicks =
                     unit.EffectiveAttackIntervalTicks;
-                var effectiveTicks = Math.Min(
-                    unit.Definition.AttackAnimationDurationTicks,
-                    attackIntervalTicks);
+                var skillAttackAnimation =
+                    unit.GetTriggeredAttackSkillAnimation(
+                        unit.StartedAttackCount);
+                var originalAnimationTicks =
+                    skillAttackAnimation == null
+                        ? unit.Definition
+                            .AttackAnimationDurationTicks
+                        : skillAttackAnimation
+                            .SkillAttackAnimationOriginalDurationTicks;
+                var effectiveTicks =
+                    skillAttackAnimation == null
+                        ? Math.Min(
+                            originalAnimationTicks,
+                            attackIntervalTicks)
+                        : skillAttackAnimation
+                            .SkillAttackAnimationEffectiveDurationTicks;
                 var damageTick = CurrentTick + effectiveTicks;
                 unit.NextAttackAllowedTick =
                     attackIntervalTicks >= int.MaxValue - CurrentTick
                         ? int.MaxValue
                         : CurrentTick + attackIntervalTicks;
-                unit.AttackAnimationLockUntilTick = Math.Max(unit.AttackAnimationLockUntilTick, damageTick);
-                pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.EffectiveTargetDefenseMultiplierPermille, unit.StartedAttackCount, unit.Definition.AttackAnimationDurationTicks, effectiveTicks));
-                Emit(BattleEventType.Attack, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, unit.Definition.AttackAnimationDurationTicks, effectiveTicks, null, BattleStopReason.None);
+                pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.EffectiveTargetDefenseMultiplierPermille, unit.StartedAttackCount, originalAnimationTicks, effectiveTicks));
+                if (skillAttackAnimation == null)
+                {
+                    unit.AttackAnimationLockUntilTick = Math.Max(
+                        unit.AttackAnimationLockUntilTick,
+                        damageTick);
+                    Emit(BattleEventType.Attack, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, originalAnimationTicks, effectiveTicks, null, BattleStopReason.None);
+                }
+                else
+                {
+                    unit.SkillAnimationLockUntilTick = Math.Max(
+                        unit.SkillAnimationLockUntilTick,
+                        damageTick);
+                    Emit(BattleEventType.Skill, unit.UnitId, null, target.UnitId, null, null, unit.Definition.DamageType, 0, 0, 0, damageTick, originalAnimationTicks, effectiveTicks, null, BattleStopReason.None, skillAttackAnimation.SkillAttackAnimationKey);
+                }
             }
         }
 
