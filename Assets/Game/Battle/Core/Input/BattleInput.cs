@@ -388,6 +388,17 @@ namespace ArknoNights.Battle.Core
                             .DistanceCentimetres).Append(',')
                         .Append(ability.TimedBlinkEffect
                             .RelocationDelayEffectiveTicks);
+                if (ability.ProximityEntryDamageEffect != null)
+                    builder.Append("|PE:")
+                        .Append(ability.ProximityEntryDamageEffect
+                            .RadiusCentimetres).Append(',')
+                        .Append((int)ability
+                            .ProximityEntryDamageEffect
+                            .DamageType).Append(',')
+                        .Append(ability.ProximityEntryDamageEffect
+                            .AttackMultiplierPermille).Append(',')
+                        .Append(ability.ProximityEntryDamageEffect
+                            .GroundTargetsOnly ? 1 : 0);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -475,6 +486,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.HealthThresholdFullHealEffect != null) validationErrors.Add(new ValidationError("ability.healthThresholdFullHeal.unexpected", "Timed ability cannot define a health-threshold full-heal effect: " + ability.AbilityId));
                     if (ability.OnHitDefenseDebuffEffect != null) validationErrors.Add(new ValidationError("ability.onHitDefenseDebuff.unexpected", "Timed ability cannot define an on-hit defense debuff: " + ability.AbilityId));
                     if (ability.AttackDashEffect != null) validationErrors.Add(new ValidationError("ability.attackDash.unexpected", "Timed ability cannot define an attack-dash effect: " + ability.AbilityId));
+                    if (ability.ProximityEntryDamageEffect != null) validationErrors.Add(new ValidationError("ability.proximityEntryDamage.unexpected", "Timed ability cannot define a proximity-entry damage effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     var timedEffectCount =
@@ -544,7 +556,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.HealthThresholdFullHealEffect == null ? 0 : 1)
                         + (ability.OnHitDefenseDebuffEffect == null ? 0 : 1)
                         + (ability.AttackDashEffect == null ? 0 : 1)
-                        + (ability.TimedBlinkEffect == null ? 0 : 1);
+                        + (ability.TimedBlinkEffect == null ? 0 : 1)
+                        + (ability.ProximityEntryDamageEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -753,6 +766,18 @@ namespace ArknoNights.Battle.Core
                                != ability.AttackDashEffect
                                    .UnblockableDurationTicks))
                         validationErrors.Add(new ValidationError("ability.attackDash.invalid", "Attack-dash effect is invalid: " + ability.AbilityId));
+                    if (ability.ProximityEntryDamageEffect != null
+                        && (ability.ProximityEntryDamageEffect
+                                .RadiusCentimetres <= 0
+                            || ability.ProximityEntryDamageEffect
+                                .DamageType == DamageType.None
+                            || !Enum.IsDefined(
+                                typeof(DamageType),
+                                ability.ProximityEntryDamageEffect
+                                    .DamageType)
+                            || ability.ProximityEntryDamageEffect
+                                .AttackMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.proximityEntryDamage.invalid", "Proximity-entry damage effect is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "GROUND_PROXIMITY_COLLISION_DAMAGE",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "地面敌方单位每次进入自身0.5格半径时，立即受到攻击力100%的物理伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "ProximityEntryDamage",
+      "radiusMetres": 0.5,
+      "damageType": "Physical",
+      "attackMultiplierPermille": 1000,
+      "groundTargetsOnly": true
+    }
+  ]
+}

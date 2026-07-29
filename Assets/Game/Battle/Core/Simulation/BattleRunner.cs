@@ -26,6 +26,9 @@ namespace ArknoNights.Battle.Core
         private bool healthThresholdFullHealCompleted;
         private int healthThresholdFullHealDueTick =
             int.MinValue;
+        private readonly HashSet<string>
+            proximityEntryInsideTargetIds =
+                new HashSet<string>(StringComparer.Ordinal);
 
         internal RuntimeAbilityState(AbilityDefinition definition)
         {
@@ -136,6 +139,23 @@ namespace ArknoNights.Battle.Core
             damageReceivedCount++;
             receivedOrdinal = damageReceivedCount;
             return effect.IsTriggered(damageReceivedCount);
+        }
+
+        internal IReadOnlyList<string>
+            UpdateProximityEntryTargets(
+                IEnumerable<string> targetUnitIds)
+        {
+            var next = new HashSet<string>(
+                targetUnitIds ?? Enumerable.Empty<string>(),
+                StringComparer.Ordinal);
+            var entered = next
+                .Where(item =>
+                    !proximityEntryInsideTargetIds.Contains(item))
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .ToArray();
+            proximityEntryInsideTargetIds.Clear();
+            proximityEntryInsideTargetIds.UnionWith(next);
+            return entered;
         }
 
         internal void UpdateHealthThresholdState(
@@ -293,6 +313,14 @@ namespace ArknoNights.Battle.Core
                         healthThresholdFullHealCompleted ? 1 : 0)
                     .Append(':')
                     .Append(healthThresholdFullHealDueTick);
+            if (Definition.ProximityEntryDamageEffect != null)
+                builder.Append(":proximity:")
+                    .Append(string.Join(
+                        ",",
+                        proximityEntryInsideTargetIds
+                            .OrderBy(
+                                item => item,
+                                StringComparer.Ordinal)));
         }
     }
 
@@ -1205,6 +1233,9 @@ namespace ArknoNights.Battle.Core
             AcquireTargets();
             ApplyMovement();
             ResolveOpposingGateArrivals();
+            RefreshAuraCombatModifiers();
+            ResolveProximityEntryDamage();
+            ResolveDeathsAndCleanup();
             RefreshAuraCombatModifiers();
             EvaluateBlocking();
             RefreshAuraCombatModifiers();
@@ -2676,6 +2707,123 @@ namespace ArknoNights.Battle.Core
             }
         }
 
+        private void ResolveProximityEntryDamage()
+        {
+            var hits = new List<ProximityEntryDamageHit>();
+            foreach (var source in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+            foreach (var abilityState in source.AbilityStates
+                         .Where(item =>
+                             item.Definition
+                                 .ProximityEntryDamageEffect != null)
+                         .OrderBy(
+                             item => item.Definition.AbilityId,
+                             StringComparer.Ordinal))
+            {
+                var effect =
+                    abilityState.Definition
+                        .ProximityEntryDamageEffect;
+                var radiusSquared =
+                    (long)effect.RadiusCentimetres
+                    * effect.RadiusCentimetres;
+                var inside = runtimeUnits
+                    .Where(target =>
+                        IsActive(target)
+                        && target.Side != source.Side
+                        && (!effect.GroundTargetsOnly
+                            || target.IsTargetableBy(
+                                AttackMethod.Melee))
+                        && DistanceSquared(
+                            source.Position,
+                            target.Position)
+                           <= radiusSquared)
+                    .OrderBy(
+                        target => target.UnitId,
+                        StringComparer.Ordinal)
+                    .Select(target => target.UnitId)
+                    .ToArray();
+                foreach (var targetUnitId in abilityState
+                             .UpdateProximityEntryTargets(inside))
+                {
+                    var target = FindUnit(targetUnitId);
+                    if (!IsActive(target))
+                        continue;
+                    hits.Add(new ProximityEntryDamageHit(
+                        source.UnitId,
+                        targetUnitId,
+                        effect,
+                        CalculateProximityEntryDamage(
+                            source,
+                            target,
+                            effect)));
+                }
+            }
+
+            foreach (var group in hits
+                         .GroupBy(
+                             item => item.TargetUnitId,
+                             StringComparer.Ordinal)
+                         .OrderBy(
+                             item => item.Key,
+                             StringComparer.Ordinal))
+            {
+                var target = FindUnit(group.Key);
+                if (target == null || !IsInBattle(target))
+                    continue;
+                var resolved = group
+                    .OrderBy(
+                        item => item.SourceUnitId,
+                        StringComparer.Ordinal)
+                    .ToArray();
+                var before = target.CurrentHitPoints;
+                var total = resolved.Sum(item =>
+                    (long)item.Amount);
+                target.CurrentHitPoints = (int)Math.Max(
+                    0,
+                    before - Math.Min(int.MaxValue, total));
+                foreach (var hit in resolved)
+                    Emit(
+                        BattleEventType.Damage,
+                        hit.SourceUnitId,
+                        null,
+                        hit.TargetUnitId,
+                        null,
+                        null,
+                        hit.Effect.DamageType,
+                        hit.Amount,
+                        before,
+                        target.CurrentHitPoints,
+                        0,
+                        0,
+                        0,
+                        null,
+                        BattleStopReason.None);
+            }
+        }
+
+        private static int CalculateProximityEntryDamage(
+            RuntimeUnitState source,
+            RuntimeUnitState target,
+            ProximityEntryDamageEffectDefinition effect)
+        {
+            var scaledAttack = (int)Math.Min(
+                int.MaxValue,
+                (long)source.EffectiveAttack
+                * effect.AttackMultiplierPermille
+                / 1000);
+            var damage = DamageCalculator.Calculate(
+                effect.DamageType,
+                scaledAttack,
+                target.EffectiveDefense,
+                target.EffectiveMagicResistance);
+            return target.ApplyDamageTakenModifiers(
+                effect.DamageType,
+                damage);
+        }
+
         private static int CalculateTimedTargetAreaDamage(
             PendingTimedTargetAreaDamage pending,
             RuntimeUnitState target)
@@ -3115,6 +3263,7 @@ namespace ArknoNights.Battle.Core
         private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
         private readonly struct DeathAreaDamageHit { public DeathAreaDamageHit(PendingDeathAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingDeathAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
         private readonly struct TimedTargetAreaDamageHit { public TimedTargetAreaDamageHit(PendingTimedTargetAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingTimedTargetAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
+        private readonly struct ProximityEntryDamageHit { public ProximityEntryDamageHit(string sourceUnitId, string targetUnitId, ProximityEntryDamageEffectDefinition effect, int amount) { SourceUnitId = sourceUnitId; TargetUnitId = targetUnitId; Effect = effect; Amount = amount; } public string SourceUnitId { get; } public string TargetUnitId { get; } public ProximityEntryDamageEffectDefinition Effect { get; } public int Amount { get; } }
         private readonly struct PendingTimedTargetAreaDamage { public PendingTimedTargetAreaDamage(int dueTick, string ownerUnitId, BattleSide side, string targetUnitId, int attack, string abilityId, TimedTargetAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; TargetUnitId = targetUnitId; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public string TargetUnitId { get; } public int Attack { get; } public string AbilityId { get; } public TimedTargetAreaDamageEffectDefinition Effect { get; } }
         private readonly struct PendingRelocation { public PendingRelocation(int dueTick, string unitId, string targetUnitId, int distanceCentimetres) { DueTick = dueTick; UnitId = unitId; TargetUnitId = targetUnitId; DistanceCentimetres = distanceCentimetres; } public int DueTick { get; } public string UnitId { get; } public string TargetUnitId { get; } public int DistanceCentimetres { get; } }
         private readonly struct PendingDeathAreaDamage { public PendingDeathAreaDamage(int dueTick, string ownerUnitId, BattleSide side, FixedPosition position, int attack, string abilityId, DeathAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; Position = position; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public FixedPosition Position { get; } public int Attack { get; } public string AbilityId { get; } public DeathAreaDamageEffectDefinition Effect { get; } }

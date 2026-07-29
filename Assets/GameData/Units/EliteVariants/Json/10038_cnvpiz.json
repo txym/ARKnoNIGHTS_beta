@@ -58,7 +58,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "FORTIFIED_CATERING_VEHICLE"
+                                                  "FORTIFIED_CATERING_VEHICLE",
+                                                  "GROUND_PROXIMITY_COLLISION_DAMAGE"
                                               ]
                      },
                      {
@@ -105,7 +106,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "FORTIFIED_CATERING_VEHICLE"
+                                                  "FORTIFIED_CATERING_VEHICLE",
+                                                  "GROUND_PROXIMITY_COLLISION_DAMAGE"
                                               ]
                      }
                  ]

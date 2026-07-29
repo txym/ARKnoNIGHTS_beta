@@ -698,6 +698,13 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 动画按 `Disappear → Appear` 顺序在同一轨道二倍速播放。两个真实源片段均为 `0.5s = 10 Tick`，总源时长为 `20 Tick`，二倍速后的完整 Skill 占用为 `10 Tick`；`Disappear` 的有效占用为 `5 Tick`。
 - 在 `Disappear` 完整播放后的第 `5` Tick，`1502` 沿当前位置到敌方门中心的方向迁移 `150cm`，随后继续播放 `Appear`。若到门距离不足 `150cm`，则停在门中心；同 Tick 继续使用既有门区判定，进入门区会立即退出战斗并结算生命损失。闪现不造成伤害。
 
+## 21. `10038` 地面进入半径碰撞伤害（2026-07-29）
+
+- `10038` 对每个进入自身 `50cm` 闭区间半径的地面敌方单位立即造成一次当前有效攻击力 `100%` 的物理伤害。距离在单位移动和冲门退出处理后按整数厘米平方距离判断；恰好 `50cm` 视为进入范围。
+- 该效果按 `10038/能力/目标实例` 分别保存上一 Tick 的范围内集合。目标从范围外进入时触发一次，持续停留不重复；离开范围后再次进入可以再次触发。能力首次开始参与战斗时，已经位于范围内的合法目标视为进入。
+- 同 Tick 多个碰撞来源先按目标聚合伤害，再统一处理死亡，避免来源遍历顺序改变存活结果。伤害读取触发 Tick 的当前有效攻击力、目标防御与承伤倍率；它不是普通攻击，不触发普通攻击专属的闪避、反伤、命中效果或攻击计数。
+- `GroundTargetsOnly` 通过既有近战目标资格排除无人机及其他不可被近战索敌的实体。该被动没有 Skill 动画，不占用或打断 Attack/Skill。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

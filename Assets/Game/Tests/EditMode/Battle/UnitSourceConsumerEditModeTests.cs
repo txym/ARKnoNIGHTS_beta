@@ -341,6 +341,24 @@ namespace ArknoNights.Battle.Tests
                 charged.areaAttackMultiplierPermille,
                 Is.EqualTo(1000));
             Assert.That(charged.groundTargetsOnly, Is.True);
+            var collision = document.abilities.Single(item =>
+                item.abilityId
+                == "GROUND_PROXIMITY_COLLISION_DAMAGE");
+            Assert.That(
+                collision.activationKind,
+                Is.EqualTo("Passive"));
+            Assert.That(
+                collision.proximityEntryRadiusCentimetres,
+                Is.EqualTo(50));
+            Assert.That(
+                collision.proximityEntryDamageType,
+                Is.EqualTo("Physical"));
+            Assert.That(
+                collision.proximityEntryAttackMultiplierPermille,
+                Is.EqualTo(1000));
+            Assert.That(
+                collision.proximityEntryGroundTargetsOnly,
+                Is.True);
         }
 
         [Test]
@@ -418,6 +436,7 @@ namespace ArknoNights.Battle.Tests
                 "CHARGED_DRINK_AREA_ATTACK",
                 "FORTIFIED_CATERING_VEHICLE",
                 "GREY_HAT_THIRD_ATTACK_DASH",
+                "GROUND_PROXIMITY_COLLISION_DAMAGE",
                 "STACKING_DEFENSE_REDUCTION_ON_HIT",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
@@ -767,6 +786,10 @@ namespace ArknoNights.Battle.Tests
             public int attackDashDistanceCentimetres;
             public int attackDashUnblockableDurationTicks;
             public int timedBlinkDistanceCentimetres;
+            public int proximityEntryRadiusCentimetres;
+            public string proximityEntryDamageType;
+            public int proximityEntryAttackMultiplierPermille;
+            public bool proximityEntryGroundTargetsOnly;
         }
     }
 }

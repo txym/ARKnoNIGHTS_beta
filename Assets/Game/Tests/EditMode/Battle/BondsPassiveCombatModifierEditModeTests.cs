@@ -77,6 +77,83 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void ProximityEntryDamage_HitsGroundOnceAtClosedRadius()
+        {
+            const string abilityId =
+                "GROUND_PROXIMITY_COLLISION_DAMAGE";
+            var input = CreateInput(
+                2,
+                new[]
+                {
+                    Attacker(
+                        "vehicle",
+                        0,
+                        1,
+                        abilityId,
+                        attackIntervalTicks: 1000,
+                        attack: 100),
+                    Attacker(
+                        "ground",
+                        1000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        maxHitPoints: 1000,
+                        attack: 1,
+                        defense: 20),
+                    Attacker(
+                        "drone",
+                        1000,
+                        1,
+                        "DRONE_TRAIT",
+                        attackIntervalTicks: 1000,
+                        maxHitPoints: 1000,
+                        attack: 1,
+                        defense: 20)
+                },
+                new[]
+                {
+                    ProximityEntryDamage(abilityId),
+                    PassiveTrait(
+                        "DRONE_TRAIT",
+                        UnitTraitEffectKind
+                            .UntargetableByMelee)
+                },
+                new[] { Unit("vehicle", "vehicle", 5, 4) },
+                new[]
+                {
+                    Unit("ground", "ground", 5, 4),
+                    Unit("drone", "drone", 5, 4)
+                });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var collisionHits = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "vehicle")
+                .ToArray();
+
+            Assert.That(collisionHits, Has.Length.EqualTo(1));
+            Assert.That(collisionHits[0].Tick, Is.EqualTo(1));
+            Assert.That(
+                collisionHits[0].RelatedUnitId,
+                Is.EqualTo("ground"));
+            Assert.That(
+                collisionHits[0].DamageType,
+                Is.EqualTo(DamageType.Physical));
+            Assert.That(
+                collisionHits[0].DamageAmount,
+                Is.EqualTo(80));
+            Assert.That(
+                result.FinalUnits.Single(item =>
+                    item.UnitId == "ground").HitPoints,
+                Is.EqualTo(920));
+            Assert.That(
+                result.FinalUnits.Single(item =>
+                    item.UnitId == "drone").HitPoints,
+                Is.EqualTo(1000));
+        }
+
+        [Test]
         public void AttackSpeedAdditive_RecomputesAttackIntervalWithCeiling()
         {
             var input = CreateInput(
@@ -3317,6 +3394,34 @@ namespace ArknoNights.Battle.Tests
                 "blink.disappear|blink.appear",
                 20,
                 new TimedBlinkEffectDefinition(150, 5));
+        }
+
+        private static AbilityDefinition ProximityEntryDamage(
+            string abilityId)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                string.Empty,
+                0,
+                null,
+                new ProximityEntryDamageEffectDefinition(
+                    50,
+                    DamageType.Physical,
+                    1000,
+                    true));
         }
 
         private static UnitDefinition NonAttacker(

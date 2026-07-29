@@ -664,6 +664,26 @@ namespace ArknoNights.Battle.Core
         public int RelocationDelayEffectiveTicks { get; }
     }
 
+    public sealed class ProximityEntryDamageEffectDefinition
+    {
+        public ProximityEntryDamageEffectDefinition(
+            int radiusCentimetres,
+            DamageType damageType,
+            int attackMultiplierPermille,
+            bool groundTargetsOnly)
+        {
+            RadiusCentimetres = radiusCentimetres;
+            DamageType = damageType;
+            AttackMultiplierPermille = attackMultiplierPermille;
+            GroundTargetsOnly = groundTargetsOnly;
+        }
+
+        public int RadiusCentimetres { get; }
+        public DamageType DamageType { get; }
+        public int AttackMultiplierPermille { get; }
+        public bool GroundTargetsOnly { get; }
+    }
+
     public sealed class UnblockedAttackChargeDefinition
     {
         public UnblockedAttackChargeDefinition(
@@ -955,7 +975,9 @@ namespace ArknoNights.Battle.Core
             AttackDashEffectDefinition attackDashEffect,
             string animationKey,
             int skillAnimationOriginalDurationTicks,
-            TimedBlinkEffectDefinition timedBlinkEffect = null)
+            TimedBlinkEffectDefinition timedBlinkEffect = null,
+            ProximityEntryDamageEffectDefinition
+                proximityEntryDamageEffect = null)
             : this(
                 abilityId: abilityId,
                 displayNameZhHans: displayNameZhHans,
@@ -993,7 +1015,9 @@ namespace ArknoNights.Battle.Core
                 timedTargetAreaDamageEffect:
                     timedTargetAreaDamageEffect,
                 attackDashEffect: attackDashEffect,
-                timedBlinkEffect: timedBlinkEffect)
+                timedBlinkEffect: timedBlinkEffect,
+                proximityEntryDamageEffect:
+                    proximityEntryDamageEffect)
         {
         }
 
@@ -1502,7 +1526,7 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null, AttackDashEffectDefinition attackDashEffect = null, TimedBlinkEffectDefinition timedBlinkEffect = null)
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null, AttackDashEffectDefinition attackDashEffect = null, TimedBlinkEffectDefinition timedBlinkEffect = null, ProximityEntryDamageEffectDefinition proximityEntryDamageEffect = null)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -1549,6 +1573,8 @@ namespace ArknoNights.Battle.Core
                 timedTargetAreaDamageEffect;
             AttackDashEffect = attackDashEffect;
             TimedBlinkEffect = timedBlinkEffect;
+            ProximityEntryDamageEffect =
+                proximityEntryDamageEffect;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -1604,6 +1630,8 @@ namespace ArknoNights.Battle.Core
             TimedTargetAreaDamageEffect { get; }
         public AttackDashEffectDefinition AttackDashEffect { get; }
         public TimedBlinkEffectDefinition TimedBlinkEffect { get; }
+        public ProximityEntryDamageEffectDefinition
+            ProximityEntryDamageEffect { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>
