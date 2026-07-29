@@ -1,8 +1,8 @@
 # 局域网同步对局实施计划
 
-> 状态：设计完成后的实施分解，尚未执行。
+> 状态：M1 已集成到 `txym`；M2 是下一可启动里程碑，M2—M8 尚未执行。
 >
-> 玩家可见规则见 [LAN-MATCH-DESIGN.md](LAN-MATCH-DESIGN.md)。战斗分块计算的独立 Agent 提示词见 [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md)。
+> 玩家可见规则见 [LAN-MATCH-DESIGN.md](LAN-MATCH-DESIGN.md)。战斗分块计算的独立 Agent 提示词见 [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md)；M1 暴露出的既有 Battle 基线漂移由 [TASK-BATTLE-BASELINE-CLEANUP.md](TASK-BATTLE-BASELINE-CLEANUP.md) 单独处理。
 
 实施 Agent 提示词：
 
@@ -101,13 +101,14 @@ Assembly-CSharp 场景接线与 HUD
 
 状态（2026-07-29）：
 
-- 实现候选位于 `codex/lan-match-domain`，实现提交为 `861f198`；
-- 已新增独立 `ARKnoNIGHTS.Match` 与 `ARKnoNIGHTS.Match.EditModeTests`，但尚未由主 Planner 集成到主开发分支；
+- 实现提交 `861f198` 与文档收口提交 `c615a75` 已快进集成到 `txym`；
+- 已新增独立 `ARKnoNIGHTS.Match` 与 `ARKnoNIGHTS.Match.EditModeTests`；
 - Match focused EditMode 为 `21/21`，LocalMatch、PreparationPhase、Lobby 回归分别为 `18/18`、`6/6`、`94/94`；
+- 集成后在 `txym` 新目录重跑 Match focused EditMode，仍为 `21/21`，0 failed/skipped/inconclusive/not-run/not-runnable；
 - 全量 EditMode 重跑为 `419/424`，全量 PlayMode 为 `70/72`；失败均位于既有 Battle 数据或测试期望，详见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)；
 - 未执行 Windows/Android 构建、LAN 或场景人工流程；M2—M8 未实现。
 
-M2 开始前必须由主 Planner 指定已经包含 M1 的集成 commit；不得直接从尚未包含 `ARKnoNIGHTS.Match` 的分支实现第二套权威状态。
+M2 已具备领域基线，必须从包含 `c615a75` 的当前 `txym` 创建独立 worktree；不得从旧分支实现第二套权威状态。Battle 基线修复不属于 M2，按 [`TASK-BATTLE-BASELINE-CLEANUP.md`](TASK-BATTLE-BASELINE-CLEANUP.md) 独立处理。
 
 建议新建：
 
@@ -157,7 +158,7 @@ Assets/Game/Runtime/Match/
 - 权限投影不泄漏其他玩家商店、赤金、Cost 和 HostOnly 字段；
 - 重复 CommandId 不重复产生副作用。
 
-M1 暴露出的 Battle 基线漂移必须作为独立任务处理，不能在 M1 或 M2 中顺手改测试期望：
+M1 暴露出的 Battle 基线漂移必须按 [`TASK-BATTLE-BASELINE-CLEANUP.md`](TASK-BATTLE-BASELINE-CLEANUP.md) 作为独立任务处理，不能在 M1 或 M2 中顺手改测试期望：
 
 - 真实对局动态果冻数量期望 `27`、实际 `24`；`SUMMON_JELLY_MINIONS` 的源、目录与 SPEC 没有对应规则变更，不能直接把期望改成 `24`，应先定位 Core 时间线回归；
 - PlayMode 召唤隔离夹具预期动态 ID `-1..-3`、实际为空；该夹具的 `MaxTicks=101` 已不能覆盖攻击动画锁结束后的延迟施法，应修正夹具并保留三只召唤及规范负 ID 的语义期望；

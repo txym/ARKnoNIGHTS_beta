@@ -1,6 +1,6 @@
 # M2：共享牌库、商店、经济与升级 Agent 提示词
 
-> 状态：待在独立 worktree 中实施。
+> 状态：下一可启动里程碑；必须基于已包含 M1 收口提交 `c615a75` 的 `txym`，在独立 worktree 中实施。
 > 本文件可直接作为实现 Agent 的任务提示词。本轮只覆盖 M2；自动合成与 Overflow 由 M3 实现，阶段结算由 M4 编排。
 
 ## 1. 任务角色与目标
@@ -23,7 +23,7 @@
 
 - 使用独立 worktree。
 - 分支名使用 `codex/lan-match-economy`。
-- 必须基于已经完成并由主 Planner 指定的 M1 commit 创建；开始前记录实际 M1 基线 SHA。
+- 必须基于包含 M1 收口提交 `c615a75` 的当前 `txym` 创建；开始前记录实际分支点 SHA。
 - 不在主工作区直接实现。
 - 不创建子 Agent，除非主 Planner 明确授权。
 - 不合并回主分支；完成后把 commit SHA、最终 diff 摘要和验证证据交给主 Planner。

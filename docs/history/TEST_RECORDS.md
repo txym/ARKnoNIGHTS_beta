@@ -1172,3 +1172,5 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
 - 最终全量 PlayMode 位于 `Final-Full-PlayMode`，结果为 `72 total / 70 passed / 2 failed / 0 skipped / 0 inconclusive`。一项真实对局动态果冻数量期望 `27`、实际 `24`；另一项隔离夹具预期重放动态 ID `-1/-2/-3`，实际集合为空。后者的 `MaxTicks=101` 已不能覆盖攻击动画锁结束后的延迟施法，应该修正夹具而不是删除召唤期望；前者没有对应的 `5503` 规则或数据变更，仍需定位 Core 时间线回归，不能直接接受 `24`。
 - 上述全量结果不是全绿，不能记为 M1 全量回归通过；但失败列表中没有 `ArknoNights.Match.Tests`，且 M1 focused 与要求的三个定向回归均通过。`5503` 描述测试应同步已确认 authored 事实；动态召唤测试应分别修正隔离夹具和调查真实时间线；冻结哈希测试应消除平台换行敏感性。
 - 未执行 Windows/Android 构建、LAN/场景人工流程或设备验证，因为 M1 没有平台、Socket、场景或 UI 接入。
+- 主 Planner 已将 `861f198` 与文档收口 `c615a75` 快进集成到 `txym`。集成后在新目录 `Artifacts/LanMatchDomain/PostIntegration-Focused-EditMode-20260729-235326` 重跑 `ArknoNights.Match.Tests`，结果为 `21 total / 21 passed / 0 failed / 0 skipped / 0 inconclusive / 0 not-run / 0 not-runnable`。Unity 在结果写完后的 20 秒退出宽限内未自行结束，wrapper 在完整 XML 落盘后终止进程；当前无残留 Unity 进程，日志只有许可证握手和 Unity China CDN 超时环境噪声，没有 Match 测试错误。
+- Battle 失败已拆分为独立 [`TASK-BATTLE-BASELINE-CLEANUP.md`](../TASK-BATTLE-BASELINE-CLEANUP.md)；M1 Agent 不继续修改实现，M2 从包含 `c615a75` 的 `txym` 继续扩展同一个 `MatchAuthority`。

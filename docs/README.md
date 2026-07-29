@@ -22,6 +22,7 @@
 - [`LAN-MATCH-DESIGN.md`](LAN-MATCH-DESIGN.md)：持续收敛中的房主权威、四席位、AI、经济、回合、同步和重连设计。
 - [`LAN-MATCH-IMPLEMENTATION-PLAN.md`](LAN-MATCH-IMPLEMENTATION-PLAN.md)：M1～M8 实施顺序与依赖。
 - `TASK-LAN-MATCH-*.md`、[`TASK-BATTLE-STREAMING.md`](TASK-BATTLE-STREAMING.md)：各里程碑的独立实施提示词。
+- [`TASK-BATTLE-BASELINE-CLEANUP.md`](TASK-BATTLE-BASELINE-CLEANUP.md)：M1 全量回归暴露出的既有 Battle 基线漂移修复任务。
 
 现有代码已经有 LAN 房间发现、创建、加入、准备与开始流程，并新增了尚未接入 Lobby/场景的纯领域 Match M1 骨架；“开始游戏”之后仍进入各端本地 Demo，正式房主权威 Match Session、持续同步和重连尚未实施。
 
@@ -64,4 +65,4 @@
 
 1. 部署 Cost 有三套现状：`bonds/BONDS_SPEC.md` 保存逐单位费用表，v2 单位源的精英 0 `deploymentCost` 当前统一为 `2`，冻结的 `unit-catalog-v1` 又只暴露 `1000/5503/5504 = 2/12/4`。需要确认 BONDS 表是正式迁移目标、当前权威值还是分析结果。
 2. `UI_TASK_TABLE.md` 保留早期五槽任务描述，但当前 `SPEC.md`、`LocalMatchState.ShopSlotCount` 和 HUD 均为六槽。该任务表已标为历史规划，不能再作为当前槽位数依据。
-3. 正式 LAN Match 已按 M1～M8 分解，M1 纯领域骨架已实现；M2～M8 开始前仍需确认对应设计状态，并把与 `SPEC.md` 的冲突先回写，不能由实现自行选择或另建第二套 Match 权威状态。
+3. 正式 LAN Match 已按 M1～M8 分解，M1 纯领域骨架已集成，M2 为下一可启动里程碑；M2～M8 遇到与 `SPEC.md` 的冲突仍须先回写确认，不能由实现自行选择或另建第二套 Match 权威状态。
