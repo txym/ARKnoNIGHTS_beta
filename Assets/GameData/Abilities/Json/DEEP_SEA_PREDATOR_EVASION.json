@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "DEEP_SEA_PREDATOR_EVASION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "获得物理与法术闪避。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    { "kind": "EvasionModifier", "physicalChancePermille": 800, "magicChancePermille": 800 }
+  ]
+}

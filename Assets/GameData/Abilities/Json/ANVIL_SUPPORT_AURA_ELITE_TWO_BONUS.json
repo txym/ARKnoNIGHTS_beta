@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "ANVIL_SUPPORT_AURA_ELITE_TWO_BONUS",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AuraCombatModifier",
+      "targetSide": "Allies",
+      "isGlobal": false,
+      "radiusMetres": 2.5,
+      "excludeSource": true,
+      "nonStackingByAbilityId": true,
+      "attackMultiplierPermille": 1000,
+      "defenseAdditive": 100,
+      "magicResistanceAdditive": 0,
+      "attackSpeedMultiplierPermille": 1000,
+      "moveSpeedMultiplierPermille": 1000,
+      "hitPointsPerSecond": 100
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "SOLIDIFIED_GOLEM_SPLASH_ATTACK",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "攻击造成溅射伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AttackAreaDamageModifier",
+      "shape": "Radius",
+      "firstTriggerOrdinal": 1,
+      "repeatInterval": 1,
+      "damageType": "Physical",
+      "attackMultiplierPermille": 1000,
+      "radiusMetres": 1.5
+    }
+  ]
+}

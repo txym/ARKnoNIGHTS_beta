@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "ROADBUILDER_TENTH_HIT_SPAWN",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "每受到十次伤害时，召唤一个<塑路者分形>。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "TriggeredSpawn",
+      "triggerKind": "DamageReceived",
+      "firstTriggerOrdinal": 10,
+      "repeatInterval": 10,
+      "summonTypeId": "2033",
+      "spawnArea": {
+        "shape": "Square",
+        "center": "CasterPosition",
+        "sideLengthMetres": 0.4
+      },
+      "maxActiveSameType": 8
+    }
+  ]
+}

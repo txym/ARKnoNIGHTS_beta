@@ -19,7 +19,7 @@
                          "sourceVariant":  "1375_ltnclr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "残党乐团管乐家",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "未被阻挡时不断蓄积攻击力，下一次普通攻击结束后清空。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  13000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "WIND_PLAYER_UNBLOCKED_ATTACK_CHARGE"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1375_ltnclr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "巫王乐团管乐家",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "未被阻挡时不断蓄积攻击力，下一次普通攻击结束后清空。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  15000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "WIND_PLAYER_UNBLOCKED_ATTACK_CHARGE"
                                               ]
                      }
                  ]

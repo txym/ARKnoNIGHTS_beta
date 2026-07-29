@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "STEAM_TANK_HALF_HEALTH_ACCELERATION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "生命值首次低于一半时永久提升攻击速度与移动速度。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "HealthThresholdCombatModifier",
+      "thresholdHitPointsPermille": 500,
+      "inclusiveThreshold": false,
+      "triggerOnce": true,
+      "durationTicks": 0,
+      "attackMultiplierPermille": 1000,
+      "defenseMultiplierPermille": 1000,
+      "blockCapacityAdditive": 0,
+      "attackSpeedAdditive": 100,
+      "moveSpeedMultiplierPermille": 2000,
+      "makesUnblockable": false
+    }
+  ]
+}

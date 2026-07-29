@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "UNTARGETABLE_BY_MELEE",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "不会成为攻击或伤害的目标。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "UnitTrait",
+      "trait": "UntargetableByMelee"
+    }
+  ]
+}

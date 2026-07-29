@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "ROADBUILDER_THIRD_ATTACK_SPAWN",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "每攻击两次，下一次攻击召唤一个<塑路者分形>。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "animationKey": "attack.skill",
+  "effects": [
+    {
+      "kind": "TriggeredSpawn",
+      "triggerKind": "SuccessfulAttack",
+      "firstTriggerOrdinal": 3,
+      "repeatInterval": 3,
+      "summonTypeId": "2033",
+      "spawnArea": {
+        "shape": "Square",
+        "center": "CasterPosition",
+        "sideLengthMetres": 0.4
+      },
+      "maxActiveSameType": 0
+    }
+  ]
+}

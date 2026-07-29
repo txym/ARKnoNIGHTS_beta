@@ -19,7 +19,7 @@
                          "sourceVariant":  "10038_cnvpiz",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“方便快餐”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "阻挡数增加，受到的物理和法术伤害大幅降低，靠近地面敌人时造成冲撞伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  15000,
@@ -58,7 +58,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FORTIFIED_CATERING_VEHICLE",
+                                                  "GROUND_PROXIMITY_COLLISION_DAMAGE"
                                               ]
                      },
                      {
@@ -66,7 +67,7 @@
                          "sourceVariant":  "10038_cnvpiz_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“美食速递”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "阻挡数增加，受到的物理和法术伤害大幅降低，靠近地面敌人时造成冲撞伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  17000,
@@ -105,7 +106,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FORTIFIED_CATERING_VEHICLE",
+                                                  "GROUND_PROXIMITY_COLLISION_DAMAGE"
                                               ]
                      }
                  ]

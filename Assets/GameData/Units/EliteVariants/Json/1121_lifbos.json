@@ -19,7 +19,7 @@
                          "sourceVariant":  "1121_lifbos",
                          "statsLevel":  0,
                          "displayNameZhHans":  "重犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低但防御力提升，攻击数次后解放，解放时同时解放友方囚犯，解放后提升攻击。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  20000,
@@ -98,7 +98,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_LEADER"
                                               ]
                      },
                      {
@@ -106,7 +106,7 @@
                          "sourceVariant":  "1121_lifbos_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "传奇重犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低但防御力提升，攻击数次后解放，解放时同时解放友方囚犯，解放后提升攻击。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  25000,
@@ -185,7 +185,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_LEADER"
                                               ]
                      }
                  ]

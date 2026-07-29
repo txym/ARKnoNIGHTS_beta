@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "SUMMON_REPAIR_HELPER",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "每隔一段时间召唤一个<迷茫的修理小助手>。",
+  "activationKind": "Timed",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 3,
+    "required": 5,
+    "generation": "Automatic"
+  },
+  "animationKey": "skill",
+  "effects": [
+    {
+      "kind": "Summon",
+      "summonTypeId": "10073",
+      "count": 1,
+      "spawnArea": {
+        "shape": "Square",
+        "center": "CasterPosition",
+        "sideLengthMetres": 0.0
+      },
+      "inheritPathFromCaster": false
+    }
+  ]
+}

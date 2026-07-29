@@ -19,7 +19,7 @@
                          "sourceVariant":  "1119_vofsd",
                          "statsLevel":  0,
                          "displayNameZhHans":  "强壮囚犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击、法术抗性并自然回复生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  11000,
@@ -98,7 +98,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_STRONG"
                                               ]
                      },
                      {
@@ -106,7 +106,7 @@
                          "sourceVariant":  "1119_vofsd_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "巨汉囚犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击、法术抗性并自然回复生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  14000,
@@ -185,7 +185,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_STRONG"
                                               ]
                      }
                  ]

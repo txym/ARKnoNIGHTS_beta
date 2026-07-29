@@ -19,7 +19,7 @@
                          "sourceVariant":  "1138_tumor",
                          "statsLevel":  0,
                          "displayNameZhHans":  "畸变恶性瘤",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "被阻挡时阻挡单位的攻击速度大幅降低。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  1500,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MALIGNANT_TUMOR_BLOCKER_SLOW"
                                               ]
                      }
                  ]

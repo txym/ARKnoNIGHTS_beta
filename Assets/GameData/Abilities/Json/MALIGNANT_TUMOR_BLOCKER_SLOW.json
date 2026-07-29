@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "MALIGNANT_TUMOR_BLOCKER_SLOW",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "被阻挡时阻挡单位的攻击速度大幅降低。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "BlockedCounterpartCombatModifier",
+      "nonStackingByAbilityId": true,
+      "attackSpeedMultiplierPermille": 200
+    }
+  ]
+}

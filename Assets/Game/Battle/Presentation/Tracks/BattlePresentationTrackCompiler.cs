@@ -17,9 +17,12 @@ namespace ArknoNights.Battle.Presentation
             public int SpawnTick;
             public int SpawnSequence;
             public int? DeathTick;
+            public int? ExitTick;
             public readonly List<UnitPresentationTrack.PositionSegment> Positions = new List<UnitPresentationTrack.PositionSegment>();
             public readonly List<UnitPresentationTrack.HpKey> HitPoints = new List<UnitPresentationTrack.HpKey>();
             public readonly List<UnitPresentationTrack.Attack> Attacks = new List<UnitPresentationTrack.Attack>();
+            public readonly List<UnitPresentationTrack.Skill> Skills = new List<UnitPresentationTrack.Skill>();
+            public readonly List<UnitPresentationTrack.State> States = new List<UnitPresentationTrack.State>();
         }
 
         public bool TryCompile(BattleRunResult result, out BattlePresentationTrack track, out IReadOnlyList<BattlePresentationDiagnostic> diagnostics)
@@ -101,6 +104,42 @@ namespace ArknoNights.Battle.Presentation
                         actor.Attacks.Add(new UnitPresentationTrack.Attack(item.Tick, item.Sequence, item.EffectiveAnimationTicks, (float)item.OriginalAnimationTicks / item.EffectiveAnimationTicks));
                         break;
 
+                    case BattleEventType.Skill:
+                        if (string.IsNullOrWhiteSpace(item.AnimationKey)
+                            || item.OriginalAnimationTicks <= 0
+                            || item.EffectiveAnimationTicks != (item.OriginalAnimationTicks + 1) / 2)
+                        {
+                            AddError(errors, "track.skill.contract.invalid", "Skill key or 2x duration is invalid.", result.BattleId, item.UnitId, item.Tick, item.Sequence);
+                            break;
+                        }
+                        actor.Skills.Add(new UnitPresentationTrack.Skill(
+                            item.Tick,
+                            item.Sequence,
+                            item.EffectiveAnimationTicks,
+                            item.AnimationKey));
+                        break;
+
+                    case BattleEventType.PresentationStateChanged:
+                        if (string.IsNullOrWhiteSpace(
+                                item.AnimationKey))
+                        {
+                            AddError(
+                                errors,
+                                "track.presentationState.contract.invalid",
+                                "Presentation state tag is required.",
+                                result.BattleId,
+                                item.UnitId,
+                                item.Tick,
+                                item.Sequence);
+                            break;
+                        }
+                        actor.States.Add(
+                            new UnitPresentationTrack.State(
+                                item.Tick,
+                                item.Sequence,
+                                item.AnimationKey));
+                        break;
+
                     case BattleEventType.Damage:
                         if (string.IsNullOrEmpty(item.RelatedUnitId) || !builders.TryGetValue(item.RelatedUnitId, out var target) || item.HitPointsAfter < 0 || item.HitPointsAfter > target.Snapshot.MaxHitPoints)
                         {
@@ -110,6 +149,17 @@ namespace ArknoNights.Battle.Presentation
                         target.HitPoints.Add(new UnitPresentationTrack.HpKey(item.Tick, item.Sequence, item.HitPointsAfter));
                         break;
 
+                    case BattleEventType.HealthChanged:
+                        if (item.HitPointsAfter < 0
+                            || item.HitPointsAfter
+                            > actor.Snapshot.MaxHitPoints)
+                        {
+                            AddError(errors, "track.healthChanged.contract.invalid", "Health change target HP is invalid.", result.BattleId, item.UnitId, item.Tick, item.Sequence);
+                            break;
+                        }
+                        actor.HitPoints.Add(new UnitPresentationTrack.HpKey(item.Tick, item.Sequence, item.HitPointsAfter));
+                        break;
+
                     case BattleEventType.Death:
                         if (actor.DeathTick.HasValue)
                         {
@@ -117,6 +167,20 @@ namespace ArknoNights.Battle.Presentation
                             break;
                         }
                         actor.DeathTick = item.Tick;
+                        break;
+
+                    case BattleEventType.GateReached:
+                        if (actor.ExitTick.HasValue
+                            || actor.DeathTick.HasValue
+                            || !item.ToPosition.HasValue
+                            || !actor.Positions.Last().To.Equals(
+                                item.ToPosition.Value)
+                            || item.DamageAmount < 0)
+                        {
+                            AddError(errors, "track.gateReached.contract.invalid", "GateReached must hide one living unit at its current position.", result.BattleId, item.UnitId, item.Tick, item.Sequence);
+                            break;
+                        }
+                        actor.ExitTick = item.Tick;
                         break;
                 }
 
@@ -143,7 +207,7 @@ namespace ArknoNights.Battle.Presentation
                 .OrderBy(item => item.SpawnTick)
                 .ThenBy(item => item.SpawnSequence)
                 .ThenBy(item => item.Snapshot.UnitId, StringComparer.Ordinal)
-                .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, compressedPositions[item.Snapshot.UnitId], item.HitPoints, item.Attacks))
+                .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, item.ExitTick, compressedPositions[item.Snapshot.UnitId], item.HitPoints, item.Attacks, item.Skills, item.States))
                 .ToArray();
             track = new BattlePresentationTrack(result, units, CreateEventDigest(events, result.UnitSnapshots), metrics);
             diagnostics = ReadOnly(errors);
@@ -286,7 +350,7 @@ namespace ArknoNights.Battle.Presentation
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var final in finalUnits)
             {
-                if (final == null || !seen.Add(final.UnitId) || !builders.TryGetValue(final.UnitId, out var builder) || builder.Snapshot.TypeId != final.TypeId || builder.Snapshot.Side != final.Side || !builder.Positions.Last().To.Equals(final.Position) || builder.HitPoints.Last().Value != final.HitPoints || (!builder.DeathTick.HasValue) != final.IsAlive)
+                if (final == null || !seen.Add(final.UnitId) || !builders.TryGetValue(final.UnitId, out var builder) || builder.Snapshot.TypeId != final.TypeId || builder.Snapshot.Side != final.Side || !builder.Positions.Last().To.Equals(final.Position) || builder.HitPoints.Last().Value != final.HitPoints || (!builder.DeathTick.HasValue) != final.IsAlive || builder.ExitTick.HasValue != final.HasExitedBattle)
                 {
                     AddError(errors, "track.finalState.mismatch", "Track differs from a final unit state.", result.BattleId, final == null ? string.Empty : final.UnitId, battleEnded.Tick, battleEnded.Sequence);
                     return;
@@ -477,7 +541,7 @@ namespace ArknoNights.Battle.Presentation
             foreach (var item in events)
             {
                 if (item.Type == BattleEventType.BattleEnded ||
-                    (item.UnitId == unitId && (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Attack || item.Type == BattleEventType.BlockStarted || item.Type == BattleEventType.BlockEnded || item.Type == BattleEventType.Death)) ||
+                    (item.UnitId == unitId && (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Attack || item.Type == BattleEventType.Skill || item.Type == BattleEventType.BlockStarted || item.Type == BattleEventType.BlockEnded || item.Type == BattleEventType.Death || item.Type == BattleEventType.GateReached)) ||
                     (item.RelatedUnitId == unitId && (item.Type == BattleEventType.BlockStarted || item.Type == BattleEventType.BlockEnded)))
                 {
                     ticks.Add(item.Tick);
@@ -516,7 +580,7 @@ namespace ArknoNights.Battle.Presentation
             var builder = new StringBuilder();
             foreach (var item in events)
             {
-                builder.Append((int)item.Type).Append('|').Append(item.Tick).Append('|').Append(item.Sequence).Append('|').Append(item.UnitId).Append('|').Append(item.UnitTypeId).Append('|').Append(item.UnitSide).Append('|').Append(item.RelatedUnitId).Append('|').Append(item.FromPosition).Append('|').Append(item.ToPosition).Append('|').Append(item.DamageType).Append('|').Append(item.DamageAmount).Append('|').Append(item.HitPointsBefore).Append('|').Append(item.HitPointsAfter).Append('|').Append(item.PlannedDamageTick).Append('|').Append(item.OriginalAnimationTicks).Append('|').Append(item.EffectiveAnimationTicks).Append('|').Append(item.Winner).Append('|').Append(item.Reason);
+                builder.Append((int)item.Type).Append('|').Append(item.Tick).Append('|').Append(item.Sequence).Append('|').Append(item.UnitId).Append('|').Append(item.UnitTypeId).Append('|').Append(item.UnitSide).Append('|').Append(item.RelatedUnitId).Append('|').Append(item.FromPosition).Append('|').Append(item.ToPosition).Append('|').Append(item.DamageType).Append('|').Append(item.DamageAmount).Append('|').Append(item.HitPointsBefore).Append('|').Append(item.HitPointsAfter).Append('|').Append(item.PlannedDamageTick).Append('|').Append(item.OriginalAnimationTicks).Append('|').Append(item.EffectiveAnimationTicks).Append('|').Append(item.AnimationKey).Append('|').Append(item.Winner).Append('|').Append(item.Reason);
                 if (item.Type == BattleEventType.Spawn && TryResolveSpawnSnapshot(item, snapshots, out var snapshot))
                     AppendSnapshot(builder, snapshot);
             }
@@ -526,7 +590,7 @@ namespace ArknoNights.Battle.Presentation
         private static void AppendSnapshot(StringBuilder builder, BattleUnitInstanceSnapshot snapshot)
         {
             if (snapshot == null) return;
-            builder.Append("|spawn:").Append(snapshot.UnitId).Append('|').Append(snapshot.TypeId).Append('|').Append(snapshot.PlayerId).Append('|').Append(snapshot.Side).Append('|').Append(snapshot.IsDynamicallyGenerated).Append('|').Append(snapshot.Position).Append('|').Append(snapshot.EliteLevel).Append('|').Append(snapshot.MaxHitPoints).Append('|').Append(snapshot.CurrentHitPoints).Append('|').Append(snapshot.CurrentShield).Append('|').Append(snapshot.Attack).Append('|').Append(snapshot.Defense).Append('|').Append(snapshot.MagicResistance).Append('|').Append(snapshot.MoveSpeedCentimetresPerSecond).Append('|').Append(snapshot.AttackIntervalTicks).Append('|').Append(snapshot.AttackAnimationDurationTicks).Append('|').Append(snapshot.DamageType).Append('|').Append(snapshot.AttackMethod).Append('|').Append(snapshot.BlockCapacity).Append('|').Append(snapshot.TauntLevel);
+            builder.Append("|spawn:").Append(snapshot.UnitId).Append('|').Append(snapshot.TypeId).Append('|').Append(snapshot.PlayerId).Append('|').Append(snapshot.Side).Append('|').Append(snapshot.IsDynamicallyGenerated).Append('|').Append(snapshot.Position).Append('|').Append(snapshot.EliteLevel).Append('|').Append(snapshot.MaxHitPoints).Append('|').Append(snapshot.CurrentHitPoints).Append('|').Append(snapshot.CurrentShield).Append('|').Append(snapshot.Attack).Append('|').Append(snapshot.Defense).Append('|').Append(snapshot.MagicResistance).Append('|').Append(snapshot.MoveSpeedCentimetresPerSecond).Append('|').Append(snapshot.AttackIntervalTicks).Append('|').Append(snapshot.AttackAnimationDurationTicks).Append('|').Append(snapshot.DamageType).Append('|').Append(snapshot.AttackMethod).Append('|').Append(snapshot.BlockCapacity).Append('|').Append(snapshot.TauntLevel).Append('|').Append(snapshot.LifeDeduct);
             foreach (var buff in snapshot.Buffs) builder.Append("|buff:").Append(buff.Id).Append('|').Append(buff.RawPayload);
         }
     }

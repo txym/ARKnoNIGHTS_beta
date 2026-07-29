@@ -10,6 +10,7 @@ namespace ArknoNights.Battle.Presentation
         void SetWorldPosition(Vector3 position);
         void SetFacing(Vector3 direction);
         void SetPlaybackSpeed(float playbackSpeed);
+        void SetPresentationState(string stateTag) { }
         void PlayIdle() { }
         void PlayMove();
         void PlayAttack(float animationSpeedMultiplier);
@@ -22,6 +23,12 @@ namespace ArknoNights.Battle.Presentation
     public interface IBattlePresentationViewFactory
     {
         bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic);
+    }
+
+    /// <summary>Optional capability for views backed by catalog-named Skill clips.</summary>
+    public interface IBattleSkillPresentationView
+    {
+        void PlaySkill(string animationKey, float animationSpeedMultiplier);
     }
 
     public sealed class BattlePresentationDiagnostic

@@ -19,7 +19,7 @@
                          "sourceVariant":  "1118_lidbox",
                          "statsLevel":  0,
                          "displayNameZhHans":  "拳手囚犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击力，并无视目标部分防御力。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  8000,
@@ -98,7 +98,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_BOXER"
                                               ]
                      },
                      {
@@ -106,7 +106,7 @@
                          "sourceVariant":  "1118_lidbox_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "拳师囚犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击力，并无视目标部分防御力。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  9500,
@@ -185,7 +185,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_BOXER"
                                               ]
                      }
                  ]

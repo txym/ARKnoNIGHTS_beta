@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "WIND_PLAYER_UNBLOCKED_ATTACK_CHARGE",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "未被阻挡时不断蓄积攻击力，下一次普通攻击结束后清空。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "UnblockedAttackCharge",
+      "checkIntervalTicks": 5,
+      "attackAdditivePerStack": 30,
+      "maxStacks": 30
+    }
+  ]
+}

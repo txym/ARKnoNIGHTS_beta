@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "CORE_FEEDER_DEATH_SPAWN",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "被击倒时随机释放一只<单核掠食者>或<微核沉积者>，该单位移动速度较大幅度提升。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "DeathSpawn",
+      "options": [
+        { "summonTypeId": "1434", "weight": 40 },
+        { "summonTypeId": "1433", "weight": 60 }
+      ],
+      "count": 1,
+      "delayTicks": 0,
+      "spawnArea": { "shape": "Square", "center": "CasterCellCenter", "sideLengthMetres": 0 },
+      "snapToNearestPassableCell": false,
+      "summonedMoveSpeedMultiplierPermille": 3000
+    }
+  ]
+}

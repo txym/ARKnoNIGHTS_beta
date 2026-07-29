@@ -19,7 +19,7 @@
                          "sourceVariant":  "1166_dusbr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池侦察兵",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SEVENTY"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1166_dusbr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池侦察队长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4400,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SEVENTY"
                                               ]
                      }
                  ]

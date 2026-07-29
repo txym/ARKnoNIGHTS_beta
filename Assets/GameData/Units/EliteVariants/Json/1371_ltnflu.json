@@ -19,7 +19,7 @@
                          "sourceVariant":  "1371_ltnflu",
                          "statsLevel":  0,
                          "displayNameZhHans":  "残党乐团长笛手",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击伤害提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FLAUTIST_THIRD_ATTACK_BOOST"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1371_ltnflu_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "巫王乐团长笛手",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击伤害提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FLAUTIST_THIRD_ATTACK_BOOST"
                                               ]
                      }
                  ]

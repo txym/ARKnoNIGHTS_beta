@@ -19,7 +19,7 @@
                          "sourceVariant":  "1089_ltlntc",
                          "statsLevel":  0,
                          "displayNameZhHans":  "冬灵血巫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "逐渐损失生命，死亡时对周围敌方单位造成法术伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  20000,
@@ -58,7 +58,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "WINTERWISP_LIFE_LOSS",
+                                                  "WINTERWISP_DEATH_BLAST"
                                               ]
                      },
                      {
@@ -66,7 +67,7 @@
                          "sourceVariant":  "1089_ltlntc_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "冬灵血巫大师",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "逐渐损失生命，死亡时对周围敌方单位造成法术伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  30000,
@@ -105,7 +106,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "WINTERWISP_LIFE_LOSS",
+                                                  "WINTERWISP_DEATH_BLAST"
                                               ]
                      }
                  ]

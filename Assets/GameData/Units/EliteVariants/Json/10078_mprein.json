@@ -19,7 +19,7 @@
                          "sourceVariant":  "10078_mprein",
                          "statsLevel":  0,
                          "displayNameZhHans":  "固化源石巨像",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "攻击造成溅射伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  15000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SOLIDIFIED_GOLEM_SPLASH_ATTACK"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "10078_mprein_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "活性源石巨像",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "攻击造成溅射伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  16000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SOLIDIFIED_GOLEM_SPLASH_ATTACK"
                                               ]
                      }
                  ]

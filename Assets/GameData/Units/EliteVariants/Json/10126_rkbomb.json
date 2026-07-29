@@ -19,7 +19,7 @@
                          "sourceVariant":  "10126_rkbomb",
                          "statsLevel":  0,
                          "displayNameZhHans":  "异质源石虫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到伤害降低，受到攻击时对目标造成法术伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4500,
@@ -58,7 +58,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HETEROGENEOUS_BUG_DAMAGE_REDUCTION",
+                                                  "HETEROGENEOUS_BUG_DAMAGE_REACTION"
                                               ]
                      },
                      {
@@ -66,7 +67,7 @@
                          "sourceVariant":  "10126_rkbomb_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "异质源石虫·α",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到伤害降低，受到攻击时对目标造成法术伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -105,7 +106,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HETEROGENEOUS_BUG_DAMAGE_REDUCTION",
+                                                  "HETEROGENEOUS_BUG_DAMAGE_REACTION"
                                               ]
                      }
                  ]

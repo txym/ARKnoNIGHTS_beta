@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "BLOCK_CAPACITY_PLUS_TWO",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "阻挡数提升。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "PassiveCombatModifier",
+      "blockCapacityAdditive": 2,
+      "magicResistanceAdditive": 0,
+      "attackSpeedAdditive": 0,
+      "physicalDamageTakenPermille": 1000,
+      "magicDamageTakenPermille": 1000
+    }
+  ]
+}

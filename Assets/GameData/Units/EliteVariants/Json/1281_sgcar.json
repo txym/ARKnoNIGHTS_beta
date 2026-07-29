@@ -19,7 +19,7 @@
                          "sourceVariant":  "1281_sgcar",
                          "statsLevel":  0,
                          "displayNameZhHans":  "家族专用轿车",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "被击倒时释放三个\u003c家族士兵\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  10000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FAMILY_CAR_DEATH_SPAWN"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1281_sgcar_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "家族豪华轿车",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "被击倒时释放三个\u003c家族士兵\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  18000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FAMILY_CAR_DEATH_SPAWN"
                                               ]
                      }
                  ]

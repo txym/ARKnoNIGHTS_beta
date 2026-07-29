@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "ANVIL_LIFETIME",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "出场一段时间后自动退出。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    { "kind": "PassiveLifecycle", "hitPointsPerSecond": 0, "lifetimeTicks": 300 }
+  ]
+}

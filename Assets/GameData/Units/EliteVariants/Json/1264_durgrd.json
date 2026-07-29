@@ -19,7 +19,7 @@
                          "sourceVariant":  "1264_durgrd",
                          "statsLevel":  0,
                          "displayNameZhHans":  "蜜酿级醒酒助手",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "首次受伤后短时间提升攻击速度与移动速度。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  10000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1264_durgrd_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "烈酒级醒酒助手",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "首次受伤后短时间提升攻击速度与移动速度。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  18000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION_ELITE_TWO"
                                               ]
                      }
                  ]

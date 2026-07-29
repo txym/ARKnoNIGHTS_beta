@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "DEEP_POOL_PHALANX_NEARBY_DEFENSE",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "附近每个同类型友方单位都会提升自身防御力。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "NearbySameTypeSelfModifier",
+      "radiusMetres": 1.5,
+      "defenseAdditive": 200
+    }
+  ]
+}

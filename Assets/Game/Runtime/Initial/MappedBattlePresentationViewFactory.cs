@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Battle.Presentation;
 using Spine.Unity;
@@ -49,6 +50,16 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
             ? UnitCatalogLoader.LoadFromJson(unitCatalogAsset.text)
             : UnitCatalogLoader.LoadFromResources(DefaultCatalogResourcePath);
         if (catalogResult.Success) catalogResult.Catalog.TryGet(typeId, out catalogEntry);
+        var skillAnimations = SkillAnimationCatalogLoader.LoadFromResources();
+        if (!skillAnimations.Success)
+        {
+            diagnostic = new BattlePresentationDiagnostic(
+                "resource.skillAnimationCatalog.invalid",
+                string.Join(
+                    "; ",
+                    skillAnimations.Errors.Select(item => item.ToString())));
+            return false;
+        }
         if (binding == null && catalogEntry == null)
         {
             diagnostic = new BattlePresentationDiagnostic("resource.mapping.missing", "No catalog or explicit Unity resource binding exists for Core type " + typeId + ".");
@@ -122,7 +133,17 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
         var presentationView = instance.GetComponent<UnitSkelPresentationView>() ?? instance.AddComponent<UnitSkelPresentationView>();
         if (catalogEntry != null) presentationView.ConfigureStatusBarMaximumHitPoints(catalogEntry.Definition.MaxHitPoints);
         if (catalogEntry != null)
-            presentationView.ConfigureAnimations(unitSkel, catalogEntry.MoveAnimation, catalogEntry.AttackAnimation, catalogEntry.HitAnimation, catalogEntry.DeathAnimation);
+            presentationView.ConfigureAnimations(
+                unitSkel,
+                catalogEntry.MoveAnimation,
+                catalogEntry.AttackAnimation,
+                catalogEntry.HitAnimation,
+                catalogEntry.DeathAnimation,
+                skillAnimations.Catalog.Bindings.Where(item =>
+                    string.Equals(
+                        item.TypeId,
+                        typeId,
+                        StringComparison.Ordinal)));
         instance.name = "BattleView_" + unitId;
         view = presentationView;
         return true;

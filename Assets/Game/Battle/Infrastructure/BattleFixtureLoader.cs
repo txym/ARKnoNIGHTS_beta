@@ -41,7 +41,7 @@ namespace ArknoNights.Battle.Infrastructure
         private static UnitDefinition ConvertDefinition(UnitDefinitionDto dto)
         {
             if (dto == null) return null;
-            return new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, ParseEnum<DamageType>(dto.damageType), ParseEnum<AttackMethod>(dto.attackMethod), dto.blockCapacity, dto.tauntLevel, dto.isSyntheticFixtureData);
+            return new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, ParseEnum<DamageType>(dto.damageType), ParseEnum<AttackMethod>(dto.attackMethod), dto.blockCapacity, dto.tauntLevel, dto.isSyntheticFixtureData, Array.Empty<string>(), dto.actionMethod == 0 ? 1 : dto.actionMethod);
         }
 
         private static PlayerSnapshot ConvertPlayer(PlayerDto dto)
@@ -68,7 +68,7 @@ namespace ArknoNights.Battle.Infrastructure
         private static BattleFixtureLoadResult Failure(string code, string message) => new BattleFixtureLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class BattleFixtureDto { public string schemaVersion; public string battleId; public int maxTicks; public UnitDefinitionDto[] unitTypes; public PlayerDto[] players; }
-        [Serializable] private sealed class UnitDefinitionDto { public string typeId; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int blockCapacity; public int tauntLevel; public bool isSyntheticFixtureData; }
+        [Serializable] private sealed class UnitDefinitionDto { public string typeId; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int actionMethod; public int blockCapacity; public int tauntLevel; public bool isSyntheticFixtureData; }
         [Serializable] private sealed class PlayerDto { public string playerId; public string side; public UnitDto[] units; }
         [Serializable] private sealed class UnitDto { public string unitId; public string typeId; public string zone; public int formationX; public int formationY; public int eliteLevel; public BuffDto[] buffs; }
         [Serializable] private sealed class BuffDto { public string id; public string rawPayload; }

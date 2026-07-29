@@ -47,17 +47,136 @@ namespace ArknoNights.Battle.Tests
             var loaded = AbilityCatalogLoader.LoadFromResources(AbilityCatalogPath, unitCatalog.Catalog);
 
             Assert.That(loaded.Success, Is.True, Errors(loaded.Errors));
-            var ability = loaded.Catalog.Abilities.Single();
+            var ability = loaded.Catalog.Abilities.Single(candidate => candidate.AbilityId == "SUMMON_JELLY_MINIONS");
             Assert.That(ability.AbilityId, Is.EqualTo("SUMMON_JELLY_MINIONS"));
             Assert.That(ability.DisplayNameZhHans, Is.Empty);
             Assert.That(ability.DescriptionZhHans, Is.EqualTo("每隔一段时间，分裂出三个<果冻丁>。"));
             Assert.That(ability.InitialSkillPoints, Is.EqualTo(5));
             Assert.That(ability.RequiredSkillPoints, Is.EqualTo(15));
             Assert.That(ability.SkillPointGeneration, Is.EqualTo(SkillPointGeneration.Automatic));
+            Assert.That(ability.AnimationKey, Is.EqualTo("skill"));
+            Assert.That(ability.SkillAnimationOriginalDurationTicks, Is.EqualTo(30));
+            Assert.That(ability.SkillAnimationEffectiveDurationTicks, Is.EqualTo(15));
             Assert.That(ability.SummonEffect.SummonTypeId, Is.EqualTo("5504"));
             Assert.That(ability.SummonEffect.Count, Is.EqualTo(3));
             Assert.That(ability.SummonEffect.SideLengthCentimetres, Is.EqualTo(100));
             Assert.That(ability.SummonEffect.InheritPathFromCaster, Is.False);
+        }
+
+        [Test]
+        public void AbilityCatalog_LoadsPassiveLifecycleDefinition()
+        {
+            var unitCatalog =
+                UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(
+                unitCatalog.Success,
+                Is.True,
+                Errors(unitCatalog.Errors));
+            const string json =
+                "{\"schemaVersion\":\"ability-catalog-v1\","
+                + "\"catalogId\":\"passive-lifecycle\","
+                + "\"abilities\":[{"
+                + "\"abilityId\":\"REGEN\","
+                + "\"displayNameZhHans\":\"\","
+                + "\"descriptionZhHans\":\"\","
+                + "\"activationKind\":\"Passive\","
+                + "\"silencePolicy\":\"Unaffected\","
+                + "\"initialSkillPoints\":0,"
+                + "\"requiredSkillPoints\":0,"
+                + "\"skillPointGeneration\":\"None\","
+                + "\"hitPointsPerSecond\":160,"
+                + "\"lifetimeTicks\":0}]}";
+
+            var loaded = AbilityCatalogLoader.LoadFromJson(
+                json,
+                unitCatalog.Catalog);
+
+            Assert.That(
+                loaded.Success,
+                Is.True,
+                Errors(loaded.Errors));
+            var lifecycle = loaded.Catalog.Abilities
+                .Single()
+                .PassiveLifecycleEffect;
+            Assert.That(lifecycle, Is.Not.Null);
+            Assert.That(
+                lifecycle.HitPointsPerSecond,
+                Is.EqualTo(160));
+            Assert.That(lifecycle.LifetimeTicks, Is.Zero);
+        }
+
+        [Test]
+        public void AbilityCatalog_LoadsAuraGrantedTagAndConditionalModifier()
+        {
+            var unitCatalog =
+                UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(
+                unitCatalog.Success,
+                Is.True,
+                Errors(unitCatalog.Errors));
+            const string json =
+                "{\"schemaVersion\":\"ability-catalog-v1\","
+                + "\"catalogId\":\"tactical-command\","
+                + "\"abilities\":[{"
+                + "\"abilityId\":\"COMMAND_AURA\","
+                + "\"displayNameZhHans\":\"\","
+                + "\"descriptionZhHans\":\"\","
+                + "\"activationKind\":\"Passive\","
+                + "\"silencePolicy\":\"Unaffected\","
+                + "\"initialSkillPoints\":0,"
+                + "\"requiredSkillPoints\":0,"
+                + "\"skillPointGeneration\":\"None\","
+                + "\"auraTargetSide\":\"Allies\","
+                + "\"auraIsGlobal\":true,"
+                + "\"auraRadiusCentimetres\":0,"
+                + "\"auraExcludeSource\":false,"
+                + "\"auraNonStackingByAbilityId\":false,"
+                + "\"auraAttackMultiplierPermille\":1100,"
+                + "\"auraDefenseAdditive\":100,"
+                + "\"auraMagicResistanceAdditive\":0,"
+                + "\"auraAttackSpeedMultiplierPermille\":1000,"
+                + "\"auraMoveSpeedMultiplierPermille\":1000,"
+                + "\"auraHitPointsPerSecond\":0,"
+                + "\"auraGrantedStatusTag\":\"TacticalCommand\""
+                + "},{"
+                + "\"abilityId\":\"COMMAND_ATTACK\","
+                + "\"displayNameZhHans\":\"\","
+                + "\"descriptionZhHans\":\"\","
+                + "\"activationKind\":\"Passive\","
+                + "\"silencePolicy\":\"Unaffected\","
+                + "\"initialSkillPoints\":0,"
+                + "\"requiredSkillPoints\":0,"
+                + "\"skillPointGeneration\":\"None\","
+                + "\"requiredStatusTag\":\"TacticalCommand\","
+                + "\"requiredStatusTagAttackMultiplierPermille\":1500,"
+                + "\"requiredStatusTagMoveSpeedMultiplierPermille\":1000"
+                + "}]}";
+
+            var loaded = AbilityCatalogLoader.LoadFromJson(
+                json,
+                unitCatalog.Catalog);
+
+            Assert.That(
+                loaded.Success,
+                Is.True,
+                Errors(loaded.Errors));
+            var aura = loaded.Catalog.Abilities.Single(item =>
+                item.AbilityId == "COMMAND_AURA").AuraCombatModifier;
+            Assert.That(aura, Is.Not.Null);
+            Assert.That(aura.IsGlobal, Is.True);
+            Assert.That(
+                aura.GrantedStatusTag,
+                Is.EqualTo("TacticalCommand"));
+            var conditional = loaded.Catalog.Abilities.Single(item =>
+                    item.AbilityId == "COMMAND_ATTACK")
+                .RequiredStatusTagCombatModifier;
+            Assert.That(conditional, Is.Not.Null);
+            Assert.That(
+                conditional.RequiredStatusTag,
+                Is.EqualTo("TacticalCommand"));
+            Assert.That(
+                conditional.AttackMultiplierPermille,
+                Is.EqualTo(1500));
         }
 
         [TestCase("\"abilityId\":\"\"", "ability.id.invalid")]
@@ -66,7 +185,7 @@ namespace ArknoNights.Battle.Tests
         [TestCase("\"requiredSkillPoints\":0", "ability.skillPoints.required.invalid")]
         [TestCase("\"summonTypeId\":\"missing\"", "ability.summon.type.unknown")]
         [TestCase("\"count\":0", "ability.summon.count.invalid")]
-        [TestCase("\"sideLengthCentimetres\":0", "ability.summon.sideLength.invalid")]
+        [TestCase("\"sideLengthCentimetres\":-1", "ability.summon.sideLength.invalid")]
         [TestCase("\"inheritPathFromCaster\":true", "ability.summon.inheritPath.invalid")]
         public void AbilityCatalog_RejectsInvalidDefinitions(string replacement, string expectedCode)
         {
@@ -137,7 +256,7 @@ namespace ArknoNights.Battle.Tests
             Directory.CreateDirectory(outputDirectory);
             var sourcePath = Path.Combine(sourceDirectory, "unknown-summon.json");
             var outputPath = Path.Combine(outputDirectory, "ability-catalog.json");
-            File.WriteAllText(sourcePath, "{\"schemaVersion\":\"ability-source-v1\",\"abilityId\":\"UNKNOWN_SUMMON\",\"displayNameZhHans\":\"\",\"descriptionZhHans\":\"\",\"activationKind\":\"Timed\",\"silencePolicy\":\"Unaffected\",\"skillPoints\":{\"initial\":0,\"required\":1,\"generation\":\"Automatic\"},\"effects\":[{\"kind\":\"Summon\",\"summonTypeId\":\"does-not-exist\",\"count\":1,\"spawnArea\":{\"shape\":\"Square\",\"center\":\"CasterPosition\",\"sideLengthMetres\":1.0},\"inheritPathFromCaster\":false}]}");
+            File.WriteAllText(sourcePath, "{\"schemaVersion\":\"ability-source-v1\",\"abilityId\":\"UNKNOWN_SUMMON\",\"displayNameZhHans\":\"\",\"descriptionZhHans\":\"\",\"activationKind\":\"Timed\",\"silencePolicy\":\"Unaffected\",\"skillPoints\":{\"initial\":0,\"required\":1,\"generation\":\"Automatic\"},\"animationKey\":\"skill\",\"effects\":[{\"kind\":\"Summon\",\"summonTypeId\":\"does-not-exist\",\"count\":1,\"spawnArea\":{\"shape\":\"Square\",\"center\":\"CasterPosition\",\"sideLengthMetres\":1.0},\"inheritPathFromCaster\":false}]}");
             File.WriteAllText(outputPath, "must-not-change");
 
             var exception = Assert.Throws<TargetInvocationException>(() => generate.Invoke(null, new object[] { sourceDirectory, outputPath }));
@@ -407,7 +526,7 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.Contains(focal.BlockedUnitIds, "away-primary");
             Assert.AreEqual("away-primary", focal.TargetUnitId);
             Assert.That(runner.Events, Has.Some.Matches<BattleEvent>(item =>
-                item.Type == BattleEventType.Attack && item.Tick == 3 &&
+                item.Type == BattleEventType.Attack && item.Tick == 2 &&
                 item.UnitId == "home-focal" &&
                 item.RelatedUnitId == "away-primary"));
         }
@@ -1068,7 +1187,7 @@ namespace ArknoNights.Battle.Tests
             var controlInput = CreateInput(
                 "nonterminal-cadence-control",
                 100,
-                new[] { caster, minion, Definition("enemy", 2000, 1000, 1, 200, 99, 1) },
+                new[] { caster, minion, Definition("enemy", 0, 1000, 1, 200, 99, 1) },
                 new[] { ability },
                 new[] { Unit("caster", "5503", 4, 4) },
                 new[] { Unit("enemy", "enemy", 6, 4) });
@@ -1111,7 +1230,22 @@ namespace ArknoNights.Battle.Tests
             => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true);
 
         private static UnitDefinition DefinitionWithAbility(string typeId, string abilityId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1)
-            => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, 0, true, new[] { abilityId });
+            => new UnitDefinition(
+                typeId,
+                hitPoints,
+                attack,
+                0,
+                0,
+                speed,
+                interval,
+                animation,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                capacity,
+                0,
+                true,
+                new[] { abilityId },
+                1);
 
         private static UnitSnapshot Unit(string id, string typeId, int x, int y)
             => new UnitSnapshot(id, typeId, UnitZone.Deployed, new FormationCoordinate(x, y), Array.Empty<BuffPlaceholder>());
@@ -1126,7 +1260,10 @@ namespace ArknoNights.Battle.Tests
                 5,
                 15,
                 SkillPointGeneration.Automatic,
-                new SummonEffectDefinition("5504", 3, 100, false));
+                new SummonEffectDefinition("5504", 3, 100, false),
+                null,
+                "skill",
+                30);
 
         private static BattleInput CreateJellySummonInput(string battleId, int maxTicks)
         {
@@ -1160,7 +1297,8 @@ namespace ArknoNights.Battle.Tests
                 item.BlockCapacity,
                 item.TauntLevel,
                 item.IsSyntheticFixtureData,
-                Array.Empty<string>())).ToArray();
+                Array.Empty<string>(),
+                item.ActionMethod)).ToArray();
             var specification = new BattleInputSpecification(
                 source.SchemaVersion,
                 source.BattleId + "-without-abilities",

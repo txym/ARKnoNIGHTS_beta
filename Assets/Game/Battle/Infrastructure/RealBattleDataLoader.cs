@@ -177,7 +177,7 @@ namespace ArknoNights.Battle.Infrastructure
             if (!valid) return null;
 
             return new UnitCatalogEntry(
-                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>()),
+                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>(), 1, dto.lifeDeduct),
                 dto.legacyUnitTypeId, dto.resourceKey, dto.displayNameZhHans, dto.skillDescriptionZhHans, dto.sourceFile, dto.deploymentCost, dto.portraitResourcePath, dto.rarity, dto.initialEliteLevel, dto.lifeDeduct, dto.prefabResourcePath, dto.skeletonDataResourcePath, dto.unitSkelType, dto.moveAnimation, dto.attackAnimation, dto.hitAnimation ?? string.Empty, dto.deathAnimation);
         }
 

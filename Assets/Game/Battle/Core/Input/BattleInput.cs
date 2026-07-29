@@ -9,8 +9,8 @@ namespace ArknoNights.Battle.Core
 {
     public enum BattleSide { Home, Away }
     public enum UnitZone { Deployed, Staging, Shop }
-    public enum DamageType { Physical, Magic, True }
-    public enum AttackMethod { Melee, Ranged }
+    public enum DamageType { Physical = 0, Magic = 1, True = 2, None = 3 }
+    public enum AttackMethod { Melee = 0, Ranged = 1, None = 2 }
 
     public sealed class ValidationError
     {
@@ -58,6 +58,26 @@ namespace ArknoNights.Battle.Core
         }
 
         public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds)
+            : this(
+                typeId,
+                maxHitPoints,
+                attack,
+                defense,
+                magicResistance,
+                moveSpeedCentimetresPerSecond,
+                attackIntervalTicks,
+                attackAnimationDurationTicks,
+                damageType,
+                attackMethod,
+                blockCapacity,
+                tauntLevel,
+                isSyntheticFixtureData,
+                innateAbilityIds,
+                1)
+        {
+        }
+
+        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod, int lifeDeduct = 1)
         {
             TypeId = typeId;
             MaxHitPoints = maxHitPoints;
@@ -73,6 +93,8 @@ namespace ArknoNights.Battle.Core
             TauntLevel = tauntLevel;
             IsSyntheticFixtureData = isSyntheticFixtureData;
             InnateAbilityIds = new ReadOnlyCollection<string>((innateAbilityIds ?? Enumerable.Empty<string>()).ToArray());
+            ActionMethod = actionMethod;
+            LifeDeduct = lifeDeduct;
         }
 
         public string TypeId { get; }
@@ -89,6 +111,9 @@ namespace ArknoNights.Battle.Core
         public int TauntLevel { get; }
         public bool IsSyntheticFixtureData { get; }
         public IReadOnlyList<string> InnateAbilityIds { get; }
+        public int ActionMethod { get; }
+        public int LifeDeduct { get; }
+        public bool CanAttack => AttackMethod != AttackMethod.None;
     }
 
     public readonly struct BuffPlaceholder : IEquatable<BuffPlaceholder>
@@ -172,10 +197,220 @@ namespace ArknoNights.Battle.Core
             foreach (var definition in UnitDefinitions.OrderBy(item => item.TypeId, StringComparer.Ordinal))
             {
                 builder.Append("|T:").Append(definition.TypeId).Append(',').Append(definition.MaxHitPoints).Append(',').Append(definition.Attack).Append(',').Append(definition.Defense).Append(',').Append(definition.MagicResistance).Append(',').Append(definition.MoveSpeedCentimetresPerSecond).Append(',').Append(definition.AttackIntervalTicks).Append(',').Append(definition.AttackAnimationDurationTicks).Append(',').Append((int)definition.DamageType).Append(',').Append((int)definition.AttackMethod).Append(',').Append(definition.BlockCapacity).Append(',').Append(definition.TauntLevel).Append(',').Append(definition.IsSyntheticFixtureData ? 1 : 0);
+                if (definition.ActionMethod != 1)
+                    builder.Append("|M:").Append(definition.ActionMethod);
+                if (definition.LifeDeduct != 1)
+                    builder.Append("|D:").Append(definition.LifeDeduct);
                 foreach (var innateId in definition.InnateAbilityIds.OrderBy(item => item, StringComparer.Ordinal)) builder.Append("|I:").Append(innateId);
             }
             foreach (var ability in AbilityDefinitions.OrderBy(item => item.AbilityId, StringComparer.Ordinal))
-                builder.Append("|A:").Append(ability.AbilityId).Append(',').Append((int)ability.ActivationKind).Append(',').Append((int)ability.SilencePolicy).Append(',').Append(ability.InitialSkillPoints).Append(',').Append(ability.RequiredSkillPoints).Append(',').Append((int)ability.SkillPointGeneration).Append(',').Append(ability.SummonEffect == null ? string.Empty : ability.SummonEffect.SummonTypeId).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.Count).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.SideLengthCentimetres).Append(',').Append(ability.SummonEffect != null && ability.SummonEffect.InheritPathFromCaster ? 1 : 0);
+            {
+                builder.Append("|A:").Append(ability.AbilityId).Append(',').Append((int)ability.ActivationKind).Append(',').Append((int)ability.SilencePolicy).Append(',').Append(ability.InitialSkillPoints).Append(',').Append(ability.RequiredSkillPoints).Append(',').Append((int)ability.SkillPointGeneration).Append(',').Append(ability.SummonEffect == null ? string.Empty : ability.SummonEffect.SummonTypeId).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.Count).Append(',').Append(ability.SummonEffect == null ? 0 : ability.SummonEffect.SideLengthCentimetres).Append(',').Append(ability.SummonEffect != null && ability.SummonEffect.InheritPathFromCaster ? 1 : 0).Append(',').Append(ability.AnimationKey).Append(',').Append(ability.SkillAnimationOriginalDurationTicks);
+                if (ability.UnitTraitEffect != null)
+                    builder.Append("|G:").Append((int)ability.UnitTraitEffect.Kind);
+                if (ability.PassiveCombatModifier != null)
+                    builder.Append("|C:")
+                        .Append(ability.PassiveCombatModifier.BlockCapacityAdditive).Append(',')
+                        .Append(ability.PassiveCombatModifier.MagicResistanceAdditive).Append(',')
+                        .Append(ability.PassiveCombatModifier.AttackSpeedAdditive).Append(',')
+                        .Append(ability.PassiveCombatModifier.PhysicalDamageTakenPermille).Append(',')
+                        .Append(ability.PassiveCombatModifier.MagicDamageTakenPermille);
+                if (ability.PassiveLifecycleEffect != null)
+                    builder.Append("|L:")
+                        .Append(ability.PassiveLifecycleEffect.HitPointsPerSecond).Append(',')
+                        .Append(ability.PassiveLifecycleEffect.LifetimeTicks);
+                if (ability.OnDamageReactionEffect != null)
+                    builder.Append("|R:")
+                        .Append((int)ability.OnDamageReactionEffect.DamageType).Append(',')
+                        .Append(ability.OnDamageReactionEffect.DamageAmount);
+                if (ability.HealthThresholdCombatModifier != null)
+                    builder.Append("|H:")
+                        .Append(ability.HealthThresholdCombatModifier.ThresholdHitPointsPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.InclusiveThreshold ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.TriggerOnce ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.DurationTicks).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.DefenseMultiplierPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.BlockCapacityAdditive).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.AttackSpeedAdditive).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.MakesUnblockable ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.TransitionAnimationKey).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.CompletedPresentationStateTag);
+                if (ability.UnblockedDamageTakenModifier != null)
+                    builder.Append("|U:")
+                        .Append(ability.UnblockedDamageTakenModifier.PhysicalDamageTakenPermille).Append(',')
+                        .Append(ability.UnblockedDamageTakenModifier.MagicDamageTakenPermille);
+                if (ability.AttackSequenceModifier != null)
+                    builder.Append("|Q:")
+                        .Append(ability.AttackSequenceModifier.FirstEnhancedAttackOrdinal).Append(',')
+                        .Append(ability.AttackSequenceModifier.RepeatInterval).Append(',')
+                        .Append(ability.AttackSequenceModifier.AttackMultiplierPermille);
+                if (ability.AttackCountStateModifier != null)
+                    builder.Append("|K:")
+                        .Append(ability.AttackCountStateModifier.TransitionBeforeAttackOrdinal).Append(',')
+                        .Append(ability.AttackCountStateModifier.LockedAttackSpeedAdditive).Append(',')
+                        .Append(ability.AttackCountStateModifier.LockedDefenseAdditive).Append(',')
+                        .Append(ability.AttackCountStateModifier.UnlockedAttackMultiplierPermille).Append(',')
+                        .Append(ability.AttackCountStateModifier.UnlockedMagicResistanceAdditive).Append(',')
+                        .Append(ability.AttackCountStateModifier.UnlockedHitPointsPerSecond).Append(',')
+                        .Append(ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille).Append(',')
+                        .Append(ability.AttackCountStateModifier.ReleasesAlliedAttackCountStates ? 1 : 0).Append(',')
+                        .Append(ability.AttackCountStateModifier.UnlockedPresentationStateTag);
+                if (ability.DeathSpawnEffect != null)
+                {
+                    builder.Append("|X:")
+                        .Append(ability.DeathSpawnEffect.Count).Append(',')
+                        .Append(ability.DeathSpawnEffect.DelayTicks).Append(',')
+                        .Append(ability.DeathSpawnEffect.SideLengthCentimetres).Append(',')
+                        .Append(ability.DeathSpawnEffect.SnapToNearestPassableCell ? 1 : 0).Append(',')
+                        .Append(ability.DeathSpawnEffect.SummonedMoveSpeedMultiplierPermille);
+                    foreach (var option in
+                             ability.DeathSpawnEffect.Options)
+                        builder.Append(',')
+                            .Append(option == null
+                                ? string.Empty
+                                : option.SummonTypeId)
+                            .Append(':')
+                            .Append(option == null
+                                ? 0
+                                : option.Weight);
+                }
+                if (ability.AuraCombatModifier != null)
+                    builder.Append("|O:")
+                        .Append((int)ability.AuraCombatModifier.TargetSide).Append(',')
+                        .Append(ability.AuraCombatModifier.IsGlobal ? 1 : 0).Append(',')
+                        .Append(ability.AuraCombatModifier.RadiusCentimetres).Append(',')
+                        .Append(ability.AuraCombatModifier.ExcludeSource ? 1 : 0).Append(',')
+                        .Append(ability.AuraCombatModifier.NonStackingByAbilityId ? 1 : 0).Append(',')
+                        .Append(ability.AuraCombatModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.AuraCombatModifier.DefenseAdditive).Append(',')
+                        .Append(ability.AuraCombatModifier.MagicResistanceAdditive).Append(',')
+                        .Append(ability.AuraCombatModifier.AttackSpeedMultiplierPermille).Append(',')
+                        .Append(ability.AuraCombatModifier.MoveSpeedMultiplierPermille).Append(',')
+                        .Append(ability.AuraCombatModifier.HitPointsPerSecond).Append(',')
+                        .Append(ability.AuraCombatModifier.GrantedStatusTag);
+                if (ability.RequiredStatusTagCombatModifier != null)
+                    builder.Append("|RT:")
+                        .Append(ability.RequiredStatusTagCombatModifier.RequiredStatusTag).Append(',')
+                        .Append(ability.RequiredStatusTagCombatModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.RequiredStatusTagCombatModifier.MoveSpeedMultiplierPermille);
+                if (ability.BlockedCounterpartCombatModifier != null)
+                    builder.Append("|J:")
+                        .Append(ability.BlockedCounterpartCombatModifier.NonStackingByAbilityId ? 1 : 0).Append(',')
+                        .Append(ability.BlockedCounterpartCombatModifier.AttackSpeedMultiplierPermille);
+                if (ability.NearbySameTypeSelfModifier != null)
+                    builder.Append("|N:")
+                        .Append(ability.NearbySameTypeSelfModifier.RadiusCentimetres).Append(',')
+                        .Append(ability.NearbySameTypeSelfModifier.DefenseAdditive);
+                if (ability.EvasionModifier != null)
+                    builder.Append("|V:")
+                        .Append(ability.EvasionModifier.PhysicalChancePermille).Append(',')
+                        .Append(ability.EvasionModifier.MagicChancePermille);
+                if (ability.DeathAreaDamageEffect != null)
+                    builder.Append("|Z:")
+                        .Append((int)ability.DeathAreaDamageEffect.DamageType).Append(',')
+                        .Append(ability.DeathAreaDamageEffect.AttackMultiplierPermille).Append(',')
+                        .Append(ability.DeathAreaDamageEffect.RadiusCentimetres).Append(',')
+                        .Append(ability.DeathAreaDamageEffect.DelayTicks);
+                if (ability.AttackAreaDamageModifier != null)
+                    builder.Append("|Y:")
+                        .Append((int)ability.AttackAreaDamageModifier.Shape).Append(',')
+                        .Append(ability.AttackAreaDamageModifier.FirstAreaAttackOrdinal).Append(',')
+                        .Append(ability.AttackAreaDamageModifier.RepeatInterval).Append(',')
+                        .Append((int)ability.AttackAreaDamageModifier.DamageType).Append(',')
+                        .Append(ability.AttackAreaDamageModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.AttackAreaDamageModifier.RadiusCentimetres);
+                if (ability.OnHitDamageOverTimeEffect != null)
+                    builder.Append("|D:")
+                        .Append(ability.OnHitDamageOverTimeEffect.DamagePerSecond).Append(',')
+                        .Append(ability.OnHitDamageOverTimeEffect.DurationTicks);
+                if (ability.UnblockedAttackCharge != null)
+                    builder.Append("|E:")
+                        .Append(ability.UnblockedAttackCharge.CheckIntervalTicks).Append(',')
+                        .Append(ability.UnblockedAttackCharge.AttackAdditivePerStack).Append(',')
+                        .Append(ability.UnblockedAttackCharge.MaxStacks);
+                if (ability.TriggeredSpawnEffect != null)
+                {
+                    builder.Append("|F:")
+                        .Append((int)ability.TriggeredSpawnEffect.TriggerKind).Append(',')
+                        .Append(ability.TriggeredSpawnEffect.FirstTriggerOrdinal).Append(',')
+                        .Append(ability.TriggeredSpawnEffect.RepeatInterval).Append(',')
+                        .Append(ability.TriggeredSpawnEffect.SummonTypeId).Append(',')
+                        .Append(ability.TriggeredSpawnEffect.SideLengthCentimetres).Append(',')
+                        .Append(ability.TriggeredSpawnEffect.MaxActiveSameType);
+                    if (ability.TriggeredSpawnEffect
+                        .UsesSkillAttackAnimation)
+                        builder.Append(',')
+                            .Append(ability.TriggeredSpawnEffect
+                                .SkillAttackAnimationKey)
+                            .Append(',')
+                            .Append(ability.TriggeredSpawnEffect
+                                .SkillAttackAnimationOriginalDurationTicks);
+                }
+                if (ability.HealthThresholdAdjacentSpawnEffect != null)
+                    builder.Append("|G:")
+                        .Append(ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille).Append(',')
+                        .Append(ability.HealthThresholdAdjacentSpawnEffect.InclusiveThreshold ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdAdjacentSpawnEffect.SummonTypeId);
+                if (ability.HealthThresholdFullHealEffect != null)
+                    builder.Append("|I:")
+                        .Append(ability.HealthThresholdFullHealEffect.ThresholdHitPointsPermille).Append(',')
+                        .Append(ability.HealthThresholdFullHealEffect.InclusiveThreshold ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdFullHealEffect.AnimationKey).Append(',')
+                        .Append(ability.HealthThresholdFullHealEffect.AnimationOriginalDurationTicks).Append(',')
+                        .Append(ability.HealthThresholdFullHealEffect.CompletedPresentationStateTag);
+                if (ability.OnHitDefenseDebuffEffect != null)
+                    builder.Append("|W:")
+                        .Append(ability.OnHitDefenseDebuffEffect
+                            .DefenseReductionPerStack);
+                if (ability.TimedTargetAreaDamageEffect != null)
+                    builder.Append("|AA:")
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .TargetRangeCentimetres).Append(',')
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .RadiusCentimetres).Append(',')
+                        .Append((int)ability.TimedTargetAreaDamageEffect
+                            .DamageType).Append(',')
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .AttackMultiplierPermille).Append(',')
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .GroundTargetsOnly ? 1 : 0);
+                if (ability.AttackDashEffect != null)
+                    builder.Append("|AD:")
+                        .Append(ability.AttackDashEffect
+                            .FirstTriggerOrdinal).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .RepeatInterval).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .DashDistanceCentimetres).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .UnblockableDurationTicks).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .MovementDelayEffectiveTicks).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .AnimationSequenceKey).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .AnimationOriginalDurationTicks);
+                if (ability.TimedBlinkEffect != null)
+                    builder.Append("|BL:")
+                        .Append(ability.TimedBlinkEffect
+                            .DistanceCentimetres).Append(',')
+                        .Append(ability.TimedBlinkEffect
+                            .RelocationDelayEffectiveTicks);
+                if (ability.ProximityEntryDamageEffect != null)
+                    builder.Append("|PE:")
+                        .Append(ability.ProximityEntryDamageEffect
+                            .RadiusCentimetres).Append(',')
+                        .Append((int)ability
+                            .ProximityEntryDamageEffect
+                            .DamageType).Append(',')
+                        .Append(ability.ProximityEntryDamageEffect
+                            .AttackMultiplierPermille).Append(',')
+                        .Append(ability.ProximityEntryDamageEffect
+                            .GroundTargetsOnly ? 1 : 0);
+            }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
                 builder.Append("|P:").Append((int)player.Side).Append(',').Append(player.PlayerId);
@@ -214,9 +449,18 @@ namespace ArknoNights.Battle.Core
                 if (definition == null) { validationErrors.Add(new ValidationError("type.missing", "Unit definition is missing.")); continue; }
                 if (string.IsNullOrWhiteSpace(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.invalid", "Type ID is required."));
                 else if (!typeIds.Add(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.duplicate", "Duplicate type ID: " + definition.TypeId));
-                if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.AttackIntervalTicks <= 0 || definition.AttackAnimationDurationTicks <= 0 || definition.BlockCapacity <= 0 || definition.TauntLevel < 0)
+                if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.BlockCapacity < 0 || definition.TauntLevel < 0 || definition.ActionMethod < 1 || definition.ActionMethod > 4 || definition.LifeDeduct < 0)
                     validationErrors.Add(new ValidationError("type.values.invalid", "Unit definition has invalid numeric values: " + (definition.TypeId ?? "<missing>")));
                 if (!Enum.IsDefined(typeof(DamageType), definition.DamageType) || !Enum.IsDefined(typeof(AttackMethod), definition.AttackMethod)) validationErrors.Add(new ValidationError("type.enum.invalid", "Unit definition has invalid enum values: " + (definition.TypeId ?? "<missing>")));
+                else if (definition.CanAttack)
+                {
+                    if (definition.DamageType == DamageType.None || definition.AttackIntervalTicks <= 0 || definition.AttackAnimationDurationTicks <= 0)
+                        validationErrors.Add(new ValidationError("type.attack.values.invalid", "Attacking unit requires damage and positive attack timings: " + (definition.TypeId ?? "<missing>")));
+                }
+                else if (definition.DamageType != DamageType.None || definition.Attack != 0 || definition.AttackIntervalTicks != 0 || definition.AttackAnimationDurationTicks != 0)
+                {
+                    validationErrors.Add(new ValidationError("type.nonAttacker.values.invalid", "Non-attacking unit must use None damage, zero attack and zero attack timings: " + (definition.TypeId ?? "<missing>")));
+                }
             }
 
             var abilityIds = new HashSet<string>(StringComparer.Ordinal);
@@ -226,15 +470,347 @@ namespace ArknoNights.Battle.Core
                 if (string.IsNullOrWhiteSpace(ability.AbilityId)) validationErrors.Add(new ValidationError("ability.id.invalid", "Ability ID is required."));
                 else if (!abilityIds.Add(ability.AbilityId)) validationErrors.Add(new ValidationError("ability.id.duplicate", "Duplicate ability ID: " + ability.AbilityId));
                 if (!Enum.IsDefined(typeof(AbilityActivationKind), ability.ActivationKind) || !Enum.IsDefined(typeof(SilencePolicy), ability.SilencePolicy) || !Enum.IsDefined(typeof(SkillPointGeneration), ability.SkillPointGeneration)) validationErrors.Add(new ValidationError("ability.enum.invalid", "Ability has an invalid enum value: " + ability.AbilityId));
-                if (ability.RequiredSkillPoints <= 0) validationErrors.Add(new ValidationError("ability.skillPoints.required.invalid", "Required skill points must be positive: " + ability.AbilityId));
-                if (ability.InitialSkillPoints < 0) validationErrors.Add(new ValidationError("ability.skillPoints.initial.invalid", "Initial skill points cannot be negative: " + ability.AbilityId));
-                if (ability.InitialSkillPoints > ability.RequiredSkillPoints) validationErrors.Add(new ValidationError("ability.skillPoints.order.invalid", "Initial skill points cannot exceed required skill points: " + ability.AbilityId));
-                if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
-                else
+                if (ability.ActivationKind == AbilityActivationKind.Timed)
                 {
-                    if (string.IsNullOrWhiteSpace(ability.SummonEffect.SummonTypeId) || !typeIds.Contains(ability.SummonEffect.SummonTypeId)) validationErrors.Add(new ValidationError("ability.summon.type.unknown", "Summon type is unknown: " + ability.SummonEffect.SummonTypeId));
-                    if (ability.SummonEffect.Count <= 0) validationErrors.Add(new ValidationError("ability.summon.count.invalid", "Summon count must be positive: " + ability.AbilityId));
-                    if (ability.SummonEffect.SideLengthCentimetres <= 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be positive: " + ability.AbilityId));
+                    if (ability.RequiredSkillPoints <= 0) validationErrors.Add(new ValidationError("ability.skillPoints.required.invalid", "Required skill points must be positive: " + ability.AbilityId));
+                    if (ability.InitialSkillPoints < 0) validationErrors.Add(new ValidationError("ability.skillPoints.initial.invalid", "Initial skill points cannot be negative: " + ability.AbilityId));
+                    if (ability.InitialSkillPoints > ability.RequiredSkillPoints) validationErrors.Add(new ValidationError("ability.skillPoints.order.invalid", "Initial skill points cannot exceed required skill points: " + ability.AbilityId));
+                    if (ability.UnitTraitEffect != null) validationErrors.Add(new ValidationError("ability.trait.unexpected", "Timed ability cannot define a unit trait: " + ability.AbilityId));
+                    if (ability.PassiveCombatModifier != null) validationErrors.Add(new ValidationError("ability.combatModifier.unexpected", "Timed ability cannot define a passive combat modifier: " + ability.AbilityId));
+                    if (ability.PassiveLifecycleEffect != null) validationErrors.Add(new ValidationError("ability.lifecycle.unexpected", "Timed ability cannot define a passive lifecycle effect: " + ability.AbilityId));
+                    if (ability.OnDamageReactionEffect != null) validationErrors.Add(new ValidationError("ability.damageReaction.unexpected", "Timed ability cannot define an on-damage reaction: " + ability.AbilityId));
+                    if (ability.HealthThresholdCombatModifier != null) validationErrors.Add(new ValidationError("ability.healthThreshold.unexpected", "Timed ability cannot define a health-threshold modifier: " + ability.AbilityId));
+                    if (ability.UnblockedDamageTakenModifier != null) validationErrors.Add(new ValidationError("ability.unblockedDamageTaken.unexpected", "Timed ability cannot define an unblocked damage-taken modifier: " + ability.AbilityId));
+                    if (ability.AttackSequenceModifier != null) validationErrors.Add(new ValidationError("ability.attackSequence.unexpected", "Timed ability cannot define an attack-sequence modifier: " + ability.AbilityId));
+                    if (ability.AttackCountStateModifier != null) validationErrors.Add(new ValidationError("ability.attackCountState.unexpected", "Timed ability cannot define an attack-count state modifier: " + ability.AbilityId));
+                    if (ability.DeathSpawnEffect != null) validationErrors.Add(new ValidationError("ability.deathSpawn.unexpected", "Timed ability cannot define a death-spawn effect: " + ability.AbilityId));
+                    if (ability.AuraCombatModifier != null) validationErrors.Add(new ValidationError("ability.aura.unexpected", "Timed ability cannot define an aura modifier: " + ability.AbilityId));
+                    if (ability.BlockedCounterpartCombatModifier != null) validationErrors.Add(new ValidationError("ability.blockedCounterpart.unexpected", "Timed ability cannot define a blocked-counterpart modifier: " + ability.AbilityId));
+                    if (ability.NearbySameTypeSelfModifier != null) validationErrors.Add(new ValidationError("ability.nearbySameType.unexpected", "Timed ability cannot define a nearby-same-type modifier: " + ability.AbilityId));
+                    if (ability.EvasionModifier != null) validationErrors.Add(new ValidationError("ability.evasion.unexpected", "Timed ability cannot define an evasion modifier: " + ability.AbilityId));
+                    if (ability.DeathAreaDamageEffect != null) validationErrors.Add(new ValidationError("ability.deathAreaDamage.unexpected", "Timed ability cannot define a death-area damage effect: " + ability.AbilityId));
+                    if (ability.AttackAreaDamageModifier != null) validationErrors.Add(new ValidationError("ability.attackAreaDamage.unexpected", "Timed ability cannot define an attack-area damage modifier: " + ability.AbilityId));
+                    if (ability.OnHitDamageOverTimeEffect != null) validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.unexpected", "Timed ability cannot define an on-hit damage-over-time effect: " + ability.AbilityId));
+                    if (ability.UnblockedAttackCharge != null) validationErrors.Add(new ValidationError("ability.unblockedAttackCharge.unexpected", "Timed ability cannot define an unblocked attack-charge effect: " + ability.AbilityId));
+                    if (ability.TriggeredSpawnEffect != null) validationErrors.Add(new ValidationError("ability.triggeredSpawn.unexpected", "Timed ability cannot define a triggered-spawn effect: " + ability.AbilityId));
+                    if (ability.HealthThresholdAdjacentSpawnEffect != null) validationErrors.Add(new ValidationError("ability.healthThresholdAdjacentSpawn.unexpected", "Timed ability cannot define a health-threshold adjacent-spawn effect: " + ability.AbilityId));
+                    if (ability.HealthThresholdFullHealEffect != null) validationErrors.Add(new ValidationError("ability.healthThresholdFullHeal.unexpected", "Timed ability cannot define a health-threshold full-heal effect: " + ability.AbilityId));
+                    if (ability.OnHitDefenseDebuffEffect != null) validationErrors.Add(new ValidationError("ability.onHitDefenseDebuff.unexpected", "Timed ability cannot define an on-hit defense debuff: " + ability.AbilityId));
+                    if (ability.AttackDashEffect != null) validationErrors.Add(new ValidationError("ability.attackDash.unexpected", "Timed ability cannot define an attack-dash effect: " + ability.AbilityId));
+                    if (ability.ProximityEntryDamageEffect != null) validationErrors.Add(new ValidationError("ability.proximityEntryDamage.unexpected", "Timed ability cannot define a proximity-entry damage effect: " + ability.AbilityId));
+                    if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
+                    if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
+                    var timedEffectCount =
+                        (ability.SummonEffect == null ? 0 : 1)
+                        + (ability.TimedTargetAreaDamageEffect == null ? 0 : 1)
+                        + (ability.TimedBlinkEffect == null ? 0 : 1);
+                    if (timedEffectCount != 1)
+                        validationErrors.Add(new ValidationError("ability.timed.effect.invalid", "Timed ability requires exactly one supported effect: " + ability.AbilityId));
+                    if (ability.SummonEffect != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(ability.SummonEffect.SummonTypeId) || !typeIds.Contains(ability.SummonEffect.SummonTypeId)) validationErrors.Add(new ValidationError("ability.summon.type.unknown", "Summon type is unknown: " + ability.SummonEffect.SummonTypeId));
+                        if (ability.SummonEffect.Count <= 0) validationErrors.Add(new ValidationError("ability.summon.count.invalid", "Summon count must be positive: " + ability.AbilityId));
+                        if (ability.SummonEffect.SideLengthCentimetres < 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be non-negative: " + ability.AbilityId));
+                    }
+                    if (ability.TimedTargetAreaDamageEffect != null
+                        && (ability.TimedTargetAreaDamageEffect.TargetRangeCentimetres <= 0
+                            || ability.TimedTargetAreaDamageEffect.RadiusCentimetres <= 0
+                            || ability.TimedTargetAreaDamageEffect.DamageType == DamageType.None
+                            || !Enum.IsDefined(
+                                typeof(DamageType),
+                                ability.TimedTargetAreaDamageEffect.DamageType)
+                            || ability.TimedTargetAreaDamageEffect.AttackMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.timedTargetAreaDamage.invalid", "Timed target-area damage effect is invalid: " + ability.AbilityId));
+                    if (ability.TimedBlinkEffect != null
+                        && (ability.TimedBlinkEffect
+                                .DistanceCentimetres <= 0
+                            || ability.TimedBlinkEffect
+                                .RelocationDelayEffectiveTicks <= 0
+                            || ability.TimedBlinkEffect
+                                .RelocationDelayEffectiveTicks
+                               > ability
+                                   .SkillAnimationEffectiveDurationTicks))
+                        validationErrors.Add(new ValidationError("ability.timedBlink.invalid", "Timed blink effect is invalid: " + ability.AbilityId));
+                }
+                else if (ability.ActivationKind == AbilityActivationKind.Passive)
+                {
+                    if (ability.InitialSkillPoints != 0 || ability.RequiredSkillPoints != 0)
+                        validationErrors.Add(new ValidationError("ability.passive.skillPoints.invalid", "Passive ability cannot define skill points: " + ability.AbilityId));
+                    if (ability.SkillPointGeneration != SkillPointGeneration.None)
+                        validationErrors.Add(new ValidationError("ability.passive.generation.invalid", "Passive ability must use None skill-point generation: " + ability.AbilityId));
+                    if (ability.SummonEffect != null)
+                        validationErrors.Add(new ValidationError("ability.passive.summon.unexpected", "Passive ability cannot define a summon effect: " + ability.AbilityId));
+                    if (ability.TimedTargetAreaDamageEffect != null)
+                        validationErrors.Add(new ValidationError("ability.passive.timedTargetAreaDamage.unexpected", "Passive ability cannot define a timed target-area damage effect: " + ability.AbilityId));
+                    if (ability.TimedBlinkEffect != null)
+                        validationErrors.Add(new ValidationError("ability.passive.timedBlink.unexpected", "Passive ability cannot define a timed blink effect: " + ability.AbilityId));
+                    var passiveEffectCount =
+                        (ability.UnitTraitEffect == null ? 0 : 1)
+                        + (ability.PassiveCombatModifier == null ? 0 : 1)
+                        + (ability.PassiveLifecycleEffect == null ? 0 : 1)
+                        + (ability.OnDamageReactionEffect == null ? 0 : 1)
+                        + (ability.HealthThresholdCombatModifier == null ? 0 : 1)
+                        + (ability.UnblockedDamageTakenModifier == null ? 0 : 1)
+                        + (ability.AttackSequenceModifier == null ? 0 : 1)
+                        + (ability.AttackCountStateModifier == null ? 0 : 1)
+                        + (ability.DeathSpawnEffect == null ? 0 : 1)
+                        + (ability.AuraCombatModifier == null ? 0 : 1)
+                        + (ability.BlockedCounterpartCombatModifier == null ? 0 : 1)
+                        + (ability.NearbySameTypeSelfModifier == null ? 0 : 1)
+                        + (ability.EvasionModifier == null ? 0 : 1)
+                        + (ability.DeathAreaDamageEffect == null ? 0 : 1)
+                        + (ability.AttackAreaDamageModifier == null ? 0 : 1)
+                        + (ability.OnHitDamageOverTimeEffect == null ? 0 : 1)
+                        + (ability.UnblockedAttackCharge == null ? 0 : 1)
+                        + (ability.TriggeredSpawnEffect == null ? 0 : 1)
+                        + (ability.HealthThresholdAdjacentSpawnEffect == null ? 0 : 1)
+                        + (ability.HealthThresholdFullHealEffect == null ? 0 : 1)
+                        + (ability.OnHitDefenseDebuffEffect == null ? 0 : 1)
+                         + (ability.AttackDashEffect == null ? 0 : 1)
+                         + (ability.TimedBlinkEffect == null ? 0 : 1)
+                         + (ability.ProximityEntryDamageEffect == null ? 0 : 1)
+                         + (ability.RequiredStatusTagCombatModifier == null ? 0 : 1);
+                    if (passiveEffectCount != 1)
+                        validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
+                    if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
+                        validationErrors.Add(new ValidationError("ability.trait.invalid", "Passive ability has an invalid unit trait: " + ability.AbilityId));
+                    if (ability.PassiveCombatModifier != null
+                        && (ability.PassiveCombatModifier.IsNeutral
+                            || ability.PassiveCombatModifier.BlockCapacityAdditive < 0
+                            || ability.PassiveCombatModifier.MagicResistanceAdditive < -100
+                            || ability.PassiveCombatModifier.MagicResistanceAdditive > 100
+                            || ability.PassiveCombatModifier.AttackSpeedAdditive <= -100
+                            || ability.PassiveCombatModifier.AttackSpeedAdditive > 10000
+                            || ability.PassiveCombatModifier.PhysicalDamageTakenPermille <= 0
+                            || ability.PassiveCombatModifier.PhysicalDamageTakenPermille > 10000
+                            || ability.PassiveCombatModifier.MagicDamageTakenPermille <= 0
+                            || ability.PassiveCombatModifier.MagicDamageTakenPermille > 10000))
+                        validationErrors.Add(new ValidationError("ability.combatModifier.invalid", "Passive combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.PassiveLifecycleEffect != null
+                        && (ability.PassiveLifecycleEffect.IsNeutral
+                            || ability.PassiveLifecycleEffect.LifetimeTicks < 0))
+                        validationErrors.Add(new ValidationError("ability.lifecycle.invalid", "Passive lifecycle effect is invalid: " + ability.AbilityId));
+                    if (ability.OnDamageReactionEffect != null
+                        && (ability.OnDamageReactionEffect.DamageAmount <= 0
+                            || ability.OnDamageReactionEffect.DamageType == DamageType.None
+                            || !Enum.IsDefined(typeof(DamageType), ability.OnDamageReactionEffect.DamageType)))
+                        validationErrors.Add(new ValidationError("ability.damageReaction.invalid", "On-damage reaction is invalid: " + ability.AbilityId));
+                    if (ability.HealthThresholdCombatModifier != null
+                        && (ability.HealthThresholdCombatModifier.IsNeutral
+                            || ability.HealthThresholdCombatModifier.ThresholdHitPointsPermille <= 0
+                            || ability.HealthThresholdCombatModifier.ThresholdHitPointsPermille > 1000
+                            || ability.HealthThresholdCombatModifier.DurationTicks < 0
+                            || (!ability.HealthThresholdCombatModifier.TriggerOnce
+                                && ability.HealthThresholdCombatModifier.DurationTicks != 0)
+                            || ability.HealthThresholdCombatModifier.AttackMultiplierPermille <= 0
+                            || ability.HealthThresholdCombatModifier.DefenseMultiplierPermille <= 0
+                            || ability.HealthThresholdCombatModifier.BlockCapacityAdditive < 0
+                            || ability.HealthThresholdCombatModifier.AttackSpeedAdditive <= -100
+                            || ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille <= 0
+                            || (ability.HealthThresholdCombatModifier.UsesTransitionAnimation
+                                && ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks <= 0)
+                            || (!ability.HealthThresholdCombatModifier.UsesTransitionAnimation
+                                && ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks != 0)
+                            || (!string.IsNullOrWhiteSpace(
+                                    ability.HealthThresholdCombatModifier.CompletedPresentationStateTag)
+                                && !ability.HealthThresholdCombatModifier.UsesTransitionAnimation)))
+                        validationErrors.Add(new ValidationError("ability.healthThreshold.invalid", "Health-threshold combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.UnblockedDamageTakenModifier != null
+                        && (ability.UnblockedDamageTakenModifier.IsNeutral
+                            || ability.UnblockedDamageTakenModifier.PhysicalDamageTakenPermille <= 0
+                            || ability.UnblockedDamageTakenModifier.PhysicalDamageTakenPermille > 10000
+                            || ability.UnblockedDamageTakenModifier.MagicDamageTakenPermille <= 0
+                            || ability.UnblockedDamageTakenModifier.MagicDamageTakenPermille > 10000))
+                        validationErrors.Add(new ValidationError("ability.unblockedDamageTaken.invalid", "Unblocked damage-taken modifier is invalid: " + ability.AbilityId));
+                    if (ability.AttackSequenceModifier != null
+                        && (ability.AttackSequenceModifier.FirstEnhancedAttackOrdinal <= 0
+                            || ability.AttackSequenceModifier.RepeatInterval < 0
+                            || ability.AttackSequenceModifier.AttackMultiplierPermille <= 0
+                            || ability.AttackSequenceModifier.AttackMultiplierPermille
+                                == AttackSequenceModifierDefinition.NeutralAttackMultiplierPermille))
+                        validationErrors.Add(new ValidationError("ability.attackSequence.invalid", "Attack-sequence modifier is invalid: " + ability.AbilityId));
+                    if (ability.AttackCountStateModifier != null
+                        && (ability.AttackCountStateModifier.IsNeutral
+                            || ability.AttackCountStateModifier.TransitionBeforeAttackOrdinal <= 1
+                            || ability.AttackCountStateModifier.LockedAttackSpeedAdditive <= -100
+                            || ability.AttackCountStateModifier.LockedDefenseAdditive < 0
+                            || ability.AttackCountStateModifier.UnlockedAttackMultiplierPermille <= 0
+                            || ability.AttackCountStateModifier.UnlockedMagicResistanceAdditive < -100
+                            || ability.AttackCountStateModifier.UnlockedMagicResistanceAdditive > 100
+                            || ability.AttackCountStateModifier.UnlockedHitPointsPerSecond < 0
+                            || ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille <= 0
+                            || ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille > 1000))
+                        validationErrors.Add(new ValidationError("ability.attackCountState.invalid", "Attack-count state modifier is invalid: " + ability.AbilityId));
+                    if (ability.DeathSpawnEffect != null)
+                    {
+                        var options =
+                            ability.DeathSpawnEffect.Options;
+                        if (ability.DeathSpawnEffect.Count <= 0
+                            || ability.DeathSpawnEffect.DelayTicks < 0
+                            || ability.DeathSpawnEffect.SideLengthCentimetres < 0
+                            || ability.DeathSpawnEffect.SummonedMoveSpeedMultiplierPermille <= 0
+                            || options.Count == 0
+                            || options.Any(item =>
+                                item == null
+                                || string.IsNullOrWhiteSpace(item.SummonTypeId)
+                                || item.Weight <= 0)
+                            || options.Where(item => item != null).Sum(item =>
+                                (long)item.Weight) > int.MaxValue)
+                            validationErrors.Add(new ValidationError("ability.deathSpawn.invalid", "Death-spawn effect is invalid: " + ability.AbilityId));
+                        foreach (var option in options.Where(item =>
+                                     item != null
+                                     && !string.IsNullOrWhiteSpace(
+                                         item.SummonTypeId)))
+                        {
+                            if (!typeIds.Contains(option.SummonTypeId))
+                                validationErrors.Add(new ValidationError("ability.deathSpawn.type.unknown", "Death-spawn type is unknown: " + option.SummonTypeId));
+                        }
+                    }
+                    if (ability.AuraCombatModifier != null
+                        && (ability.AuraCombatModifier.IsNeutral
+                            || !Enum.IsDefined(typeof(AuraTargetSide), ability.AuraCombatModifier.TargetSide)
+                            || (ability.AuraCombatModifier.IsGlobal
+                                && ability.AuraCombatModifier.RadiusCentimetres != 0)
+                            || (!ability.AuraCombatModifier.IsGlobal
+                                && ability.AuraCombatModifier.RadiusCentimetres <= 0)
+                            || ability.AuraCombatModifier.AttackMultiplierPermille <= 0
+                            || ability.AuraCombatModifier.DefenseAdditive < 0
+                            || ability.AuraCombatModifier.MagicResistanceAdditive < -100
+                            || ability.AuraCombatModifier.MagicResistanceAdditive > 100
+                            || ability.AuraCombatModifier.AttackSpeedMultiplierPermille <= 0
+                            || ability.AuraCombatModifier.MoveSpeedMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.aura.invalid", "Aura combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.RequiredStatusTagCombatModifier != null
+                        && (ability.RequiredStatusTagCombatModifier.IsNeutral
+                            || string.IsNullOrWhiteSpace(
+                                ability.RequiredStatusTagCombatModifier
+                                    .RequiredStatusTag)
+                            || ability.RequiredStatusTagCombatModifier
+                                .AttackMultiplierPermille <= 0
+                            || ability.RequiredStatusTagCombatModifier
+                                .MoveSpeedMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.requiredStatusTag.invalid", "Required-status-tag combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.BlockedCounterpartCombatModifier != null
+                        && ability.BlockedCounterpartCombatModifier.AttackSpeedMultiplierPermille <= 0)
+                        validationErrors.Add(new ValidationError("ability.blockedCounterpart.invalid", "Blocked-counterpart modifier is invalid: " + ability.AbilityId));
+                    if (ability.NearbySameTypeSelfModifier != null
+                        && (ability.NearbySameTypeSelfModifier.RadiusCentimetres <= 0
+                            || ability.NearbySameTypeSelfModifier.DefenseAdditive <= 0))
+                        validationErrors.Add(new ValidationError("ability.nearbySameType.invalid", "Nearby-same-type modifier is invalid: " + ability.AbilityId));
+                    if (ability.EvasionModifier != null
+                        && (ability.EvasionModifier.IsNeutral
+                            || ability.EvasionModifier.PhysicalChancePermille < 0
+                            || ability.EvasionModifier.PhysicalChancePermille > 1000
+                            || ability.EvasionModifier.MagicChancePermille < 0
+                            || ability.EvasionModifier.MagicChancePermille > 1000))
+                        validationErrors.Add(new ValidationError("ability.evasion.invalid", "Evasion modifier is invalid: " + ability.AbilityId));
+                    if (ability.DeathAreaDamageEffect != null
+                        && (ability.DeathAreaDamageEffect.DamageType == DamageType.None
+                            || !Enum.IsDefined(typeof(DamageType), ability.DeathAreaDamageEffect.DamageType)
+                            || ability.DeathAreaDamageEffect.AttackMultiplierPermille <= 0
+                            || ability.DeathAreaDamageEffect.RadiusCentimetres <= 0
+                            || ability.DeathAreaDamageEffect.DelayTicks <= 0))
+                        validationErrors.Add(new ValidationError("ability.deathAreaDamage.invalid", "Death-area damage effect is invalid: " + ability.AbilityId));
+                    if (ability.AttackAreaDamageModifier != null
+                        && (!Enum.IsDefined(typeof(AttackAreaShape), ability.AttackAreaDamageModifier.Shape)
+                            || ability.AttackAreaDamageModifier.FirstAreaAttackOrdinal <= 0
+                            || ability.AttackAreaDamageModifier.RepeatInterval < 0
+                            || ability.AttackAreaDamageModifier.DamageType == DamageType.None
+                            || !Enum.IsDefined(typeof(DamageType), ability.AttackAreaDamageModifier.DamageType)
+                            || ability.AttackAreaDamageModifier.AttackMultiplierPermille <= 0
+                            || (ability.AttackAreaDamageModifier.Shape == AttackAreaShape.Radius
+                                && ability.AttackAreaDamageModifier.RadiusCentimetres <= 0)
+                            || (ability.AttackAreaDamageModifier.Shape == AttackAreaShape.OrthogonalAdjacentCells
+                                && ability.AttackAreaDamageModifier.RadiusCentimetres != 0)))
+                        validationErrors.Add(new ValidationError("ability.attackAreaDamage.invalid", "Attack-area damage modifier is invalid: " + ability.AbilityId));
+                    if (ability.OnHitDamageOverTimeEffect != null
+                        && (ability.OnHitDamageOverTimeEffect.DamagePerSecond <= 0
+                            || ability.OnHitDamageOverTimeEffect.DurationTicks <= 0))
+                        validationErrors.Add(new ValidationError("ability.onHitDamageOverTime.invalid", "On-hit damage-over-time effect is invalid: " + ability.AbilityId));
+                    if (ability.UnblockedAttackCharge != null
+                        && (ability.UnblockedAttackCharge.CheckIntervalTicks <= 0
+                            || ability.UnblockedAttackCharge.AttackAdditivePerStack <= 0
+                            || ability.UnblockedAttackCharge.MaxStacks <= 0))
+                        validationErrors.Add(new ValidationError("ability.unblockedAttackCharge.invalid", "Unblocked attack-charge effect is invalid: " + ability.AbilityId));
+                    if (ability.TriggeredSpawnEffect != null
+                        && (!Enum.IsDefined(typeof(TriggeredSpawnKind), ability.TriggeredSpawnEffect.TriggerKind)
+                            || ability.TriggeredSpawnEffect.FirstTriggerOrdinal <= 0
+                            || ability.TriggeredSpawnEffect.RepeatInterval < 0
+                            || string.IsNullOrWhiteSpace(ability.TriggeredSpawnEffect.SummonTypeId)
+                            || !typeIds.Contains(ability.TriggeredSpawnEffect.SummonTypeId)
+                            || ability.TriggeredSpawnEffect.SideLengthCentimetres < 0
+                            || ability.TriggeredSpawnEffect.MaxActiveSameType < 0
+                            || (ability.TriggeredSpawnEffect
+                                    .UsesSkillAttackAnimation
+                                && (ability.TriggeredSpawnEffect.TriggerKind
+                                        != TriggeredSpawnKind
+                                            .SuccessfulAttack
+                                    || ability.TriggeredSpawnEffect
+                                        .SkillAttackAnimationOriginalDurationTicks
+                                        <= 0))
+                            || (!ability.TriggeredSpawnEffect
+                                    .UsesSkillAttackAnimation
+                                && ability.TriggeredSpawnEffect
+                                    .SkillAttackAnimationOriginalDurationTicks
+                                    != 0)))
+                        validationErrors.Add(new ValidationError("ability.triggeredSpawn.invalid", "Triggered-spawn effect is invalid: " + ability.AbilityId));
+                    if (ability.HealthThresholdAdjacentSpawnEffect != null
+                        && (ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille <= 0
+                            || ability.HealthThresholdAdjacentSpawnEffect.ThresholdHitPointsPermille > 1000
+                            || string.IsNullOrWhiteSpace(ability.HealthThresholdAdjacentSpawnEffect.SummonTypeId)
+                            || !typeIds.Contains(ability.HealthThresholdAdjacentSpawnEffect.SummonTypeId)))
+                        validationErrors.Add(new ValidationError("ability.healthThresholdAdjacentSpawn.invalid", "Health-threshold adjacent-spawn effect is invalid: " + ability.AbilityId));
+                    if (ability.HealthThresholdFullHealEffect != null
+                        && (ability.HealthThresholdFullHealEffect.ThresholdHitPointsPermille <= 0
+                            || ability.HealthThresholdFullHealEffect.ThresholdHitPointsPermille > 1000
+                            || string.IsNullOrWhiteSpace(ability.HealthThresholdFullHealEffect.AnimationKey)
+                            || ability.HealthThresholdFullHealEffect.AnimationOriginalDurationTicks <= 0))
+                        validationErrors.Add(new ValidationError("ability.healthThresholdFullHeal.invalid", "Health-threshold full-heal effect is invalid: " + ability.AbilityId));
+                    if (ability.OnHitDefenseDebuffEffect != null
+                        && ability.OnHitDefenseDebuffEffect
+                            .DefenseReductionPerStack <= 0)
+                        validationErrors.Add(new ValidationError("ability.onHitDefenseDebuff.invalid", "On-hit defense debuff is invalid: " + ability.AbilityId));
+                    if (ability.AttackDashEffect != null
+                        && (ability.AttackDashEffect
+                                .FirstTriggerOrdinal <= 0
+                            || ability.AttackDashEffect
+                                .RepeatInterval <= 0
+                            || ability.AttackDashEffect
+                                .DashDistanceCentimetres <= 0
+                            || ability.AttackDashEffect
+                                .UnblockableDurationTicks <= 0
+                            || ability.AttackDashEffect
+                                .MovementDelayEffectiveTicks <= 0
+                            || ability.AttackDashEffect
+                                .MovementDelayEffectiveTicks
+                               > ability.AttackDashEffect
+                                   .AnimationEffectiveDurationTicks
+                            || string.IsNullOrWhiteSpace(
+                                ability.AttackDashEffect
+                                    .AnimationSequenceKey)
+                            || ability.AttackDashEffect
+                                .AnimationOriginalDurationTicks <= 0
+                            || ability.AttackDashEffect
+                                .AnimationEffectiveDurationTicks
+                               != ability.AttackDashEffect
+                                   .UnblockableDurationTicks))
+                        validationErrors.Add(new ValidationError("ability.attackDash.invalid", "Attack-dash effect is invalid: " + ability.AbilityId));
+                    if (ability.ProximityEntryDamageEffect != null
+                        && (ability.ProximityEntryDamageEffect
+                                .RadiusCentimetres <= 0
+                            || ability.ProximityEntryDamageEffect
+                                .DamageType == DamageType.None
+                            || !Enum.IsDefined(
+                                typeof(DamageType),
+                                ability.ProximityEntryDamageEffect
+                                    .DamageType)
+                            || ability.ProximityEntryDamageEffect
+                                .AttackMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.proximityEntryDamage.invalid", "Proximity-entry damage effect is invalid: " + ability.AbilityId));
+                    if (!string.IsNullOrEmpty(ability.AnimationKey))
+                        validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
+                    if (ability.SkillAnimationOriginalDurationTicks != 0)
+                        validationErrors.Add(new ValidationError("ability.passive.animationDuration.unexpected", "Passive ability cannot define an animation duration: " + ability.AbilityId));
                 }
             }
             foreach (var definition in specification.UnitDefinitions.Where(item => item != null))

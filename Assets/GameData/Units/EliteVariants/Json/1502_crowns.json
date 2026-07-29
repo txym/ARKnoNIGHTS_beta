@@ -19,7 +19,7 @@
                          "sourceVariant":  "1502_crowns",
                          "statsLevel":  0,
                          "displayNameZhHans":  "弑君者",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "被阻挡时可以快速移动至其身后。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -68,7 +68,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "BLOCKED_BLINK_FORWARD"
                                               ]
                      }
                  ]

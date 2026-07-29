@@ -19,7 +19,7 @@
                          "sourceVariant":  "2031_syboy",
                          "statsLevel":  0,
                          "displayNameZhHans":  "塑路者",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击召唤一个\u003c塑路者分形\u003e；每受到十次伤害时，也会召唤一个\u003c塑路者分形\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  35000,
@@ -63,7 +63,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "ROADBUILDER_THIRD_ATTACK_SPAWN",
+                                                  "ROADBUILDER_TENTH_HIT_SPAWN"
                                               ]
                      }
                  ]

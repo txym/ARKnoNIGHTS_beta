@@ -19,7 +19,7 @@
                          "sourceVariant":  "1169_duphx",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池方阵战士",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "提升自身法抗；其他方阵战士位于附近时，防御力提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4000,
@@ -58,7 +58,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SEVENTY",
+                                                  "DEEP_POOL_PHALANX_NEARBY_DEFENSE"
                                               ]
                      },
                      {
@@ -66,7 +67,7 @@
                          "sourceVariant":  "1169_duphx_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池方阵指挥官",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "提升自身法抗；其他方阵战士位于附近时，防御力提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -105,7 +106,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SEVENTY",
+                                                  "DEEP_POOL_PHALANX_NEARBY_DEFENSE"
                                               ]
                      }
                  ]

@@ -19,7 +19,7 @@
                          "sourceVariant":  "1333_cbbgen",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“交通警察”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "无法被阻挡。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5500,
@@ -61,7 +61,7 @@
                          "sourceVariant":  "1333_cbbgen_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“交通警长”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "无法被阻挡。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  8500,

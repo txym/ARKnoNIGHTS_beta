@@ -474,6 +474,92 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 2026-07-29 Task 7 全量 PlayMode：`Artifacts/UnitEliteVariantsV2/Full-PlayMode/PlayModeResults.xml` 为 `27 total / 27 passed / 0 failed / 0 skipped / 0 inconclusive`，wrapper 退出码 `0`，Unity 正常退出；XML 与日志 SHA-256 分别为 `68B4677F0D7FCADF3637E62C1753CF71E03E337E9985C20FAC1EA40E4BD8831C`、`7213A123211732CDC85B470AB3490D3025A36E94A6AE60003247C0DBD527A582`。
 - 2026-07-29 Task 7 Windows x64 StrictMode：首次完整构建的结构化日志为 `result=Succeeded`、`errors=0`、`warnings=2`，两条均为既有 `Assets/Game/Runtime/Bitset/TagRegistry.cs(11,39) warning CS0414`，但当前 PowerShell 主机异步返回 GUI `Unity.exe`，没有捕获该次 Unity OS 退出码；日志在覆盖前的 SHA-256 为 `EDC6DA6AAF98AD2105F87D3D083ACC8A75D313121286A3579D9D7A87EC973279`。随后在全机 Unity 队列为空时使用相同 Unity 参数和 `Start-Process -Wait -PassThru` 复建，捕获 Unity 退出码 `0`；增量构建日志 `Artifacts/UnitEliteVariantsV2/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=0`，SHA-256 为 `6BFE96FE6E08E2E319C6DC84774582606AF51A3131C34F8C0A995C6B9E00565F`。产物为 `143` 个文件、总计 `282952109` 字节，主 EXE SHA-256 为 `F49CDCB9E27CF2AA5C6F63BC961B4364E93363071533661593549AEC421AD60B`。
 - 2026-07-29 Task 7 冻结目录与静态审计：`unit-catalog-v1.json` SHA-256 为 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`，`ability-catalog-v1.json` SHA-256 为 `BA76A69BFC5AFB186863ECF28AB36EBD504F14CD503347BE09CEEC652ECB3466`。人工维护目录恰好包含 `1000_gopro.json`、`5503_arcslma.json`、`5504_arcslmi.json`，旧目录不存在；源 JSON 禁用字段扫描为零匹配。计划列出的 `16` 个迁移提交及单独的计划更正提交 `1ef5d16` 均存在于当前 HEAD 祖先链且通过 `git show --check`；共审计 `38` 个唯一提交路径，没有场景、Prefab、ScriptableObject、Package、ProjectSettings 或冻结目录文件，当前相关 Unity 资产没有缺失或孤立 `.meta`。Task 7 前后工作树脏状态数量均为 `703`（已跟踪修改 `14`、未跟踪 `689`），任务范围路径保持干净，暂存区保持为空。
+
+### BONDS 特殊索敌、冲门与单场生命损失（2026-07-29）
+
+- `BondsTargetingEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖 `Untargetable`、历史能力 ID `UntargetableByMelee` 均排除近战与远程索敌、非攻击单位、零阻挡、无合法目标冲门、边长 `0.8m` 门区、`GateReached`、`lifeDeduct`、较少扣血方胜出，以及退出 Tick 的 Presentation Track 隐藏。
+- `UnitSourceConsumerEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖被动单位特征的能力目录隔离投影，以及 `1017/1042/1146/1355` 全部 v2 变体对 `UNTARGETABLE_BY_MELEE` 的显式引用。
+- `BattleCoreEditModeTests`：第一次完整回归 `57` 项中发现 `2` 项失败；根因是目标死亡时错误删除待结算攻击并提前解除攻击动画锁。修正为仅清理失效攻击者、目标死亡或冲门只在到期 Tick 取消伤害后，最终完整回归 `57/57` 通过，`failed=0`、`skipped=0`。
+- 额外静态构建：`dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error；警告来自既有 Unity 程序集版本冲突与测试反序列化 DTO 未直接赋值。
+- Unity 两次测试均在结构化 XML 写入后通过；中国版配置请求令 Editor 未在 10 秒收尾窗口内自行退出，脚本随后结束对应 batchmode 进程。未运行 PlayMode 与 Player 构建。
+
+### BONDS `10077` 自助出餐终端召唤（2026-07-29）
+
+- `BondsSkillAnimationEditModeTests`：`4/4` 通过，覆盖 `10077` 在 Tick `20` 发出 `Skill`、`50 → 25 Tick` 二倍速占用、同 Tick 精确中心 Spawn，以及 `10073` 在下一 Tick 激活并按普通规则索敌。结果位于 `Artifacts/BondsAbilities/RepairSummonSkill/EditModeResults.xml`。
+- `UnitSourceConsumerEditModeTests`：`8/8` 通过，覆盖 `10077 → SUMMON_REPAIR_HELPER → 10073` 的 v2 引用、初始/需求 SP `3/5`、单体中心召唤、无路径继承，以及真实 `Skill/2.5s` 动画目录投影。结果位于 `Artifacts/BondsAbilities/RepairSummonSources/EditModeResults.xml`。
+- `BattleCoreEditModeTests.AbilityCatalog_RejectsInvalidDefinitions`：参数化用例 `8/8` 通过，确认 `0cm` 是合法中心召唤而负边长仍被拒绝。结果位于 `Artifacts/BondsAbilities/SummonValidation/EditModeResults.xml`。
+- `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 人工动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS `1095` 永久叠加减防（2026-07-29）
+
+- `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests` 合并定向运行 `49/49` 通过，`failed=0`、`skipped=0`、`inconclusive=0`。最终结果位于 `Artifacts/BondsAbilities/DefenseDebuffFinal/EditModeResults.xml`。
+- Core 断言使用 `100 ATK / 30 DEF`，连续四次伤害严格为 `70/80/90/100`，证明当前 Hit 先按旧防御结算、之后每次永久叠加 `-10`，累计减防为 `40` 且有效防御下限为 `0`。
+- 数据消费者断言 `1095` 全部 v2 变体显式引用 `STACKING_DEFENSE_REDUCTION_ON_HIT`，能力源投影为 Passive/None、每层减防 `10`；Skill 动画目录仍只包含两个真实 Timed 技能。
+- `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error。Unity 在 XML 落盘后超过 20 秒收尾窗口并由脚本停止对应 batchmode；未运行 PlayMode、Player 构建或可见 Editor 检查。
+
+### BONDS `10038/10039` 防御被动与蓄力范围攻击（2026-07-29）
+
+- 最终定向 Unity EditMode 筛选 `BondsSkillAnimationEditModeTests;UnitSourceConsumerEditModeTests;BondsPassiveCombatModifierEditModeTests`，结果为 `55/55` 通过、失败 `0`、跳过 `0`，并正常退出；XML 位于 `Artifacts/BondsAbilities/ChargedDrinkFinal/EditModeResults.xml`。
+- Core 用例断言 `10039` 在 Tick `100` 选定地面目标并发出 Skill，源动画 `57 Tick` 按二倍速向上取整为 `29 Tick`；Tick `129` 才对主目标与 `150cm` 内地面目标各造成 `900` 物理伤害，范围外单位与无人机均不受伤。
+- 数据消费者覆盖 `10038/10039 → FORTIFIED_CATERING_VEHICLE`、`10039 → CHARGED_DRINK_AREA_ATTACK` 的 v2 引用，以及阻挡 `+2`、物理/法术承伤 `100/1000`、目标范围 `220cm`、范围半径 `150cm` 和真实 `Skill/2.833333s` 投影。
+- `dotnet build ARKnoNIGHTS.Battle.Core.csproj --no-restore -v:minimal` 与 `dotnet build Assembly-CSharp-Editor.csproj --no-restore -v:minimal` 均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS `1322` 第三击灰礼帽位移（2026-07-29）
+
+- 最终定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `52/52` 通过、失败 `0`、跳过 `0`、未运行 `0`，并正常退出；XML 位于 `Artifacts/BondsAbilities/GreyHatFocusedFinal/EditModeResults.xml`。
+- Core 用例断言前两击在 Tick `1/3` 发出普通 Attack，第三击在 Tick `5` 发出源 `40 Tick → 20 Tick` 的 Skill 并立即解除阻挡；Tick `9` 才在 `Skill_Begin` 完整二倍速播放后位移并对原阻挡者造成 `100` 点正常物理伤害，Tick `6..24` 不重建阻挡，Tick `25` 才恢复阻挡资格。
+- 数据消费者断言 `1322` 全部 v2 变体显式引用 `GREY_HAT_THIRD_ATTACK_DASH`，能力目录投影为第 `3` 击起每 `3` 击触发、位移 `150cm`、不可阻挡 `20 Tick`；技能动画目录投影为 `skill.begin|skill.loop|skill.end`、真实名称 `Skill_Begin|Skill_Loop|Skill_End`、总源 `40 Tick` 与片段源 `7/4/30 Tick`。
+- `dotnet build ARKnoNIGHTS.Battle.Core.csproj -nologo -v:minimal` 与 `dotnet build Assembly-CSharp-Editor.csproj -nologo -v:minimal` 均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS `1502` 被阻挡闪现（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `55/55` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/BlockedBlinkFinal/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
+- Core 覆盖满 SP 但未阻挡时不施放，以及攻击进行中 SP 回满后等待出伤/动画完成才施放；施放 Tick 解除阻挡，`Disappear` 的 `10` 个源 Tick 二倍速为 `5 Tick`，到期朝敌方门迁移 `150cm`，随后由 `Appear` 继续持有总计 `10 Tick` 的 Skill。
+- 数据消费者覆盖 `1502 → BLOCKED_BLINK_FORWARD`、初始/需求 `15/15 SP`、目录位移 `150cm`，以及 `blink.disappear|blink.appear → Disappear|Appear`、总源 `20 Tick`、逐段 `10/10 Tick`；生成的技能动画 JSON 还需通过运行时 `SkillAnimationCatalogLoader.LoadFromJson` 往返验证。
+- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS `10038` 地面进入半径碰撞（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `56/56` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/CollisionFocused/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
+- Core 用例令地面目标与近战不可选无人机在 Tick `1` 同时移动到车辆恰好 `50cm` 处；只有地面目标受到 `100 ATK - 20 DEF = 80` 物理伤害，Tick `2` 继续停留不重复触发，无人机保持满血。
+- 数据消费者断言 `10038` v2 变体同时引用 `FORTIFIED_CATERING_VEHICLE` 与 `GROUND_PROXIMITY_COLLISION_DAMAGE`；能力目录投影为 Passive/None、半径 `50cm`、Physical、攻击倍率 `1000/1000`、仅地面目标。该被动不进入技能动画目录。
+- 提交前最终静态构建的 Core、Editor 和 EditMode Tests 均为 `0` error；`git diff --check` 通过。未运行 PlayMode、Windows Player 构建或可见 Editor 检查。
+
+### BONDS `2031/2033` 计数触发召唤生产接线（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `57/57` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/RoadbuilderFocused/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
+- 既有 Core 回归覆盖第三击使用 Skill、奇数源 Tick 二倍速向上取整、动画到期出伤与生成、`40cm` 方形确定性位置、下一 Tick 激活、每10次受伤生成以及 `8/12` 同类存活上限。
+- 数据消费者新增断言：`2031` 引用第三击与每10次受伤两项能力，`2033` 引用其有上限第三击能力；三项 `TriggeredSpawn` 投影分别为 `SuccessfulAttack/3/3/2033/40cm/0`、`DamageReceived/10/10/2033/40cm/8` 和 `SuccessfulAttack/3/3/2033/40cm/12`。两项攻击触发动画均由真实 v2 数据生成 `attack.skill → Skill`、源 `40 Tick`、二倍速有效 `20 Tick`。
+- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor Spine 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS `10006` 首次半血召唤与移速生产接线（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `58/58` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/CorruptedGolemFocused/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
+- 既有 Core 回归断言 `10006` 首次严格低于 `50%` 后仅在四个非门正交格中心各生成一个 `10002`，动态单位下一 Tick 激活且后续不重复生成；既有一次性生命阈值修正覆盖永久移速倍率。
+- 数据消费者新增断言：两个 `10006` v2 变体均引用 `CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN` 与 `CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED`；生成投影分别为严格低于 `500/1000`、召唤类型 `10002`，以及一次性、永久、移速 `2500/1000` 且其他战斗倍率中性。
+- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS 常驻自身战斗属性生产接线（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `59/59` 通过、失败 `0`、跳过 `0`、未运行 `0`，Unity 在结果写入后正常退出；XML 位于 `Artifacts/BondsAbilities/ConstantSelfModifiersFocused/EditModeResults.xml`。
+- 数据消费者以一个新增用例覆盖五条共享能力投影，并逐一读取 8 份真实 v2 文档的全部 16 个变体：`1058/1081 → BLOCK_CAPACITY_PLUS_TWO`、`1240 → BLOCK_CAPACITY_PLUS_ONE`、`1165/1166/1170 → MAGIC_RESISTANCE_PLUS_SEVENTY`、`1230 → MAGIC_RESISTANCE_PLUS_SIXTY`、`10127 → HETEROGENEOUS_BEAST_FORTIFICATION`。
+- 投影断言阻挡加算 `2/1`、法抗加算 `70/60`、`10127` 攻速加算 `100` 和物理/法术承伤 `500/1000`；中性承伤字段保持 `1000/1000`。既有 Core 回归继续覆盖阻挡、法抗上限、攻速向上取整和承伤类型边界。
+- Editor 与 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS 生命阈值战斗属性生产接线（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `60/60` 通过、失败 `0`、跳过 `0`、未运行 `0`，Unity 在结果写入后正常退出；XML 位于 `Artifacts/BondsAbilities/HealthThresholdModifiersFocused/EditModeResults.xml`。
+- 数据消费者验证 `1025` 精英 0/2 分别引用 `2000/2800` 攻击倍率的半血持续能力；`1232` 两变体引用严格半血以下、防御 `4000/1000`、阻挡 `+1`；`1264` 两变体引用严格低于满血、一次触发、持续 `300 Tick`、攻速 `+100`、移速 `2000/1000`；`1274` 两变体引用严格半血以下、一次触发、永久加速。
+- 既有 Core 回归覆盖持续阈值随治疗撤销、首次触发限时状态精确到期、永久状态、攻防/阻挡/攻速/移速组合，以及阻挡容量下降时的稳定关系裁剪。
+- Editor 与 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS 全部单位能力与永久表现状态收口（2026-07-29）
+
+- 描述同步后的最终代码定向 EditMode 筛选 BONDS 五组聚焦套件及 `BattlePresentationEditModeTests;BattlePresentationTrackEditModeTests`，结果为 `169/169` 通过、失败 `0`、跳过 `0`、不确定 `0`、未运行 `0`，Unity 正常退出；XML 位于 `Artifacts/BondsAbilities/FinalDescriptions/EditModeResults.xml`。
+- 其中 `BondsTargeting=7`、`BondsPassiveCombatModifier=45`、`BondsSkillAnimation=5`、`UnitSourceConsumer=17`、`BattleCore=59`、`BattlePresentation=23`、`BattlePresentationTrack=13`；覆盖战术命令标签及条件增益、无人机光环、生命周期、死亡后继、囚犯第四击解放、首领群体解放、半血 Skill 排队、二倍速向上取整、永久表现状态、时间轴/回放回归及能力/动画目录投影。`1146` 另覆盖 `250cm` 半径、基础与精英 2 增量光环数值、排除自身、同能力不叠加以及两个精英变体生产接线。静态 `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:q -clp:ErrorsOnly` 为 `0` error（保留既有 `118` 个警告）。
+- 用户确认 `1089` 无需独立地面/空中标签，因为无人机已由公共目标资格从全部索敌与伤害候选排除；`1146` 光环半径确认为 `2.5格`。`BONDS_IMPLEMENTATION.md` 的 `59/59` 条目现均为已实现。未运行 PlayMode 真实 Spine 动画、Windows Player 构建或人工动画检查；冻结 v1 目录未重新生成。
+- 能力描述同步检查使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Sync-BondsUnitDescriptions.ps1 -Check`。检查要求实现台账恰有 `59` 条非空描述，并逐变体匹配生产 v2 JSON；当前结果为 `59` 条描述、`108/108` 个相关变体非空且一致、修改文件数 `0`。全部单位与能力源 JSON 解析错误数为 `0`。
+
 - 2026-07-29 Task 7 独立审查后修复：审查发现解析器已拒绝 `animations[].key == "Default"`，但未拒绝 `animations[].name == "Default"`。提交 `8893b1d` 先加入负向回归测试；RED 为 `44 total / 43 passed / 1 failed / 0 skipped`，唯一失败证明 `key=idle/name=Default` 会被旧实现接受。随后以相同 `StringComparison.Ordinal` 同时校验 key 与 name；GREEN 为 `44/44` 通过、失败 `0`、跳过 `0`，wrapper 退出码 `0`，日志没有编译错误或未处理异常。证据位于 `Artifacts/UnitEliteVariantsV2/DefaultBindingFix/{RED,GREEN}`。两次 Unity 都在结果落盘后超过 runner grace period 并被强制停止，最终确认无 Unity/UnityHub 残留；修复提交经独立只读复审为 `CLEAN`。
 - 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：
 - 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。

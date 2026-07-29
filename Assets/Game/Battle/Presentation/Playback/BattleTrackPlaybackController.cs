@@ -64,6 +64,15 @@ namespace ArknoNights.Battle.Presentation
             {
                 var sample = unit.Sample(PresentationTick);
                 if (!sample.HasSpawned) continue;
+                if (sample.HasExitedBattle)
+                {
+                    if (views.TryGetValue(unit.UnitId, out var exited))
+                    {
+                        exited.View.Dispose();
+                        views.Remove(unit.UnitId);
+                    }
+                    continue;
+                }
                 if (!views.TryGetValue(unit.UnitId, out var record))
                 {
                     if (!sample.ShouldDisplay) continue;
@@ -118,11 +127,27 @@ namespace ArknoNights.Battle.Presentation
                 record.LastFacing = sample.HorizontalFacing;
             }
             record.View.SetStatusBarState(record.Unit.UnitId, record.Unit.Side != (Observer == BattleObserverView.Home ? BattleSide.Home : BattleSide.Away), sample.MaxHitPoints, sample.CurrentHitPoints, sample.CurrentShield);
-            if (record.Action != sample.Action || record.ActionStartTick != sample.ActionStartTick || record.ActionSequence != sample.ActionSequence)
+            var presentationStateChanged = !string.Equals(
+                record.PresentationStateTag,
+                sample.PresentationStateTag,
+                StringComparison.Ordinal);
+            if (presentationStateChanged)
+            {
+                record.View.SetPresentationState(
+                    sample.PresentationStateTag);
+                record.PresentationStateTag =
+                    sample.PresentationStateTag;
+            }
+            if (presentationStateChanged || record.Action != sample.Action || record.ActionStartTick != sample.ActionStartTick || record.ActionSequence != sample.ActionSequence)
             {
                 if (sample.Action == UnitPresentationAction.Idle) record.View.PlayIdle();
                 else if (sample.Action == UnitPresentationAction.Move) record.View.PlayMove();
                 else if (sample.Action == UnitPresentationAction.Attack) record.View.PlayAttack(sample.AttackAnimationSpeedMultiplier);
+                else if (sample.Action == UnitPresentationAction.Skill
+                    && record.View is IBattleSkillPresentationView skillView)
+                    skillView.PlaySkill(
+                        sample.AnimationKey,
+                        sample.AnimationSpeedMultiplier);
                 else if (sample.Action == UnitPresentationAction.Death) record.View.PlayDeath();
                 record.Action = sample.Action;
                 record.ActionStartTick = sample.ActionStartTick;
@@ -143,6 +168,8 @@ namespace ArknoNights.Battle.Presentation
             internal UnitPresentationAction Action { get; set; } = (UnitPresentationAction)(-1);
             internal int ActionStartTick { get; set; } = int.MinValue;
             internal int ActionSequence { get; set; } = int.MinValue;
+            internal string PresentationStateTag { get; set; }
+                = null;
             internal BattlePresentationViewState ToState(double presentationTick)
             {
                 var sample = Unit.Sample(presentationTick);

@@ -19,7 +19,7 @@
                          "sourceVariant":  "10077_mpbarr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "内测版自助出餐终端",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每隔一段时间召唤一个\u003c迷茫的修理小助手\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -63,7 +63,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SUMMON_REPAIR_HELPER"
                                               ]
                      },
                      {
@@ -71,7 +71,7 @@
                          "sourceVariant":  "10077_mpbarr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "自助出餐终端原型机",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每隔一段时间召唤一个\u003c迷茫的修理小助手\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  8000,
@@ -115,7 +115,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SUMMON_REPAIR_HELPER"
                                               ]
                      }
                  ]

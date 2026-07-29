@@ -19,7 +19,7 @@
                          "sourceVariant":  "10006_trsmgi",
                          "statsLevel":  0,
                          "displayNameZhHans":  "染秽魔像",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "生命值首次低于一半时，会在四周掉落\u003c浆果虫\u003e，之后自身移动速度增加。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  30000,
@@ -63,7 +63,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
+                                                  "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED"
                                               ]
                      },
                      {
@@ -71,7 +72,7 @@
                          "sourceVariant":  "10006_trsmgi_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "凶秽魔像",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "生命值首次低于一半时，会在四周掉落\u003c浆果虫\u003e，之后自身移动速度增加。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  45000,
@@ -115,7 +116,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
+                                                  "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED"
                                               ]
                      }
                  ]

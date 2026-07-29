@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "HETEROGENEOUS_BUG_DAMAGE_REACTION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "受到敌方单位伤害时反击伤害来源。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    { "kind": "OnDamageReaction", "damageType": "Magic", "damageAmount": 200 }
+  ]
+}

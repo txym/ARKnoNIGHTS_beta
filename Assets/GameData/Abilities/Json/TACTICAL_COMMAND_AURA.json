@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "TACTICAL_COMMAND_AURA",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "在场时强化全场友方单位，并赋予<战术命令>。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AuraCombatModifier",
+      "targetSide": "Allies",
+      "isGlobal": true,
+      "radiusMetres": 0,
+      "excludeSource": false,
+      "nonStackingByAbilityId": false,
+      "attackMultiplierPermille": 1100,
+      "defenseAdditive": 100,
+      "magicResistanceAdditive": 0,
+      "attackSpeedMultiplierPermille": 1000,
+      "moveSpeedMultiplierPermille": 1000,
+      "hitPointsPerSecond": 0,
+      "grantedStatusTag": "TacticalCommand"
+    }
+  ]
+}

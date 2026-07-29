@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "STACKING_DEFENSE_REDUCTION_ON_HIT",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "攻击会永久降低目标防御力。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "animationKey": "",
+  "effects": [
+    {
+      "kind": "OnHitDefenseDebuff",
+      "defenseReductionPerStack": 10
+    }
+  ]
+}

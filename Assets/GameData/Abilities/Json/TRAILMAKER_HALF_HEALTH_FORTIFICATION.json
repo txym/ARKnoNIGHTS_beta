@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "TRAILMAKER_HALF_HEALTH_FORTIFICATION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "低于半血时提升防御力与阻挡数。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "HealthThresholdCombatModifier",
+      "thresholdHitPointsPermille": 500,
+      "inclusiveThreshold": false,
+      "triggerOnce": false,
+      "durationTicks": 0,
+      "attackMultiplierPermille": 1000,
+      "defenseMultiplierPermille": 4000,
+      "blockCapacityAdditive": 1,
+      "attackSpeedAdditive": 0,
+      "moveSpeedMultiplierPermille": 1000,
+      "makesUnblockable": false
+    }
+  ]
+}

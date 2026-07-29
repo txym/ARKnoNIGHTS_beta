@@ -19,7 +19,7 @@
                          "sourceVariant":  "1042_frostd",
                          "statsLevel":  0,
                          "displayNameZhHans":  "寒霜",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "周围的敌方单位的攻击速度大幅度降低。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6500,
@@ -53,7 +53,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "UNTARGETABLE_BY_MELEE",
+                                                  "FROST_ATTACK_SPEED_AURA"
                                               ]
                      }
                  ]

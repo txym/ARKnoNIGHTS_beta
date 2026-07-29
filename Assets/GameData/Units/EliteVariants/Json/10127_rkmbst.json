@@ -19,7 +19,7 @@
                          "sourceVariant":  "10127_rkmbst",
                          "statsLevel":  0,
                          "displayNameZhHans":  "异质裂兽",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到伤害降低，攻击速度提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  20000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HETEROGENEOUS_BEAST_FORTIFICATION"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "10127_rkmbst_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "异质裂兽·α",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到伤害降低，攻击速度提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  27500,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HETEROGENEOUS_BEAST_FORTIFICATION"
                                               ]
                      }
                  ]

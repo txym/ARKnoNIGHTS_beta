@@ -19,7 +19,7 @@
                          "sourceVariant":  "1043_zomsabr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "宿主士兵",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "能够自然回复生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  2500,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HOST_NATURAL_REGENERATION_160"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1043_zomsabr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "宿主士兵组长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "能够自然回复生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HOST_NATURAL_REGENERATION_300"
                                               ]
                      }
                  ]

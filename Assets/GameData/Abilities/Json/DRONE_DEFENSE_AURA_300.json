@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "DRONE_DEFENSE_AURA_300",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "为周围友方单位持续提供防御力加成。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AuraCombatModifier",
+      "targetSide": "Allies",
+      "isGlobal": false,
+      "radiusMetres": 2.5,
+      "excludeSource": true,
+      "nonStackingByAbilityId": true,
+      "attackMultiplierPermille": 1000,
+      "defenseAdditive": 300,
+      "magicResistanceAdditive": 0,
+      "attackSpeedMultiplierPermille": 1000,
+      "moveSpeedMultiplierPermille": 1000,
+      "hitPointsPerSecond": 0
+    }
+  ]
+}

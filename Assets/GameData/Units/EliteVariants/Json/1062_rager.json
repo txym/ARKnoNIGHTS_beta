@@ -19,7 +19,7 @@
                          "sourceVariant":  "1062_rager",
                          "statsLevel":  0,
                          "displayNameZhHans":  "狂暴宿主士兵",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "持续损失生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  20000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "RAGING_HOST_LIFE_LOSS_330"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1062_rager_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "狂暴宿主组长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "持续损失生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  30000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "RAGING_HOST_LIFE_LOSS_500"
                                               ]
                      }
                  ]

@@ -19,7 +19,7 @@
                          "sourceVariant":  "1322_wdgyht",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“灰礼帽”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击向侵入点方向瞬移。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  15000,
@@ -73,7 +73,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "GREY_HAT_THIRD_ATTACK_DASH"
                                               ]
                      },
                      {
@@ -81,7 +81,7 @@
                          "sourceVariant":  "1322_wdgyht_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“灰礼帽”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击向侵入点方向瞬移。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  36000,
@@ -135,7 +135,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "GREY_HAT_THIRD_ATTACK_DASH"
                                               ]
                      }
                  ]

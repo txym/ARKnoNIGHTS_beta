@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "HETEROGENEOUS_BEAST_FORTIFICATION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "受到伤害降低，攻击速度提升。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "PassiveCombatModifier",
+      "blockCapacityAdditive": 0,
+      "magicResistanceAdditive": 0,
+      "attackSpeedAdditive": 100,
+      "physicalDamageTakenPermille": 500,
+      "magicDamageTakenPermille": 500
+    }
+  ]
+}

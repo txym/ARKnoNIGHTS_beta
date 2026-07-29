@@ -123,7 +123,7 @@ namespace ArknoNights.Battle.Presentation
             displayTicks += unscaledDeltaSeconds * PlaybackSpeed * BattleInput.TicksPerSecond;
             if (compiledTrack != null)
             {
-                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack) && item.Tick > previousTicks && item.Tick <= displayTicks))
+                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack || item.Type == BattleEventType.Skill || item.Type == BattleEventType.PresentationStateChanged) && item.Tick > previousTicks && item.Tick <= displayTicks))
                     if (!trackPlayback.RenderAt(action.Tick, out var actionDiagnostics)) diagnostics.AddRange(actionDiagnostics);
                 if (!trackPlayback.RenderAt(displayTicks, out var trackDiagnostics)) diagnostics.AddRange(trackDiagnostics);
             }
@@ -243,12 +243,71 @@ namespace ArknoNights.Battle.Presentation
                     attacker.MarkAttackFacing(item.Tick, attacker.PositionAt(item.Tick), attackTarget.PositionAt(item.Tick));
                     break;
 
+                case BattleEventType.Skill:
+                    if (!TryGetView(item.UnitId, item, out var caster)) return false;
+                    if (string.IsNullOrWhiteSpace(item.AnimationKey)
+                        || item.OriginalAnimationTicks <= 0
+                        || item.EffectiveAnimationTicks != (item.OriginalAnimationTicks + 1) / 2)
+                    {
+                        AddDiagnostic("skill.contract.invalid", "Skill requires a key and a rounded 2x duration.", item.Tick, item.Sequence);
+                        return false;
+                    }
+                    if (caster.View is IBattleSkillPresentationView skillView)
+                        skillView.PlaySkill(item.AnimationKey, 2f);
+                    caster.MarkAttackAnimationStarted(
+                        item.Tick,
+                        item.EffectiveAnimationTicks);
+                    if (!string.IsNullOrEmpty(item.RelatedUnitId))
+                    {
+                        if (!TryGetView(
+                                item.RelatedUnitId,
+                                item,
+                                out var skillTarget))
+                            return false;
+                        caster.MarkAttackFacing(
+                            item.Tick,
+                            caster.PositionAt(item.Tick),
+                            skillTarget.PositionAt(item.Tick));
+                    }
+                    break;
+
+                case BattleEventType.PresentationStateChanged:
+                    if (!TryGetView(
+                            item.UnitId,
+                            item,
+                            out var stateChanged))
+                        return false;
+                    if (string.IsNullOrWhiteSpace(
+                            item.AnimationKey))
+                    {
+                        AddDiagnostic(
+                            "presentationState.contract.invalid",
+                            "Presentation state tag is required.",
+                            item.Tick,
+                            item.Sequence);
+                        return false;
+                    }
+                    stateChanged.View.SetPresentationState(
+                        item.AnimationKey);
+                    break;
+
                 case BattleEventType.Damage:
                     if (string.IsNullOrEmpty(item.RelatedUnitId) || !TryGetView(item.RelatedUnitId, item, out var damaged)) return false;
                     damaged.HitPoints = item.HitPointsAfter;
                     damaged.View.SetStatusBarState(damaged.UnitId, damaged.Side != ToBattleSide(Observer), damaged.HitPoints, 0);
                     damaged.View.PlayHit();
                     damaged.MarkNonMoveAnimationStarted();
+                    break;
+
+                case BattleEventType.HealthChanged:
+                    if (!TryGetView(item.UnitId, item, out var changed))
+                        return false;
+                    changed.HitPoints = item.HitPointsAfter;
+                    changed.View.SetStatusBarState(
+                        changed.UnitId,
+                        changed.Side != ToBattleSide(Observer),
+                        changed.HitPoints,
+                        0);
                     break;
 
                 case BattleEventType.Death:

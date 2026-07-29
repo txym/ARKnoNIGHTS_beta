@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "首次低于半血时切换状态，短时间无法被阻挡并大幅加速。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "animationKey": "skill.begin",
+  "persistentPresentationStateTag": "b",
+  "effects": [
+    {
+      "kind": "HealthThresholdCombatModifier",
+      "thresholdHitPointsPermille": 500,
+      "inclusiveThreshold": false,
+      "triggerOnce": true,
+      "durationTicks": 30,
+      "attackMultiplierPermille": 1000,
+      "defenseMultiplierPermille": 1000,
+      "blockCapacityAdditive": 0,
+      "attackSpeedAdditive": 0,
+      "moveSpeedMultiplierPermille": 2500,
+      "makesUnblockable": true
+    }
+  ]
+}

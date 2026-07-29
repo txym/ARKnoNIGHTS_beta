@@ -19,7 +19,7 @@
                          "sourceVariant":  "1080_sotidp",
                          "statsLevel":  0,
                          "displayNameZhHans":  "游击队传令兵",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "在场时强化全场友方单位，并赋予\u003c战术命令\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TACTICAL_COMMAND_AURA"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1080_sotidp_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "游击队传令兵组长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "在场时强化全场友方单位，并赋予\u003c战术命令\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  10000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TACTICAL_COMMAND_AURA"
                                               ]
                      }
                  ]

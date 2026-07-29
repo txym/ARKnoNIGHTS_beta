@@ -19,7 +19,7 @@
                          "sourceVariant":  "1170_dushld",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池重甲卫士",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SEVENTY"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1170_dushld_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池重甲卫士队长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  9000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SEVENTY"
                                               ]
                      }
                  ]

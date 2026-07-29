@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "FAMILY_CAR_DEATH_SPAWN",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "被击倒时释放三个<家族士兵>。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "DeathSpawn",
+      "options": [ { "summonTypeId": "1277", "weight": 1 } ],
+      "count": 3,
+      "delayTicks": 0,
+      "spawnArea": { "shape": "Square", "center": "CasterCellCenter", "sideLengthMetres": 0 },
+      "snapToNearestPassableCell": false,
+      "summonedMoveSpeedMultiplierPermille": 1000
+    }
+  ]
+}

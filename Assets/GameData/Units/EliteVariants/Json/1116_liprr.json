@@ -19,7 +19,7 @@
                          "sourceVariant":  "1116_liprr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "普通囚犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击力。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5500,
@@ -98,7 +98,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_STANDARD"
                                               ]
                      },
                      {
@@ -106,7 +106,7 @@
                          "sourceVariant":  "1116_liprr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "老练囚犯",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击力。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7500,
@@ -185,7 +185,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PRISONER_RELEASE_STANDARD"
                                               ]
                      }
                  ]

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "WINTERWISP_DEATH_BLAST",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "死亡后对周围所有敌方造成高额法术伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "DeathAreaDamage",
+      "damageType": "Magic",
+      "attackMultiplierPermille": 2000,
+      "radiusMetres": 1.5,
+      "delayTicks": 26
+    }
+  ]
+}

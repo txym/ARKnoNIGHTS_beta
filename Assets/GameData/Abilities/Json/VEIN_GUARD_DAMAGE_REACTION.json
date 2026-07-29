@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "VEIN_GUARD_DAMAGE_REACTION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "受到攻击时对目标造成一定法术伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    { "kind": "OnDamageReaction", "damageType": "Magic", "damageAmount": 200 }
+  ]
+}

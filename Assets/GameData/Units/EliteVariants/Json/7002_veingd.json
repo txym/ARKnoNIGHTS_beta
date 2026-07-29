@@ -19,7 +19,7 @@
                          "sourceVariant":  "7002_veingd",
                          "statsLevel":  0,
                          "displayNameZhHans":  "矿脉守卫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到攻击时对目标造成一定法术伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  25000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "VEIN_GUARD_DAMAGE_REACTION"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "7002_veingd_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "狂化矿脉守卫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到攻击时对目标造成一定法术伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  40000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "VEIN_GUARD_DAMAGE_REACTION"
                                               ]
                      }
                  ]

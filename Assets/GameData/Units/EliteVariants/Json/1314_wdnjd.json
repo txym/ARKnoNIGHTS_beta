@@ -19,7 +19,7 @@
                          "sourceVariant":  "1314_wdnjd",
                          "statsLevel":  0,
                          "displayNameZhHans":  "寻路密探",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "首次攻击伤害提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6500,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PATHFINDER_FIRST_ATTACK_BOOST"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1314_wdnjd_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "寻路密探长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "首次攻击伤害提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  8000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "PATHFINDER_FIRST_ATTACK_BOOST"
                                               ]
                      }
                  ]

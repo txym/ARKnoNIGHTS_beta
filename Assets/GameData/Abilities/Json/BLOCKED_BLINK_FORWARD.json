@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "BLOCKED_BLINK_FORWARD",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "被阻挡时可以快速移动至其身后。",
+  "activationKind": "Timed",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 15,
+    "required": 15,
+    "generation": "Automatic"
+  },
+  "animationKeys": [
+    "blink.disappear",
+    "blink.appear"
+  ],
+  "effects": [
+    {
+      "kind": "TimedBlink",
+      "blinkDistanceMetres": 1.5
+    }
+  ]
+}
