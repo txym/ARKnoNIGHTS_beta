@@ -8,7 +8,11 @@ namespace ArknoNights.Battle.Core
     public enum AbilityActivationKind { Timed, Passive }
     public enum SilencePolicy { Unaffected }
     public enum SkillPointGeneration { Automatic, None }
-    public enum UnitTraitEffectKind { Untargetable }
+    public enum UnitTraitEffectKind
+    {
+        Untargetable,
+        MoveFromOwnGateToDeploymentPosition
+    }
 
     public sealed class UnitTraitEffectDefinition
     {

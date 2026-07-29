@@ -1634,6 +1634,114 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void DeploymentApproach_StartsAtOwnGateAndEnablesAuraOnlyAtDestination()
+        {
+            var input = CreateInput(
+                4,
+                new[]
+                {
+                    MovingNonAttacker(
+                        "anvil",
+                        2000,
+                        4,
+                        "ANVIL_APPROACH",
+                        "ANVIL_UNTARGETABLE",
+                        "ANVIL_AURA"),
+                    Attacker(
+                        "ally",
+                        0,
+                        0,
+                        attackIntervalTicks: 1000,
+                        defense: 100)
+                },
+                new[]
+                {
+                    PassiveTrait(
+                        "ANVIL_APPROACH",
+                        UnitTraitEffectKind
+                            .MoveFromOwnGateToDeploymentPosition),
+                    PassiveTrait(
+                        "ANVIL_UNTARGETABLE",
+                        UnitTraitEffectKind.Untargetable),
+                    PassiveAura(
+                        "ANVIL_AURA",
+                        AuraTargetSide.Allies,
+                        isGlobal: false,
+                        radiusCentimetres: 150,
+                        excludeSource: true,
+                        nonStackingByAbilityId: true,
+                        defenseAdditive: 200,
+                        hitPointsPerSecond: 400)
+                },
+                new[]
+                {
+                    Unit("home-anvil", "anvil", 5, 4),
+                    Unit("home-ally", "ally", 6, 4)
+                },
+                new[]
+                {
+                    Unit("away-anvil", "anvil", 5, 4),
+                    Unit("away-ally", "ally", 4, 4)
+                });
+            var runner = new BattleRunner(input);
+            var homeAnvil = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "home-anvil");
+            var awayAnvil = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "away-anvil");
+            var homeAlly = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "home-ally");
+            var awayAlly = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "away-ally");
+
+            Assert.That(
+                homeAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 100)));
+            Assert.That(
+                awayAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 800)));
+
+            runner.Step();
+            runner.Step();
+
+            Assert.That(
+                homeAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 300)));
+            Assert.That(
+                awayAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 600)));
+            Assert.That(homeAlly.EffectiveDefense, Is.EqualTo(100));
+            Assert.That(awayAlly.EffectiveDefense, Is.EqualTo(100));
+
+            runner.Step();
+
+            Assert.That(
+                homeAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 400)));
+            Assert.That(
+                awayAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 500)));
+            Assert.That(homeAlly.EffectiveDefense, Is.EqualTo(300));
+            Assert.That(awayAlly.EffectiveDefense, Is.EqualTo(300));
+
+            runner.Step();
+
+            Assert.That(
+                homeAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 400)));
+            Assert.That(
+                awayAnvil.Position,
+                Is.EqualTo(new FixedPosition(500, 500)));
+            Assert.That(
+                runner.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Move
+                        && (item.UnitId == "home-anvil"
+                            || item.UnitId == "away-anvil"))
+                    .Select(item => item.Tick),
+                Is.EqualTo(new[] { 1, 1, 2, 2, 3, 3 }));
+        }
+
+        [Test]
         public void BlockedCounterpartSlow_DoesNotStackByAbilityId()
         {
             var input = CreateInput(
@@ -2585,6 +2693,23 @@ namespace ArknoNights.Battle.Tests
                 0);
         }
 
+        private static AbilityDefinition PassiveTrait(
+            string abilityId,
+            UnitTraitEffectKind kind)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                new UnitTraitEffectDefinition(kind));
+        }
+
         private static AbilityDefinition PassiveBlockedCounterpartSlow(
             int attackSpeedMultiplierPermille)
         {
@@ -2740,7 +2865,21 @@ namespace ArknoNights.Battle.Tests
 
         private static UnitDefinition MovingNonAttacker(
             string typeId,
-            int moveSpeedCentimetresPerSecond)
+            int moveSpeedCentimetresPerSecond,
+            params string[] abilityIds)
+        {
+            return MovingNonAttacker(
+                typeId,
+                moveSpeedCentimetresPerSecond,
+                1,
+                abilityIds);
+        }
+
+        private static UnitDefinition MovingNonAttacker(
+            string typeId,
+            int moveSpeedCentimetresPerSecond,
+            int actionMethod,
+            params string[] abilityIds)
         {
             return new UnitDefinition(
                 typeId,
@@ -2756,7 +2895,8 @@ namespace ArknoNights.Battle.Tests
                 0,
                 0,
                 true,
-                Array.Empty<string>());
+                abilityIds ?? Array.Empty<string>(),
+                actionMethod);
         }
 
         private static UnitSnapshot Unit(

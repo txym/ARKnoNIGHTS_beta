@@ -416,6 +416,19 @@ namespace ArknoNights.Battle.Core
             abilityStates = (abilities ?? Enumerable.Empty<RuntimeAbilityState>()).OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal).ToList();
             AbilityStates = new ReadOnlyCollection<RuntimeAbilityState>(abilityStates);
             BlockedUnitIds = new ReadOnlyCollection<string>(blockedUnitIds);
+            if (activationTick == 0
+                && abilityStates.Any(item =>
+                    item.Definition.UnitTraitEffect != null
+                    && item.Definition.UnitTraitEffect.Kind
+                    == UnitTraitEffectKind
+                        .MoveFromOwnGateToDeploymentPosition))
+            {
+                DeploymentApproachDestination = position;
+                Position = FixedPosition.FromCell(
+                    side == BattleSide.Home
+                        ? BattlefieldRules.BlueGate
+                        : BattlefieldRules.RedGate);
+            }
         }
 
         public string UnitId { get; }
@@ -451,6 +464,16 @@ namespace ArknoNights.Battle.Core
         }
         internal UnitDefinition Definition { get; }
         internal IReadOnlyList<RuntimeAbilityState> AbilityStates { get; }
+        internal FixedPosition? DeploymentApproachDestination
+        {
+            get;
+        }
+        internal bool HasDeploymentApproach =>
+            DeploymentApproachDestination.HasValue;
+        internal bool IsDeploymentApproachInProgress =>
+            HasDeploymentApproach
+            && !Position.Equals(
+                DeploymentApproachDestination.Value);
         internal bool IsTargetable => abilityStates.All(item =>
             item.Definition.UnitTraitEffect == null
             || item.Definition.UnitTraitEffect.Kind != UnitTraitEffectKind.Untargetable);
@@ -716,6 +739,8 @@ namespace ArknoNights.Battle.Core
             AuraCombatModifiers =>
             abilityStates
                 .Where(item =>
+                    !IsDeploymentApproachInProgress
+                    &&
                     item.Definition.AuraCombatModifier != null)
                 .Select(item =>
                     new KeyValuePair<string, AuraCombatModifierDefinition>(
@@ -1097,7 +1122,8 @@ namespace ArknoNights.Battle.Core
         {
             foreach (var unit in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
-                if (!unit.Definition.CanAttack)
+                if (unit.IsDeploymentApproachInProgress
+                    || !unit.Definition.CanAttack)
                 {
                     SetTarget(unit, null);
                     continue;
@@ -1114,8 +1140,27 @@ namespace ArknoNights.Battle.Core
         private void ApplyMovement()
         {
             var intents = new List<MoveIntent>();
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && item.Definition.ActionMethod != 4 && !item.IsBlocked && !IsSkillAnimationLocked(item) && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && (item.HasDeploymentApproach || item.Definition.ActionMethod != 4) && !item.IsBlocked && !IsSkillAnimationLocked(item) && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
+                if (unit.HasDeploymentApproach)
+                {
+                    if (unit.IsDeploymentApproachInProgress)
+                    {
+                        var destination =
+                            unit.DeploymentApproachDestination.Value;
+                        var nextDestinationPosition =
+                            MoveTowards(unit, destination, 0);
+                        if (!nextDestinationPosition.Equals(
+                                unit.Position))
+                            intents.Add(new MoveIntent(
+                                unit,
+                                unit.Position,
+                                nextDestinationPosition,
+                                null));
+                    }
+                    continue;
+                }
+
                 if (!unit.Definition.CanAttack)
                 {
                     var gate = OpposingGatePosition(unit.Side);
@@ -2578,6 +2623,15 @@ namespace ArknoNights.Battle.Core
                     builder.Append(",move:")
                         .Append(
                             unit.InstanceMoveSpeedMultiplierPermille);
+                if (unit.DeploymentApproachDestination.HasValue)
+                    builder.Append(",approach:")
+                        .Append(
+                            unit.DeploymentApproachDestination
+                                .Value.XUnits)
+                        .Append(':')
+                        .Append(
+                            unit.DeploymentApproachDestination
+                                .Value.YUnits);
                 if (unit.AbilityStates.Any(item =>
                         item.Definition.AttackSequenceModifier != null
                         || item.Definition.AttackCountStateModifier != null))
