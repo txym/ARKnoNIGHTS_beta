@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "REVENGER_HALF_HEALTH_ATTACK_BOOST",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "生命值不高于50%时，攻击力提升100%。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "HealthThresholdCombatModifier",
+      "thresholdHitPointsPermille": 500,
+      "inclusiveThreshold": true,
+      "triggerOnce": false,
+      "durationTicks": 0,
+      "attackMultiplierPermille": 2000,
+      "defenseMultiplierPermille": 1000,
+      "blockCapacityAdditive": 0,
+      "attackSpeedAdditive": 0,
+      "moveSpeedMultiplierPermille": 1000,
+      "makesUnblockable": false
+    }
+  ]
+}

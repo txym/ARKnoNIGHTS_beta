@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION"
                                               ]
                      },
                      {
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION"
                                               ]
                      }
                  ]

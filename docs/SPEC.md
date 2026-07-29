@@ -727,6 +727,14 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - `10127` 的全部 v2 变体常驻攻击速度 `+100`，并令最终物理/法术承伤分别乘 `500/1000`；真实伤害不受该承伤修正影响。攻击间隔继续按 `ceil(BaseIntervalTicks × 100 / (100 + AttackSpeedAdditive))` 计算。
 - 上述能力均为无 Skill 动画的被动，不占用或打断 Attack/Skill。相同数值的单位共享同一能力定义，单位源只保存稳定 ability ID；冻结的 v1 目录不在本批次重新生成。
 
+## 25. 生命阈值战斗属性生产接线（2026-07-29）
+
+- `1025` 精英 0 变体在生命值不高于 `50%` 时攻击力乘 `2000/1000`；精英 2 变体在相同条件下攻击力乘 `2800/1000`。该状态随当前生命值连续生效，治疗至半血以上后失效。
+- `1232` 在生命值严格低于 `50%` 时防御力乘 `4000/1000`、阻挡数 `+1`；回到半血或以上后失效，超出新阻挡容量的关系按 unit ID 稳定释放。
+- `1264` 当前生命值首次严格低于 `100%` 后，攻击速度 `+100`、移动速度乘 `2000/1000`，触发 Tick 计入总计 `300 Tick` 的持续时间；到期后不会因再次受伤重触发。
+- `1274` 当前生命值首次严格低于 `50%` 后，攻击速度 `+100`、移动速度乘 `2000/1000`，永久生效；治疗不会撤销，也不会再次触发。
+- 四项均为无 Skill 动画的被动，不占用或打断 Attack/Skill。每个 v2 精英变体显式引用与自身数值相符的能力源；冻结的 v1 目录不在本批次重新生成。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

@@ -698,6 +698,125 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsAndWiresHealthThresholdModifiers()
+        {
+            var output = NewIsolatedPath(
+                "ability-health-threshold-modifier-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var revenger = document.abilities.Single(item =>
+                item.abilityId
+                == "REVENGER_HALF_HEALTH_ATTACK_BOOST");
+            Assert.That(
+                revenger.healthThresholdCombatHitPointsPermille,
+                Is.EqualTo(500));
+            Assert.That(
+                revenger.healthThresholdCombatInclusive,
+                Is.True);
+            Assert.That(
+                revenger.healthThresholdCombatTriggerOnce,
+                Is.False);
+            Assert.That(
+                revenger.healthThresholdCombatAttackMultiplierPermille,
+                Is.EqualTo(2000));
+            var avenger = document.abilities.Single(item =>
+                item.abilityId
+                == "AVENGER_HALF_HEALTH_ATTACK_BOOST");
+            Assert.That(
+                avenger.healthThresholdCombatAttackMultiplierPermille,
+                Is.EqualTo(2800));
+
+            var trailmaker = document.abilities.Single(item =>
+                item.abilityId
+                == "TRAILMAKER_HALF_HEALTH_FORTIFICATION");
+            Assert.That(
+                trailmaker.healthThresholdCombatInclusive,
+                Is.False);
+            Assert.That(
+                trailmaker
+                    .healthThresholdCombatDefenseMultiplierPermille,
+                Is.EqualTo(4000));
+            Assert.That(
+                trailmaker
+                    .healthThresholdCombatBlockCapacityAdditive,
+                Is.EqualTo(1));
+
+            var sobering = document.abilities.Single(item =>
+                item.abilityId
+                == "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION");
+            Assert.That(
+                sobering.healthThresholdCombatHitPointsPermille,
+                Is.EqualTo(1000));
+            Assert.That(
+                sobering.healthThresholdCombatTriggerOnce,
+                Is.True);
+            Assert.That(
+                sobering.healthThresholdCombatDurationTicks,
+                Is.EqualTo(300));
+            Assert.That(
+                sobering.healthThresholdCombatAttackSpeedAdditive,
+                Is.EqualTo(100));
+            Assert.That(
+                sobering
+                    .healthThresholdCombatMoveSpeedMultiplierPermille,
+                Is.EqualTo(2000));
+
+            var steamTank = document.abilities.Single(item =>
+                item.abilityId
+                == "STEAM_TANK_HALF_HEALTH_ACCELERATION");
+            Assert.That(
+                steamTank.healthThresholdCombatHitPointsPermille,
+                Is.EqualTo(500));
+            Assert.That(
+                steamTank.healthThresholdCombatInclusive,
+                Is.False);
+            Assert.That(
+                steamTank.healthThresholdCombatTriggerOnce,
+                Is.True);
+            Assert.That(
+                steamTank.healthThresholdCombatDurationTicks,
+                Is.Zero);
+
+            var revengerUnit =
+                JsonUtility.FromJson<UnitAbilitySourceDocument>(
+                    File.ReadAllText(Path.Combine(
+                        RealSourceDirectory(),
+                        "1025_reveng.json")));
+            Assert.That(
+                revengerUnit.variants[0].innateAbilityIds,
+                Is.EqualTo(new[]
+                {
+                    "REVENGER_HALF_HEALTH_ATTACK_BOOST"
+                }));
+            Assert.That(
+                revengerUnit.variants[1].innateAbilityIds,
+                Is.EqualTo(new[]
+                {
+                    "AVENGER_HALF_HEALTH_ATTACK_BOOST"
+                }));
+            AssertUnitAbilityIds(
+                "1232_dssalr.json",
+                1232,
+                "TRAILMAKER_HALF_HEALTH_FORTIFICATION");
+            AssertUnitAbilityIds(
+                "1264_durgrd.json",
+                1264,
+                "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION");
+            AssertUnitAbilityIds(
+                "1274_stmram.json",
+                1274,
+                "STEAM_TANK_HALF_HEALTH_ACCELERATION");
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -707,6 +826,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.That(ids, Is.EqualTo(new[]
             {
+                "AVENGER_HALF_HEALTH_ATTACK_BOOST",
                 "BLOCKED_BLINK_FORWARD",
                 "BLOCK_CAPACITY_PLUS_ONE",
                 "BLOCK_CAPACITY_PLUS_TWO",
@@ -719,12 +839,16 @@ namespace ArknoNights.Battle.Tests
                 "HETEROGENEOUS_BEAST_FORTIFICATION",
                 "MAGIC_RESISTANCE_PLUS_SEVENTY",
                 "MAGIC_RESISTANCE_PLUS_SIXTY",
+                "REVENGER_HALF_HEALTH_ATTACK_BOOST",
                 "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
                 "ROADBUILDER_TENTH_HIT_SPAWN",
                 "ROADBUILDER_THIRD_ATTACK_SPAWN",
+                "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION",
                 "STACKING_DEFENSE_REDUCTION_ON_HIT",
+                "STEAM_TANK_HALF_HEALTH_ACCELERATION",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
+                "TRAILMAKER_HALF_HEALTH_FORTIFICATION",
                 "UNTARGETABLE_BY_MELEE"
             }));
         }
