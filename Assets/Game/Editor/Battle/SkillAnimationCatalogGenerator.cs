@@ -56,12 +56,33 @@ public static class SkillAnimationCatalogGenerator
                         + unit.typeId
                         + " abilityId="
                         + abilityId);
-                if (!string.Equals(
-                        ability.activationKind,
-                        "Timed",
-                        StringComparison.Ordinal))
+                var animationKeys =
+                    ability.animationKeys != null
+                    && ability.animationKeys.Length > 0
+                        ? ability.animationKeys
+                        : string.IsNullOrWhiteSpace(
+                            ability.animationKey)
+                            ? Array.Empty<string>()
+                            : new[] { ability.animationKey };
+                if (animationKeys.Length == 0)
                     continue;
-                if (string.IsNullOrWhiteSpace(ability.animationKey))
+                if (animationKeys.Any(
+                        string.IsNullOrWhiteSpace)
+                    || animationKeys.Any(key =>
+                        key.Contains("|"))
+                    || (string.Equals(
+                            ability.activationKind,
+                            "Timed",
+                            StringComparison.Ordinal)
+                        && animationKeys.Length != 1)
+                    || (!string.Equals(
+                            ability.activationKind,
+                            "Timed",
+                            StringComparison.Ordinal)
+                        && !string.Equals(
+                            ability.activationKind,
+                            "Passive",
+                            StringComparison.Ordinal)))
                     throw new InvalidOperationException(
                         "SKILL_ANIMATION_KEY_MISSING abilityId="
                         + abilityId);
@@ -70,26 +91,44 @@ public static class SkillAnimationCatalogGenerator
                         "SKILL_ANIMATION_ABILITY_DUPLICATE abilityId="
                         + abilityId);
 
-                var animation = unit.FindAnimation(ability.animationKey);
-                if (animation == null
-                    || string.IsNullOrWhiteSpace(animation.name)
-                    || animation.durationSeconds <= 0f)
+                var animations = animationKeys
+                    .Select(unit.FindAnimation)
+                    .ToArray();
+                if (animations.Any(animation =>
+                        animation == null
+                        || string.IsNullOrWhiteSpace(
+                            animation.name)
+                        || animation.name.Contains("|")
+                        || animation.durationSeconds <= 0f))
                     throw new InvalidOperationException(
                         "SKILL_ANIMATION_BINDING_INVALID typeId="
                         + unit.typeId
                         + " abilityId="
                         + abilityId
                         + " animationKey="
-                        + ability.animationKey);
+                        + string.Join("|", animationKeys));
                 bindings.Add(new SkillAnimationCatalogEntry
                 {
                     typeId = unit.typeId.ToString(
                         CultureInfo.InvariantCulture),
                     abilityId = abilityId,
-                    animationKey = ability.animationKey,
-                    animationName = animation.name,
+                    animationKey = string.Join(
+                        "|",
+                        animationKeys),
+                    animationName = string.Join(
+                        "|",
+                        animations.Select(item =>
+                            item.name)),
                     originalAnimationTicks = Mathf.CeilToInt(
-                        animation.durationSeconds * TicksPerSecond)
+                        animations.Sum(item =>
+                            item.durationSeconds)
+                        * TicksPerSecond),
+                    segmentOriginalAnimationTicks =
+                        animations.Select(item =>
+                                Mathf.CeilToInt(
+                                    item.durationSeconds
+                                    * TicksPerSecond))
+                            .ToArray()
                 });
             }
         }
@@ -191,6 +230,7 @@ public static class SkillAnimationCatalogGenerator
         public string animationKey;
         public string animationName;
         public int originalAnimationTicks;
+        public int[] segmentOriginalAnimationTicks;
     }
 
     [Serializable]
@@ -200,5 +240,6 @@ public static class SkillAnimationCatalogGenerator
         public string abilityId;
         public string activationKind;
         public string animationKey;
+        public string[] animationKeys;
     }
 }

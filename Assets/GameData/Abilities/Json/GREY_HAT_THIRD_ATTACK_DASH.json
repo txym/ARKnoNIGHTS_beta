@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "GREY_HAT_THIRD_ATTACK_DASH",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "每第三次攻击清除自身阻挡，短暂无视阻挡并向敌方门位移1.5格，对触发前的目标正常造成伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "animationKeys": [
+    "skill.begin",
+    "skill.loop",
+    "skill.end"
+  ],
+  "effects": [
+    {
+      "kind": "AttackDash",
+      "firstTriggerOrdinal": 3,
+      "repeatInterval": 3,
+      "dashDistanceMetres": 1.5,
+      "unblockableDurationSeconds": 1.0
+    }
+  ]
+}

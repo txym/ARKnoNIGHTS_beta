@@ -144,10 +144,37 @@ namespace ArknoNights.Battle.Infrastructure
                         ParseEnum<DamageType>(source.areaDamageType),
                         source.areaAttackMultiplierPermille,
                         source.groundTargetsOnly),
+                source.attackDashFirstTriggerOrdinal == 0
+                    ? null
+                    : new AttackDashEffectDefinition(
+                        source.attackDashFirstTriggerOrdinal,
+                        source.attackDashRepeatInterval,
+                        source.attackDashDistanceCentimetres,
+                        source.attackDashUnblockableDurationTicks,
+                        hasSkillAnimation
+                        && skillAnimation
+                            .SegmentOriginalAnimationTicks.Count > 0
+                            ? (skillAnimation
+                                   .SegmentOriginalAnimationTicks[0]
+                               + 1)
+                              / 2
+                            : 0,
+                        hasSkillAnimation
+                            ? skillAnimation.AnimationKey
+                            : string.Empty,
+                        hasSkillAnimation
+                            ? skillAnimation.OriginalAnimationTicks
+                            : 0),
                 hasSkillAnimation
+                && ParseEnum<AbilityActivationKind>(
+                    source.activationKind)
+                == AbilityActivationKind.Timed
                     ? skillAnimation.AnimationKey
                     : string.Empty,
                 hasSkillAnimation
+                && ParseEnum<AbilityActivationKind>(
+                    source.activationKind)
+                == AbilityActivationKind.Timed
                     ? skillAnimation.OriginalAnimationTicks
                     : 0);
         }
@@ -156,6 +183,6 @@ namespace ArknoNights.Battle.Infrastructure
         private static AbilityCatalogLoadResult Failure(string code, string message) => new AbilityCatalogLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class AbilityCatalogDto { public string schemaVersion; public string catalogId; public AbilityDto[] abilities; }
-        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; }
+        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; }
     }
 }

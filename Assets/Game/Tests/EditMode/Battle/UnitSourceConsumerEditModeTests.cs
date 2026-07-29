@@ -112,6 +112,7 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(new[]
                 {
                     "CHARGED_DRINK_AREA_ATTACK",
+                    "GREY_HAT_THIRD_ATTACK_DASH",
                     "SUMMON_JELLY_MINIONS",
                     "SUMMON_REPAIR_HELPER"
                 }));
@@ -123,6 +124,23 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 chargedBinding.originalAnimationTicks,
                 Is.EqualTo(57));
+            var greyHatBinding = document.bindings.Single(item =>
+                item.abilityId == "GREY_HAT_THIRD_ATTACK_DASH");
+            Assert.That(greyHatBinding.typeId, Is.EqualTo("1322"));
+            Assert.That(
+                greyHatBinding.animationKey,
+                Is.EqualTo(
+                    "skill.begin|skill.loop|skill.end"));
+            Assert.That(
+                greyHatBinding.animationName,
+                Is.EqualTo(
+                    "Skill_Begin|Skill_Loop|Skill_End"));
+            Assert.That(
+                greyHatBinding.originalAnimationTicks,
+                Is.EqualTo(40));
+            Assert.That(
+                greyHatBinding.segmentOriginalAnimationTicks,
+                Is.EqualTo(new[] { 7, 4, 30 }));
             var binding = document.bindings.Single(item =>
                 item.abilityId == "SUMMON_JELLY_MINIONS");
             Assert.That(binding.typeId, Is.EqualTo("5503"));
@@ -291,6 +309,39 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsGreyHatAttackDash()
+        {
+            var output = NewIsolatedPath(
+                "ability-grey-hat-dash-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var ability = document.abilities.Single(item =>
+                item.abilityId
+                == "GREY_HAT_THIRD_ATTACK_DASH");
+            Assert.That(ability.activationKind, Is.EqualTo("Passive"));
+            Assert.That(
+                ability.attackDashFirstTriggerOrdinal,
+                Is.EqualTo(3));
+            Assert.That(
+                ability.attackDashRepeatInterval,
+                Is.EqualTo(3));
+            Assert.That(
+                ability.attackDashDistanceCentimetres,
+                Is.EqualTo(150));
+            Assert.That(
+                ability.attackDashUnblockableDurationTicks,
+                Is.EqualTo(20));
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -302,6 +353,7 @@ namespace ArknoNights.Battle.Tests
             {
                 "CHARGED_DRINK_AREA_ATTACK",
                 "FORTIFIED_CATERING_VEHICLE",
+                "GREY_HAT_THIRD_ATTACK_DASH",
                 "STACKING_DEFENSE_REDUCTION_ON_HIT",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
@@ -613,6 +665,7 @@ namespace ArknoNights.Battle.Tests
             public string animationKey;
             public string animationName;
             public int originalAnimationTicks;
+            public int[] segmentOriginalAnimationTicks;
         }
 
         [Serializable]
@@ -645,6 +698,10 @@ namespace ArknoNights.Battle.Tests
             public string areaDamageType;
             public int areaAttackMultiplierPermille;
             public bool groundTargetsOnly;
+            public int attackDashFirstTriggerOrdinal;
+            public int attackDashRepeatInterval;
+            public int attackDashDistanceCentimetres;
+            public int attackDashUnblockableDurationTicks;
         }
     }
 }

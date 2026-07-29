@@ -683,6 +683,14 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 到期时以原目标的当前位置为圆心，对其及 `150cm` 闭区间半径内仍在场的地面敌方单位各造成一次封存攻击力 `100%` 的物理伤害。目标已死亡或离场时本次技能不再结算；无人机等不可被近战索敌单位不作为主目标或范围目标。
 - 该技能伤害走普通物理防御和承伤倍率，但不属于普通攻击，不触发普通攻击专属的闪避、反伤、命中 Debuff 或攻击计数。冻结的 v1 目录仍不在本批次重新生成。
 
+## 19. `1322` 第三击灰礼帽位移（2026-07-29）
+
+- `1322` 的第 `3/6/9...` 次攻击替换为一次位移攻击；计数在攻击成功开始时推进。该特殊攻击与普通攻击共用攻击槽，只能在已经开始的 Attack/Skill 占用结束后开始，不会打断正在进行的攻击。
+- 位移攻击开始时封存本次正常攻击力与目标。若 `1322` 正在阻挡敌人，按稳定 unit ID 选择原阻挡对象作为本次目标；否则沿用正常近战目标。随后立即解除 `1322` 的全部阻挡关系，并在本次 `1s = 20 Tick` 技能窗口内令其阻挡容量为 `0`。
+- 动画按 `Skill_Begin → Skill_Loop → Skill_End` 顺序在同一轨道播放，三个真实源片段分别投影为 `7/4/30 Tick`；原始动画总时长按三个片段的真实时长之和计算为 `2s = 40 Tick`，固定二倍速后的技能占用为 `20 Tick`。每个片段都独立采用向上取整的源 Tick，保证短片段完整播放。
+- `Skill_Begin` 的 `7` 个源 Tick 二倍速向上取整为 `4 Tick`。在位移攻击开始后的第 `4` Tick，`1322` 沿当前位置到敌方门中心的方向位移 `150cm`；若到门距离不足 `150cm`，则停在门中心。同 Tick 对开始时封存的目标结算一次正常攻击伤害；目标已死亡或离场时取消伤害，但位移仍执行。
+- 该次伤害继续进入普通攻击的防御、承伤、闪避、反伤、命中效果和攻击计数链；`Skill_Loop/Skill_End` 在出伤后继续播放，完整 `20 Tick` 占用结束前不能开始下一次攻击或普通移动。项目没有路径点模型，因此位移方向不检查检查点。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

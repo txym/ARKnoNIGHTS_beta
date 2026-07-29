@@ -167,7 +167,41 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
             Debug.LogWarning("[BattlePresentation][skill.mapping.missing] key=" + (animationKey ?? string.Empty), this);
             return;
         }
-        PlayOrReport(animationName, false, animationSpeedMultiplier, "skill:" + animationKey);
+        var animationNames = animationName.Split('|');
+        if (animationNames.Length == 1)
+        {
+            PlayOrReport(
+                animationName,
+                false,
+                animationSpeedMultiplier,
+                "skill:" + animationKey);
+            return;
+        }
+        if (!PlayOrReport(
+                animationNames[0],
+                false,
+                animationSpeedMultiplier,
+                "skill:" + animationKey))
+            return;
+        for (var index = 1; index < animationNames.Length; index++)
+        {
+            var entry = unitSkel.QueueAnimation(
+                animationNames[index],
+                false);
+            if (entry == null)
+            {
+                Debug.LogWarning(
+                    "[BattlePresentation][animation.missing] action=skill:"
+                    + animationKey
+                    + " name="
+                    + animationNames[index],
+                    this);
+                return;
+            }
+            entry.TimeScale = Mathf.Max(
+                0f,
+                animationSpeedMultiplier);
+        }
     }
 
     // Real catalog entries may intentionally omit Hit. Damage remains event-authoritative and this is a no-op presentation fallback.

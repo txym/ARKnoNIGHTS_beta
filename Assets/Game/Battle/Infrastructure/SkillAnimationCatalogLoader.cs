@@ -14,13 +14,19 @@ namespace ArknoNights.Battle.Infrastructure
             string abilityId,
             string animationKey,
             string animationName,
-            int originalAnimationTicks)
+            int originalAnimationTicks,
+            IEnumerable<int> segmentOriginalAnimationTicks)
         {
             TypeId = typeId;
             AbilityId = abilityId;
             AnimationKey = animationKey;
             AnimationName = animationName;
             OriginalAnimationTicks = originalAnimationTicks;
+            SegmentOriginalAnimationTicks =
+                new ReadOnlyCollection<int>(
+                    (segmentOriginalAnimationTicks
+                     ?? new[] { originalAnimationTicks })
+                    .ToArray());
         }
 
         public string TypeId { get; }
@@ -28,6 +34,10 @@ namespace ArknoNights.Battle.Infrastructure
         public string AnimationKey { get; }
         public string AnimationName { get; }
         public int OriginalAnimationTicks { get; }
+        public IReadOnlyList<int> SegmentOriginalAnimationTicks
+        {
+            get;
+        }
     }
 
     public sealed class SkillAnimationCatalog
@@ -139,6 +149,25 @@ namespace ArknoNights.Battle.Infrastructure
                         "Skill animation binding is incomplete."));
                     continue;
                 }
+                var animationKeys = item.animationKey.Split('|');
+                var animationNames = item.animationName.Split('|');
+                var segmentTicks =
+                    item.segmentOriginalAnimationTicks != null
+                    && item.segmentOriginalAnimationTicks.Length > 0
+                        ? item.segmentOriginalAnimationTicks
+                        : new[] { item.originalAnimationTicks };
+                if (animationKeys.Length != animationNames.Length
+                    || animationKeys.Length != segmentTicks.Length
+                    || animationKeys.Any(string.IsNullOrWhiteSpace)
+                    || animationNames.Any(string.IsNullOrWhiteSpace)
+                    || segmentTicks.Any(value => value <= 0))
+                {
+                    errors.Add(new ValidationError(
+                        "skillAnimation.sequence.invalid",
+                        "Skill animation sequence is incomplete: "
+                        + item.abilityId));
+                    continue;
+                }
                 if (!abilityIds.Add(item.abilityId))
                 {
                     errors.Add(new ValidationError(
@@ -152,7 +181,8 @@ namespace ArknoNights.Battle.Infrastructure
                     item.abilityId,
                     item.animationKey,
                     item.animationName,
-                    item.originalAnimationTicks));
+                    item.originalAnimationTicks,
+                    segmentTicks));
             }
 
             if (bindings.Count == 0)
@@ -193,6 +223,7 @@ namespace ArknoNights.Battle.Infrastructure
             public string animationKey;
             public string animationName;
             public int originalAnimationTicks;
+            public int[] segmentOriginalAnimationTicks;
         }
     }
 }

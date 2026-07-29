@@ -73,7 +73,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "GREY_HAT_THIRD_ATTACK_DASH"
                                               ]
                      },
                      {
@@ -135,7 +135,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "GREY_HAT_THIRD_ATTACK_DASH"
                                               ]
                      }
                  ]

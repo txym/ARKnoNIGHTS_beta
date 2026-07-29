@@ -1524,6 +1524,165 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void ThirdAttackDash_ClearsBlockMovesAfterBeginAndDamagesFormerBlocker()
+        {
+            const string abilityId =
+                "GREY_HAT_THIRD_ATTACK_DASH";
+            var dash = new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new AttackDashEffectDefinition(
+                    3,
+                    3,
+                    100,
+                    20,
+                    4,
+                    "skill.begin|skill.loop|skill.end",
+                    40),
+                string.Empty,
+                0);
+            var input = CreateInput(
+                26,
+                new[]
+                {
+                    Attacker(
+                        "grey-hat",
+                        0,
+                        1,
+                        abilityId,
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        maxHitPoints: 100000,
+                        attack: 1)
+                },
+                new[] { dash },
+                new[] { Unit("grey-hat", "grey-hat", 5, 4) },
+                new[]
+                {
+                    Unit("former-blocker", "enemy", 5, 4),
+                    Unit("interceptor", "enemy", 5, 3)
+                });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var skills = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Skill
+                    && item.UnitId == "grey-hat")
+                .ToArray();
+            Assert.That(
+                skills,
+                Has.Length.EqualTo(1),
+                string.Join(
+                    Environment.NewLine,
+                    result.Events.Select(item =>
+                        item.Tick
+                        + ":"
+                        + item.Type
+                        + ":"
+                        + item.UnitId
+                        + ":"
+                        + item.RelatedUnitId)));
+            var skill = skills[0];
+
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Attack
+                        && item.UnitId == "grey-hat"
+                        && item.Tick < skill.Tick)
+                    .Select(item => item.Tick),
+                Is.EqualTo(new[] { 1, 3 }));
+            Assert.That(skill.Tick, Is.EqualTo(5));
+            Assert.That(
+                skill.RelatedUnitId,
+                Is.EqualTo("former-blocker"));
+            Assert.That(
+                skill.AnimationKey,
+                Is.EqualTo(
+                    "skill.begin|skill.loop|skill.end"));
+            Assert.That(skill.OriginalAnimationTicks, Is.EqualTo(40));
+            Assert.That(skill.EffectiveAnimationTicks, Is.EqualTo(20));
+            Assert.That(skill.PlannedDamageTick, Is.EqualTo(9));
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.BlockEnded
+                && item.Tick == 5
+                && (item.UnitId == "grey-hat"
+                    || item.RelatedUnitId == "grey-hat")));
+            var movement = result.Events.Single(item =>
+                item.Type == BattleEventType.Move
+                && item.UnitId == "grey-hat"
+                && item.Tick == 9);
+            Assert.That(
+                movement.FromPosition.Value,
+                Is.EqualTo(new FixedPosition(500, 400)));
+            Assert.That(
+                movement.ToPosition.Value,
+                Is.EqualTo(new FixedPosition(500, 500)));
+            var thirdDamage = result.Events.Single(item =>
+                item.Type == BattleEventType.Damage
+                && item.UnitId == "grey-hat"
+                && item.Tick == 9);
+            Assert.That(
+                thirdDamage.RelatedUnitId,
+                Is.EqualTo("former-blocker"));
+            Assert.That(thirdDamage.DamageAmount, Is.EqualTo(100));
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.BlockStarted
+                && item.Tick > 5
+                && item.Tick < 25
+                && (item.UnitId == "grey-hat"
+                    || item.RelatedUnitId == "grey-hat")));
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.BlockStarted
+                && item.Tick == 25
+                && (item.UnitId == "grey-hat"
+                    || item.RelatedUnitId == "grey-hat")));
+
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(
+                compiler.TryCompile(
+                    result,
+                    out var track,
+                    out var diagnostics),
+                Is.True,
+                string.Join(
+                    "; ",
+                    diagnostics.Select(item =>
+                        item.ToString())));
+            Assert.That(
+                track.TryGetUnit(
+                    "grey-hat",
+                    out var greyHatTrack),
+                Is.True);
+            Assert.That(
+                greyHatTrack.Sample(5).Action,
+                Is.EqualTo(UnitPresentationAction.Skill));
+            Assert.That(
+                greyHatTrack.Sample(5).AnimationKey,
+                Is.EqualTo(
+                    "skill.begin|skill.loop|skill.end"));
+            Assert.That(
+                greyHatTrack.Sample(25).Action,
+                Is.EqualTo(UnitPresentationAction.Skill));
+        }
+
+        [Test]
         public void DamageReceivedTriggeredSpawn_RespectsFriendlyTypeCap()
         {
             Assert.That(

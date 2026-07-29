@@ -366,6 +366,22 @@ namespace ArknoNights.Battle.Core
                             .AttackMultiplierPermille).Append(',')
                         .Append(ability.TimedTargetAreaDamageEffect
                             .GroundTargetsOnly ? 1 : 0);
+                if (ability.AttackDashEffect != null)
+                    builder.Append("|AD:")
+                        .Append(ability.AttackDashEffect
+                            .FirstTriggerOrdinal).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .RepeatInterval).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .DashDistanceCentimetres).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .UnblockableDurationTicks).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .MovementDelayEffectiveTicks).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .AnimationSequenceKey).Append(',')
+                        .Append(ability.AttackDashEffect
+                            .AnimationOriginalDurationTicks);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -452,6 +468,7 @@ namespace ArknoNights.Battle.Core
                     if (ability.HealthThresholdAdjacentSpawnEffect != null) validationErrors.Add(new ValidationError("ability.healthThresholdAdjacentSpawn.unexpected", "Timed ability cannot define a health-threshold adjacent-spawn effect: " + ability.AbilityId));
                     if (ability.HealthThresholdFullHealEffect != null) validationErrors.Add(new ValidationError("ability.healthThresholdFullHeal.unexpected", "Timed ability cannot define a health-threshold full-heal effect: " + ability.AbilityId));
                     if (ability.OnHitDefenseDebuffEffect != null) validationErrors.Add(new ValidationError("ability.onHitDefenseDebuff.unexpected", "Timed ability cannot define an on-hit defense debuff: " + ability.AbilityId));
+                    if (ability.AttackDashEffect != null) validationErrors.Add(new ValidationError("ability.attackDash.unexpected", "Timed ability cannot define an attack-dash effect: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     var timedEffectCount =
@@ -506,7 +523,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.TriggeredSpawnEffect == null ? 0 : 1)
                         + (ability.HealthThresholdAdjacentSpawnEffect == null ? 0 : 1)
                         + (ability.HealthThresholdFullHealEffect == null ? 0 : 1)
-                        + (ability.OnHitDefenseDebuffEffect == null ? 0 : 1);
+                        + (ability.OnHitDefenseDebuffEffect == null ? 0 : 1)
+                        + (ability.AttackDashEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -690,6 +708,31 @@ namespace ArknoNights.Battle.Core
                         && ability.OnHitDefenseDebuffEffect
                             .DefenseReductionPerStack <= 0)
                         validationErrors.Add(new ValidationError("ability.onHitDefenseDebuff.invalid", "On-hit defense debuff is invalid: " + ability.AbilityId));
+                    if (ability.AttackDashEffect != null
+                        && (ability.AttackDashEffect
+                                .FirstTriggerOrdinal <= 0
+                            || ability.AttackDashEffect
+                                .RepeatInterval <= 0
+                            || ability.AttackDashEffect
+                                .DashDistanceCentimetres <= 0
+                            || ability.AttackDashEffect
+                                .UnblockableDurationTicks <= 0
+                            || ability.AttackDashEffect
+                                .MovementDelayEffectiveTicks <= 0
+                            || ability.AttackDashEffect
+                                .MovementDelayEffectiveTicks
+                               > ability.AttackDashEffect
+                                   .AnimationEffectiveDurationTicks
+                            || string.IsNullOrWhiteSpace(
+                                ability.AttackDashEffect
+                                    .AnimationSequenceKey)
+                            || ability.AttackDashEffect
+                                .AnimationOriginalDurationTicks <= 0
+                            || ability.AttackDashEffect
+                                .AnimationEffectiveDurationTicks
+                               != ability.AttackDashEffect
+                                   .UnblockableDurationTicks))
+                        validationErrors.Add(new ValidationError("ability.attackDash.invalid", "Attack-dash effect is invalid: " + ability.AbilityId));
                     if (!string.IsNullOrEmpty(ability.AnimationKey))
                         validationErrors.Add(new ValidationError("ability.passive.animation.unexpected", "Passive ability cannot define an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks != 0)
