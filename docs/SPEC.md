@@ -705,6 +705,14 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 同 Tick 多个碰撞来源先按目标聚合伤害，再统一处理死亡，避免来源遍历顺序改变存活结果。伤害读取触发 Tick 的当前有效攻击力、目标防御与承伤倍率；它不是普通攻击，不触发普通攻击专属的闪避、反伤、命中效果或攻击计数。
 - `GroundTargetsOnly` 通过既有近战目标资格排除无人机及其他不可被近战索敌的实体。该被动没有 Skill 动画，不占用或打断 Attack/Skill。
 
+## 22. `2031/2033` 攻击与受击计数召唤（2026-07-29）
+
+- `2031` 的第 `3/6/9...` 次成功开始的攻击改用其 v2 `attack.skill → Skill` 动画。真实源时长为 `2s = 40 Tick`，二倍速后的完整攻击占用为 `20 Tick`；伤害在动画完整播放后的到期 Tick 结算，且仅在对至少一个目标造成正伤害后召唤 `1` 只 `2033`。该攻击召唤没有同类存活数量上限。
+- `2031` 每受到第 `10/20/30...` 个正伤害普通攻击 Hit 时，若结算后自身仍存活且同阵营存活 `2033` 少于 `8` 只，召唤 `1` 只 `2033`。同 Tick 多来源按稳定顺序计数；致死伤害批次不从死亡 owner 生成单位。
+- `2033` 的第 `3/6/9...` 次攻击同样使用真实 `Skill` 动画并在正伤害后召唤 `1` 只 `2033`，但仅在同阵营存活 `2033` 少于 `12` 只时生成。
+- 三种召唤均以触发 Tick 的 owner 位置为中心，在 `40cm × 40cm` 方形内使用确定性偏移。项目没有路径点，生成体不继承路径、目标、阻挡或攻击状态；Spawn Tick 只创建实例，从下一 Tick 起按普通单位规则行动。
+- 第三击 Skill 是本次普通攻击的动画替代，只会在既有 Attack/Skill 占用均结束后开始，不会打断正在进行的攻击；普通攻击间隔继续从该次攻击开始 Tick 计算。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

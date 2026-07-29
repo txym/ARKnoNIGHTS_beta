@@ -63,7 +63,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "ROADBUILDER_THIRD_ATTACK_SPAWN",
+                                                  "ROADBUILDER_TENTH_HIT_SPAWN"
                                               ]
                      }
                  ]

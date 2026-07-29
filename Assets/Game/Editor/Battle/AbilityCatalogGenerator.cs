@@ -220,6 +220,46 @@ public static class AbilityCatalogGenerator
                 unblockableDurationTicks;
             return entry;
         }
+        if (effect.kind == "TriggeredSpawn")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || !Enum.TryParse(
+                    effect.triggerKind,
+                    true,
+                    out TriggeredSpawnKind triggerKind)
+                || !Enum.IsDefined(typeof(TriggeredSpawnKind), triggerKind)
+                || effect.firstTriggerOrdinal <= 0
+                || effect.repeatInterval <= 0
+                || string.IsNullOrWhiteSpace(effect.summonTypeId)
+                || !knownUnitTypeIds.Contains(effect.summonTypeId)
+                || effect.spawnArea == null
+                || effect.spawnArea.shape != "Square"
+                || effect.spawnArea.center != "CasterPosition"
+                || effect.spawnArea.sideLengthMetres < 0f
+                || effect.maxActiveSameType < 0
+                || (!string.IsNullOrWhiteSpace(source.animationKey)
+                    && triggerKind
+                    != TriggeredSpawnKind.SuccessfulAttack))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TRIGGERED_SPAWN_INVALID path=" + sourcePath);
+            var sideLengthCentimetres = Mathf.RoundToInt(
+                effect.spawnArea.sideLengthMetres * 100f);
+            if (Mathf.Abs(
+                    effect.spawnArea.sideLengthMetres * 100f
+                    - sideLengthCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TRIGGERED_SPAWN_NOT_EXACT path=" + sourcePath);
+            entry.triggeredSpawnKind = triggerKind.ToString();
+            entry.triggeredSpawnFirstTriggerOrdinal =
+                effect.firstTriggerOrdinal;
+            entry.triggeredSpawnRepeatInterval =
+                effect.repeatInterval;
+            entry.triggeredSpawnSummonTypeId =
+                effect.summonTypeId;
+            entry.triggeredSpawnSideLengthCentimetres =
+                sideLengthCentimetres;
+            entry.triggeredSpawnMaxActiveSameType =
+                effect.maxActiveSameType;
+            return entry;
+        }
         if (effect.kind == "TimedBlink")
         {
             if (activationKind != AbilityActivationKind.Timed
@@ -270,9 +310,9 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; }
-    [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public AbilityEffect[] effects; }
+    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; }
+    [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public string animationKey; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
-    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; }
+    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; public string triggerKind; public int maxActiveSameType; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
 }

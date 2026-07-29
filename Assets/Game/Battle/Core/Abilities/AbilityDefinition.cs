@@ -977,7 +977,8 @@ namespace ArknoNights.Battle.Core
             int skillAnimationOriginalDurationTicks,
             TimedBlinkEffectDefinition timedBlinkEffect = null,
             ProximityEntryDamageEffectDefinition
-                proximityEntryDamageEffect = null)
+                proximityEntryDamageEffect = null,
+            TriggeredSpawnEffectDefinition triggeredSpawnEffect = null)
             : this(
                 abilityId: abilityId,
                 displayNameZhHans: displayNameZhHans,
@@ -1005,7 +1006,7 @@ namespace ArknoNights.Battle.Core
                 attackAreaDamageModifier: null,
                 onHitDamageOverTimeEffect: null,
                 unblockedAttackCharge: null,
-                triggeredSpawnEffect: null,
+                triggeredSpawnEffect: triggeredSpawnEffect,
                 healthThresholdAdjacentSpawnEffect: null,
                 healthThresholdFullHealEffect: null,
                 onHitDefenseDebuffEffect: onHitDefenseDebuffEffect,

@@ -115,6 +115,8 @@ namespace ArknoNights.Battle.Tests
                     "BLOCKED_BLINK_FORWARD",
                     "CHARGED_DRINK_AREA_ATTACK",
                     "GREY_HAT_THIRD_ATTACK_DASH",
+                    "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
+                    "ROADBUILDER_THIRD_ATTACK_SPAWN",
                     "SUMMON_JELLY_MINIONS",
                     "SUMMON_REPAIR_HELPER"
                 }));
@@ -176,6 +178,38 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 greyHatBinding.segmentOriginalAnimationTicks,
                 Is.EqualTo(new[] { 7, 4, 30 }));
+            var roadbuilderBinding = document.bindings.Single(item =>
+                item.abilityId
+                == "ROADBUILDER_THIRD_ATTACK_SPAWN");
+            Assert.That(roadbuilderBinding.typeId, Is.EqualTo("2031"));
+            Assert.That(
+                roadbuilderBinding.animationKey,
+                Is.EqualTo("attack.skill"));
+            Assert.That(
+                roadbuilderBinding.animationName,
+                Is.EqualTo("Skill"));
+            Assert.That(
+                roadbuilderBinding.originalAnimationTicks,
+                Is.EqualTo(40));
+            Assert.That(
+                roadbuilderBinding.segmentOriginalAnimationTicks,
+                Is.EqualTo(new[] { 40 }));
+            var fragmentBinding = document.bindings.Single(item =>
+                item.abilityId
+                == "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN");
+            Assert.That(fragmentBinding.typeId, Is.EqualTo("2033"));
+            Assert.That(
+                fragmentBinding.animationKey,
+                Is.EqualTo("attack.skill"));
+            Assert.That(
+                fragmentBinding.animationName,
+                Is.EqualTo("Skill"));
+            Assert.That(
+                fragmentBinding.originalAnimationTicks,
+                Is.EqualTo(40));
+            Assert.That(
+                fragmentBinding.segmentOriginalAnimationTicks,
+                Is.EqualTo(new[] { 40 }));
             var binding = document.bindings.Single(item =>
                 item.abilityId == "SUMMON_JELLY_MINIONS");
             Assert.That(binding.typeId, Is.EqualTo("5503"));
@@ -423,6 +457,88 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsRoadbuilderTriggeredSpawns()
+        {
+            var output = NewIsolatedPath(
+                "ability-roadbuilder-spawn-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var roadbuilder = document.abilities.Single(item =>
+                item.abilityId
+                == "ROADBUILDER_THIRD_ATTACK_SPAWN");
+            Assert.That(
+                roadbuilder.triggeredSpawnKind,
+                Is.EqualTo("SuccessfulAttack"));
+            Assert.That(
+                roadbuilder.triggeredSpawnFirstTriggerOrdinal,
+                Is.EqualTo(3));
+            Assert.That(
+                roadbuilder.triggeredSpawnRepeatInterval,
+                Is.EqualTo(3));
+            Assert.That(
+                roadbuilder.triggeredSpawnSummonTypeId,
+                Is.EqualTo("2033"));
+            Assert.That(
+                roadbuilder.triggeredSpawnSideLengthCentimetres,
+                Is.EqualTo(40));
+            Assert.That(
+                roadbuilder.triggeredSpawnMaxActiveSameType,
+                Is.EqualTo(0));
+
+            var received = document.abilities.Single(item =>
+                item.abilityId
+                == "ROADBUILDER_TENTH_HIT_SPAWN");
+            Assert.That(
+                received.triggeredSpawnKind,
+                Is.EqualTo("DamageReceived"));
+            Assert.That(
+                received.triggeredSpawnFirstTriggerOrdinal,
+                Is.EqualTo(10));
+            Assert.That(
+                received.triggeredSpawnRepeatInterval,
+                Is.EqualTo(10));
+            Assert.That(
+                received.triggeredSpawnSummonTypeId,
+                Is.EqualTo("2033"));
+            Assert.That(
+                received.triggeredSpawnSideLengthCentimetres,
+                Is.EqualTo(40));
+            Assert.That(
+                received.triggeredSpawnMaxActiveSameType,
+                Is.EqualTo(8));
+
+            var fragment = document.abilities.Single(item =>
+                item.abilityId
+                == "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN");
+            Assert.That(
+                fragment.triggeredSpawnKind,
+                Is.EqualTo("SuccessfulAttack"));
+            Assert.That(
+                fragment.triggeredSpawnFirstTriggerOrdinal,
+                Is.EqualTo(3));
+            Assert.That(
+                fragment.triggeredSpawnRepeatInterval,
+                Is.EqualTo(3));
+            Assert.That(
+                fragment.triggeredSpawnSummonTypeId,
+                Is.EqualTo("2033"));
+            Assert.That(
+                fragment.triggeredSpawnSideLengthCentimetres,
+                Is.EqualTo(40));
+            Assert.That(
+                fragment.triggeredSpawnMaxActiveSameType,
+                Is.EqualTo(12));
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -437,6 +553,9 @@ namespace ArknoNights.Battle.Tests
                 "FORTIFIED_CATERING_VEHICLE",
                 "GREY_HAT_THIRD_ATTACK_DASH",
                 "GROUND_PROXIMITY_COLLISION_DAMAGE",
+                "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
+                "ROADBUILDER_TENTH_HIT_SPAWN",
+                "ROADBUILDER_THIRD_ATTACK_SPAWN",
                 "STACKING_DEFENSE_REDUCTION_ON_HIT",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
@@ -790,6 +909,12 @@ namespace ArknoNights.Battle.Tests
             public string proximityEntryDamageType;
             public int proximityEntryAttackMultiplierPermille;
             public bool proximityEntryGroundTargetsOnly;
+            public string triggeredSpawnKind;
+            public int triggeredSpawnFirstTriggerOrdinal;
+            public int triggeredSpawnRepeatInterval;
+            public string triggeredSpawnSummonTypeId;
+            public int triggeredSpawnSideLengthCentimetres;
+            public int triggeredSpawnMaxActiveSameType;
         }
     }
 }
