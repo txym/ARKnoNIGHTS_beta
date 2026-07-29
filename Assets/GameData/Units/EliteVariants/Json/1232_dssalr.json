@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1232,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1232_dssalr",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "深溟引痕者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  19000,
+                                                      "attack":  800,
+                                                      "defense":  500,
+                                                      "magicResistance":  5
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "dssalr",
+                                       "skeletonDataResourceName":  "enemy_1232_dssalr_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1232_dssalr",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1232_dssalr_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "富营养的引痕者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  24000,
+                                                      "attack":  900,
+                                                      "defense":  500,
+                                                      "magicResistance":  5
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "dssalr_2",
+                                       "skeletonDataResourceName":  "enemy_1232_dssalr_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1232_dssalr_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

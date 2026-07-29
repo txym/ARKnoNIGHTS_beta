@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1095,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1095_ccripr",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "提亚卡乌好战者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5500,
+                                                      "attack":  320,
+                                                      "defense":  380,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  1,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "ccripr",
+                                       "skeletonDataResourceName":  "enemy_1095_ccripr_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1095_ccripr",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  0.8
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1095_ccripr_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "提亚卡乌撕裂者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7500,
+                                                      "attack":  350,
+                                                      "defense":  460,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  0.9,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "ccripr_2",
+                                       "skeletonDataResourceName":  "enemy_1095_ccripr_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1095_ccripr_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  0.8
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

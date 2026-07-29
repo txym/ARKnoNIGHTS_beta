@@ -23,9 +23,9 @@ $junctionPath = $null
 
 function New-ValidAuditFixture {
     $variants = @(
-        for ($index = 0; $index -lt 172; $index++) {
+        for ($index = 0; $index -lt 182; $index++) {
             [pscustomobject]@{
-                typeId = 1000 + ($index % 93)
+                typeId = 1000 + ($index % 99)
                 unitKey = 'fixture_{0:D3}' -f $index
                 sourceUnitKey = 'fixture_{0:D3}' -f $index
                 skeletonDataResourcePath = 'Characters/fixture/enemy_fixture_SkeletonData'
@@ -45,8 +45,8 @@ function New-ValidAuditFixture {
     return [pscustomobject]@{
         schemaVersion = 'bonds-unit-animation-audit-v1'
         generatedAtUtc = '2026-07-28T00:00:00.0000000Z'
-        typeIdCount = 93
-        variantCount = 172
+        typeIdCount = 99
+        variantCount = 182
         variants = $variants
         signatures = @(
             [pscustomobject]@{
@@ -57,8 +57,8 @@ function New-ValidAuditFixture {
         tokenSummary = @(
             [pscustomobject]@{
                 token = 'idle'
-                variantCount = 172
-                animationCount = 172
+                variantCount = 182
+                animationCount = 182
             }
         )
         diagnostics = @()

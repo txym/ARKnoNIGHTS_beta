@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1134,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Magic"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1134_diamd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "源石畸变体",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  4000,
+                                                      "attack":  1000,
+                                                      "defense":  2000,
+                                                      "magicResistance":  80
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "diamd",
+                                       "skeletonDataResourceName":  "enemy_1134_diamd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1134_diamd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.133333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1134_diamd_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "源石畸变体α",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7000,
+                                                      "attack":  1500,
+                                                      "defense":  2000,
+                                                      "magicResistance":  80
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "diamd_2",
+                                       "skeletonDataResourceName":  "enemy_1134_diamd_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1134_diamd_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.133333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

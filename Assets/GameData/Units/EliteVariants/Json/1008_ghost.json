@@ -1,0 +1,60 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1008,
+    "common":  {
+                   "rarity":  1,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  2,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  false,
+                   "blockCapacity":  0,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1008_ghost",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "幽灵",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  2300,
+                                                      "attack":  0,
+                                                      "defense":  120,
+                                                      "magicResistance":  35
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "ghost",
+                                       "skeletonDataResourceName":  "enemy_1008_ghost_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1008_ghost",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

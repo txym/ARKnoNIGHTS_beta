@@ -1,0 +1,75 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1502,
+    "common":  {
+                   "rarity":  3,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1502_crowns",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "弑君者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6000,
+                                                      "attack":  400,
+                                                      "defense":  120,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.4,
+                                                      "attackIntervalSeconds":  2.8,
+                                                      "lifeDeduct":  2
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "crowns",
+                                       "skeletonDataResourceName":  "enemy_1502_crowns_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1502_crowns",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "blink.disappear",
+                                                              "name":  "Disappear",
+                                                              "durationSeconds":  0.5
+                                                          },
+                                                          {
+                                                              "key":  "blink.appear",
+                                                              "name":  "Appear",
+                                                              "durationSeconds":  0.5
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

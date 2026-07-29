@@ -133,14 +133,14 @@ function Test-BondsUnitAnimationAuditOutput {
             -InputObject $document `
             -Name 'typeIdCount' `
             -Context 'document'
-        if ($typeIdCount -ne 93) {
+        if ($typeIdCount -ne 99) {
             throw "typeIdCount=$typeIdCount"
         }
         $variantCount = Get-BondsAuditRequiredInteger `
             -InputObject $document `
             -Name 'variantCount' `
             -Context 'document'
-        if ($variantCount -ne 172) {
+        if ($variantCount -ne 182) {
             throw "variantCount=$variantCount"
         }
 
@@ -148,7 +148,7 @@ function Test-BondsUnitAnimationAuditOutput {
             -InputObject $document `
             -Name 'variants' `
             -Context 'document').Value)
-        if ($variants.Count -ne 172) {
+        if ($variants.Count -ne 182) {
             throw "variants.Count=$($variants.Count)"
         }
 
@@ -226,7 +226,7 @@ function Test-BondsUnitAnimationAuditOutput {
                 }
             }
         }
-        if ($typeIds.Count -ne 93) {
+        if ($typeIds.Count -ne 99) {
             throw "actual typeId coverage=$($typeIds.Count)"
         }
 

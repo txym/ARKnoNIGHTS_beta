@@ -1,0 +1,162 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  10004,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "10004_trdiam",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "浆果磐蟹",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5000,
+                                                      "attack":  550,
+                                                      "defense":  4000,
+                                                      "magicResistance":  90
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.75,
+                                                      "attackIntervalSeconds":  2.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "trdiam",
+                                       "skeletonDataResourceName":  "enemy_10004_trdiam_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10004_trdiam",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_A"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_A"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack_A",
+                                                              "durationSeconds":  1.766667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_A"
+                                                          },
+                                                          {
+                                                              "key":  "idle.b",
+                                                              "name":  "Idle_B",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "move.b",
+                                                              "name":  "Move_B",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.b",
+                                                              "name":  "Attack_B",
+                                                              "durationSeconds":  1.766667
+                                                          },
+                                                          {
+                                                              "key":  "death.b",
+                                                              "name":  "Die_B",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "skill",
+                                                              "name":  "Skill_A",
+                                                              "durationSeconds":  4
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "10004_trdiam_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "硕果磐蟹",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6000,
+                                                      "attack":  650,
+                                                      "defense":  4000,
+                                                      "magicResistance":  90
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.75,
+                                                      "attackIntervalSeconds":  2.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "trdiam_2",
+                                       "skeletonDataResourceName":  "enemy_10004_trdiam_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10004_trdiam_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_A"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_A"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack_A",
+                                                              "durationSeconds":  1.766667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_A"
+                                                          },
+                                                          {
+                                                              "key":  "idle.b",
+                                                              "name":  "Idle_B",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "move.b",
+                                                              "name":  "Move_B",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.b",
+                                                              "name":  "Attack_B",
+                                                              "durationSeconds":  1.766667
+                                                          },
+                                                          {
+                                                              "key":  "death.b",
+                                                              "name":  "Die_B",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "skill",
+                                                              "name":  "Skill_A",
+                                                              "durationSeconds":  4
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

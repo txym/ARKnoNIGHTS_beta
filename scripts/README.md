@@ -29,5 +29,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 脚本会在发现本项目已有 Unity 进程时失败。成功后只在项目 `Temp` 目录写入
 `bonds-unit-animation-audit-v1.json` 和 `bonds-unit-animation-audit.log`；
-它不会修改 Spine 资源或单位 JSON。报告必须包含 93 个 TypeId 和 172 个唯一变体，
+它不会修改 Spine 资源或单位 JSON。报告必须包含 99 个 TypeId 和 182 个唯一变体，
 否则脚本返回非零退出码。

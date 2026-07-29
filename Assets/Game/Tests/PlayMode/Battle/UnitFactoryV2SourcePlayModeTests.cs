@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -18,8 +19,22 @@ namespace ArknoNights.Battle.Tests
         {
             var parent = new GameObject("Task5_UnitFactoryV2Source_Parent");
             var spawned = new List<GameObject>();
-            var templates = new List<UnityEngine.Object>();
+            var templates = new Dictionary<int, UnityEngine.Object>();
             MethodInfo resetStatics = null;
+            var sourceDirectory = Path.Combine(
+                Application.dataPath,
+                "GameData/Units/EliteVariants/Json");
+            var expectedTypeIds = Directory.GetFiles(
+                    sourceDirectory,
+                    "*.json",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => int.Parse(
+                    Path.GetFileNameWithoutExtension(path).Split('_')[0],
+                    System.Globalization.CultureInfo.InvariantCulture))
+                .OrderBy(typeId => typeId)
+                .ToArray();
+            Assert.That(expectedTypeIds.Length, Is.EqualTo(100));
+            Assert.That(expectedTypeIds, Has.No.Member(1021));
 
             try
             {
@@ -43,9 +58,10 @@ namespace ArknoNights.Battle.Tests
 
                 var arguments = new object[] { parent.transform, true, null };
                 var spawnedResult = spawnAll.Invoke(null, arguments) as IEnumerable;
-                foreach (var typeId in new[] { 1000, 5503, 5504 })
+                foreach (var typeId in expectedTypeIds)
                 {
                     templates.Add(
+                        typeId,
                         getTemplate.Invoke(null, new object[] { typeId })
                         as UnityEngine.Object);
                 }
@@ -55,14 +71,14 @@ namespace ArknoNights.Battle.Tests
                 Assert.That(idMap, Is.Not.Null);
 
                 spawned.AddRange(spawnedResult.Cast<GameObject>());
-                Assert.That(spawned.Count, Is.EqualTo(3));
+                Assert.That(spawned.Count, Is.EqualTo(expectedTypeIds.Length));
                 Assert.That(
                     idMap.Keys.Cast<int>().OrderBy(id => id),
-                    Is.EqualTo(new[] { 1000, 5503, 5504 }));
+                    Is.EqualTo(expectedTypeIds));
 
-                AssertTemplate(templates[0], 1000, "gopro", 820, 190, 1, 2, 1.9f, 0.7f);
-                AssertTemplate(templates[1], 5503, "arcslma", 18000, 1100, 6, 2, 0.2f, 2.0f);
-                AssertTemplate(templates[2], 5504, "arcslmi", 2500, 290, 3, 2, 1.9f, 0.75f);
+                AssertTemplate(templates[1000], 1000, "gopro", 820, 190, 1, 2, 1.9f, 0.7f);
+                AssertTemplate(templates[5503], 5503, "arcslma", 18000, 1100, 6, 2, 0.2f, 2.0f);
+                AssertTemplate(templates[5504], 5504, "arcslmi", 2500, 290, 3, 2, 1.9f, 0.75f);
 
                 var type2 = Type.GetType("UnitSkelType2, Assembly-CSharp");
                 Assert.That(type2, Is.Not.Null);
@@ -72,10 +88,15 @@ namespace ArknoNights.Battle.Tests
                 Assert.That(
                     idMap.Values.Cast<GameObject>(),
                     Has.All.Matches<GameObject>(HasConfiguredSkeletonData));
+                Assert.That(
+                    idMap.Values.Cast<GameObject>(),
+                    Has.All.Matches<GameObject>(
+                        gameObject => gameObject.GetComponent(type2) != null));
 
                 Assert.That(MoveName(GameObjectFor(idMap, 1000), type2), Is.EqualTo("Run_Loop"));
                 Assert.That(MoveName(GameObjectFor(idMap, 5503), type2), Is.EqualTo("Move"));
                 Assert.That(AttackName(GameObjectFor(idMap, 5504), type2), Is.EqualTo("Attack"));
+                Assert.That(AttackName(GameObjectFor(idMap, 10002), type2), Is.Empty);
             }
             finally
             {
@@ -92,7 +113,7 @@ namespace ArknoNights.Battle.Tests
                     UnityEngine.Object.DestroyImmediate(parent);
                 }
 
-                foreach (var template in templates)
+                foreach (var template in templates.Values)
                 {
                     if (template != null)
                     {

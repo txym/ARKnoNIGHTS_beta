@@ -11,8 +11,8 @@ using UnityEngine;
 internal static class BondsUnitAnimationAudit
 {
     internal const string SchemaVersion = "bonds-unit-animation-audit-v1";
-    private const int ExpectedTypeIdCount = 93;
-    private const int ExpectedVariantCount = 172;
+    private const int ExpectedTypeIdCount = 99;
+    private const int ExpectedVariantCount = 182;
     private const string BondSpecRelativePath = "docs/bonds/BONDS_SPEC.md";
     private const string CharacterAssetRoot = "Assets/Resources/Characters";
     private const string CharacterResourceRoot = "Characters";

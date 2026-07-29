@@ -1,0 +1,192 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1119,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1119_vofsd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "强壮囚犯",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  11000,
+                                                      "attack":  600,
+                                                      "defense":  700,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  3.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "vofsd",
+                                       "skeletonDataResourceName":  "enemy_1119_vofsd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1119_vofsd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle3"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move3"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack3",
+                                                              "durationSeconds":  0.933333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die3"
+                                                          },
+                                                          {
+                                                              "key":  "idle.2",
+                                                              "name":  "Idle2",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "move.2",
+                                                              "name":  "Move2",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.2",
+                                                              "name":  "Attack2",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death.2",
+                                                              "name":  "Die2",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "idle.released",
+                                                              "name":  "Idle",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "move.released",
+                                                              "name":  "Move",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.released",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death.released",
+                                                              "name":  "Die",
+                                                              "durationSeconds":  1
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1119_vofsd_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "巨汉囚犯",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  14000,
+                                                      "attack":  700,
+                                                      "defense":  1000,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  3.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "vofsd_2",
+                                       "skeletonDataResourceName":  "enemy_1119_vofsd_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1119_vofsd_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle3"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move3"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack3",
+                                                              "durationSeconds":  0.933333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die3"
+                                                          },
+                                                          {
+                                                              "key":  "idle.2",
+                                                              "name":  "Idle2",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "move.2",
+                                                              "name":  "Move2",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.2",
+                                                              "name":  "Attack2",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death.2",
+                                                              "name":  "Die2",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "idle.released",
+                                                              "name":  "Idle",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "move.released",
+                                                              "name":  "Move",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.released",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death.released",
+                                                              "name":  "Die",
+                                                              "durationSeconds":  1
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

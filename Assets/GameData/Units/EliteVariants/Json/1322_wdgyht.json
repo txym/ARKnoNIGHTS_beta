@@ -1,0 +1,142 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1322,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1322_wdgyht",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“灰礼帽”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  15000,
+                                                      "attack":  1800,
+                                                      "defense":  375,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  6,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdgyht",
+                                       "skeletonDataResourceName":  "enemy_1322_wdgyht_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1322_wdgyht",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.166667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "skill.begin",
+                                                              "name":  "Skill_Begin",
+                                                              "durationSeconds":  0.333333
+                                                          },
+                                                          {
+                                                              "key":  "skill.loop",
+                                                              "name":  "Skill_Loop",
+                                                              "durationSeconds":  0.166667
+                                                          },
+                                                          {
+                                                              "key":  "skill.end",
+                                                              "name":  "Skill_End",
+                                                              "durationSeconds":  1.5
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1322_wdgyht_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“灰礼帽”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  36000,
+                                                      "attack":  2250,
+                                                      "defense":  500,
+                                                      "magicResistance":  35
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  6,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdgyht_2",
+                                       "skeletonDataResourceName":  "enemy_1322_wdgyht_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1322_wdgyht_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.166667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "skill.begin",
+                                                              "name":  "Skill_Begin",
+                                                              "durationSeconds":  0.333333
+                                                          },
+                                                          {
+                                                              "key":  "skill.loop",
+                                                              "name":  "Skill_Loop",
+                                                              "durationSeconds":  0.166667
+                                                          },
+                                                          {
+                                                              "key":  "skill.end",
+                                                              "name":  "Skill_End",
+                                                              "durationSeconds":  1.5
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

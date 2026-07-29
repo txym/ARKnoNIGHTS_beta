@@ -19,25 +19,25 @@ namespace ArknoNights.Battle.Tests
             var document = BuildDocument();
 
             Assert.That(GetField<string>(document, "schemaVersion"), Is.EqualTo(ExpectedSchemaVersion));
-            Assert.That(GetField<int>(document, "typeIdCount"), Is.EqualTo(93));
-            Assert.That(GetField<int>(document, "variantCount"), Is.EqualTo(172));
+            Assert.That(GetField<int>(document, "typeIdCount"), Is.EqualTo(99));
+            Assert.That(GetField<int>(document, "variantCount"), Is.EqualTo(182));
 
             var variants = GetArrayField(document, "variants");
-            Assert.That(variants.Length, Is.EqualTo(172));
+            Assert.That(variants.Length, Is.EqualTo(182));
             Assert.That(
                 variants
                     .Cast<object>()
                     .Select(variant => GetField<int>(variant, "typeId"))
                     .Distinct()
                     .Count(),
-                Is.EqualTo(93));
+                Is.EqualTo(99));
 
             var unitKeys = variants
                 .Cast<object>()
                 .Select(variant => GetField<string>(variant, "unitKey"))
                 .ToArray();
             Assert.That(unitKeys, Is.Ordered.Using<string>(StringComparer.Ordinal));
-            Assert.That(unitKeys.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(172));
+            Assert.That(unitKeys.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(182));
 
             foreach (var variant in variants)
             {
@@ -55,7 +55,7 @@ namespace ArknoNights.Battle.Tests
                 GetField<string>(FindVariant(variants, "1322_wdgyht_2"), "sourceUnitKey"),
                 Is.EqualTo("1322_wdgyht"));
 
-            AssertAnimationDuration(FindVariant(variants, "1000_gopro"), "Attack", 1.0f);
+            AssertAnimationDuration(FindVariant(variants, "1014_rogue"), "Attack", 1.1f);
             AssertAnimationDuration(FindVariant(variants, "5503_arcslma"), "Attack", 2.666667f);
         }
 
@@ -115,7 +115,7 @@ namespace ArknoNights.Battle.Tests
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .ToArray();
-            Assert.That(assetPaths.Length, Is.GreaterThanOrEqualTo(172));
+            Assert.That(assetPaths.Length, Is.GreaterThanOrEqualTo(182));
 
             var hashesBefore = assetPaths.ToDictionary(
                 path => path,

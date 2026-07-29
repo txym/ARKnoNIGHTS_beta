@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1039,
+    "common":  {
+                   "rarity":  2,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1039_breakr",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "破阵者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  3500,
+                                                      "attack":  410,
+                                                      "defense":  50,
+                                                      "magicResistance":  25
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.9,
+                                                      "attackIntervalSeconds":  1.4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "breakr",
+                                       "skeletonDataResourceName":  "enemy_1039_breakr_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1039_breakr",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1039_breakr_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "破阵者组长",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5000,
+                                                      "attack":  500,
+                                                      "defense":  80,
+                                                      "magicResistance":  25
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.9,
+                                                      "attackIntervalSeconds":  1.4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "breakr_2",
+                                       "skeletonDataResourceName":  "enemy_1039_breakr_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1039_breakr_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -452,14 +454,20 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void RealSources_AreOnlyTheThreeSelfContainedV2Documents()
+        public void RealSources_CoverCurrentBondsAndLegacy1000()
         {
             var v2Directory = Path.Combine(
                 Application.dataPath,
                 "GameData/Units/EliteVariants/Json");
             var sources = LoadDirectory(v2Directory);
+            var expectedTypeIds = ReadBondsTypeIds();
+            expectedTypeIds.Add(1000);
 
-            Assert.That(DictionaryKeys(sources), Is.EqualTo(new[] { 1000, 5503, 5504 }));
+            Assert.That(expectedTypeIds.Count, Is.EqualTo(100));
+            Assert.That(
+                DictionaryKeys(sources),
+                Is.EqualTo(expectedTypeIds.OrderBy(typeId => typeId)));
+            Assert.That(expectedTypeIds, Has.No.Member(1021));
             Assert.That(Directory.Exists(
                 Path.Combine(Application.dataPath, "GameData/Units/Json")), Is.False);
         }
@@ -660,6 +668,54 @@ namespace ArknoNights.Battle.Tests
             AssertDeclaredAnimationsExistInSpine(resolved);
         }
 
+        [Test]
+        public void RealSources_AllVariantsDeclareLoadableSpineAnimations()
+        {
+            var v2Directory = Path.Combine(
+                Application.dataPath,
+                "GameData/Units/EliteVariants/Json");
+            var sources = LoadDirectory(v2Directory) as IDictionary;
+            Assert.That(sources, Is.Not.Null, "LoadDirectory must return a dictionary.");
+
+            var resolvedVariantCount = 0;
+            foreach (DictionaryEntry entry in sources)
+            {
+                var source = entry.Value;
+                var json = Property<string>(source, "Json");
+                var path = Property<string>(source, "Path");
+                var eliteLevels = Regex.Matches(
+                        json,
+                        @"""minEliteLevel""\s*:\s*(?<level>\d+)")
+                    .Cast<Match>()
+                    .Select(match => int.Parse(
+                        match.Groups["level"].Value,
+                        System.Globalization.CultureInfo.InvariantCulture))
+                    .ToArray();
+
+                Assert.That(
+                    eliteLevels,
+                    Is.Not.Empty,
+                    "Source contains no elite variants: " + path);
+                Assert.That(
+                    eliteLevels.Distinct().Count(),
+                    Is.EqualTo(eliteLevels.Length),
+                    "Source contains duplicate elite levels: " + path);
+
+                foreach (var eliteLevel in eliteLevels)
+                {
+                    var resolved = Resolve(json, eliteLevel, path);
+                    Assert.That(
+                        Field<int>(resolved, "minEliteLevel"),
+                        Is.EqualTo(eliteLevel),
+                        path);
+                    AssertDeclaredAnimationsExistInSpine(resolved);
+                    resolvedVariantCount++;
+                }
+            }
+
+            Assert.That(resolvedVariantCount, Is.EqualTo(185));
+        }
+
         private static string InvalidFixture(string fixture)
         {
             switch (fixture)
@@ -835,6 +891,37 @@ namespace ArknoNights.Battle.Tests
             var dictionary = sources as IDictionary;
             Assert.That(dictionary, Is.Not.Null, "LoadDirectory must return a dictionary.");
             return dictionary.Keys.Cast<int>().OrderBy(key => key).ToArray();
+        }
+
+        private static HashSet<int> ReadBondsTypeIds()
+        {
+            var repositoryRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            var specificationPath = Path.Combine(
+                repositoryRoot,
+                "docs",
+                "bonds",
+                "BONDS_SPEC.md");
+            var specification = File.ReadAllText(
+                specificationPath,
+                new UTF8Encoding(false, true));
+            var sections = Regex.Matches(
+                specification,
+                @"(?ms)^## [^\r\n]+\s*```text\s*(?<ids>.*?)\s*```");
+            Assert.That(
+                sections.Count,
+                Is.EqualTo(2),
+                "The BONDS specification must keep exactly two TypeId text sections.");
+            var typeIds = sections
+                .Cast<Match>()
+                .SelectMany(section => Regex.Matches(
+                    section.Groups["ids"].Value,
+                    @"\d+").Cast<Match>())
+                .Select(match => int.Parse(
+                    match.Value,
+                    System.Globalization.CultureInfo.InvariantCulture))
+                .ToHashSet();
+            Assert.That(typeIds.Count, Is.EqualTo(99));
+            return typeIds;
         }
 
         private static object ResolveReal(int typeId, int eliteLevel)

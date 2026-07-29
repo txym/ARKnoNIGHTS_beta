@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1316,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1316_wdpjd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "武装密探",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  12000,
+                                                      "attack":  1000,
+                                                      "defense":  1200,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.35,
+                                                      "attackIntervalSeconds":  3.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdpjd",
+                                       "skeletonDataResourceName":  "enemy_1316_wdpjd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1316_wdpjd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_B"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_B"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_B"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1316_wdpjd_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "武装密探长",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  15000,
+                                                      "attack":  1200,
+                                                      "defense":  1500,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.35,
+                                                      "attackIntervalSeconds":  3.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdpjd_2",
+                                       "skeletonDataResourceName":  "enemy_1316_wdpjd_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1316_wdpjd_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_B"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_B"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_B"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

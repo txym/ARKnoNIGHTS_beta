@@ -13,17 +13,27 @@ namespace ArknoNights.Battle.Tests
     {
         private const string ExpectedRuntimeCatalogHash =
             "359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA";
+        private static readonly string[] LegacyProjectionFileNames =
+        {
+            "1000_gopro.json",
+            "5503_arcslma.json",
+            "5504_arcslmi.json"
+        };
 
         [Test]
-        public void Generate_ProjectsResolvedEliteZeroVariantsToIsolatedV1Catalog()
+        public void Generate_ProjectsRepresentableLegacySourcesToIsolatedV1Catalog()
         {
             var outputPath = NewIsolatedPath("projection", "unit-catalog-v1.json");
+            var sourceDirectory = CopyRealSources(
+                "projection-sources",
+                null,
+                json => json);
             var hashBefore = RuntimeCatalogHash();
             Assert.That(hashBefore, Is.EqualTo(ExpectedRuntimeCatalogHash));
 
             try
             {
-                InvokeGenerator(RealSourceDirectory(), outputPath);
+                InvokeGenerator(sourceDirectory, outputPath);
             }
             finally
             {
@@ -205,12 +215,10 @@ namespace ArknoNights.Battle.Tests
         {
             var fixtureDirectory = NewIsolatedPath(scenario, "sources");
             Directory.CreateDirectory(fixtureDirectory);
-            foreach (var sourcePath in Directory.GetFiles(
-                         RealSourceDirectory(),
-                         "*.json",
-                         SearchOption.TopDirectoryOnly))
+            foreach (var fileName in LegacyProjectionFileNames)
             {
-                var fileName = Path.GetFileName(sourcePath);
+                var sourcePath = Path.Combine(RealSourceDirectory(), fileName);
+                Assert.That(File.Exists(sourcePath), Is.True, "Missing legacy fixture source.");
                 var json = File.ReadAllText(sourcePath);
                 File.WriteAllText(
                     Path.Combine(fixtureDirectory, fileName),

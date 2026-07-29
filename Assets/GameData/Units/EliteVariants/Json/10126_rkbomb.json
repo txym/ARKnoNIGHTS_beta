@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  10126,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "10126_rkbomb",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "异质源石虫",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  4500,
+                                                      "attack":  300,
+                                                      "defense":  100,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.5,
+                                                      "attackIntervalSeconds":  2,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "rkbomb",
+                                       "skeletonDataResourceName":  "enemy_10126_rkbomb_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10126_rkbomb",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "A_Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "A_Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "A_Attack",
+                                                              "durationSeconds":  2
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "A_Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "10126_rkbomb_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "异质源石虫·α",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6000,
+                                                      "attack":  400,
+                                                      "defense":  100,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.5,
+                                                      "attackIntervalSeconds":  2,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "rkbomb_2",
+                                       "skeletonDataResourceName":  "enemy_10126_rkbomb_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10126_rkbomb_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "A_Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "A_Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "A_Attack",
+                                                              "durationSeconds":  2
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "A_Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

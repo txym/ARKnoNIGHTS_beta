@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1315,
+    "common":  {
+                   "rarity":  3,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1315_wdyjd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "岗哨密探",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5500,
+                                                      "attack":  700,
+                                                      "defense":  150,
+                                                      "magicResistance":  35
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.65,
+                                                      "attackIntervalSeconds":  3.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdyjd",
+                                       "skeletonDataResourceName":  "enemy_1315_wdyjd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1315_wdyjd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_B"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_B"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_B"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1315_wdyjd_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "岗哨密探长",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6500,
+                                                      "attack":  800,
+                                                      "defense":  200,
+                                                      "magicResistance":  35
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.65,
+                                                      "attackIntervalSeconds":  3.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdyjd_2",
+                                       "skeletonDataResourceName":  "enemy_1315_wdyjd_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1315_wdyjd_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_B"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_B"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_B"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}
