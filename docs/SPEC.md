@@ -699,7 +699,7 @@ LAN Home 右侧的 `加入同盟` 区域按图 9 构成一个连续的橙灰色�
 - 图12用于房主已准备、成员未准备和灰色“协议启动”；图13用于所有当前成员已准备、青色“协议启动”和左上离开操作。
 - 图12与图13因右侧弹窗遮挡而排除完整的第四个玩家槽，且排除项不记为通过。
 - 上方滚动弹幕、图12/13右侧弹窗像素、所有角色立绘和资料卡内容均不属于视觉验收。
-- 房主槽不得渲染头像、角色立绘、玩家名、玩家 ID 或资料卡内容，但保留已准备边框、勾选图标、“已就绪”和创建者标识。
+- 所有已占用槽位（包括房主槽）都在 `LowerDecoration` 中显示玩家头像与扩展游戏名；扩展游戏名格式为 `<DisplayName>#<SeatNumber>`，其中座位号按当前房间成员显示顺序固定投影为 `1..4`。房主槽仍保留已准备边框、勾选图标、“已就绪”和创建者标识。
 - 视觉验收以实际渲染的可见图形为准，而不是纹理矩形或RectTransform中心。
 - 在 `1920×1080` 下，阻塞式图标/标签的可见中心每轴误差不得超过 `2 px`、可见尺寸误差不得超过 `3 px`；长轮廓/组合槽位每条可见边误差不得超过 `4 px`，命名 ROI 内的可见轮廓 Jaccard 不得低于 `0.95`。
 
@@ -711,8 +711,8 @@ LAN Home 右侧的 `加入同盟` 区域按图 9 构成一个连续的橙灰色�
 
 - 四个玩家槽以及 Empty、Waiting、Ready、host 状态必须使用同一套归一化 `CardBody`/PortraitFrame backing 几何；状态切换和 Ready 的纵向翻转不得改变其世界空间 footprint。
 - PortraitFrame 必须绘制在状态内容后面；`TopBar`、`LowerDecoration` 绘制在其前面。边框必须延伸到下方头像名称横条的覆盖区，`LowerDecoration` 必须遮住延长段和接缝。
-- `TopBar`、`ReadyTopBar`、`StateOverlay`、`EmptyInvite`、`ReadyIcon`、`ReadyLabel`、`LowerDecoration`、`CreatorTag`、按钮、Leave、延迟和槽位根不得因边框补偿而移动。
-- 房主槽仍不得填入头像、立绘、玩家名、玩家 ID 或资料卡内容。
+- `TopBar`、`ReadyTopBar`、`EmptyInvite`、`ReadyIcon`、`ReadyLabel`、`LowerDecoration`、`CreatorTag`、按钮、Leave、延迟和槽位根不得因边框补偿而移动。旧 `ReadyOverlay`/`StateOverlay` 可见层已删除，不得重新创建同名运行时节点。
+- 所有已占用槽位（包括房主槽）都必须在 `LowerDecoration` 中显示成员快照的头像和 `<DisplayName>#<SeatNumber>`；空槽隐藏这两项，不显示伪造资料。
 - backing 与 `LowerDecoration` 的几何重叠不得小于 `60 px`，下方横条上沿附近的连续背景缝隙不得超过 `1 px`。
 
 PortraitFrame 的阻塞式位置比较使用每张截图自身已解码的 `TopBar` 与 `LowerDecoration` 作为相对锚点；绝对屏幕坐标只作诊断，不阻塞统一几何。探测器必须按每个可见行保留实际观测到的 `(leftX,y,rightX,y)` 配对：观测左像素直接映射到 canonical `x=0`，同一行的观测右像素直接映射到 canonical `x=256`；只有 Y 按该记录自身的 `TopBar` 下沿到 `LowerDecoration` 上沿做最近整数归一化。TopBar 的水平 center/width 关系继续作为独立阻塞门，不得用于把语义上的左右 side pixel 分散到中间列。图 11 的 1–4 槽、图 12 的 1–3 槽、图 13 的 1–3 槽构成恰好 10 个未遮挡贡献者，并由同一确定性共识目标验收。实际截图像素是唯一可见轮廓事实源，不得用 bounds 内部、线段、源 aperture、manifest backing、ROI 或其他推断像素回填。生成 target 后必须 fail-closed 地确认左右两侧都非空、只含 `x=0/256`、像素数相等且逐行集合完全一致。
@@ -731,3 +731,16 @@ PortraitFrame 的阻塞式位置比较使用每张截图自身已解码的 `TopB
 图 12/13 的完整第四槽仍分别为 `RoomFull.Slot4.ReferencePopupExclusion` 和 `RoomReady.Slot4.ReferencePopupExclusion`；二者状态必须是 `ExcludedByReferencePopup` 且 `passed=false`，不得改记为通过。图 11 第四槽仍是唯一无遮挡的第四槽参考。
 
 当前 Cycle 3 生成的 target 为 `1020` 个实际观测像素，即 `510` 个 canonical-left 与逐行完全配对的 `510` 个 canonical-right 像素；无中间列 target。10 个 eligible PortraitFrame 的实际像素 Jaccard 为 `0.976562..0.994152`，均达到未修改的 `0.95`，但只有 `8/10` 整体通过：`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 仍因 `4 px > 3 px` 的自身 TopBar 可见宽度差失败。`RoomReady.Slot2.ReadyTopBar` 的宽度差为 `4 px > 3 px`，`RoomHost.Slot2To3.VisibleContourSpacing` 的间距差为 `-4.5 px`、绝对值超过 `4 px`，二者仍是 Cycle 2 到 Cycle 3 的命名回归。因此视觉验收仍为 **FAILED**。三次可见 Player 校准已经全部使用；在新的授权任务前，不得将本轮描述为完成或启动第四次校准。
+
+## 17. LAN 主界面身份与房间成员信息优化（2026-07-29，当前权威补充）
+
+本节由项目负责人当前任务确认，取代第 15、16 节中与房主资料隐藏、`ReadyOverlay` 保留以及旧 Join backing 几何冲突的历史描述。
+
+- `Home/IdentityPanel` 不再使用背景贴图，不再提供玩家名输入框或 Save 按钮。可选头像限定为已批准的 `Amiy`、`Clementi`、`Kirar`、`Zumam` 四项；游戏名由当前头像名称直接派生并保持首字母大写。点击上一项或下一项后立即保存头像索引与派生游戏名。
+- `IdentityPanel/Title` 固定显示“更改头像”，其 RectTransform 中心 Y 与 `AvatarSelector` 中心 Y 对齐。`IdentityPanel` 内全部 UI 相对既有尺寸统一放大为 `1.5×`；容器可为保证放大后内容不越出屏幕而整体平移，但子项之间的相对布局保持不变。
+- `Home/RoomSelect/RightBackground` 运行时节点删除；保留资源文件仅用于历史资产记录，不得据此重新创建节点。
+- `Home/RoomSelect/Join/InteriorBacking` 使用顶锚点、左上 pivot，其 `RectTransform.anchoredPosition` 为 `(146,-11)`、尺寸为 `667×280`。`GuideHorizontal` 删除；`OutlineLeft` 与 `OutlineRight` 的 Join 局部 X 分别为 `140` 与 `814`，其余已确认坐标不变。本次变更不改变加入按钮、房间号输入或网络行为。
+- 每个 `RoomCard` 删除 `ReadyOverlay` 运行时节点。Ready 状态继续由现有 CardBody、TopBar、ReadyIcon、ReadyLabel 与 LowerDecoration 表达。
+- 每个 `LowerDecoration` 包含左侧玩家头像与右侧游戏名。头像使用 LowerDecoration 局部左下坐标 `(30,10)`、尺寸 `90×90`；名字与头像纵向对齐，局部 X 为 `140`，字号为 `30`。已占用槽位显示成员快照中的 `DisplayName`，并拼接 `#1..#4` 当前显示座位号；空槽隐藏头像与名字。房主和普通成员遵守同一显示规则。
+- 主界面与房间界面中任何包含汉字的 uGUI `Text` 必须使用 `Resources/Fonts/FangZhengHeiTiJianTi-1.ttf`；纯英文和数字文本可继续使用既有字体。
+- 座位号当前由 `room.Members[index]` 投影为 `index + 1`；成员离开后现有房间成员列表会压缩，因此本节不定义跨离开/重加入保持不变的永久座位身份。

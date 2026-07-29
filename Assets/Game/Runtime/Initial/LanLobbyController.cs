@@ -14,9 +14,7 @@ using UnityEngine.SceneManagement;
 public sealed class LanLobbyController : MonoBehaviour
 {
     private const string RootName = "LanLobbyRoot";
-    private const string ProfileNameKey = "LanLobby.Profile.Name";
     private const string ProfileAvatarKey = "LanLobby.Profile.AvatarIndex";
-    private const string DefaultDisplayName = "Doctor";
 
     private LanLobbyView view;
     private PreparationBattleLoopController preparationLoop;
@@ -140,14 +138,12 @@ public sealed class LanLobbyController : MonoBehaviour
 
     private void SaveProfile(LobbyProfile requested)
     {
-        var name = requested == null ? DefaultDisplayName : NormalizeDisplayName(requested.DisplayName);
         var avatar = requested == null ? 0 : Mathf.Clamp(requested.AvatarIndex, LobbyProfile.MinimumAvatarIndex, LobbyProfile.MaximumAvatarIndex);
-        PlayerPrefs.SetString(ProfileNameKey, name);
         PlayerPrefs.SetInt(ProfileAvatarKey, avatar);
         PlayerPrefs.Save();
-        profile = new LobbyProfile(profile.PlayerId, name, avatar);
+        profile = new LobbyProfile(profile.PlayerId, LobbyProfile.DisplayNameForAvatar(avatar), avatar);
         view.ShowHome(profile);
-        view.SetStatus("Profile saved.");
+        view.SetStatus("Avatar changed.");
     }
 
     private void CreateRoom()
@@ -372,18 +368,11 @@ public sealed class LanLobbyController : MonoBehaviour
 
     private LobbyProfile LoadProfile()
     {
-        var name = NormalizeDisplayName(PlayerPrefs.GetString(ProfileNameKey, DefaultDisplayName));
         var avatar = Mathf.Clamp(PlayerPrefs.GetInt(ProfileAvatarKey, 0), LobbyProfile.MinimumAvatarIndex, LobbyProfile.MaximumAvatarIndex);
-        return new LobbyProfile("lan-" + Guid.NewGuid().ToString("N"), name, avatar);
-    }
-
-    private static string NormalizeDisplayName(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return DefaultDisplayName;
-        value = value.Trim();
-        return value.Length <= LobbyProfile.MaximumDisplayNameCharacters
-            ? value
-            : value.Substring(0, LobbyProfile.MaximumDisplayNameCharacters);
+        return new LobbyProfile(
+            "lan-" + Guid.NewGuid().ToString("N"),
+            LobbyProfile.DisplayNameForAvatar(avatar),
+            avatar);
     }
 
     private void OnDestroy()

@@ -95,15 +95,15 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
 
     private IEnumerator CaptureHome(bool captureScreen)
     {
-        view.ShowHome(new LobbyProfile("capture-host", "Doctor", 0));
+        view.ShowHome(new LobbyProfile("capture-host", "Amiy", 0));
         view.SetStatus("DISCOVERING LOCAL ROOMS");
         yield return CaptureOne("home", null, 0, captureScreen);
     }
 
     private IEnumerator CaptureDiscoveredPrefill(bool captureScreen)
     {
-        view.ShowHome(new LobbyProfile("capture-host", "Doctor", 0));
-        view.BindDiscoveredRooms(new[] { new LobbyDiscoveryEntry("654321", "Doctor", 1, 4, true, 48765, 1) });
+        view.ShowHome(new LobbyProfile("capture-host", "Amiy", 0));
+        view.BindDiscoveredRooms(new[] { new LobbyDiscoveryEntry("654321", "Amiy", 1, 4, true, 48765, 1) });
         view.ClickDiscoveredRoomForTests("654321");
         yield return CaptureOne("discovered-prefill", null, 0, captureScreen);
     }
@@ -207,8 +207,9 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
             names.Add(slot);
             names.Add(slot + "/CardBody");
             names.Add(slot + "/TopBar");
-            names.Add(slot + "/ReadyOverlay");
             names.Add(slot + "/LowerDecoration");
+            AddIfActive(names, slot + "/LowerDecoration/PlayerAvatar");
+            AddIfActive(names, slot + "/LowerDecoration/PlayerName");
             AddIfActive(names, slot + "/EmptyContent");
             AddIfActive(names, slot + "/EmptyContent/EmptyInviteIcon");
             AddIfActive(names, slot + "/EmptyContent/EmptyInviteLabel");
@@ -558,7 +559,7 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     {
         return new LobbyRoomSnapshot("654321", "capture-host", new[]
         {
-            new LobbyMemberSnapshot(new LobbyProfile("capture-host", "Doctor", 0), true, 18)
+            new LobbyMemberSnapshot(new LobbyProfile("capture-host", "Amiy", 0), true, 18)
         }, false, 1);
     }
 
@@ -566,10 +567,10 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     {
         return new LobbyRoomSnapshot("654321", "capture-host", new[]
         {
-            new LobbyMemberSnapshot(new LobbyProfile("capture-host", "Doctor", 0), true, 42),
-            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-1", "Amiya", 1), true, 56),
-            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-2", "Chen", 2), true, 71),
-            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-3", "Kal'tsit", 3), true, 95)
+            new LobbyMemberSnapshot(new LobbyProfile("capture-host", "Amiy", 0), true, 42),
+            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-1", "Clementi", 1), true, 56),
+            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-2", "Kirar", 2), true, 71),
+            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-3", "Zumam", 3), true, 95)
         }, false, 2);
     }
 
@@ -577,10 +578,10 @@ public sealed class LanLobbyCaptureSuite : MonoBehaviour
     {
         return new LobbyRoomSnapshot("654321", "capture-host", new[]
         {
-            new LobbyMemberSnapshot(new LobbyProfile("capture-host", "Doctor", 0), true, 87),
-            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-1", "Amiya", 1), false, 64),
-            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-2", "Chen", 2), false, 71),
-            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-3", "Kal'tsit", 3), false, 95)
+            new LobbyMemberSnapshot(new LobbyProfile("capture-host", "Amiy", 0), true, 87),
+            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-1", "Clementi", 1), false, 64),
+            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-2", "Kirar", 2), false, 71),
+            new LobbyMemberSnapshot(new LobbyProfile("capture-guest-3", "Zumam", 3), false, 95)
         }, false, 3);
     }
 

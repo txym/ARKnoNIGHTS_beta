@@ -149,17 +149,17 @@ namespace ArknoNights.Lobby.Tests
 
             AssertActionRect(home, "LanLobbyRoot/Home/RoomSelect/Create/CreateAction");
             AssertActionRect(home, "LanLobbyRoot/Home/RoomSelect/Join/JoinAction");
-            Assert.That(home.unityText.Any(text => text.text == "LOCAL IDENTITY"), Is.True,
+            Assert.That(home.unityText.Any(text => text.text == "更改头像"), Is.True,
                 "Home identity title must be captured dynamically.");
-            Assert.That(home.unityText.Any(text => text.text == "Doctor"), Is.True,
-                "Current profile input text must be captured dynamically.");
+            Assert.That(home.unityText.Any(text => text.text == "Amiy"), Is.True,
+                "The avatar-derived profile name must be captured dynamically.");
             Assert.That(home.unityText.Any(text => text.text == "创建同盟"), Is.True,
                 "Create action text must be captured dynamically.");
             Assert.That(home.unityText.Any(text => text.text == "加入同盟"), Is.True,
                 "Join action text must be captured dynamically.");
             Assert.That(home.unityText.Any(text => text.text == "DISCOVERING LOCAL ROOMS"), Is.True,
                 "Current Home status text must be captured dynamically.");
-            Assert.That(discovered.unityText.Any(text => text.text.Contains("654321") && text.text.Contains("Doctor")), Is.True,
+            Assert.That(discovered.unityText.Any(text => text.text.Contains("654321") && text.text.Contains("Amiy")), Is.True,
                 "The rendered discovered-room row must be captured dynamically.");
             var roomHost = parsed.captures.Single(record => record.name == "room-host");
             Assert.That(roomHost.unityText.Any(text => text.text == "18 ms"), Is.True,
@@ -170,7 +170,7 @@ namespace ArknoNights.Lobby.Tests
                 roomHost,
                 new[]
                 {
-                    new MemberExpectation("capture-host", "Doctor", true)
+                    new MemberExpectation("capture-host", "Amiy", true)
                 },
                 true,
                 "btn_match_normal");
@@ -178,10 +178,10 @@ namespace ArknoNights.Lobby.Tests
                 parsed.captures.Single(record => record.name == "room-full"),
                 new[]
                 {
-                    new MemberExpectation("capture-host", "Doctor", true),
-                    new MemberExpectation("capture-guest-1", "Amiya", false),
-                    new MemberExpectation("capture-guest-2", "Chen", false),
-                    new MemberExpectation("capture-guest-3", "Kal'tsit", false)
+                    new MemberExpectation("capture-host", "Amiy", true),
+                    new MemberExpectation("capture-guest-1", "Clementi", false),
+                    new MemberExpectation("capture-guest-2", "Kirar", false),
+                    new MemberExpectation("capture-guest-3", "Zumam", false)
                 },
                 false,
                 "btn_match_grey");
@@ -189,10 +189,10 @@ namespace ArknoNights.Lobby.Tests
                 parsed.captures.Single(record => record.name == "room-ready"),
                 new[]
                 {
-                    new MemberExpectation("capture-host", "Doctor", true),
-                    new MemberExpectation("capture-guest-1", "Amiya", true),
-                    new MemberExpectation("capture-guest-2", "Chen", true),
-                    new MemberExpectation("capture-guest-3", "Kal'tsit", true)
+                    new MemberExpectation("capture-host", "Amiy", true),
+                    new MemberExpectation("capture-guest-1", "Clementi", true),
+                    new MemberExpectation("capture-guest-2", "Kirar", true),
+                    new MemberExpectation("capture-guest-3", "Zumam", true)
                 },
                 true,
                 "btn_match_normal");
@@ -272,15 +272,20 @@ namespace ArknoNights.Lobby.Tests
                 string.Equals(text.text, "OPEN SLOT", StringComparison.Ordinal) ||
                 string.Equals(text.text, "WAITING", StringComparison.Ordinal)), Is.False,
                 capture.name + " must not render legacy placeholder literals.");
-            Assert.That(HasRenderedHostProfile(capture, "Doctor", "capture-host"), Is.False,
-                capture.name + " must not render the host display name, player ID, or avatar bitmap.");
-            var semanticNodes = capture.keyRects.Select(rect => rect.name)
-                .Concat(capture.spriteSources.Select(sprite => sprite.node))
-                .Concat(capture.unityText.Select(text => text.node))
-                .Concat(capture.sourceAudit.Select(item => item.node))
-                .ToArray();
-            Assert.That(semanticNodes.Any(IsHostProfileNode), Is.False,
-                capture.name + " must not contain host portrait/avatar/profile/name/id nodes.");
+            for (var index = 0; index < expectedMembers.Count; index++)
+            {
+                var slot = "LanLobbyRoot/Room/RoomCard_" + index + "/LowerDecoration";
+                Assert.That(capture.unityText.Count(text =>
+                        text.node == slot + "/PlayerName"
+                        && text.text == expectedMembers[index].DisplayName + "#" + (index + 1)),
+                    Is.EqualTo(1),
+                    capture.name + " must render the authoritative game name and seat number.");
+                Assert.That(capture.spriteSources.Count(sprite =>
+                        sprite.node == slot + "/PlayerAvatar"
+                        && sprite.spriteName == ExpectedAvatarSprite(index)),
+                    Is.EqualTo(1),
+                    capture.name + " must render the member avatar in the lower decoration.");
+            }
         }
 
         private static void AssertRoomKeyRects(
@@ -306,21 +311,28 @@ namespace ArknoNights.Lobby.Tests
                 AssertKeyRect(capture, slot);
                 AssertKeyRect(capture, slot + "/CardBody");
                 AssertKeyRect(capture, slot + "/TopBar");
-                AssertKeyRect(capture, slot + "/ReadyOverlay");
+                Assert.That(capture.keyRects.Any(rect => rect.name == slot + "/ReadyOverlay"), Is.False);
                 AssertKeyRect(capture, slot + "/LowerDecoration");
                 if (index == 0) AssertKeyRect(capture, slot + "/CreatorTag");
 
                 if (index >= expectedMembers.Count)
                 {
+                    Assert.That(capture.keyRects.Any(rect => rect.name == slot + "/LowerDecoration/PlayerAvatar"), Is.False);
+                    Assert.That(capture.keyRects.Any(rect => rect.name == slot + "/LowerDecoration/PlayerName"), Is.False);
                     AssertKeyRect(capture, slot + "/EmptyContent");
                     AssertKeyRect(capture, slot + "/EmptyContent/EmptyInviteIcon");
                     AssertKeyRect(capture, slot + "/EmptyContent/EmptyInviteLabel");
                     AssertKeyRect(capture, slot + "/EmptyContent/EmptyInviteHint");
                 }
-                else if (expectedMembers[index].IsReady)
+                else
                 {
-                    AssertKeyRect(capture, slot + "/OccupiedContent/ReadyIcon");
-                    AssertKeyRect(capture, slot + "/OccupiedContent/ReadyLabel");
+                    AssertKeyRect(capture, slot + "/LowerDecoration/PlayerAvatar");
+                    AssertKeyRect(capture, slot + "/LowerDecoration/PlayerName");
+                    if (expectedMembers[index].IsReady)
+                    {
+                        AssertKeyRect(capture, slot + "/OccupiedContent/ReadyIcon");
+                        AssertKeyRect(capture, slot + "/OccupiedContent/ReadyLabel");
+                    }
                 }
             }
         }
@@ -346,8 +358,12 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(ExpectedRoomBitmapSources.ContainsKey(item.spriteName), Is.True,
                     capture.name + " rendered an unapproved room bitmap: " + item.spriteName);
                 var expectedSource = ExpectedRoomBitmapSources[item.spriteName];
-                Assert.That(item.resourcesPath, Is.EqualTo("UI/Lobby/" + item.spriteName));
-                Assert.That(item.sourcePath, Is.EqualTo("[uc]autochessouter/" + item.spriteName + ".png"));
+                var isAvatar = item.spriteName.StartsWith("icon_", StringComparison.Ordinal);
+                Assert.That(item.resourcesPath, Is.EqualTo(
+                    (isAvatar ? "UI/Lobby/Home/" : "UI/Lobby/") + item.spriteName));
+                Assert.That(item.sourcePath, Is.EqualTo(
+                    (isAvatar ? "Combined/[uc]autochesscommon/" : "[uc]autochessouter/")
+                    + item.spriteName + ".png"));
                 Assert.That(item.sha256, Is.EqualTo(expectedSource.Sha256));
                 Assert.That(item.sourcePath.Contains("$0") || item.sourcePath.Contains("#0"), Is.False);
                 Assert.That(item.captures, Is.EqualTo(new[] { capture.name }));
@@ -479,7 +495,7 @@ namespace ArknoNights.Lobby.Tests
                     {
                         { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
-                        { "player_card_self_frame", 1 }, { "card_empty", 3 }, { "bg_plus", 3 },
+                        { "card_empty", 3 }, { "bg_plus", 3 }, { "icon_amiy", 1 },
                         { "player_card_ready", 1 }, { "card_deco_bg", 3 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_normal", 1 }, { "btn_match_host_normal", 1 }
                     };
@@ -488,7 +504,8 @@ namespace ArknoNights.Lobby.Tests
                     {
                         { "bg_terrain", 1 }, { "card_bg", 4 },
                         { "bg_top_ready", 1 }, { "bg_top_normal", 3 },
-                        { "player_card_self_frame", 1 }, { "player_card_ready", 1 },
+                        { "player_card_ready", 1 },
+                        { "icon_amiy", 1 }, { "icon_clementi", 1 }, { "icon_kirar", 1 }, { "icon_zumam", 1 },
                         { "card_deco_bg", 3 }, { "card_deco_self", 1 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_grey", 1 }, { "btn_match_host_grey", 1 }
                     };
@@ -496,7 +513,8 @@ namespace ArknoNights.Lobby.Tests
                     return new Dictionary<string, int>
                     {
                         { "bg_terrain", 1 }, { "card_bg", 4 },
-                        { "bg_top_ready", 4 }, { "player_card_self_frame", 4 },
+                        { "bg_top_ready", 4 },
+                        { "icon_amiy", 1 }, { "icon_clementi", 1 }, { "icon_kirar", 1 }, { "icon_zumam", 1 },
                         { "player_card_ready", 4 }, { "card_deco_self", 4 }, { "host_top_tag", 1 },
                         { "img_return", 1 }, { "btn_match_normal", 1 }, { "btn_match_host_normal", 1 }
                     };
@@ -512,76 +530,24 @@ namespace ArknoNights.Lobby.Tests
                 capture.name + " must export one diagnostic key rect for " + name);
         }
 
-        private static bool IsHostProfileNode(string node)
+        private static string ExpectedAvatarSprite(int seatIndex)
         {
-            if (string.IsNullOrEmpty(node)) return false;
-            var forbiddenSegments = new[]
+            switch (seatIndex)
             {
-                "/Portrait", "/Avatar", "/Profile", "/PlayerName", "/PlayerId", "/MemberName", "/MemberId"
-            };
-            return forbiddenSegments.Any(segment =>
-                node.IndexOf(segment, StringComparison.OrdinalIgnoreCase) >= 0);
-        }
-
-        private static bool HasRenderedHostProfile(
-            CaptureRecordProbe capture,
-            string hostDisplayName,
-            string hostPlayerId)
-        {
-            var forbiddenTexts = new[] { hostDisplayName, hostPlayerId };
-            if (capture.unityText.Any(text => forbiddenTexts.Any(forbidden =>
-                !string.IsNullOrEmpty(forbidden) &&
-                !string.IsNullOrEmpty(text.text) &&
-                text.text.IndexOf(forbidden, StringComparison.OrdinalIgnoreCase) >= 0)))
-            {
-                return true;
+                case 0: return "icon_amiy";
+                case 1: return "icon_clementi";
+                case 2: return "icon_kirar";
+                default: return "icon_zumam";
             }
-
-            var approvedAvatarSprites = new HashSet<string>(StringComparer.Ordinal)
-            {
-                "icon_amiy", "icon_clementi", "icon_kirar", "icon_zumam"
-            };
-            return capture.spriteSources.Any(sprite => approvedAvatarSprites.Contains(sprite.spriteName));
         }
 
-        [Test]
-        public void HostProfileAbsenceGuard_RejectsGenericLabelAndIconMutations()
+        [TestCase(0, "icon_amiy")]
+        [TestCase(1, "icon_clementi")]
+        [TestCase(2, "icon_kirar")]
+        [TestCase(3, "icon_zumam")]
+        public void ExpectedAvatarSprite_MapsEveryRoomSeat(int seatIndex, string expected)
         {
-            var probe = new CaptureRecordProbe
-            {
-                unityText = new[]
-                {
-                    new UnityTextProbe { node = "LanLobbyRoot/Room/PrimaryAction/Label", text = "协议启动" }
-                },
-                spriteSources = new[]
-                {
-                    new SpriteSourceProbe
-                    {
-                        node = "LanLobbyRoot/Room/RoomCard_0/CardBody",
-                        spriteName = "card_bg"
-                    }
-                }
-            };
-            Assert.That(HasRenderedHostProfile(probe, "Doctor", "capture-host"), Is.False);
-
-            probe.unityText = new[]
-            {
-                new UnityTextProbe { node = "LanLobbyRoot/Room/RoomCard_0/Label", text = "Doctor" }
-            };
-            Assert.That(HasRenderedHostProfile(probe, "Doctor", "capture-host"), Is.True,
-                "A generic Label containing the host display name must trip the guard.");
-
-            probe.unityText = Array.Empty<UnityTextProbe>();
-            probe.spriteSources = new[]
-            {
-                new SpriteSourceProbe
-                {
-                    node = "LanLobbyRoot/Room/RoomCard_0/Icon",
-                    spriteName = "icon_amiy"
-                }
-            };
-            Assert.That(HasRenderedHostProfile(probe, "Doctor", "capture-host"), Is.True,
-                "A generic Icon rendering the host avatar must trip the guard.");
+            Assert.That(ExpectedAvatarSprite(seatIndex), Is.EqualTo(expected));
         }
 
         private static void AssertJoinBitmapInventory(CaptureRecordProbe capture)
@@ -632,11 +598,10 @@ namespace ArknoNights.Lobby.Tests
         {
             var expected = new[]
             {
-                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking", 1154f, 204f, 717f, 280f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/InteriorBacking", 1178f, 204f, 667f, 280f),
                 new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineTop", 1154f, 482f, 717f, 2f),
-                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft", 1154f, 204f, 2f, 280f),
-                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineRight", 1869f, 204f, 2f, 280f),
-                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal", 1154f, 383f, 717f, 2f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft", 1172f, 204f, 2f, 280f),
+                new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/OutlineRight", 1846f, 204f, 2f, 280f),
                 new GeometryExpectation("LanLobbyRoot/Home/RoomSelect/Join/GuideVertical", 1506f, 288f, 2f, 196f)
             };
             foreach (var item in expected)
@@ -653,8 +618,8 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(geometry.width / capture.canvasScale, Is.EqualTo(item.Width).Within(.05f));
                 Assert.That(geometry.height / capture.canvasScale, Is.EqualTo(item.Height).Within(.05f));
             }
-            Assert.That(capture.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(8),
-                capture.name + " must report OpaqueBlocker, Create backing, and exactly six Join geometry rows.");
+            Assert.That(capture.codeNativeGeometry, Is.Not.Null.And.Length.EqualTo(7),
+                capture.name + " must report OpaqueBlocker, Create backing, and exactly five Join geometry rows.");
             foreach (var geometry in capture.codeNativeGeometry)
             {
                 Assert.That(geometry.name, Is.Not.Null.And.Not.Empty);
@@ -675,7 +640,6 @@ namespace ArknoNights.Lobby.Tests
                     "LanLobbyRoot/Home/RoomSelect/Join/OutlineTop",
                     "LanLobbyRoot/Home/RoomSelect/Join/OutlineLeft",
                     "LanLobbyRoot/Home/RoomSelect/Join/OutlineRight",
-                    "LanLobbyRoot/Home/RoomSelect/Join/GuideHorizontal",
                     "LanLobbyRoot/Home/RoomSelect/Join/GuideVertical"
                 },
                 capture.codeNativeGeometry.Select(geometry => geometry.name).ToArray(),
@@ -811,7 +775,11 @@ namespace ArknoNights.Lobby.Tests
                 { "img_return", new BitmapSourceExpectation("3F20542913541EAF1F175225268FD3E1EC0343C45A18D0BFE3F7DFBDDEFBEC09") },
                 { "btn_match_host_normal", new BitmapSourceExpectation("9D36CBDA42FC64CEB7590CBEDF5E49176BFA90E63A8B263FD3C87EE08C3BF3DF") },
                 { "btn_match_host_grey", new BitmapSourceExpectation("C4CD3326EA4D04777AAA540525405DF8AA217D2E972443FDE95C202333F93614") },
-                { "host_top_tag", new BitmapSourceExpectation("861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009") }
+                { "host_top_tag", new BitmapSourceExpectation("861754CAFABFEF6641129CAC439501EE3E3D964E0FA3C72BC32FDAC117131009") },
+                { "icon_amiy", new BitmapSourceExpectation("14D5F8D3A8026751B511942517B9815BA3E04438857FEA649EF8A8A02B64868B") },
+                { "icon_clementi", new BitmapSourceExpectation("D5195FFE5CCCC61EA49DBC1CF3CD0493DA4CE131D033DEC7F91B446EC77152F8") },
+                { "icon_kirar", new BitmapSourceExpectation("A9B279D39C74BD8EDD9CCDC8F8A7AA6157E445639F99800E95481DF6BE84CEFA") },
+                { "icon_zumam", new BitmapSourceExpectation("B656BF323746029AD66469F350DCCC5B52F903F68E1ACEB2E202068AF41A1302") }
             };
 
         private sealed class BitmapSourceExpectation
