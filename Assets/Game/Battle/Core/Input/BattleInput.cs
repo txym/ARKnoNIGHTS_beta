@@ -442,7 +442,7 @@ namespace ArknoNights.Battle.Core
                     {
                         if (string.IsNullOrWhiteSpace(ability.SummonEffect.SummonTypeId) || !typeIds.Contains(ability.SummonEffect.SummonTypeId)) validationErrors.Add(new ValidationError("ability.summon.type.unknown", "Summon type is unknown: " + ability.SummonEffect.SummonTypeId));
                         if (ability.SummonEffect.Count <= 0) validationErrors.Add(new ValidationError("ability.summon.count.invalid", "Summon count must be positive: " + ability.AbilityId));
-                        if (ability.SummonEffect.SideLengthCentimetres <= 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be positive: " + ability.AbilityId));
+                        if (ability.SummonEffect.SideLengthCentimetres < 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be non-negative: " + ability.AbilityId));
                     }
                 }
                 else if (ability.ActivationKind == AbilityActivationKind.Passive)

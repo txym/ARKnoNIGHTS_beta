@@ -80,6 +80,106 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(16));
         }
 
+        [Test]
+        public void RepairTerminal_SummonsAtCasterCentreAndMinionTargetsNormallyNextTick()
+        {
+            const string abilityId = "SUMMON_REPAIR_HELPER";
+            var terminal = new UnitDefinition(
+                "10077",
+                100000,
+                1,
+                0,
+                0,
+                0,
+                1000,
+                1,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                1,
+                0,
+                true,
+                new[] { abilityId },
+                1);
+            var helper = new UnitDefinition(
+                "10073",
+                1000,
+                1,
+                0,
+                0,
+                100,
+                1000,
+                1,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                1,
+                0,
+                true);
+            var ability = new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Timed,
+                SilencePolicy.Unaffected,
+                3,
+                5,
+                SkillPointGeneration.Automatic,
+                new SummonEffectDefinition("10073", 1, 0, false),
+                null,
+                "skill",
+                50);
+            var specification = new BattleInputSpecification(
+                BattleInput.SupportedSchemaVersion,
+                "repair-terminal-centre-summon",
+                22,
+                new[] { terminal, helper, Enemy(0) },
+                new[] { ability },
+                new[]
+                {
+                    new PlayerSnapshot(
+                        "home",
+                        BattleSide.Home,
+                        new[] { Unit("terminal", "10077", 5, 2) }),
+                    new PlayerSnapshot(
+                        "away",
+                        BattleSide.Away,
+                        new[] { Unit("enemy", "enemy", 5, 4) })
+                });
+            Assert.That(
+                BattleInputFactory.TryCreate(
+                    specification,
+                    out var input,
+                    out var errors),
+                Is.True,
+                string.Join("; ", errors.Select(item => item.ToString())));
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            var skill = result.Events.Single(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "terminal");
+            Assert.That(skill.Tick, Is.EqualTo(20));
+            Assert.That(skill.OriginalAnimationTicks, Is.EqualTo(50));
+            Assert.That(skill.EffectiveAnimationTicks, Is.EqualTo(25));
+            var spawn = result.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitTypeId == "10073");
+            Assert.That(spawn.Tick, Is.EqualTo(20));
+            Assert.That(
+                spawn.ToPosition.Value,
+                Is.EqualTo(FixedPosition.FromCell(
+                    new BattlefieldCoordinate(5, 2))));
+            Assert.That(spawn.SpawnSnapshot.ActivationTick, Is.EqualTo(21));
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.TargetChanged
+                && item.UnitId == spawn.UnitId
+                && item.Tick == 20));
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.TargetChanged
+                && item.UnitId == spawn.UnitId
+                && item.RelatedUnitId == "enemy"
+                && item.Tick == 21));
+        }
+
         private static UnitDefinition Caster(
             int attackIntervalTicks,
             int moveSpeed = 0)

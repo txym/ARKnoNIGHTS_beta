@@ -63,7 +63,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SUMMON_REPAIR_HELPER"
                                               ]
                      },
                      {
@@ -115,7 +115,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "SUMMON_REPAIR_HELPER"
                                               ]
                      }
                  ]

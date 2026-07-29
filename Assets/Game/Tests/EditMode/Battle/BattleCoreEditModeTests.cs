@@ -69,7 +69,7 @@ namespace ArknoNights.Battle.Tests
         [TestCase("\"requiredSkillPoints\":0", "ability.skillPoints.required.invalid")]
         [TestCase("\"summonTypeId\":\"missing\"", "ability.summon.type.unknown")]
         [TestCase("\"count\":0", "ability.summon.count.invalid")]
-        [TestCase("\"sideLengthCentimetres\":0", "ability.summon.sideLength.invalid")]
+        [TestCase("\"sideLengthCentimetres\":-1", "ability.summon.sideLength.invalid")]
         [TestCase("\"inheritPathFromCaster\":true", "ability.summon.inheritPath.invalid")]
         public void AbilityCatalog_RejectsInvalidDefinitions(string replacement, string expectedCode)
         {

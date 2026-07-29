@@ -107,7 +107,15 @@ namespace ArknoNights.Battle.Tests
             var document =
                 JsonUtility.FromJson<SkillAnimationCatalogDocument>(
                     File.ReadAllText(outputPath));
-            var binding = document.bindings.Single();
+            Assert.That(
+                document.bindings.Select(item => item.abilityId),
+                Is.EqualTo(new[]
+                {
+                    "SUMMON_JELLY_MINIONS",
+                    "SUMMON_REPAIR_HELPER"
+                }));
+            var binding = document.bindings.Single(item =>
+                item.abilityId == "SUMMON_JELLY_MINIONS");
             Assert.That(binding.typeId, Is.EqualTo("5503"));
             Assert.That(
                 binding.abilityId,
@@ -115,6 +123,14 @@ namespace ArknoNights.Battle.Tests
             Assert.That(binding.animationKey, Is.EqualTo("skill"));
             Assert.That(binding.animationName, Is.EqualTo("Skill"));
             Assert.That(binding.originalAnimationTicks, Is.EqualTo(30));
+            var repairBinding = document.bindings.Single(item =>
+                item.abilityId == "SUMMON_REPAIR_HELPER");
+            Assert.That(repairBinding.typeId, Is.EqualTo("10077"));
+            Assert.That(repairBinding.animationKey, Is.EqualTo("skill"));
+            Assert.That(repairBinding.animationName, Is.EqualTo("Skill"));
+            Assert.That(
+                repairBinding.originalAnimationTicks,
+                Is.EqualTo(50));
         }
 
         [Test]
@@ -171,6 +187,35 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsRepairHelperCentreSummon()
+        {
+            var output = NewIsolatedPath(
+                "ability-centre-summon-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var ability = document.abilities.Single(item =>
+                item.abilityId == "SUMMON_REPAIR_HELPER");
+            Assert.That(ability.activationKind, Is.EqualTo("Timed"));
+            Assert.That(ability.initialSkillPoints, Is.EqualTo(3));
+            Assert.That(ability.requiredSkillPoints, Is.EqualTo(5));
+            Assert.That(
+                ability.skillPointGeneration,
+                Is.EqualTo("Automatic"));
+            Assert.That(ability.summonTypeId, Is.EqualTo("10073"));
+            Assert.That(ability.count, Is.EqualTo(1));
+            Assert.That(ability.sideLengthCentimetres, Is.Zero);
+            Assert.That(ability.inheritPathFromCaster, Is.False);
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -181,6 +226,7 @@ namespace ArknoNights.Battle.Tests
             Assert.That(ids, Is.EqualTo(new[]
             {
                 "SUMMON_JELLY_MINIONS",
+                "SUMMON_REPAIR_HELPER",
                 "UNTARGETABLE_BY_MELEE"
             }));
         }
@@ -502,7 +548,13 @@ namespace ArknoNights.Battle.Tests
         {
             public string abilityId;
             public string activationKind;
+            public int initialSkillPoints;
+            public int requiredSkillPoints;
             public string skillPointGeneration;
+            public string summonTypeId;
+            public int count;
+            public int sideLengthCentimetres;
+            public bool inheritPathFromCaster;
             public string unitTrait;
         }
     }

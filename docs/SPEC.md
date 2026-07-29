@@ -645,3 +645,11 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 同一 Tick 先完成已到达伤害、Death、阻挡解除与索敌清理，再判断战斗是否终局。若清理后已终局，该 Tick 不回复 SP、不施放定时技能，召唤不能延长已经结束的战斗；BattleEnded 仍是该终局 Tick 的最后事件。
 - `BattleRunResult` 为动态实例保留唯一负数实例 ID、生成位置、激活 Tick、完整单位状态及只读实例快照索引。Presentation 只能从该封存结果编译动态 Track：初始单位在 Tick `0` 建立视图，动态 `5504` 在各自 Spawn Tick 建立视图；Home/Away 投影、暂停、变速、观察切换和 Replay 均不得重算或回写 Core。Replay 清理旧动态视图，并在再次越过对应 Spawn Tick 时用相同 ID 与快照重建。
 - `Assets/GameData/Units/EliteVariants/Json` 与 `Assets/GameData/Abilities/Json` 是人工维护的权威源；单位、能力与技能动画目录生成器只读、校验、稳定排序并写各自生成目录，不回写源 JSON。任何已部署单位引用的 innate ability 都必须在封存的 ability definitions 中解析成功；未知能力 ID、未知召唤类型或缺少 Skill 动画绑定返回结构化验证错误，不允许静默省略能力。
+
+## 16. `SUMMON_REPAIR_HELPER` 自助出餐终端召唤（2026-07-29）
+
+- `10077` 的自动技能初始为 `3 SP`、需求并消耗 `5 SP`，继续使用全局 `2 SP/s` 回复规则；没有攻击动画占用时首次在 Tick `20` 施放。若满足施放条件时正在攻击，技能必须等待已开始的攻击动画与出伤完整结束，不能打断攻击。
+- 每次施放生成一个 `10073`。生成位置精确等于施法者当前中心，不使用地块中心向下偏移，也不继承施法者的路径、目标或阻挡关系；召唤物在 Spawn Tick 只建立实例，从下一 Tick 起按普通单位规则独立索敌和行动。
+- `10077` v2 源的 `skill` 动画名为 `Skill`，源时长 `2.5s = 50 Tick`；固定 `2×` 播放后的有效占用为 `25 Tick`，完整覆盖源动画最后关键帧。Spawn 与 Skill 事件发生在同一施放 Tick，召唤物激活不等待 Skill 占用结束。
+- `Timed/Summon` 能力的正方形边长允许为 `0cm`，其唯一语义是精确使用施法者中心；负数仍是非法配置。该扩展不改变正边长召唤的确定性方形偏移算法。
+- 本能力只进入 v2 人工维护源、生成器投影和 Core 流程；冻结的 `unit-catalog-v1`、`ability-catalog-v1` 与当前正式 Player 目录不在本批次重新生成。

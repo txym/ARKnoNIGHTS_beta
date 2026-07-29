@@ -482,6 +482,13 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - `BattleCoreEditModeTests`：第一次完整回归 `57` 项中发现 `2` 项失败；根因是目标死亡时错误删除待结算攻击并提前解除攻击动画锁。修正为仅清理失效攻击者、目标死亡或冲门只在到期 Tick 取消伤害后，最终完整回归 `57/57` 通过，`failed=0`、`skipped=0`。
 - 额外静态构建：`dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error；警告来自既有 Unity 程序集版本冲突与测试反序列化 DTO 未直接赋值。
 - Unity 两次测试均在结构化 XML 写入后通过；中国版配置请求令 Editor 未在 10 秒收尾窗口内自行退出，脚本随后结束对应 batchmode 进程。未运行 PlayMode 与 Player 构建。
+
+### BONDS `10077` 自助出餐终端召唤（2026-07-29）
+
+- `BondsSkillAnimationEditModeTests`：`4/4` 通过，覆盖 `10077` 在 Tick `20` 发出 `Skill`、`50 → 25 Tick` 二倍速占用、同 Tick 精确中心 Spawn，以及 `10073` 在下一 Tick 激活并按普通规则索敌。结果位于 `Artifacts/BondsAbilities/RepairSummonSkill/EditModeResults.xml`。
+- `UnitSourceConsumerEditModeTests`：`8/8` 通过，覆盖 `10077 → SUMMON_REPAIR_HELPER → 10073` 的 v2 引用、初始/需求 SP `3/5`、单体中心召唤、无路径继承，以及真实 `Skill/2.5s` 动画目录投影。结果位于 `Artifacts/BondsAbilities/RepairSummonSources/EditModeResults.xml`。
+- `BattleCoreEditModeTests.AbilityCatalog_RejectsInvalidDefinitions`：参数化用例 `8/8` 通过，确认 `0cm` 是合法中心召唤而负边长仍被拒绝。结果位于 `Artifacts/BondsAbilities/SummonValidation/EditModeResults.xml`。
+- `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 人工动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
 - 2026-07-29 Task 7 独立审查后修复：审查发现解析器已拒绝 `animations[].key == "Default"`，但未拒绝 `animations[].name == "Default"`。提交 `8893b1d` 先加入负向回归测试；RED 为 `44 total / 43 passed / 1 failed / 0 skipped`，唯一失败证明 `key=idle/name=Default` 会被旧实现接受。随后以相同 `StringComparison.Ordinal` 同时校验 key 与 name；GREEN 为 `44/44` 通过、失败 `0`、跳过 `0`，wrapper 退出码 `0`，日志没有编译错误或未处理异常。证据位于 `Artifacts/UnitEliteVariantsV2/DefaultBindingFix/{RED,GREEN}`。两次 Unity 都在结果落盘后超过 runner grace period 并被强制停止，最终确认无 Unity/UnityHub 残留；修复提交经独立只读复审为 `CLEAN`。
 - 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：
 - 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。

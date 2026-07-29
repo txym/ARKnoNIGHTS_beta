@@ -100,7 +100,7 @@ public static class AbilityCatalogGenerator
             || effect.spawnArea == null
             || effect.spawnArea.shape != "Square"
             || effect.spawnArea.center != "CasterPosition"
-            || effect.spawnArea.sideLengthMetres <= 0f)
+            || effect.spawnArea.sideLengthMetres < 0f)
             throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_SUMMON_INVALID path=" + sourcePath);
         if (!knownUnitTypeIds.Contains(effect.summonTypeId)) throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_SUMMON_TYPE_UNKNOWN path=" + sourcePath + " typeId=" + effect.summonTypeId);
         if (source.abilityId == "SUMMON_JELLY_MINIONS" && effect.inheritPathFromCaster) throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_INHERIT_PATH_INVALID path=" + sourcePath);
