@@ -331,6 +331,7 @@ namespace ArknoNights.Battle.Core
         private readonly List<RuntimeDamageOverTimeState>
             damageOverTimeStates =
                 new List<RuntimeDamageOverTimeState>();
+        private long accumulatedDefenseReduction;
 
         internal RuntimeUnitState(
             string unitId,
@@ -580,13 +581,20 @@ namespace ArknoNights.Battle.Core
             foreach (var ability in abilityStates)
                 ability.CompleteAttack();
         }
-        public int EffectiveDefense => ApplyThresholdMultiplier(
-            Definition.Defense
-            + ActiveLockedAttackCountStateModifiers.Sum(item =>
-                item.LockedDefenseAdditive)
-            + auraCombatModifiers.Sum(item =>
-                item.DefenseAdditive),
-            item => item.DefenseMultiplierPermille);
+        public int AccumulatedDefenseReduction =>
+            accumulatedDefenseReduction >= int.MaxValue
+                ? int.MaxValue
+                : (int)accumulatedDefenseReduction;
+        public int EffectiveDefense => Math.Max(
+            0,
+            ApplyThresholdMultiplier(
+                Definition.Defense
+                + ActiveLockedAttackCountStateModifiers.Sum(item =>
+                    item.LockedDefenseAdditive)
+                + auraCombatModifiers.Sum(item =>
+                    item.DefenseAdditive),
+                item => item.DefenseMultiplierPermille)
+            - AccumulatedDefenseReduction);
         public int EffectiveMoveSpeedCentimetresPerSecond
         {
             get
@@ -824,6 +832,21 @@ namespace ArknoNights.Battle.Core
                     new KeyValuePair<string, OnHitDamageOverTimeEffectDefinition>(
                         item.Definition.AbilityId,
                         item.Definition.OnHitDamageOverTimeEffect));
+        internal IEnumerable<KeyValuePair<string, OnHitDefenseDebuffEffectDefinition>>
+            OnHitDefenseDebuffEffects =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.OnHitDefenseDebuffEffect != null)
+                .Select(item =>
+                    new KeyValuePair<string, OnHitDefenseDebuffEffectDefinition>(
+                        item.Definition.AbilityId,
+                        item.Definition.OnHitDefenseDebuffEffect));
+        internal void ApplyDefenseReduction(int amount)
+        {
+            accumulatedDefenseReduction = Math.Min(
+                int.MaxValue,
+                accumulatedDefenseReduction + amount);
+        }
         internal void ApplyOrRefreshDamageOverTime(
             string abilityId,
             int damagePerSecond,
@@ -1467,6 +1490,14 @@ namespace ArknoNights.Battle.Core
                                 CurrentTick
                                 + effect.Value.DurationTicks);
                     }
+                    foreach (var effect in attacker
+                                 .OnHitDefenseDebuffEffects
+                                 .OrderBy(
+                                     item => item.Key,
+                                     StringComparer.Ordinal))
+                        target.ApplyDefenseReduction(
+                            effect.Value
+                                .DefenseReductionPerStack);
                     foreach (var reaction in target.OnDamageReactions)
                         reactions.Add(new DamageReaction(
                             target.UnitId,

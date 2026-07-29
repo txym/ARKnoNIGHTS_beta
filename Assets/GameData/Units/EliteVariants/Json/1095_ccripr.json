@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "STACKING_DEFENSE_REDUCTION_ON_HIT"
                                               ]
                      },
                      {
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "STACKING_DEFENSE_REDUCTION_ON_HIT"
                                               ]
                      }
                  ]

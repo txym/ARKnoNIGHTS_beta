@@ -120,6 +120,10 @@ namespace ArknoNights.Battle.Infrastructure
                 string.IsNullOrWhiteSpace(source.unitTrait)
                     ? null
                     : new UnitTraitEffectDefinition(ParseEnum<UnitTraitEffectKind>(source.unitTrait)),
+                source.onHitDefenseReductionPerStack == 0
+                    ? null
+                    : new OnHitDefenseDebuffEffectDefinition(
+                        source.onHitDefenseReductionPerStack),
                 hasSkillAnimation
                     ? skillAnimation.AnimationKey
                     : string.Empty,
@@ -132,6 +136,6 @@ namespace ArknoNights.Battle.Infrastructure
         private static AbilityCatalogLoadResult Failure(string code, string message) => new AbilityCatalogLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class AbilityCatalogDto { public string schemaVersion; public string catalogId; public AbilityDto[] abilities; }
-        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; }
+        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; }
     }
 }

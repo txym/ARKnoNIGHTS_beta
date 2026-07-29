@@ -667,6 +667,14 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - `Timed/Summon` 能力的正方形边长允许为 `0cm`，其唯一语义是精确使用施法者中心；负数仍是非法配置。该扩展不改变正边长召唤的确定性方形偏移算法。
 - 本能力只进入 v2 人工维护源、生成器投影和 Core 流程；冻结的 `unit-catalog-v1`、`ability-catalog-v1` 与当前正式 Player 目录不在本批次重新生成。
 
+## 17. `STACKING_DEFENSE_REDUCTION_ON_HIT` 永久叠加减防（2026-07-29）
+
+- `1095` 的每次普通攻击只有在对目标实际造成正伤害后，才为该目标增加一层永久防御 Debuff；每层令有效防御力 `-10`，同一目标没有层数上限。闪避或其他原因产生的零伤害不增加层数，持续伤害、反伤和其他非普通攻击伤害不触发该能力。
+- 当前攻击先按目标受击前的有效防御结算，再在伤害批次完成后增加 Debuff。同一 Tick 内同时到达同一目标的多次攻击先统一按批次开始时的防御计算，再各自根据正伤害结果叠层，避免遍历顺序改变伤害。
+- 防御力继续遵守属性下限 `0`；达到 `0` 后层数仍可继续永久累加，但不会令有效防御成为负数。该固定 `-10` 在目标自身、状态与光环修正全部结算后应用，不被目标的防御倍率再次放大。
+- Debuff 属于受击目标实例状态，不跟随攻击者，也不因攻击者死亡、离场或切换目标而清除。当前没有沉默运行时；本能力也不新增施加沉默的能力或异常状态。
+- `1095` 的全部 v2 变体显式绑定该能力；能力源和生成器投影已经接入，但冻结 v1 目录不在本批次重新生成。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

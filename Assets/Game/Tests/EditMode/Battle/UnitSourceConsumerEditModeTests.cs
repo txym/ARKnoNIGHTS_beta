@@ -216,6 +216,33 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsStackingDefenseReduction()
+        {
+            var output = NewIsolatedPath(
+                "ability-defense-reduction-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var ability = document.abilities.Single(item =>
+                item.abilityId
+                == "STACKING_DEFENSE_REDUCTION_ON_HIT");
+            Assert.That(ability.activationKind, Is.EqualTo("Passive"));
+            Assert.That(
+                ability.skillPointGeneration,
+                Is.EqualTo("None"));
+            Assert.That(
+                ability.onHitDefenseReductionPerStack,
+                Is.EqualTo(10));
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -225,6 +252,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.That(ids, Is.EqualTo(new[]
             {
+                "STACKING_DEFENSE_REDUCTION_ON_HIT",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
                 "UNTARGETABLE_BY_MELEE"
@@ -556,6 +584,7 @@ namespace ArknoNights.Battle.Tests
             public int sideLengthCentimetres;
             public bool inheritPathFromCaster;
             public string unitTrait;
+            public int onHitDefenseReductionPerStack;
         }
     }
 }

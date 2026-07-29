@@ -93,6 +93,15 @@ public static class AbilityCatalogGenerator
             entry.unitTrait = trait.ToString();
             return entry;
         }
+        if (effect.kind == "OnHitDefenseDebuff")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.defenseReductionPerStack <= 0)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_ON_HIT_DEFENSE_DEBUFF_INVALID path=" + sourcePath);
+            entry.onHitDefenseReductionPerStack =
+                effect.defenseReductionPerStack;
+            return entry;
+        }
         if (effect.kind != "Summon"
             || activationKind != AbilityActivationKind.Timed
             || string.IsNullOrWhiteSpace(effect.summonTypeId)
@@ -128,9 +137,9 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; }
+    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; }
     [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
-    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; }
+    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
 }

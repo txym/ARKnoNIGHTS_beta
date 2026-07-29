@@ -1287,6 +1287,51 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void OnHitDefenseDebuff_StacksAfterDamageAndPersistsOnTarget()
+        {
+            var input = CreateInput(
+                8,
+                new[]
+                {
+                    Attacker(
+                        "fighter",
+                        2000,
+                        0,
+                        "DEFENSE_SHRED",
+                        attackIntervalTicks: 2,
+                        attack: 100),
+                    NonAttacker(
+                        "target",
+                        10000,
+                        defense: 30)
+                },
+                new[]
+                {
+                    PassiveOnHitDefenseDebuff(
+                        defenseReductionPerStack: 10)
+                },
+                new[] { Unit("fighter", "fighter", 5, 4) },
+                new[] { Unit("target", "target", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            var result = runner.RunToCompletion();
+
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Damage
+                        && item.UnitId == "fighter")
+                    .Select(item => item.DamageAmount),
+                Is.EqualTo(new[] { 70, 80, 90, 100 }));
+            var target = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "target");
+            Assert.That(
+                target.AccumulatedDefenseReduction,
+                Is.EqualTo(40));
+            Assert.That(target.EffectiveDefense, Is.Zero);
+        }
+
+        [Test]
         public void UnblockedAttackCharge_AccumulatesAndClearsAtAttackEnd()
         {
             var input = CreateInput(
@@ -2546,6 +2591,26 @@ namespace ArknoNights.Battle.Tests
                 0);
         }
 
+        private static AbilityDefinition PassiveOnHitDefenseDebuff(
+            int defenseReductionPerStack)
+        {
+            return new AbilityDefinition(
+                "DEFENSE_SHRED",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                null,
+                new OnHitDefenseDebuffEffectDefinition(
+                    defenseReductionPerStack),
+                string.Empty,
+                0);
+        }
+
         private static AbilityDefinition PassiveUnblockedAttackCharge(
             int checkIntervalTicks,
             int attackAdditivePerStack,
@@ -2936,13 +3001,14 @@ namespace ArknoNights.Battle.Tests
         private static UnitDefinition NonAttacker(
             string typeId,
             int maxHitPoints,
-            string abilityId = null)
+            string abilityId = null,
+            int defense = 0)
         {
             return new UnitDefinition(
                 typeId,
                 maxHitPoints,
                 0,
-                0,
+                defense,
                 0,
                 0,
                 0,
