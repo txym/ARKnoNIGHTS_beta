@@ -1683,6 +1683,144 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void BlockedBlink_FullSkillPointsWaitWithoutBlock()
+        {
+            const string abilityId = "BLOCKED_BLINK_FORWARD";
+            var input = CreateInput(
+                5,
+                new[]
+                {
+                    Attacker(
+                        "blinker",
+                        0,
+                        1,
+                        abilityId,
+                        attackIntervalTicks: 1000),
+                    Attacker(
+                        "enemy",
+                        0,
+                        1,
+                        attackIntervalTicks: 1000)
+                },
+                new[] { TimedBlink(abilityId, 15) },
+                new[] { Unit("blinker", "blinker", 1, 1) },
+                new[] { Unit("enemy", "enemy", 1, 1) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "blinker"));
+        }
+
+        [Test]
+        public void BlockedBlink_WaitsForAttackThenRelocatesAfterDisappear()
+        {
+            const string abilityId = "BLOCKED_BLINK_FORWARD";
+            var input = CreateInput(
+                25,
+                new[]
+                {
+                    Attacker(
+                        "blinker",
+                        0,
+                        1,
+                        abilityId,
+                        attackIntervalTicks: 100,
+                        attack: 100,
+                        attackAnimationDurationTicks: 12),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        maxHitPoints: 100000,
+                        attack: 1)
+                },
+                new[] { TimedBlink(abilityId, 14) },
+                new[] { Unit("blinker", "blinker", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+
+            var result = new BattleRunner(input).RunToCompletion();
+            var skill = result.Events.Single(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "blinker");
+
+            Assert.That(
+                result.Events,
+                Has.Some.Matches<BattleEvent>(item =>
+                    item.Type == BattleEventType.Attack
+                    && item.UnitId == "blinker"
+                    && item.Tick == 1
+                    && item.PlannedDamageTick == 13));
+            Assert.That(skill.Tick, Is.EqualTo(14));
+            Assert.That(skill.RelatedUnitId, Is.EqualTo("enemy"));
+            Assert.That(
+                skill.AnimationKey,
+                Is.EqualTo(
+                    "blink.disappear|blink.appear"));
+            Assert.That(skill.OriginalAnimationTicks, Is.EqualTo(20));
+            Assert.That(skill.EffectiveAnimationTicks, Is.EqualTo(10));
+            Assert.That(
+                result.Events,
+                Has.Some.Matches<BattleEvent>(item =>
+                    item.Type == BattleEventType.BlockEnded
+                    && item.Tick == 14
+                    && (item.UnitId == "blinker"
+                        || item.RelatedUnitId == "blinker")));
+            var movement = result.Events.Single(item =>
+                item.Type == BattleEventType.Move
+                && item.UnitId == "blinker"
+                && item.Tick == 19);
+            Assert.That(
+                movement.FromPosition.Value,
+                Is.EqualTo(new FixedPosition(500, 400)));
+            Assert.That(
+                movement.ToPosition.Value,
+                Is.EqualTo(new FixedPosition(500, 550)));
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.BlockStarted
+                && item.Tick > 14
+                && item.Tick < 24
+                && (item.UnitId == "blinker"
+                    || item.RelatedUnitId == "blinker")));
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.BlockStarted
+                && item.Tick == 24
+                && (item.UnitId == "blinker"
+                    || item.RelatedUnitId == "blinker")));
+
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(
+                compiler.TryCompile(
+                    result,
+                    out var track,
+                    out var diagnostics),
+                Is.True,
+                string.Join(
+                    "; ",
+                    diagnostics.Select(item =>
+                        item.ToString())));
+            Assert.That(
+                track.TryGetUnit(
+                    "blinker",
+                    out var blinkerTrack),
+                Is.True);
+            Assert.That(
+                blinkerTrack.Sample(14).Action,
+                Is.EqualTo(UnitPresentationAction.Skill));
+            Assert.That(
+                blinkerTrack.Sample(24).Action,
+                Is.EqualTo(UnitPresentationAction.Skill));
+            Assert.That(
+                blinkerTrack.Sample(19).Position.XUnits,
+                Is.EqualTo(5d));
+            Assert.That(
+                blinkerTrack.Sample(19).Position.YUnits,
+                Is.EqualTo(5.5d));
+        }
+
+        [Test]
         public void DamageReceivedTriggeredSpawn_RespectsFriendlyTypeCap()
         {
             Assert.That(
@@ -3155,6 +3293,30 @@ namespace ArknoNights.Battle.Tests
                 abilityId == null
                     ? Array.Empty<string>()
                     : new[] { abilityId });
+        }
+
+        private static AbilityDefinition TimedBlink(
+            string abilityId,
+            int initialSkillPoints)
+        {
+            return new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Timed,
+                SilencePolicy.Unaffected,
+                initialSkillPoints,
+                15,
+                SkillPointGeneration.Automatic,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "blink.disappear|blink.appear",
+                20,
+                new TimedBlinkEffectDefinition(150, 5));
         }
 
         private static UnitDefinition NonAttacker(

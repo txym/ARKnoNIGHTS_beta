@@ -691,6 +691,13 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - `Skill_Begin` 的 `7` 个源 Tick 二倍速向上取整为 `4 Tick`。在位移攻击开始后的第 `4` Tick，`1322` 沿当前位置到敌方门中心的方向位移 `150cm`；若到门距离不足 `150cm`，则停在门中心。同 Tick 对开始时封存的目标结算一次正常攻击伤害；目标已死亡或离场时取消伤害，但位移仍执行。
 - 该次伤害继续进入普通攻击的防御、承伤、闪避、反伤、命中效果和攻击计数链；`Skill_Loop/Skill_End` 在出伤后继续播放，完整 `20 Tick` 占用结束前不能开始下一次攻击或普通移动。项目没有路径点模型，因此位移方向不检查检查点。
 
+## 20. `1502` 被阻挡闪现（2026-07-29）
+
+- `1502` 使用自动回复技能，初始/需求均为 `15 SP`。技能只在当前存在阻挡关系时施放；SP 已满但未被阻挡时保持满 SP，不消费、不播放 Skill。技能仍须等待已经开始的 Attack 完整结束，不能中断攻击。
+- 施放时稳定选择当前阻挡对象用于事件审计，立即解除 `1502` 的全部阻挡关系，并在本次 Skill 动画期间令其阻挡容量为 `0`。项目没有路径点和地块通行性模型，因此不检查检查点或目的地地块。
+- 动画按 `Disappear → Appear` 顺序在同一轨道二倍速播放。两个真实源片段均为 `0.5s = 10 Tick`，总源时长为 `20 Tick`，二倍速后的完整 Skill 占用为 `10 Tick`；`Disappear` 的有效占用为 `5 Tick`。
+- 在 `Disappear` 完整播放后的第 `5` Tick，`1502` 沿当前位置到敌方门中心的方向迁移 `150cm`，随后继续播放 `Appear`。若到门距离不足 `150cm`，则停在门中心；同 Tick 继续使用既有门区判定，进入门区会立即退出战斗并结算生命损失。闪现不造成伤害。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

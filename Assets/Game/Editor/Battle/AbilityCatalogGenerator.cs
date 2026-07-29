@@ -193,6 +193,21 @@ public static class AbilityCatalogGenerator
                 unblockableDurationTicks;
             return entry;
         }
+        if (effect.kind == "TimedBlink")
+        {
+            if (activationKind != AbilityActivationKind.Timed
+                || effect.blinkDistanceMetres <= 0f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TIMED_BLINK_INVALID path=" + sourcePath);
+            var blinkDistanceCentimetres = Mathf.RoundToInt(
+                effect.blinkDistanceMetres * 100f);
+            if (Mathf.Abs(
+                    effect.blinkDistanceMetres * 100f
+                    - blinkDistanceCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TIMED_BLINK_NOT_EXACT path=" + sourcePath);
+            entry.timedBlinkDistanceCentimetres =
+                blinkDistanceCentimetres;
+            return entry;
+        }
         if (effect.kind != "Summon"
             || activationKind != AbilityActivationKind.Timed
             || string.IsNullOrWhiteSpace(effect.summonTypeId)
@@ -228,9 +243,9 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; }
+    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; }
     [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
-    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; }
+    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
 }

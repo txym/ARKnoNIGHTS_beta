@@ -510,6 +510,13 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - Core 用例断言前两击在 Tick `1/3` 发出普通 Attack，第三击在 Tick `5` 发出源 `40 Tick → 20 Tick` 的 Skill 并立即解除阻挡；Tick `9` 才在 `Skill_Begin` 完整二倍速播放后位移并对原阻挡者造成 `100` 点正常物理伤害，Tick `6..24` 不重建阻挡，Tick `25` 才恢复阻挡资格。
 - 数据消费者断言 `1322` 全部 v2 变体显式引用 `GREY_HAT_THIRD_ATTACK_DASH`，能力目录投影为第 `3` 击起每 `3` 击触发、位移 `150cm`、不可阻挡 `20 Tick`；技能动画目录投影为 `skill.begin|skill.loop|skill.end`、真实名称 `Skill_Begin|Skill_Loop|Skill_End`、总源 `40 Tick` 与片段源 `7/4/30 Tick`。
 - `dotnet build ARKnoNIGHTS.Battle.Core.csproj -nologo -v:minimal` 与 `dotnet build Assembly-CSharp-Editor.csproj -nologo -v:minimal` 均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS `1502` 被阻挡闪现（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `55/55` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/BlockedBlinkFinal/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
+- Core 覆盖满 SP 但未阻挡时不施放，以及攻击进行中 SP 回满后等待出伤/动画完成才施放；施放 Tick 解除阻挡，`Disappear` 的 `10` 个源 Tick 二倍速为 `5 Tick`，到期朝敌方门迁移 `150cm`，随后由 `Appear` 继续持有总计 `10 Tick` 的 Skill。
+- 数据消费者覆盖 `1502 → BLOCKED_BLINK_FORWARD`、初始/需求 `15/15 SP`、目录位移 `150cm`，以及 `blink.disappear|blink.appear → Disappear|Appear`、总源 `20 Tick`、逐段 `10/10 Tick`；生成的技能动画 JSON 还需通过运行时 `SkillAnimationCatalogLoader.LoadFromJson` 往返验证。
+- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
 - 2026-07-29 Task 7 独立审查后修复：审查发现解析器已拒绝 `animations[].key == "Default"`，但未拒绝 `animations[].name == "Default"`。提交 `8893b1d` 先加入负向回归测试；RED 为 `44 total / 43 passed / 1 failed / 0 skipped`，唯一失败证明 `key=idle/name=Default` 会被旧实现接受。随后以相同 `StringComparison.Ordinal` 同时校验 key 与 name；GREEN 为 `44/44` 通过、失败 `0`、跳过 `0`，wrapper 退出码 `0`，日志没有编译错误或未处理异常。证据位于 `Artifacts/UnitEliteVariantsV2/DefaultBindingFix/{RED,GREEN}`。两次 Unity 都在结果落盘后超过 runner grace period 并被强制停止，最终确认无 Unity/UnityHub 残留；修复提交经独立只读复审为 `CLEAN`。
 - 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：
 - 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。

@@ -382,6 +382,12 @@ namespace ArknoNights.Battle.Core
                             .AnimationSequenceKey).Append(',')
                         .Append(ability.AttackDashEffect
                             .AnimationOriginalDurationTicks);
+                if (ability.TimedBlinkEffect != null)
+                    builder.Append("|BL:")
+                        .Append(ability.TimedBlinkEffect
+                            .DistanceCentimetres).Append(',')
+                        .Append(ability.TimedBlinkEffect
+                            .RelocationDelayEffectiveTicks);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -473,7 +479,8 @@ namespace ArknoNights.Battle.Core
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
                     var timedEffectCount =
                         (ability.SummonEffect == null ? 0 : 1)
-                        + (ability.TimedTargetAreaDamageEffect == null ? 0 : 1);
+                        + (ability.TimedTargetAreaDamageEffect == null ? 0 : 1)
+                        + (ability.TimedBlinkEffect == null ? 0 : 1);
                     if (timedEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.timed.effect.invalid", "Timed ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.SummonEffect != null)
@@ -491,6 +498,16 @@ namespace ArknoNights.Battle.Core
                                 ability.TimedTargetAreaDamageEffect.DamageType)
                             || ability.TimedTargetAreaDamageEffect.AttackMultiplierPermille <= 0))
                         validationErrors.Add(new ValidationError("ability.timedTargetAreaDamage.invalid", "Timed target-area damage effect is invalid: " + ability.AbilityId));
+                    if (ability.TimedBlinkEffect != null
+                        && (ability.TimedBlinkEffect
+                                .DistanceCentimetres <= 0
+                            || ability.TimedBlinkEffect
+                                .RelocationDelayEffectiveTicks <= 0
+                            || ability.TimedBlinkEffect
+                                .RelocationDelayEffectiveTicks
+                               > ability
+                                   .SkillAnimationEffectiveDurationTicks))
+                        validationErrors.Add(new ValidationError("ability.timedBlink.invalid", "Timed blink effect is invalid: " + ability.AbilityId));
                 }
                 else if (ability.ActivationKind == AbilityActivationKind.Passive)
                 {
@@ -502,6 +519,8 @@ namespace ArknoNights.Battle.Core
                         validationErrors.Add(new ValidationError("ability.passive.summon.unexpected", "Passive ability cannot define a summon effect: " + ability.AbilityId));
                     if (ability.TimedTargetAreaDamageEffect != null)
                         validationErrors.Add(new ValidationError("ability.passive.timedTargetAreaDamage.unexpected", "Passive ability cannot define a timed target-area damage effect: " + ability.AbilityId));
+                    if (ability.TimedBlinkEffect != null)
+                        validationErrors.Add(new ValidationError("ability.passive.timedBlink.unexpected", "Passive ability cannot define a timed blink effect: " + ability.AbilityId));
                     var passiveEffectCount =
                         (ability.UnitTraitEffect == null ? 0 : 1)
                         + (ability.PassiveCombatModifier == null ? 0 : 1)
@@ -524,7 +543,8 @@ namespace ArknoNights.Battle.Core
                         + (ability.HealthThresholdAdjacentSpawnEffect == null ? 0 : 1)
                         + (ability.HealthThresholdFullHealEffect == null ? 0 : 1)
                         + (ability.OnHitDefenseDebuffEffect == null ? 0 : 1)
-                        + (ability.AttackDashEffect == null ? 0 : 1);
+                        + (ability.AttackDashEffect == null ? 0 : 1)
+                        + (ability.TimedBlinkEffect == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))

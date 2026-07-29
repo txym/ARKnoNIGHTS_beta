@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using ArknoNights.Battle.Infrastructure;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -111,11 +112,45 @@ namespace ArknoNights.Battle.Tests
                 document.bindings.Select(item => item.abilityId),
                 Is.EqualTo(new[]
                 {
+                    "BLOCKED_BLINK_FORWARD",
                     "CHARGED_DRINK_AREA_ATTACK",
                     "GREY_HAT_THIRD_ATTACK_DASH",
                     "SUMMON_JELLY_MINIONS",
                     "SUMMON_REPAIR_HELPER"
                 }));
+            var blinkBinding = document.bindings.Single(item =>
+                item.abilityId == "BLOCKED_BLINK_FORWARD");
+            Assert.That(blinkBinding.typeId, Is.EqualTo("1502"));
+            Assert.That(
+                blinkBinding.animationKey,
+                Is.EqualTo(
+                    "blink.disappear|blink.appear"));
+            Assert.That(
+                blinkBinding.animationName,
+                Is.EqualTo("Disappear|Appear"));
+            Assert.That(
+                blinkBinding.originalAnimationTicks,
+                Is.EqualTo(20));
+            Assert.That(
+                blinkBinding.segmentOriginalAnimationTicks,
+                Is.EqualTo(new[] { 10, 10 }));
+            var loaded =
+                SkillAnimationCatalogLoader.LoadFromJson(
+                    File.ReadAllText(outputPath));
+            Assert.That(
+                loaded.Success,
+                Is.True,
+                string.Join(
+                    "; ",
+                    loaded.Errors.Select(item => item.ToString())));
+            Assert.That(
+                loaded.Catalog.TryGetAbility(
+                    "BLOCKED_BLINK_FORWARD",
+                    out var loadedBlink),
+                Is.True);
+            Assert.That(
+                loadedBlink.SegmentOriginalAnimationTicks,
+                Is.EqualTo(new[] { 10, 10 }));
             var chargedBinding = document.bindings.Single(item =>
                 item.abilityId == "CHARGED_DRINK_AREA_ATTACK");
             Assert.That(chargedBinding.typeId, Is.EqualTo("10039"));
@@ -342,6 +377,34 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsBlockedBlink()
+        {
+            var output = NewIsolatedPath(
+                "ability-blocked-blink-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var ability = document.abilities.Single(item =>
+                item.abilityId == "BLOCKED_BLINK_FORWARD");
+            Assert.That(ability.activationKind, Is.EqualTo("Timed"));
+            Assert.That(ability.initialSkillPoints, Is.EqualTo(15));
+            Assert.That(ability.requiredSkillPoints, Is.EqualTo(15));
+            Assert.That(
+                ability.skillPointGeneration,
+                Is.EqualTo("Automatic"));
+            Assert.That(
+                ability.timedBlinkDistanceCentimetres,
+                Is.EqualTo(150));
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -351,6 +414,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.That(ids, Is.EqualTo(new[]
             {
+                "BLOCKED_BLINK_FORWARD",
                 "CHARGED_DRINK_AREA_ATTACK",
                 "FORTIFIED_CATERING_VEHICLE",
                 "GREY_HAT_THIRD_ATTACK_DASH",
@@ -702,6 +766,7 @@ namespace ArknoNights.Battle.Tests
             public int attackDashRepeatInterval;
             public int attackDashDistanceCentimetres;
             public int attackDashUnblockableDurationTicks;
+            public int timedBlinkDistanceCentimetres;
         }
     }
 }

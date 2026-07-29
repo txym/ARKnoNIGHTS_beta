@@ -68,7 +68,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "BLOCKED_BLINK_FORWARD"
                                               ]
                      }
                  ]

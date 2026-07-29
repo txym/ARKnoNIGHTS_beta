@@ -412,7 +412,7 @@ Move1 当 Move 用。
 
 处理方法：
 
-单位 JSON 同时保存 `Appear` 与 `Disappear` 的真实动画时长，但数据层不规定两者的播放次序。闪现能力的播放行为和次序由后续动画层实现前另行确认。
+单位 JSON 同时保存 `Disappear` 与 `Appear` 的真实动画时长。`BLOCKED_BLINK_FORWARD` 固定按 `Disappear → Appear` 在同一轨道二倍速播放；`Disappear` 完整播放后执行权威位置迁移，`Appear` 作为后摇继续占用 Skill。
 
 ## 待销毁的旧 Hit 接口
 

@@ -649,6 +649,21 @@ namespace ArknoNights.Battle.Core
         public bool GroundTargetsOnly { get; }
     }
 
+    public sealed class TimedBlinkEffectDefinition
+    {
+        public TimedBlinkEffectDefinition(
+            int distanceCentimetres,
+            int relocationDelayEffectiveTicks)
+        {
+            DistanceCentimetres = distanceCentimetres;
+            RelocationDelayEffectiveTicks =
+                relocationDelayEffectiveTicks;
+        }
+
+        public int DistanceCentimetres { get; }
+        public int RelocationDelayEffectiveTicks { get; }
+    }
+
     public sealed class UnblockedAttackChargeDefinition
     {
         public UnblockedAttackChargeDefinition(
@@ -939,7 +954,8 @@ namespace ArknoNights.Battle.Core
             TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect,
             AttackDashEffectDefinition attackDashEffect,
             string animationKey,
-            int skillAnimationOriginalDurationTicks)
+            int skillAnimationOriginalDurationTicks,
+            TimedBlinkEffectDefinition timedBlinkEffect = null)
             : this(
                 abilityId: abilityId,
                 displayNameZhHans: displayNameZhHans,
@@ -976,7 +992,8 @@ namespace ArknoNights.Battle.Core
                     skillAnimationOriginalDurationTicks,
                 timedTargetAreaDamageEffect:
                     timedTargetAreaDamageEffect,
-                attackDashEffect: attackDashEffect)
+                attackDashEffect: attackDashEffect,
+                timedBlinkEffect: timedBlinkEffect)
         {
         }
 
@@ -1485,7 +1502,7 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null, AttackDashEffectDefinition attackDashEffect = null)
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null, AttackDashEffectDefinition attackDashEffect = null, TimedBlinkEffectDefinition timedBlinkEffect = null)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -1531,6 +1548,7 @@ namespace ArknoNights.Battle.Core
             TimedTargetAreaDamageEffect =
                 timedTargetAreaDamageEffect;
             AttackDashEffect = attackDashEffect;
+            TimedBlinkEffect = timedBlinkEffect;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -1585,6 +1603,7 @@ namespace ArknoNights.Battle.Core
         public TimedTargetAreaDamageEffectDefinition
             TimedTargetAreaDamageEffect { get; }
         public AttackDashEffectDefinition AttackDashEffect { get; }
+        public TimedBlinkEffectDefinition TimedBlinkEffect { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

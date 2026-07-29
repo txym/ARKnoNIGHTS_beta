@@ -332,8 +332,8 @@ namespace ArknoNights.Battle.Core
             damageOverTimeStates =
                 new List<RuntimeDamageOverTimeState>();
         private long accumulatedDefenseReduction;
-        private bool attackDashUnblockable;
-        private int attackDashUnblockableUntilTick =
+        private bool temporaryUnblockable;
+        private int temporaryUnblockableUntilTick =
             int.MinValue;
 
         internal RuntimeUnitState(
@@ -493,7 +493,7 @@ namespace ArknoNights.Battle.Core
             {
                 if (abilityStates.Any(item =>
                         item.IsHealthThresholdUnblockable)
-                    || attackDashUnblockable)
+                    || temporaryUnblockable)
                     return 0;
                 var value = (long)Definition.BlockCapacity
                     + PassiveCombatModifiers.Sum(item =>
@@ -680,19 +680,19 @@ namespace ArknoNights.Battle.Core
             blockedUnitIds.Sort(StringComparer.Ordinal);
         }
         internal bool RemoveBlock(string unitId) => blockedUnitIds.Remove(unitId);
-        internal void StartAttackDashUnblockable(
+        internal void StartTemporaryUnblockable(
             int currentTick,
             int durationTicks)
         {
-            attackDashUnblockable = true;
-            attackDashUnblockableUntilTick =
+            temporaryUnblockable = true;
+            temporaryUnblockableUntilTick =
                 currentTick + durationTicks - 1;
         }
-        internal void UpdateAttackDashUnblockable(int currentTick)
+        internal void UpdateTemporaryUnblockable(int currentTick)
         {
-            if (attackDashUnblockable
-                && currentTick > attackDashUnblockableUntilTick)
-                attackDashUnblockable = false;
+            if (temporaryUnblockable
+                && currentTick > temporaryUnblockableUntilTick)
+                temporaryUnblockable = false;
         }
         internal void ResetMoveDirectionRemainders()
         {
@@ -710,15 +710,17 @@ namespace ArknoNights.Battle.Core
                     && item.IsTriggered(attackOrdinal))
                 .FirstOrDefault();
         }
-        internal void AppendAttackDashSummary(StringBuilder builder)
+        internal void AppendTemporaryUnblockableSummary(
+            StringBuilder builder)
         {
             if (!abilityStates.Any(item =>
-                    item.Definition.AttackDashEffect != null))
+                    item.Definition.AttackDashEffect != null
+                    || item.Definition.TimedBlinkEffect != null))
                 return;
-            builder.Append(",dash:")
-                .Append(attackDashUnblockable ? 1 : 0)
+            builder.Append(",unblockable:")
+                .Append(temporaryUnblockable ? 1 : 0)
                 .Append(':')
-                .Append(attackDashUnblockableUntilTick);
+                .Append(temporaryUnblockableUntilTick);
         }
 
         internal int ApplyDamageTakenModifiers(
@@ -1109,9 +1111,9 @@ namespace ArknoNights.Battle.Core
         private readonly List<PendingTimedTargetAreaDamage>
             pendingTimedTargetAreaDamages =
                 new List<PendingTimedTargetAreaDamage>();
-        private readonly List<PendingAttackDashMovement>
-            pendingAttackDashMovements =
-                new List<PendingAttackDashMovement>();
+        private readonly List<PendingRelocation>
+            pendingRelocations =
+                new List<PendingRelocation>();
         private readonly Dictionary<string, UnitDefinition> unitDefinitions;
         private readonly Dictionary<string, AbilityDefinition> abilityDefinitions;
         private readonly Dictionary<string, BattleUnitInstanceSnapshot> unitSnapshots = new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal);
@@ -1189,8 +1191,8 @@ namespace ArknoNights.Battle.Core
         private void RunAuthoritativeTick()
         {
             foreach (var unit in runtimeUnits)
-                unit.UpdateAttackDashUnblockable(CurrentTick);
-            ResolveDueAttackDashMovements();
+                unit.UpdateTemporaryUnblockable(CurrentTick);
+            ResolveDueRelocations();
             ResolveDueTimedTargetAreaDamage();
             ResolveDueDeathSpawns();
             ResolveDueDeathAreaDamage();
@@ -1472,7 +1474,7 @@ namespace ArknoNights.Battle.Core
                 pendingAttacks.Add(new PendingAttack(unit.UnitId, target.UnitId, damageTick, unit.Definition.DamageType, attack, unit.EffectiveTargetDefenseMultiplierPermille, unit.StartedAttackCount, originalAnimationTicks, effectiveTicks));
                 if (attackDash != null)
                 {
-                    unit.StartAttackDashUnblockable(
+                    unit.StartTemporaryUnblockable(
                         CurrentTick,
                         attackDash.UnblockableDurationTicks);
                     foreach (var blockedUnitId in unit
@@ -1480,8 +1482,8 @@ namespace ArknoNights.Battle.Core
                         EndBlock(
                             unit,
                             FindUnit(blockedUnitId));
-                    pendingAttackDashMovements.Add(
-                        new PendingAttackDashMovement(
+                    pendingRelocations.Add(
+                        new PendingRelocation(
                             damageTick,
                             unit.UnitId,
                             target.UnitId,
@@ -1525,16 +1527,16 @@ namespace ArknoNights.Battle.Core
             }
         }
 
-        private void ResolveDueAttackDashMovements()
+        private void ResolveDueRelocations()
         {
-            var due = pendingAttackDashMovements
+            var due = pendingRelocations
                 .Where(item => item.DueTick <= CurrentTick)
                 .OrderBy(item => item.DueTick)
                 .ThenBy(
                     item => item.UnitId,
                     StringComparer.Ordinal)
                 .ToArray();
-            pendingAttackDashMovements.RemoveAll(item =>
+            pendingRelocations.RemoveAll(item =>
                 item.DueTick <= CurrentTick);
             foreach (var pending in due)
             {
@@ -2465,6 +2467,10 @@ namespace ArknoNights.Battle.Core
                     || IsAttackAnimationLocked(caster)
                     || IsSkillAnimationLocked(caster))
                     continue;
+                var blinkEffect =
+                    abilityState.Definition.TimedBlinkEffect;
+                if (blinkEffect != null && !caster.IsBlocked)
+                    continue;
                 var targetAreaEffect =
                     abilityState.Definition.TimedTargetAreaDamageEffect;
                 var target = targetAreaEffect == null
@@ -2474,15 +2480,46 @@ namespace ArknoNights.Battle.Core
                         targetAreaEffect);
                 if (targetAreaEffect != null && target == null)
                     continue;
+                var blinkTarget = blinkEffect == null
+                    ? null
+                    : caster.BlockedUnitIds
+                        .Select(FindUnit)
+                        .FirstOrDefault(IsActive);
+                if (blinkEffect != null && blinkTarget == null)
+                    continue;
                 var castOrdinal = abilityState.ConsumeCast();
                 caster.SkillAnimationLockUntilTick =
                     CurrentTick
                     + abilityState.Definition.SkillAnimationEffectiveDurationTicks;
+                if (blinkEffect != null)
+                {
+                    caster.StartTemporaryUnblockable(
+                        CurrentTick,
+                        abilityState.Definition
+                            .SkillAnimationEffectiveDurationTicks);
+                    foreach (var blockedUnitId in caster
+                                 .BlockedUnitIds.ToArray())
+                        EndBlock(
+                            caster,
+                            FindUnit(blockedUnitId));
+                    pendingRelocations.Add(
+                        new PendingRelocation(
+                            CurrentTick
+                            + blinkEffect
+                                .RelocationDelayEffectiveTicks,
+                            caster.UnitId,
+                            blinkTarget.UnitId,
+                            blinkEffect.DistanceCentimetres));
+                }
                 Emit(
                     BattleEventType.Skill,
                     caster.UnitId,
                     null,
-                    target == null ? null : target.UnitId,
+                    blinkTarget != null
+                        ? blinkTarget.UnitId
+                        : target == null
+                            ? null
+                            : target.UnitId,
                     null,
                     null,
                     targetAreaEffect == null
@@ -2502,7 +2539,7 @@ namespace ArknoNights.Battle.Core
                         caster,
                         abilityState.Definition,
                         castOrdinal);
-                else
+                else if (targetAreaEffect != null)
                     pendingTimedTargetAreaDamages.Add(
                         new PendingTimedTargetAreaDamage(
                             CurrentTick
@@ -3079,7 +3116,7 @@ namespace ArknoNights.Battle.Core
         private readonly struct DeathAreaDamageHit { public DeathAreaDamageHit(PendingDeathAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingDeathAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
         private readonly struct TimedTargetAreaDamageHit { public TimedTargetAreaDamageHit(PendingTimedTargetAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingTimedTargetAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
         private readonly struct PendingTimedTargetAreaDamage { public PendingTimedTargetAreaDamage(int dueTick, string ownerUnitId, BattleSide side, string targetUnitId, int attack, string abilityId, TimedTargetAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; TargetUnitId = targetUnitId; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public string TargetUnitId { get; } public int Attack { get; } public string AbilityId { get; } public TimedTargetAreaDamageEffectDefinition Effect { get; } }
-        private readonly struct PendingAttackDashMovement { public PendingAttackDashMovement(int dueTick, string unitId, string targetUnitId, int distanceCentimetres) { DueTick = dueTick; UnitId = unitId; TargetUnitId = targetUnitId; DistanceCentimetres = distanceCentimetres; } public int DueTick { get; } public string UnitId { get; } public string TargetUnitId { get; } public int DistanceCentimetres { get; } }
+        private readonly struct PendingRelocation { public PendingRelocation(int dueTick, string unitId, string targetUnitId, int distanceCentimetres) { DueTick = dueTick; UnitId = unitId; TargetUnitId = targetUnitId; DistanceCentimetres = distanceCentimetres; } public int DueTick { get; } public string UnitId { get; } public string TargetUnitId { get; } public int DistanceCentimetres { get; } }
         private readonly struct PendingDeathAreaDamage { public PendingDeathAreaDamage(int dueTick, string ownerUnitId, BattleSide side, FixedPosition position, int attack, string abilityId, DeathAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; Position = position; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public FixedPosition Position { get; } public int Attack { get; } public string AbilityId { get; } public DeathAreaDamageEffectDefinition Effect { get; } }
         private readonly struct PendingDeathSpawn
         {
@@ -3228,7 +3265,7 @@ namespace ArknoNights.Battle.Core
                     builder.Append(",attacks:")
                         .Append(unit.StartedAttackCount);
                 foreach (var ability in unit.AbilityStates.OrderBy(item => item.Definition.AbilityId, StringComparer.Ordinal)) ability.AppendStableSummary(builder);
-                unit.AppendAttackDashSummary(builder);
+                unit.AppendTemporaryUnblockableSummary(builder);
                 unit.AppendDamageOverTimeSummary(builder);
             }
             foreach (var pending in pendingDeathSpawns
@@ -3264,12 +3301,12 @@ namespace ArknoNights.Battle.Core
                     .Append(pending.OwnerUnitId).Append(',')
                     .Append(pending.TargetUnitId).Append(',')
                     .Append(pending.AbilityId);
-            foreach (var pending in pendingAttackDashMovements
+            foreach (var pending in pendingRelocations
                          .OrderBy(item => item.DueTick)
                          .ThenBy(
                              item => item.UnitId,
                              StringComparer.Ordinal))
-                builder.Append("|AD:")
+                builder.Append("|R:")
                     .Append(pending.DueTick).Append(',')
                     .Append(pending.UnitId).Append(',')
                     .Append(pending.TargetUnitId).Append(',')

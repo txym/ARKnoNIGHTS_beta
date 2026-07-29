@@ -70,11 +70,6 @@ public static class SkillAnimationCatalogGenerator
                         string.IsNullOrWhiteSpace)
                     || animationKeys.Any(key =>
                         key.Contains("|"))
-                    || (string.Equals(
-                            ability.activationKind,
-                            "Timed",
-                            StringComparison.Ordinal)
-                        && animationKeys.Length != 1)
                     || (!string.Equals(
                             ability.activationKind,
                             "Timed",
