@@ -1,0 +1,17 @@
+{
+  "name": "ARKnoNIGHTS.Match.EditModeTests",
+  "rootNamespace": "ArknoNights.Match.Tests",
+  "references": [
+    "ARKnoNIGHTS.Match"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}
