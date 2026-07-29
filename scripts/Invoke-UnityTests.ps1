@@ -87,6 +87,9 @@ try
                 $total = [int]$testRun.total
                 $failed = [int]$testRun.failed
                 $skipped = [int]$testRun.skipped
+                $inconclusive = [int]$testRun.inconclusive
+                $notRun = [int]$testRun.GetAttribute('not-run')
+                $notRunnable = @($resultXml.SelectNodes('//*[@runstate="NotRunnable" or @runstate="Not-Runnable" or @result="NotRunnable" or @result="Not-Runnable"]')).Count
                 if ($total -le 0) { throw 'The test result XML reported zero tests.' }
 
                 $resultParsed = $true
@@ -102,9 +105,9 @@ try
                 }
                 else { $shutdown = "already-exited; exitCode=$($unityProcess.ExitCode)" }
 
-                $summary = "result=$($testRun.result); total=$total; failed=$failed; skipped=$skipped; shutdown=$shutdown; results=$resultsPath; log=$logPath"
+                $summary = "result=$($testRun.result); total=$total; failed=$failed; skipped=$skipped; inconclusive=$inconclusive; notRun=$notRun; notRunnable=$notRunnable; shutdown=$shutdown; results=$resultsPath; log=$logPath"
                 Write-Summary $summary
-                if ($failed -gt 0 -or $testRun.result -ne 'Passed') { exit 1 }
+                if ($failed -gt 0 -or $skipped -gt 0 -or $inconclusive -gt 0 -or $notRun -gt 0 -or $notRunnable -gt 0 -or $testRun.result -ne 'Passed') { exit 1 }
                 exit 0
             }
             catch [System.Xml.XmlException]

@@ -117,6 +117,40 @@ namespace ArknoNights.Battle.Tests
             Assert.That(slotRects.Select(slot => slot.Find("Background").GetComponent<Image>().sprite), Is.All.Not.Null);
             var firstSlot = slotRects[0];
             var lastSlot = slotRects[5];
+            var portraitClip = firstSlot.Find("PortraitClip");
+            var costInfo = portraitClip.Find("CostInfo");
+            var regionInfo = portraitClip.Find("RegionInfo");
+            var occupationInfo = portraitClip.Find("OccupationInfo");
+            Assert.NotNull(costInfo);
+            Assert.NotNull(regionInfo);
+            Assert.NotNull(occupationInfo);
+            Assert.Less(costInfo.GetSiblingIndex(), regionInfo.GetSiblingIndex());
+            Assert.Less(regionInfo.GetSiblingIndex(), occupationInfo.GetSiblingIndex());
+            Assert.That(costInfo.GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(9f, 6f)));
+            Assert.That(regionInfo.GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(9f, 39f)));
+            Assert.That(occupationInfo.GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(new Vector2(9f, 72f)));
+            Assert.AreEqual("2", costInfo.Find("Value").GetComponent<Text>().text);
+            Assert.AreEqual("整合运动", regionInfo.Find("Value").GetComponent<Text>().text);
+            Assert.AreEqual("感染生物", occupationInfo.Find("Value").GetComponent<Text>().text);
+            Assert.AreEqual("DeploymentCostPanelIcon", costInfo.Find("Icon").GetComponent<Image>().sprite.name);
+            Assert.AreEqual("logo_reunionMovement", regionInfo.Find("Icon").GetComponent<Image>().sprite.name);
+            Assert.AreEqual("r_enemy_slime_repbsl_3", occupationInfo.Find("Icon").GetComponent<Image>().sprite.name);
+            Assert.AreSame(
+                ArknoNights.UI.StagingHudController.FormalNumericFont,
+                costInfo.Find("Value").GetComponent<Text>().font);
+            var affinityChineseFont = Resources.Load<Font>("Fonts/FangZhengHeiTiJianTi-1");
+            Assert.AreSame(affinityChineseFont, regionInfo.Find("Value").GetComponent<Text>().font);
+            Assert.AreSame(affinityChineseFont, occupationInfo.Find("Value").GetComponent<Text>().font);
+            foreach (var row in new[] { costInfo, regionInfo, occupationInfo })
+            {
+                var icon = row.Find("Icon").GetComponent<Image>();
+                var value = row.Find("Value").GetComponent<Text>();
+                Assert.IsTrue(icon.preserveAspect);
+                Assert.IsFalse(icon.raycastTarget);
+                Assert.That(
+                    icon.rectTransform.anchoredPosition.y + icon.rectTransform.sizeDelta.y * .5f,
+                    Is.EqualTo(value.rectTransform.anchoredPosition.y + value.rectTransform.sizeDelta.y * .5f).Within(.01f));
+            }
             Assert.That(
                 lastSlot.anchoredPosition.x + lastSlot.sizeDelta.x,
                 Is.EqualTo(shopPanelRect.rect.width).Within(.01f),

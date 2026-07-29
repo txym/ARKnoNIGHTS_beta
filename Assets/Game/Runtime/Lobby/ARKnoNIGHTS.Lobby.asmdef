@@ -1,0 +1,14 @@
+{
+  "name": "ARKnoNIGHTS.Lobby",
+  "rootNamespace": "ArknoNights.Lobby",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

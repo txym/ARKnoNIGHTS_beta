@@ -20,6 +20,8 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private const float ShadowedButtonContentLift = 9f;
         private const float PriceTextVisualLift = 3f;
         private const string ShopChineseFontPath = "Fonts/FangZhengHeiTiJianTi-1";
+        private const string BattleAtlasPath = "UI/Texture/SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged";
+        private const string DeploymentCostIconName = "DeploymentCostPanelIcon";
         private static readonly Color ShopNameColor = new Color(.82f, .84f, .82f, 1f);
         private static readonly Color PriceColor = new Color(1f, .94f, .72f, 1f);
         private static readonly Color ShopLevelNumberColor = new Color(40f / 255f, 221f / 255f, 169f / 255f, 1f);
@@ -28,6 +30,13 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private static readonly Color RefreshLabelColor = new Color(.22f, .13f, .01f, 1f);
         private static readonly Color ReadyLabelColor = new Color(.02f, .18f, .17f, 1f);
         private static readonly int[] UpgradeCosts = { 4, 6, 8, 10, 12, 14, 16, 18 };
+
+        private sealed class InfoRow
+        {
+            public RectTransform Root;
+            public Image Icon;
+            public Text Value;
+        }
 
         private sealed class SlotWidgets
         {
@@ -44,12 +53,18 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             public Image CostBackground;
             public Text Name;
             public Text Price;
+            public InfoRow CostInfo;
+            public InfoRow RegionInfo;
+            public InfoRow OccupationInfo;
         }
 
         private readonly List<SlotWidgets> slotWidgets = new List<SlotWidgets>();
         private readonly ShopReadyPendingCommand pendingCommand = new ShopReadyPendingCommand();
+        private readonly HashSet<string> missingAffinityTypeIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> missingAffinityIconKeys = new HashSet<string>(StringComparer.Ordinal);
         private LocalMatchState match;
         private ShopReadyHudState state;
+        private UnitAffinityPresentationCatalog affinityCatalog;
         private RectTransform root;
         private RectTransform levelButtonRoot;
         private RectTransform shopPanel;
@@ -285,6 +300,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private void EnsureView()
         {
             if (root != null) return;
+            affinityCatalog = UnitAffinityPresentationCatalog.LoadFromResources();
             root = GetComponent<RectTransform>();
             if (root == null)
             {
@@ -328,8 +344,10 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
             readyButtonRoot = ButtonRoot("ReadyButton", root, ToggleReady, out readyButton);
             readyBackground = Image("Background", readyButtonRoot, "UI/Texture/ready/ready_bg");
+            readyBackground.type = UnityEngine.UI.Image.Type.Sliced;
             Stretch(readyBackground.rectTransform);
             readyFrame = Image("Frame", readyButtonRoot, "UI/Texture/ready/ready_frame");
+            readyFrame.type = UnityEngine.UI.Image.Type.Sliced;
             Stretch(readyFrame.rectTransform);
             readyIcon = Image("Icon", readyButtonRoot, "UI/Texture/ready/ready_icon");
             readyText = Label("Label", readyButtonRoot, 24, TextAnchor.MiddleCenter, ReadyLabelColor);
@@ -352,6 +370,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 var portraitClip = Rect("PortraitClip", rootRect);
                 portraitClip.gameObject.AddComponent<RectMask2D>();
                 var portrait = Image("Portrait", portraitClip, null);
+                var costInfo = CreateInfoRow("CostInfo", portraitClip, numeric: true);
+                var regionInfo = CreateInfoRow("RegionInfo", portraitClip, numeric: false);
+                var occupationInfo = CreateInfoRow("OccupationInfo", portraitClip, numeric: false);
                 var unaffordable = Image("UnaffordableOverlay", rootRect, "UI/Texture/shop/bg_common");
                 var outline = Image("HoverOutline", rootRect, "UI/Texture/shop/frame_outline");
                 var frame = Image("RarityFrame", rootRect, "UI/Texture/shop/frame_lv1");
@@ -376,7 +397,10 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                     Frozen = frozen,
                     CostBackground = costBackground,
                     Name = name,
-                    Price = price
+                    Price = price,
+                    CostInfo = costInfo,
+                    RegionInfo = regionInfo,
+                    OccupationInfo = occupationInfo
                 });
             }
         }
@@ -404,6 +428,86 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             widget.Name.text = string.IsNullOrWhiteSpace(slot.DisplayName) ? slot.UnitTypeId : slot.DisplayName;
             widget.Price.gameObject.SetActive(!slot.IsEmpty);
             widget.Price.text = slot.Price.ToString();
+            BindInfoRows(widget, slot);
+        }
+
+        private void BindInfoRows(SlotWidgets widget, ShopReadySlotViewState slot)
+        {
+            ClearInfoRow(widget.CostInfo);
+            ClearInfoRow(widget.RegionInfo);
+            ClearInfoRow(widget.OccupationInfo);
+            if (slot.IsEmpty) return;
+
+            var costIcon = FormalHudSpriteLoader.LoadAtlasSprite(
+                BattleAtlasPath,
+                DeploymentCostIconName);
+            BindInfoRow(widget.CostInfo, slot.DeploymentCost.ToString(), costIcon);
+            if (costIcon == null && missingAffinityIconKeys.Add("cost|" + DeploymentCostIconName))
+            {
+                Debug.LogError(
+                    "[ShopReadyHud][deployment-cost.icon.missing] atlas=" + BattleAtlasPath
+                    + "; sprite=" + DeploymentCostIconName,
+                    this);
+            }
+
+            if (affinityCatalog == null
+                || !affinityCatalog.TryGet(slot.UnitTypeId, out var affinity))
+            {
+                if (missingAffinityTypeIds.Add(slot.UnitTypeId))
+                    Debug.LogWarning("[ShopReadyHud][affinity.missing] type=" + slot.UnitTypeId, this);
+                return;
+            }
+
+            BindAffinityInfoRow(
+                widget.RegionInfo,
+                slot.UnitTypeId,
+                "region",
+                affinity.RegionName,
+                affinity.RegionIconResourcePath);
+            BindAffinityInfoRow(
+                widget.OccupationInfo,
+                slot.UnitTypeId,
+                "occupation",
+                affinity.OccupationName,
+                affinity.OccupationIconResourcePath);
+        }
+
+        private void BindAffinityInfoRow(
+            InfoRow row,
+            string typeId,
+            string kind,
+            string displayName,
+            string iconResourcePath)
+        {
+            if (string.IsNullOrEmpty(displayName)) return;
+            var icon = FormalHudSpriteLoader.Load(iconResourcePath);
+            BindInfoRow(row, displayName, icon);
+            if (!string.IsNullOrEmpty(iconResourcePath)
+                && icon == null
+                && missingAffinityIconKeys.Add(typeId + "|" + kind + "|" + iconResourcePath))
+            {
+                Debug.LogError(
+                    "[ShopReadyHud][affinity.icon.missing] type=" + typeId
+                    + "; kind=" + kind
+                    + "; resource=" + iconResourcePath,
+                    this);
+            }
+        }
+
+        private static void BindInfoRow(InfoRow row, string value, Sprite icon)
+        {
+            row.Root.gameObject.SetActive(true);
+            row.Value.text = value ?? string.Empty;
+            row.Icon.sprite = icon;
+            row.Icon.gameObject.SetActive(icon != null);
+        }
+
+        private static void ClearInfoRow(InfoRow row)
+        {
+            row.Value.text = string.Empty;
+            row.Icon.sprite = null;
+            row.Icon.gameObject.SetActive(false);
+            row.Root.gameObject.SetActive(false);
         }
 
         private void ApplyLayout()
@@ -461,6 +565,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 Stretch(widget.Background.rectTransform);
                 PositionBottomLeft(widget.Portrait.transform.parent as RectTransform, 5f * ShopVisualScale, 22f * ShopVisualScale, 148f * ShopVisualScale, 146f * ShopVisualScale, scale);
                 PositionBottomLeft(widget.Portrait.rectTransform, -4f * ShopVisualScale, -3f * ShopVisualScale, 156f * ShopVisualScale, 156f * ShopVisualScale, scale);
+                LayoutInfoRow(widget.CostInfo, 4f, scale);
+                LayoutInfoRow(widget.RegionInfo, 26f, scale);
+                LayoutInfoRow(widget.OccupationInfo, 48f, scale);
                 PositionBottomLeft(widget.Unaffordable.rectTransform, 1f * ShopVisualScale, 2f * ShopVisualScale, 156f * ShopVisualScale, 171f * ShopVisualScale, scale);
                 Stretch(widget.Outline.rectTransform);
                 Stretch(widget.Frame.rectTransform);
@@ -480,7 +587,35 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             {
                 ScaleShopText(widget.Name, 16);
                 ScaleShopText(widget.Price, 20);
+                ScaleShopText(widget.CostInfo.Value, 13);
+                ScaleShopText(widget.RegionInfo.Value, 13);
+                ScaleShopText(widget.OccupationInfo.Value, 13);
             }
+        }
+
+        private static void LayoutInfoRow(InfoRow row, float bottom, float scale)
+        {
+            PositionBottomLeft(
+                row.Root,
+                6f * ShopVisualScale,
+                bottom * ShopVisualScale,
+                132f * ShopVisualScale,
+                20f * ShopVisualScale,
+                scale);
+            PositionBottomLeft(
+                row.Icon.rectTransform,
+                0f,
+                1f * ShopVisualScale,
+                18f * ShopVisualScale,
+                18f * ShopVisualScale,
+                scale);
+            PositionBottomLeft(
+                row.Value.rectTransform,
+                22f * ShopVisualScale,
+                0f,
+                110f * ShopVisualScale,
+                20f * ShopVisualScale,
+                scale);
         }
 
         private static void ScaleShopText(Text text, int referenceSize)
@@ -531,6 +666,22 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             image.type = UnityEngine.UI.Image.Type.Simple;
             image.raycastTarget = false;
             return image;
+        }
+
+        private static InfoRow CreateInfoRow(string name, Transform parent, bool numeric)
+        {
+            var row = Rect(name, parent);
+            var icon = Image("Icon", row, null);
+            icon.preserveAspect = true;
+            var value = numeric
+                ? NumberLabel("Value", row, 13, TextAnchor.MiddleLeft, Color.white)
+                : Label("Value", row, 13, TextAnchor.MiddleLeft, Color.white);
+            return new InfoRow
+            {
+                Root = row,
+                Icon = icon,
+                Value = value
+            };
         }
 
         private static Text Label(string name, Transform parent, int fontSize, TextAnchor alignment, Color color)
@@ -589,6 +740,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     public static class FormalHudSpriteLoader
     {
         private static readonly Dictionary<string, Sprite> Cache = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, Sprite> AtlasCache = new Dictionary<string, Sprite>(StringComparer.Ordinal);
 
         public static Sprite Load(string resourcePath)
         {
@@ -611,6 +763,19 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             }
 
             Cache[resourcePath] = sprite;
+            return sprite;
+        }
+
+        public static Sprite LoadAtlasSprite(string resourcePath, string spriteName)
+        {
+            if (string.IsNullOrWhiteSpace(resourcePath) || string.IsNullOrWhiteSpace(spriteName))
+                return null;
+            var key = resourcePath + "#" + spriteName;
+            if (AtlasCache.TryGetValue(key, out var cached)) return cached;
+
+            var sprite = Resources.LoadAll<Sprite>(resourcePath)
+                .FirstOrDefault(item => string.Equals(item.name, spriteName, StringComparison.Ordinal));
+            AtlasCache[key] = sprite;
             return sprite;
         }
     }

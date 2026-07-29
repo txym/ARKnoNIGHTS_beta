@@ -1,0 +1,554 @@
+{
+    "schemaVersion":  "unit-affinity-presentation-v1",
+    "regions":  [
+                    {
+                        "id":  "ursus",
+                        "displayName":  "乌萨斯",
+                        "iconResourcePath":  "UI/Texture/region/logo_ursus"
+                    },
+                    {
+                        "id":  "leithanien",
+                        "displayName":  "莱塔尼亚",
+                        "iconResourcePath":  "UI/Texture/region/logo_Leithanien"
+                    },
+                    {
+                        "id":  "victoria",
+                        "displayName":  "维多利亚",
+                        "iconResourcePath":  "UI/Texture/region/logo_victoria"
+                    },
+                    {
+                        "id":  "columbia",
+                        "displayName":  "哥伦比亚",
+                        "iconResourcePath":  "UI/Texture/region/logo_columbia"
+                    },
+                    {
+                        "id":  "sargon",
+                        "displayName":  "萨尔贡",
+                        "iconResourcePath":  "UI/Texture/region/logo_sargon"
+                    },
+                    {
+                        "id":  "aegir",
+                        "displayName":  "阿戈尔",
+                        "iconResourcePath":  "UI/Texture/region/logo_egir"
+                    },
+                    {
+                        "id":  "siracusa",
+                        "displayName":  "叙拉古",
+                        "iconResourcePath":  "UI/Texture/region/logo_siracusa"
+                    },
+                    {
+                        "id":  "reunion",
+                        "displayName":  "整合运动",
+                        "iconResourcePath":  "UI/Texture/region/logo_reunionMovement"
+                    }
+                ],
+    "occupations":  [
+                        {
+                            "id":  "infected",
+                            "displayName":  "感染生物",
+                            "iconResourcePath":  "UI/Texture/occupation/r_enemy_slime_repbsl_3"
+                        },
+                        {
+                            "id":  "drone",
+                            "displayName":  "无人机",
+                            "iconResourcePath":  "UI/Texture/occupation/r_defdrn_up_2"
+                        },
+                        {
+                            "id":  "creation",
+                            "displayName":  "造物",
+                            "iconResourcePath":  "UI/Texture/occupation/r_global_magic_resist_2"
+                        },
+                        {
+                            "id":  "mechanical",
+                            "displayName":  "机械",
+                            "iconResourcePath":  "UI/Texture/occupation/CHIPS"
+                        },
+                        {
+                            "id":  "collapsal",
+                            "displayName":  "坍缩体",
+                            "iconResourcePath":  "UI/Texture/occupation/logo_sami"
+                        },
+                        {
+                            "id":  "other",
+                            "displayName":  "其他",
+                            "iconResourcePath":  ""
+                        }
+                    ],
+    "units":  [
+                  {
+                      "typeId":  "1000",
+                      "regionId":  "reunion",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1001",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1006",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1008",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1014",
+                      "regionId":  "reunion",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1017",
+                      "regionId":  "",
+                      "occupationId":  "drone"
+                  },
+                  {
+                      "typeId":  "1025",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1026",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1031",
+                      "regionId":  "reunion",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1039",
+                      "regionId":  "reunion",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1042",
+                      "regionId":  "",
+                      "occupationId":  "drone"
+                  },
+                  {
+                      "typeId":  "1043",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1044",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1056",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1058",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1061",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1062",
+                      "regionId":  "reunion",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1077",
+                      "regionId":  "ursus",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1078",
+                      "regionId":  "ursus",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1080",
+                      "regionId":  "ursus",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1081",
+                      "regionId":  "ursus",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1083",
+                      "regionId":  "ursus",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "1086",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1087",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1089",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1092",
+                      "regionId":  "leithanien",
+                      "occupationId":  "creation"
+                  },
+                  {
+                      "typeId":  "1095",
+                      "regionId":  "sargon",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1107",
+                      "regionId":  "ursus",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1108",
+                      "regionId":  "ursus",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1111",
+                      "regionId":  "ursus",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1116",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1118",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1119",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1121",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1131",
+                      "regionId":  "sargon",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1132",
+                      "regionId":  "sargon",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1134",
+                      "regionId":  "sargon",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1140",
+                      "regionId":  "sargon",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1146",
+                      "regionId":  "sargon",
+                      "occupationId":  "drone"
+                  },
+                  {
+                      "typeId":  "1147",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1165",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1166",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1169",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1170",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1230",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1231",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1232",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1238",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1240",
+                      "regionId":  "leithanien",
+                      "occupationId":  "creation"
+                  },
+                  {
+                      "typeId":  "1243",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1246",
+                      "regionId":  "leithanien",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "1254",
+                      "regionId":  "columbia",
+                      "occupationId":  "mechanical"
+                  },
+                  {
+                      "typeId":  "1262",
+                      "regionId":  "sargon",
+                      "occupationId":  "mechanical"
+                  },
+                  {
+                      "typeId":  "1264",
+                      "regionId":  "sargon",
+                      "occupationId":  "mechanical"
+                  },
+                  {
+                      "typeId":  "1274",
+                      "regionId":  "victoria",
+                      "occupationId":  "mechanical"
+                  },
+                  {
+                      "typeId":  "1277",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1279",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1281",
+                      "regionId":  "siracusa",
+                      "occupationId":  "mechanical"
+                  },
+                  {
+                      "typeId":  "1282",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1314",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1315",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1316",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1319",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1322",
+                      "regionId":  "victoria",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1326",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1328",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1329",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1333",
+                      "regionId":  "columbia",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1355",
+                      "regionId":  "",
+                      "occupationId":  "drone"
+                  },
+                  {
+                      "typeId":  "1371",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1372",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1375",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1377",
+                      "regionId":  "leithanien",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1433",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1434",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1437",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "1502",
+                      "regionId":  "reunion",
+                      "occupationId":  ""
+                  },
+                  {
+                      "typeId":  "2031",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "2035",
+                      "regionId":  "aegir",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "2043",
+                      "regionId":  "",
+                      "occupationId":  "collapsal"
+                  },
+                  {
+                      "typeId":  "2046",
+                      "regionId":  "",
+                      "occupationId":  "collapsal"
+                  },
+                  {
+                      "typeId":  "5503",
+                      "regionId":  "",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "7002",
+                      "regionId":  "sargon",
+                      "occupationId":  "creation"
+                  },
+                  {
+                      "typeId":  "10001",
+                      "regionId":  "",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "10004",
+                      "regionId":  "",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "10005",
+                      "regionId":  "",
+                      "occupationId":  "collapsal"
+                  },
+                  {
+                      "typeId":  "10006",
+                      "regionId":  "",
+                      "occupationId":  "collapsal"
+                  },
+                  {
+                      "typeId":  "10031",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "10038",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "10039",
+                      "regionId":  "siracusa",
+                      "occupationId":  "other"
+                  },
+                  {
+                      "typeId":  "10073",
+                      "regionId":  "",
+                      "occupationId":  "creation"
+                  },
+                  {
+                      "typeId":  "10077",
+                      "regionId":  "",
+                      "occupationId":  "creation"
+                  },
+                  {
+                      "typeId":  "10078",
+                      "regionId":  "",
+                      "occupationId":  "creation"
+                  },
+                  {
+                      "typeId":  "10126",
+                      "regionId":  "ursus",
+                      "occupationId":  "infected"
+                  },
+                  {
+                      "typeId":  "10127",
+                      "regionId":  "ursus",
+                      "occupationId":  "infected"
+                  }
+              ]
+}

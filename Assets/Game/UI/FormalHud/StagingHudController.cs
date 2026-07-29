@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ArknoNights.Player;
+using ArknoNights.UI.FormalHud.ShopReady;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -33,7 +34,9 @@ namespace ArknoNights.UI
 
         private readonly List<StagingSlotView> slotViews = new List<StagingSlotView>();
         private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+        private readonly HashSet<string> missingAffinityTypeIds = new HashSet<string>(StringComparer.Ordinal);
         private PlayerState playerState;
+        private UnitAffinityPresentationCatalog affinityCatalog;
         private PlayerStateSnapshot snapshot;
         private PlayerStateSnapshot displayedSnapshot;
         private bool displayedReadOnly;
@@ -118,6 +121,7 @@ namespace ArknoNights.UI
         private void CreateHud()
         {
             font = FormalUiFont;
+            affinityCatalog = UnitAffinityPresentationCatalog.LoadFromResources();
             foreach (var sprite in Resources.LoadAll<Sprite>(AtlasPath))
             {
                 if (sprite != null && !string.IsNullOrEmpty(sprite.name)) sprites[sprite.name] = sprite;
@@ -226,7 +230,13 @@ namespace ArknoNights.UI
             foreach (var stack in display.StagingSlots)
             {
                 var view = StagingSlotView.Create(stagingArea, font, sprites, HandleSlotClicked, HandleSlotDragStarted);
-                view.Bind(stack, BuildSlotId(stack), LoadPortrait(stack));
+                UnitAffinityPresentation affinity = null;
+                if (affinityCatalog == null || !affinityCatalog.TryGet(stack.TypeId, out affinity))
+                {
+                    if (missingAffinityTypeIds.Add(stack.TypeId))
+                        Debug.LogWarning("[StagingHud][affinity.missing] type=" + stack.TypeId, this);
+                }
+                view.Bind(stack, BuildSlotId(stack), LoadPortrait(stack), affinity);
                 slotViews.Add(view);
             }
             ApplyLayout();
@@ -420,6 +430,7 @@ namespace ArknoNights.UI
         private Image eliteDecoration;
         private Image eliteHighlight;
         private Image rarityIcon;
+        private Image affinityIcon;
         private Image selectionOverlay;
         private Text countText;
         private RectTransform root;
@@ -449,7 +460,11 @@ namespace ArknoNights.UI
             return view;
         }
 
-        public void Bind(StagingStackSnapshot stack, string slotId, Sprite portraitSprite)
+        public void Bind(
+            StagingStackSnapshot stack,
+            string slotId,
+            Sprite portraitSprite,
+            UnitAffinityPresentation affinity)
         {
             SlotId = slotId;
             eliteLevel = stack.EliteLevel;
@@ -459,6 +474,22 @@ namespace ArknoNights.UI
             rarityIcon.enabled = rarityIcon.sprite != null;
             if (!rarityIcon.enabled) Debug.LogError("[StagingHud][rarity.icon.missing] rarity=" + stack.Rarity);
             countText.text = "X" + stack.Count;
+            affinityIcon.sprite = null;
+            affinityIcon.gameObject.SetActive(false);
+            var affinityPath = affinity == null
+                ? string.Empty
+                : affinity.PreferredHeaderIconResourcePath;
+            if (!string.IsNullOrEmpty(affinityPath))
+            {
+                affinityIcon.sprite = FormalHudSpriteLoader.Load(affinityPath);
+                affinityIcon.gameObject.SetActive(affinityIcon.sprite != null);
+                if (affinityIcon.sprite == null)
+                {
+                    Debug.LogError(
+                        "[StagingHud][affinity.icon.missing] type=" + stack.TypeId
+                        + "; resource=" + affinityPath);
+                }
+            }
             var icon = GetComponentInChildren<StagingSlotCostTextMarker>();
             if (icon != null) icon.Text.text = stack.DeploymentCost.ToString();
             foreach (var pair in eliteIcons) pair.Value.gameObject.SetActive(pair.Key == eliteLevel);
@@ -549,6 +580,17 @@ namespace ArknoNights.UI
             leftHeader.rectTransform.offsetMin = Vector2.zero;
             leftHeader.rectTransform.offsetMax = Vector2.zero;
             leftHeader.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+            affinityIcon = StagingHudController.CreateImage(
+                "AffinityIcon",
+                leftHeader.rectTransform,
+                null);
+            affinityIcon.rectTransform.anchorMin = new Vector2(.5f, .5f);
+            affinityIcon.rectTransform.anchorMax = new Vector2(.5f, .5f);
+            affinityIcon.rectTransform.pivot = new Vector2(.5f, .5f);
+            affinityIcon.rectTransform.anchoredPosition = Vector2.zero;
+            affinityIcon.rectTransform.sizeDelta = new Vector2(20f, 20f);
+            affinityIcon.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+            affinityIcon.gameObject.SetActive(false);
             var rightHeader = StagingHudController.CreateImage("HeaderRight", header, Sprite(sprites, "StagingSlotHeaderHalfBackground"));
             rightHeader.rectTransform.anchorMin = new Vector2(0.5f, 0f);
             rightHeader.rectTransform.anchorMax = Vector2.one;

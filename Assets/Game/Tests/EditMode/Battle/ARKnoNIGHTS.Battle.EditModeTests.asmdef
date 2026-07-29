@@ -9,7 +9,8 @@
     "ARKnoNIGHTS.PlayerState",
     "ARKnoNIGHTS.Round",
     "ARKnoNIGHTS.UI",
-    "ARKnoNIGHTS.Details"
+    "ARKnoNIGHTS.Details",
+    "ARKnoNIGHTS.Lobby"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

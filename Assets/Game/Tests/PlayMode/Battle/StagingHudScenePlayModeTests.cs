@@ -28,7 +28,7 @@ namespace ArknoNights.Battle.Tests
             var canvas = hud.transform.Find("FormalBattleHudCanvas");
             Assert.NotNull(canvas);
             Assert.AreEqual(1, hud.GetComponentsInChildren<Canvas>().Length);
-            Assert.AreEqual("7", canvas.Find("FormalHud/GoldCurrencyPanel/Value").GetComponent<Text>().text);
+            Assert.AreEqual("200", canvas.Find("FormalHud/GoldCurrencyPanel/Value").GetComponent<Text>().text);
             Assert.AreEqual("400", canvas.Find("FormalHud/BattleStatusPanel/PlayerHealth").GetComponent<Text>().text);
             Assert.That(canvas.Find("DeploymentCostPanel/Cost").GetComponent<RectTransform>().anchoredPosition.y, Is.EqualTo(40f).Within(0.01f));
             Assert.AreSame(numericFont, canvas.Find("DeploymentCostPanel/Cost").GetComponent<Text>().font);
@@ -202,6 +202,58 @@ namespace ArknoNights.Battle.Tests
             Assert.IsFalse(firstSlot.Find("Elite1Decoration").GetComponent<Image>().preserveAspect);
             Assert.IsFalse(firstSlot.Find("Elite2PlusHighlight").GetComponent<Image>().preserveAspect);
             Assert.IsFalse(firstSlot.Find("SelectionOverlay").GetComponent<Image>().preserveAspect);
+            var stagingSlots = hud.transform
+                .Find("FormalBattleHudCanvas/StagingArea")
+                .Cast<Transform>()
+                .Where(child => child.name == "StagingSlot")
+                .ToArray();
+            var regionAffinity = stagingSlots[0]
+                .Find("Header/HeaderLeft/AffinityIcon")
+                .GetComponent<Image>();
+            Assert.IsTrue(regionAffinity.gameObject.activeSelf);
+            Assert.NotNull(regionAffinity.sprite);
+            Assert.AreEqual("logo_reunionMovement", regionAffinity.sprite.name);
+            Assert.IsTrue(regionAffinity.preserveAspect);
+            Assert.IsFalse(regionAffinity.raycastTarget);
+            Assert.AreEqual(new Vector2(.5f, .5f), regionAffinity.rectTransform.anchorMin);
+            Assert.AreEqual(new Vector2(.5f, .5f), regionAffinity.rectTransform.anchorMax);
+            Assert.AreEqual(new Vector2(.5f, .5f), regionAffinity.rectTransform.pivot);
+            Assert.AreEqual(Vector2.zero, regionAffinity.rectTransform.anchoredPosition);
+            Assert.AreEqual(new Vector2(20f, 20f), regionAffinity.rectTransform.sizeDelta);
+            var noIconAffinity = stagingSlots[1]
+                .Find("Header/HeaderLeft/AffinityIcon")
+                .GetComponent<Image>();
+            Assert.IsFalse(noIconAffinity.gameObject.activeSelf);
+
+            var fallbackCatalog = UnitAffinityPresentationCatalog.Parse(
+                "{\"schemaVersion\":\"unit-affinity-presentation-v1\","
+                + "\"regions\":[{\"id\":\"reunion\",\"displayName\":\"整合运动\","
+                + "\"iconResourcePath\":\"UI/Texture/region/logo_reunionMovement\"}],"
+                + "\"occupations\":["
+                + "{\"id\":\"infected\",\"displayName\":\"感染生物\","
+                + "\"iconResourcePath\":\"UI/Texture/occupation/r_enemy_slime_repbsl_3\"},"
+                + "{\"id\":\"collapsal\",\"displayName\":\"坍缩体\","
+                + "\"iconResourcePath\":\"UI/Texture/occupation/logo_sami\"}],"
+                + "\"units\":["
+                + "{\"typeId\":\"1000\",\"regionId\":\"reunion\",\"occupationId\":\"infected\"},"
+                + "{\"typeId\":\"5503\",\"regionId\":\"\",\"occupationId\":\"collapsal\"}]}");
+            typeof(StagingHudController)
+                .GetField("affinityCatalog", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(hud, fallbackCatalog);
+            typeof(StagingHudController)
+                .GetMethod("RebuildSlots", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(hud, null);
+            yield return null;
+            stagingSlots = hud.transform
+                .Find("FormalBattleHudCanvas/StagingArea")
+                .Cast<Transform>()
+                .Where(child => child.name == "StagingSlot")
+                .ToArray();
+            var categoryFallback = stagingSlots[1]
+                .Find("Header/HeaderLeft/AffinityIcon")
+                .GetComponent<Image>();
+            Assert.IsTrue(categoryFallback.gameObject.activeSelf);
+            Assert.AreEqual("logo_sami", categoryFallback.sprite.name);
             Assert.IsNull(GameObject.Find("InitButton"));
             Assert.IsNull(GameObject.Find("ShopPanel"));
             Assert.IsNull(GameObject.Find("FoldButton"));

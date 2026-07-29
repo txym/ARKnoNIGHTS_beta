@@ -46,6 +46,7 @@ namespace ArknoNights.Player
             if (!IsEmpty && catalog.TryGet(UnitTypeId, out var type))
             {
                 Price = type.Rarity;
+                DeploymentCost = type.DeploymentCost;
                 Rarity = type.Rarity;
                 DisplayName = type.DisplayNameZhHans;
                 PortraitResourcePath = type.PortraitResourcePath;
@@ -58,6 +59,8 @@ namespace ArknoNights.Player
         public bool IsEmpty { get; }
         /// <summary>Derived every snapshot from UnitCatalogEntry.Rarity; it is not shop configuration.</summary>
         public int Price { get; }
+        /// <summary>Read-only catalog deployment cost; distinct from the shop purchase price.</summary>
+        public int DeploymentCost { get; }
         public int Rarity { get; }
         public string DisplayName { get; } = string.Empty;
         public string PortraitResourcePath { get; } = string.Empty;
@@ -150,7 +153,7 @@ namespace ArknoNights.Player
         public const int PlayerCount = 4;
         public const int InitialLevel = 1;
         public const int MaximumLevel = 9;
-        public const int InitialGold = 7;
+        public const int InitialGold = 200;
         public const int RefreshCost = 1;
         public const int ShopSlotCount = 6;
 
@@ -160,17 +163,23 @@ namespace ArknoNights.Player
         private readonly Dictionary<string, LocalMatchPlayerData> playersById;
         private readonly ReadOnlyCollection<string> orderedPlayerIds;
         private readonly HashSet<string> knownUnitIds;
-        private readonly string[][] shopPages;
+        private readonly string[] shopTypeIds;
+        private readonly System.Random shopRandom;
         private readonly string localPlayerId;
         private string observedPlayerId;
-        private int level;
         private int gold;
         private bool isReady;
-        private int currentShopPage;
         private int purchasedUnitSequence;
         private long version;
 
-        internal LocalMatchState(UnitCatalog catalog, string localPlayerId, IEnumerable<LocalMatchPlayerData> players, IEnumerable<string[]> shopPages, int initialLevel, int initialGold)
+        internal LocalMatchState(
+            UnitCatalog catalog,
+            string localPlayerId,
+            IEnumerable<LocalMatchPlayerData> players,
+            IEnumerable<string> configuredShopTypeIds,
+            int initialLevel,
+            int initialGold,
+            int shopRandomSeed)
         {
             this.catalog = catalog;
             this.localPlayerId = localPlayerId;
@@ -178,11 +187,16 @@ namespace ArknoNights.Player
             playersById = orderedPlayers.ToDictionary(player => player.PlayerId, StringComparer.Ordinal);
             orderedPlayerIds = new ReadOnlyCollection<string>(orderedPlayers.Select(player => player.PlayerId).ToArray());
             knownUnitIds = new HashSet<string>(playersById.Values.SelectMany(player => player.PlayerState.Snapshot.Units).Select(unit => unit.UnitId), StringComparer.Ordinal);
-            this.shopPages = shopPages.Select(page => page.ToArray()).ToArray();
+            shopTypeIds = configuredShopTypeIds
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            shopRandom = new System.Random(shopRandomSeed);
             foreach (var player in orderedPlayers)
-                player.InitializeShop(this.shopPages[0]);
+            {
+                player.Level = initialLevel;
+                player.InitializeShop(SortShopOffers(GenerateShopOffers(player.Level, ShopSlotCount)));
+            }
             observedPlayerId = localPlayerId;
-            level = initialLevel;
             gold = initialGold;
         }
 
@@ -192,6 +206,7 @@ namespace ArknoNights.Player
         /// <summary>Stable fixture order used for the confirmed Player1-vs-2 / Player3-vs-4 battle pairing.</summary>
         public IReadOnlyList<string> OrderedPlayerIds => orderedPlayerIds;
         public LocalMatchSnapshot Snapshot => CreateSnapshot();
+        private LocalMatchPlayerData LocalPlayerData => playersById[localPlayerId];
         private ShopSlotData[] LocalShopSlots => playersById[localPlayerId].ShopSlots;
 
         /// <summary>Returns the persistent state belonging to one fixture player without changing command ownership.</summary>
@@ -237,8 +252,7 @@ namespace ArknoNights.Player
         public LocalMatchOperationResult TryRefresh()
         {
             if (gold < RefreshCost) return Result(LocalMatchOperationCode.InsufficientGold);
-            var nextPage = (currentShopPage + 1) % shopPages.Length;
-            var sortedOffers = SortShopOffers(shopPages[nextPage]);
+            var sortedOffers = SortShopOffers(GenerateShopOffers(LocalPlayerData.Level, LocalShopSlots.Length));
             var localSlots = LocalShopSlots.OrderBy(slot => slot.ShopSlotId).ToArray();
             for (var index = 0; index < localSlots.Length; index++)
             {
@@ -246,7 +260,6 @@ namespace ArknoNights.Player
                 localSlots[index].IsFrozen = false;
             }
 
-            currentShopPage = nextPage;
             gold -= RefreshCost;
             NotifyChanged();
             return Result(LocalMatchOperationCode.Success);
@@ -254,16 +267,14 @@ namespace ArknoNights.Player
 
         public LocalMatchOperationResult RefreshAllShopsAfterBattle()
         {
-            var nextPage = (currentShopPage + 1) % shopPages.Length;
             foreach (var playerId in orderedPlayerIds)
             {
-                var refreshableSlots = playersById[playerId].ShopSlots
+                var player = playersById[playerId];
+                var refreshableSlots = player.ShopSlots
                     .Where(slot => slot.IsEmpty || !slot.IsFrozen)
                     .OrderBy(slot => slot.ShopSlotId)
                     .ToArray();
-                var generatedOffers = refreshableSlots
-                    .Select(slot => shopPages[nextPage][slot.ShopSlotId])
-                    .ToArray();
+                var generatedOffers = GenerateShopOffers(player.Level, refreshableSlots.Length);
                 var sortedOffers = SortShopOffers(generatedOffers);
 
                 for (var index = 0; index < refreshableSlots.Length; index++)
@@ -273,7 +284,6 @@ namespace ArknoNights.Player
                 }
             }
 
-            currentShopPage = nextPage;
             NotifyChanged();
             return Result(LocalMatchOperationCode.Success);
         }
@@ -303,11 +313,11 @@ namespace ArknoNights.Player
 
         public LocalMatchOperationResult TryUpgrade()
         {
-            if (level >= MaximumLevel) return Result(LocalMatchOperationCode.MaximumLevelReached);
-            var cost = UpgradeCosts[level - InitialLevel];
+            if (LocalPlayerData.Level >= MaximumLevel) return Result(LocalMatchOperationCode.MaximumLevelReached);
+            var cost = UpgradeCosts[LocalPlayerData.Level - InitialLevel];
             if (gold < cost) return Result(LocalMatchOperationCode.InsufficientGold);
             gold -= cost;
-            level++;
+            LocalPlayerData.Level++;
             NotifyChanged();
             return Result(LocalMatchOperationCode.Success);
         }
@@ -360,6 +370,21 @@ namespace ArknoNights.Player
             });
         }
 
+        private string[] GenerateShopOffers(int playerLevel, int offerCount)
+        {
+            return ShopOfferGenerator.Generate(
+                playerLevel,
+                offerCount,
+                shopTypeIds,
+                typeId =>
+                {
+                    if (!catalog.TryGet(typeId, out var entry))
+                        throw new InvalidOperationException("Validated shop offer is missing from the unit catalog: " + typeId);
+                    return entry.Rarity;
+                },
+                maximumExclusive => shopRandom.Next(maximumExclusive));
+        }
+
         private LocalMatchOperationResult Result(LocalMatchOperationCode code) => new LocalMatchOperationResult(code, CreateSnapshot());
 
         private void NotifyChanged()
@@ -374,7 +399,7 @@ namespace ArknoNights.Player
             {
                 var local = string.Equals(player.PlayerId, localPlayerId, StringComparison.Ordinal);
                 var slots = player.ShopSlots.Select(slot => new LocalMatchShopSlotSnapshot(slot.ShopSlotId, slot.UnitTypeId, slot.IsFrozen, catalog));
-                return new LocalMatchPlayerSnapshot(player.PlayerId, player.DisplayName, player.AvatarResourcePath, player.Life, player.IsConnected, player.HasExited, player.PlayerState.Snapshot, local ? level : 0, local ? gold : 0, local && isReady, slots);
+                return new LocalMatchPlayerSnapshot(player.PlayerId, player.DisplayName, player.AvatarResourcePath, player.Life, player.IsConnected, player.HasExited, player.PlayerState.Snapshot, local ? player.Level : 0, local ? gold : 0, local && isReady, slots);
             });
             return new LocalMatchSnapshot(localPlayerId, observedPlayerId, version, players);
         }
@@ -437,24 +462,73 @@ namespace ArknoNights.Player
             if (string.IsNullOrWhiteSpace(dto.localPlayerId) || !playerIds.Contains(dto.localPlayerId)) errors.Add(Error("localMatch.localPlayer.invalid", dto.localPlayerId));
             if (dto.initialLevel < LocalMatchState.InitialLevel || dto.initialLevel > LocalMatchState.MaximumLevel) errors.Add(Error("localMatch.initialLevel.invalid", dto.initialLevel.ToString()));
             if (dto.initialGold < 0) errors.Add(Error("localMatch.initialGold.invalid", dto.initialGold.ToString()));
-            var pages = dto.shopPages ?? Array.Empty<LocalMatchShopPageDto>();
-            if (pages.Length != 3) errors.Add(Error("localMatch.shop.pages.invalid", pages.Length.ToString()));
-            var parsedPages = new List<string[]>();
-            foreach (var page in pages)
+            var configuredShopTypeIds = dto.shopTypeIds ?? Array.Empty<string>();
+            var legacyPages = dto.shopPages ?? Array.Empty<LocalMatchShopPageDto>();
+            var parsedShopTypeIds = new List<string>();
+            if (configuredShopTypeIds.Length > 0)
             {
-                var typeIds = page == null ? Array.Empty<string>() : page.typeIds ?? Array.Empty<string>();
-                if (typeIds.Length != LocalMatchState.ShopSlotCount || typeIds.Any(typeId => !catalog.TryGet(typeId, out _))) errors.Add(Error("localMatch.shop.page.invalid", string.Join(",", typeIds)));
-                else parsedPages.Add(typeIds.ToArray());
+                if (legacyPages.Length > 0)
+                    errors.Add(Error("localMatch.shop.source.ambiguous", "shopTypeIds and shopPages cannot both be configured"));
+                if (configuredShopTypeIds.Any(string.IsNullOrWhiteSpace) ||
+                    configuredShopTypeIds.Any(typeId => !catalog.TryGet(typeId, out _)) ||
+                    configuredShopTypeIds.Distinct(StringComparer.Ordinal).Count() != configuredShopTypeIds.Length)
+                    errors.Add(Error("localMatch.shop.pool.invalid", string.Join(",", configuredShopTypeIds)));
+                else
+                    parsedShopTypeIds.AddRange(configuredShopTypeIds);
+            }
+            else
+            {
+                if (legacyPages.Length != 3)
+                    errors.Add(Error("localMatch.shop.pages.invalid", legacyPages.Length.ToString()));
+                foreach (var page in legacyPages)
+                {
+                    var typeIds = page == null ? Array.Empty<string>() : page.typeIds ?? Array.Empty<string>();
+                    if (typeIds.Length != LocalMatchState.ShopSlotCount ||
+                        typeIds.Any(typeId => !catalog.TryGet(typeId, out _)))
+                        errors.Add(Error("localMatch.shop.page.invalid", string.Join(",", typeIds)));
+                    else
+                        parsedShopTypeIds.AddRange(typeIds);
+                }
+
+                parsedShopTypeIds = parsedShopTypeIds
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
             }
 
             if (errors.Count > 0) return new LocalMatchLoadResult(null, new ReadOnlyCollection<LocalMatchValidationError>(errors));
-            return new LocalMatchLoadResult(new LocalMatchState(catalog, dto.localPlayerId, players, parsedPages, dto.initialLevel, dto.initialGold), Array.Empty<LocalMatchValidationError>());
+            if (dto.initialLevel >= LocalMatchState.InitialLevel &&
+                dto.initialLevel <= LocalMatchState.MaximumLevel &&
+                parsedShopTypeIds.Count > 0)
+            {
+                var initialWeights = ShopOfferGenerator.GetRarityWeights(dto.initialLevel);
+                var hasAvailableInitialRarity = parsedShopTypeIds
+                    .Any(typeId =>
+                        catalog.TryGet(typeId, out var entry) &&
+                        entry.Rarity >= 1 &&
+                        entry.Rarity <= initialWeights.Length &&
+                        initialWeights[entry.Rarity - 1] > 0);
+                if (!hasAvailableInitialRarity)
+                    errors.Add(Error("localMatch.shop.pool.unavailable", dto.initialLevel.ToString()));
+            }
+
+            if (errors.Count > 0)
+                return new LocalMatchLoadResult(null, new ReadOnlyCollection<LocalMatchValidationError>(errors));
+            return new LocalMatchLoadResult(
+                new LocalMatchState(
+                    catalog,
+                    dto.localPlayerId,
+                    players,
+                    parsedShopTypeIds,
+                    dto.initialLevel,
+                    dto.initialGold,
+                    dto.shopRandomSeed),
+                Array.Empty<LocalMatchValidationError>());
         }
 
         private static LocalMatchLoadResult Failure(string code, string detail) => new LocalMatchLoadResult(null, new[] { Error(code, detail) });
         private static LocalMatchValidationError Error(string code, string detail) => new LocalMatchValidationError(code, detail ?? string.Empty);
 
-        [Serializable] private sealed class LocalMatchStateDto { public string schemaVersion; public string localPlayerId; public int initialLevel; public int initialGold; public LocalMatchPlayerDto[] players; public LocalMatchShopPageDto[] shopPages; }
+        [Serializable] private sealed class LocalMatchStateDto { public string schemaVersion; public string localPlayerId; public int initialLevel; public int initialGold; public int shopRandomSeed; public LocalMatchPlayerDto[] players; public string[] shopTypeIds; public LocalMatchShopPageDto[] shopPages; }
         [Serializable] private sealed class LocalMatchPlayerDto { public string playerId; public string displayName; public string avatarResourcePath; public int life; public bool isConnected; public bool hasExited; public string playerStateResourcePath; }
         [Serializable] private sealed class LocalMatchShopPageDto { public string[] typeIds; }
     }
@@ -479,6 +553,7 @@ namespace ArknoNights.Player
         public bool IsConnected { get; }
         public bool HasExited { get; }
         public PlayerState PlayerState { get; }
+        public int Level { get; set; }
         public ShopSlotData[] ShopSlots { get; private set; } = Array.Empty<ShopSlotData>();
 
         public void InitializeShop(IEnumerable<string> initialTypeIds)
