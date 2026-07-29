@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "STEAM_TANK_HALF_HEALTH_ACCELERATION",
   "displayNameZhHans": "",
-  "descriptionZhHans": "生命值首次低于50%后，攻击速度+100、移动速度提升100%。",
+  "descriptionZhHans": "生命值首次低于一半时永久提升攻击速度与移动速度。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

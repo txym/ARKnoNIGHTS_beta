@@ -138,7 +138,15 @@ namespace ArknoNights.Battle.Tests
                     new PlayerSnapshot(
                         "home",
                         BattleSide.Home,
-                        new[] { Unit("terminal", "10077", 5, 2) }),
+                        new[]
+                        {
+                            Unit(
+                                "terminal",
+                                "10077",
+                                5,
+                                2,
+                                2)
+                        }),
                     new PlayerSnapshot(
                         "away",
                         BattleSide.Away,
@@ -169,6 +177,7 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(FixedPosition.FromCell(
                     new BattlefieldCoordinate(5, 2))));
             Assert.That(spawn.SpawnSnapshot.ActivationTick, Is.EqualTo(21));
+            Assert.That(spawn.SpawnSnapshot.EliteLevel, Is.EqualTo(2));
             Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.TargetChanged
                 && item.UnitId == spawn.UnitId
@@ -408,14 +417,16 @@ namespace ArknoNights.Battle.Tests
             string id,
             string typeId,
             int x,
-            int y)
+            int y,
+            int eliteLevel = 0)
         {
             return new UnitSnapshot(
                 id,
                 typeId,
                 UnitZone.Deployed,
                 new FormationCoordinate(x, y),
-                Array.Empty<BuffPlaceholder>());
+                Array.Empty<BuffPlaceholder>(),
+                eliteLevel);
         }
 
         private static BattleInput CreateInput(

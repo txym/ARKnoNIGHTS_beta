@@ -123,7 +123,7 @@ namespace ArknoNights.Battle.Presentation
             displayTicks += unscaledDeltaSeconds * PlaybackSpeed * BattleInput.TicksPerSecond;
             if (compiledTrack != null)
             {
-                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack || item.Type == BattleEventType.Skill) && item.Tick > previousTicks && item.Tick <= displayTicks))
+                foreach (var action in events.Where(item => (item.Type == BattleEventType.Spawn || item.Type == BattleEventType.Move || item.Type == BattleEventType.Attack || item.Type == BattleEventType.Skill || item.Type == BattleEventType.PresentationStateChanged) && item.Tick > previousTicks && item.Tick <= displayTicks))
                     if (!trackPlayback.RenderAt(action.Tick, out var actionDiagnostics)) diagnostics.AddRange(actionDiagnostics);
                 if (!trackPlayback.RenderAt(displayTicks, out var trackDiagnostics)) diagnostics.AddRange(trackDiagnostics);
             }
@@ -269,6 +269,26 @@ namespace ArknoNights.Battle.Presentation
                             caster.PositionAt(item.Tick),
                             skillTarget.PositionAt(item.Tick));
                     }
+                    break;
+
+                case BattleEventType.PresentationStateChanged:
+                    if (!TryGetView(
+                            item.UnitId,
+                            item,
+                            out var stateChanged))
+                        return false;
+                    if (string.IsNullOrWhiteSpace(
+                            item.AnimationKey))
+                    {
+                        AddDiagnostic(
+                            "presentationState.contract.invalid",
+                            "Presentation state tag is required.",
+                            item.Tick,
+                            item.Sequence);
+                        return false;
+                    }
+                    stateChanged.View.SetPresentationState(
+                        item.AnimationKey);
                     break;
 
                 case BattleEventType.Damage:

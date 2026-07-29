@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "TRUMPETER_THIRD_ATTACK_CROSS",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "每攻击两次，下一次攻击变为十字范围伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AttackAreaDamageModifier",
+      "shape": "OrthogonalAdjacentCells",
+      "firstTriggerOrdinal": 3,
+      "repeatInterval": 3,
+      "damageType": "Physical",
+      "attackMultiplierPermille": 1000,
+      "radiusMetres": 0
+    }
+  ]
+}

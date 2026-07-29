@@ -19,7 +19,7 @@
                          "sourceVariant":  "10004_trdiam",
                          "statsLevel":  0,
                          "displayNameZhHans":  "浆果磐蟹",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "生命值低于一半时，会吃掉携带的\u003c闪亮果实\u003e，回复自身生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5000,
@@ -83,7 +83,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "BERRY_CRAB_HALF_HEALTH_FULL_HEAL"
                                               ]
                      },
                      {
@@ -91,7 +91,7 @@
                          "sourceVariant":  "10004_trdiam_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "硕果磐蟹",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "生命值低于一半时，会吃掉携带的\u003c闪亮果实\u003e，回复自身生命。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -155,7 +155,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "BERRY_CRAB_HALF_HEALTH_FULL_HEAL"
                                               ]
                      }
                  ]

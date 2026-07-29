@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "RAGING_HOST_LIFE_LOSS_500",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "持续损失生命。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "PassiveLifecycle",
+      "hitPointsPerSecond": -500,
+      "lifetimeTicks": 0
+    }
+  ]
+}

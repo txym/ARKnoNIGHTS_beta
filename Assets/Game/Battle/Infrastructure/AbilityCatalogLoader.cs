@@ -101,26 +101,35 @@ namespace ArknoNights.Battle.Infrastructure
         {
             if (source == null) return null;
             SkillAnimationCatalogBinding skillAnimation = null;
-            var hasSkillAnimation = skillAnimations != null
+            var hasAnimationBinding = skillAnimations != null
                 && skillAnimations.TryGetAbility(
                     source.abilityId,
                     out skillAnimation);
+            var hasSkillAnimation = hasAnimationBinding
+                && !string.IsNullOrWhiteSpace(
+                    skillAnimation.AnimationKey)
+                && skillAnimation.OriginalAnimationTicks > 0;
+            var activationKind =
+                ParseEnum<AbilityActivationKind>(source.activationKind);
             return new AbilityDefinition(
-                source.abilityId,
-                source.displayNameZhHans,
-                source.descriptionZhHans,
-                ParseEnum<AbilityActivationKind>(source.activationKind),
-                ParseEnum<SilencePolicy>(source.silencePolicy),
-                source.initialSkillPoints,
-                source.requiredSkillPoints,
-                ParseEnum<SkillPointGeneration>(source.skillPointGeneration),
-                string.IsNullOrWhiteSpace(source.summonTypeId)
+                abilityId: source.abilityId,
+                displayNameZhHans: source.displayNameZhHans,
+                descriptionZhHans: source.descriptionZhHans,
+                activationKind: activationKind,
+                silencePolicy:
+                    ParseEnum<SilencePolicy>(source.silencePolicy),
+                initialSkillPoints: source.initialSkillPoints,
+                requiredSkillPoints: source.requiredSkillPoints,
+                skillPointGeneration:
+                    ParseEnum<SkillPointGeneration>(
+                        source.skillPointGeneration),
+                summonEffect: string.IsNullOrWhiteSpace(source.summonTypeId)
                     ? null
                     : new SummonEffectDefinition(source.summonTypeId, source.count, source.sideLengthCentimetres, source.inheritPathFromCaster),
-                string.IsNullOrWhiteSpace(source.unitTrait)
+                unitTraitEffect: string.IsNullOrWhiteSpace(source.unitTrait)
                     ? null
                     : new UnitTraitEffectDefinition(ParseEnum<UnitTraitEffectKind>(source.unitTrait)),
-                source.blockCapacityAdditive == 0
+                passiveCombatModifier: source.blockCapacityAdditive == 0
                     && source.magicResistanceAdditive == 0
                     && source.attackSpeedAdditive == 0
                     && source.physicalDamageTakenPermille == 0
@@ -132,11 +141,233 @@ namespace ArknoNights.Battle.Infrastructure
                             source.attackSpeedAdditive,
                             source.physicalDamageTakenPermille,
                             source.magicDamageTakenPermille),
-                source.onHitDefenseReductionPerStack == 0
+                passiveLifecycleEffect:
+                    source.hitPointsPerSecond == 0
+                    && source.lifetimeTicks == 0
+                        ? null
+                        : new PassiveLifecycleEffectDefinition(
+                            source.hitPointsPerSecond,
+                            source.lifetimeTicks),
+                onDamageReactionEffect:
+                    source.onDamageReactionDamageAmount == 0
+                        ? null
+                        : new OnDamageReactionEffectDefinition(
+                            ParseEnum<DamageType>(
+                                source.onDamageReactionDamageType),
+                            source.onDamageReactionDamageAmount),
+                healthThresholdCombatModifier:
+                    source.healthThresholdCombatHitPointsPermille == 0
+                        ? null
+                        : new HealthThresholdCombatModifierDefinition(
+                            source
+                                .healthThresholdCombatHitPointsPermille,
+                            source.healthThresholdCombatInclusive,
+                            source.healthThresholdCombatTriggerOnce,
+                            source.healthThresholdCombatDurationTicks,
+                            source
+                                .healthThresholdCombatAttackMultiplierPermille,
+                            source
+                                .healthThresholdCombatDefenseMultiplierPermille,
+                            source
+                                .healthThresholdCombatBlockCapacityAdditive,
+                            source
+                                .healthThresholdCombatAttackSpeedAdditive,
+                            source
+                                .healthThresholdCombatMoveSpeedMultiplierPermille,
+                            source
+                                .healthThresholdCombatMakesUnblockable,
+                            hasSkillAnimation
+                                ? skillAnimation.AnimationKey
+                                : string.Empty,
+                            hasSkillAnimation
+                                ? skillAnimation.OriginalAnimationTicks
+                                : 0,
+                            source.persistentPresentationStateTag),
+                unblockedDamageTakenModifier:
+                    source.unblockedPhysicalDamageTakenPermille == 0
+                    && source.unblockedMagicDamageTakenPermille == 0
+                        ? null
+                        : new UnblockedDamageTakenModifierDefinition(
+                            source
+                                .unblockedPhysicalDamageTakenPermille,
+                            source
+                                .unblockedMagicDamageTakenPermille),
+                attackSequenceModifier:
+                    source.attackSequenceFirstEnhancedAttackOrdinal == 0
+                        ? null
+                        : new AttackSequenceModifierDefinition(
+                            source
+                                .attackSequenceFirstEnhancedAttackOrdinal,
+                            source.attackSequenceRepeatInterval,
+                            source
+                                .attackSequenceAttackMultiplierPermille),
+                attackCountStateModifier:
+                    source.attackCountTransitionBeforeAttackOrdinal == 0
+                        ? null
+                        : new AttackCountStateModifierDefinition(
+                            source
+                                .attackCountTransitionBeforeAttackOrdinal,
+                            source
+                                .attackCountLockedAttackSpeedAdditive,
+                            source.attackCountLockedDefenseAdditive,
+                            source
+                                .attackCountUnlockedAttackMultiplierPermille,
+                            source
+                                .attackCountUnlockedMagicResistanceAdditive,
+                            source
+                                .attackCountUnlockedHitPointsPerSecond,
+                            source
+                                .attackCountUnlockedTargetDefenseMultiplierPermille,
+                            source.attackCountReleasesAlliedStates,
+                            source.persistentPresentationStateTag),
+                deathSpawnEffect:
+                    source.deathSpawnCount == 0
+                        ? null
+                        : new DeathSpawnEffectDefinition(
+                            (source.deathSpawnOptions
+                             ?? Array.Empty<DeathSpawnOptionDto>())
+                            .Where(item => item != null)
+                            .Select(item =>
+                                new DeathSpawnOptionDefinition(
+                                    item.summonTypeId,
+                                    item.weight)),
+                            source.deathSpawnCount,
+                            source.deathSpawnDelayTicks,
+                            source.deathSpawnSideLengthCentimetres,
+                            source.deathSpawnSnapToNearestPassableCell,
+                            source
+                                .deathSpawnSummonedMoveSpeedMultiplierPermille),
+                auraCombatModifier:
+                    string.IsNullOrWhiteSpace(source.auraTargetSide)
+                        ? null
+                        : new AuraCombatModifierDefinition(
+                            ParseEnum<AuraTargetSide>(
+                                source.auraTargetSide),
+                            source.auraIsGlobal,
+                            source.auraRadiusCentimetres,
+                            source.auraExcludeSource,
+                            source.auraNonStackingByAbilityId,
+                            source.auraAttackMultiplierPermille,
+                            source.auraDefenseAdditive,
+                            source.auraMagicResistanceAdditive,
+                            source.auraAttackSpeedMultiplierPermille,
+                            source.auraMoveSpeedMultiplierPermille,
+                            source.auraHitPointsPerSecond,
+                            source.auraGrantedStatusTag),
+                blockedCounterpartCombatModifier:
+                    source
+                        .blockedCounterpartAttackSpeedMultiplierPermille
+                    == 0
+                        ? null
+                        : new BlockedCounterpartCombatModifierDefinition(
+                            source
+                                .blockedCounterpartNonStackingByAbilityId,
+                            source
+                                .blockedCounterpartAttackSpeedMultiplierPermille),
+                nearbySameTypeSelfModifier:
+                    source.nearbySameTypeRadiusCentimetres == 0
+                        ? null
+                        : new NearbySameTypeSelfModifierDefinition(
+                            source.nearbySameTypeRadiusCentimetres,
+                            source.nearbySameTypeDefenseAdditive),
+                evasionModifier:
+                    source.evasionPhysicalChancePermille == 0
+                    && source.evasionMagicChancePermille == 0
+                        ? null
+                        : new EvasionModifierDefinition(
+                            source.evasionPhysicalChancePermille,
+                            source.evasionMagicChancePermille),
+                deathAreaDamageEffect:
+                    source.deathAreaRadiusCentimetres == 0
+                        ? null
+                        : new DeathAreaDamageEffectDefinition(
+                            ParseEnum<DamageType>(
+                                source.deathAreaDamageType),
+                            source.deathAreaAttackMultiplierPermille,
+                            source.deathAreaRadiusCentimetres,
+                            source.deathAreaDelayTicks),
+                attackAreaDamageModifier:
+                    source.attackAreaFirstAttackOrdinal == 0
+                        ? null
+                        : new AttackAreaDamageModifierDefinition(
+                            ParseEnum<AttackAreaShape>(
+                                source.attackAreaShape),
+                            source.attackAreaFirstAttackOrdinal,
+                            source.attackAreaRepeatInterval,
+                            ParseEnum<DamageType>(
+                                source.attackAreaDamageType),
+                            source.attackAreaAttackMultiplierPermille,
+                            source.attackAreaRadiusCentimetres),
+                onHitDamageOverTimeEffect: null,
+                unblockedAttackCharge:
+                    source.unblockedAttackChargeCheckIntervalTicks == 0
+                        ? null
+                        : new UnblockedAttackChargeDefinition(
+                            source
+                                .unblockedAttackChargeCheckIntervalTicks,
+                            source
+                                .unblockedAttackChargeAttackAdditivePerStack,
+                            source.unblockedAttackChargeMaxStacks),
+                triggeredSpawnEffect:
+                    string.IsNullOrWhiteSpace(source.triggeredSpawnKind)
+                        ? null
+                        : new TriggeredSpawnEffectDefinition(
+                            ParseEnum<TriggeredSpawnKind>(
+                                source.triggeredSpawnKind),
+                            source.triggeredSpawnFirstTriggerOrdinal,
+                            source.triggeredSpawnRepeatInterval,
+                            source.triggeredSpawnSummonTypeId,
+                            source.triggeredSpawnSideLengthCentimetres,
+                            source.triggeredSpawnMaxActiveSameType,
+                            hasSkillAnimation
+                                ? skillAnimation.AnimationKey
+                                : string.Empty,
+                            hasSkillAnimation
+                                ? skillAnimation.OriginalAnimationTicks
+                                : 0),
+                healthThresholdAdjacentSpawnEffect:
+                    source
+                        .healthThresholdAdjacentSpawnHitPointsPermille
+                    == 0
+                        ? null
+                        : new HealthThresholdAdjacentSpawnEffectDefinition(
+                            source
+                                .healthThresholdAdjacentSpawnHitPointsPermille,
+                            source
+                                .healthThresholdAdjacentSpawnInclusive,
+                            source
+                                .healthThresholdAdjacentSpawnTypeId),
+                healthThresholdFullHealEffect:
+                    source.healthThresholdFullHealHitPointsPermille == 0
+                        ? null
+                        : new HealthThresholdFullHealEffectDefinition(
+                            source
+                                .healthThresholdFullHealHitPointsPermille,
+                            source.healthThresholdFullHealInclusive,
+                            hasSkillAnimation
+                                ? skillAnimation.AnimationKey
+                                : string.Empty,
+                            hasSkillAnimation
+                                ? skillAnimation.OriginalAnimationTicks
+                                : 0,
+                            source.persistentPresentationStateTag),
+                onHitDefenseDebuffEffect:
+                    source.onHitDefenseReductionPerStack == 0
                     ? null
                     : new OnHitDefenseDebuffEffectDefinition(
                         source.onHitDefenseReductionPerStack),
-                source.targetRangeCentimetres == 0
+                animationKey:
+                    hasSkillAnimation
+                    && activationKind == AbilityActivationKind.Timed
+                        ? skillAnimation.AnimationKey
+                        : string.Empty,
+                skillAnimationOriginalDurationTicks:
+                    hasSkillAnimation
+                    && activationKind == AbilityActivationKind.Timed
+                        ? skillAnimation.OriginalAnimationTicks
+                        : 0,
+                timedTargetAreaDamageEffect:
+                    source.targetRangeCentimetres == 0
                     ? null
                     : new TimedTargetAreaDamageEffectDefinition(
                         source.targetRangeCentimetres,
@@ -144,7 +375,8 @@ namespace ArknoNights.Battle.Infrastructure
                         ParseEnum<DamageType>(source.areaDamageType),
                         source.areaAttackMultiplierPermille,
                         source.groundTargetsOnly),
-                source.attackDashFirstTriggerOrdinal == 0
+                attackDashEffect:
+                    source.attackDashFirstTriggerOrdinal == 0
                     ? null
                     : new AttackDashEffectDefinition(
                         source.attackDashFirstTriggerOrdinal,
@@ -165,19 +397,8 @@ namespace ArknoNights.Battle.Infrastructure
                         hasSkillAnimation
                             ? skillAnimation.OriginalAnimationTicks
                             : 0),
-                hasSkillAnimation
-                && ParseEnum<AbilityActivationKind>(
-                    source.activationKind)
-                == AbilityActivationKind.Timed
-                    ? skillAnimation.AnimationKey
-                    : string.Empty,
-                hasSkillAnimation
-                && ParseEnum<AbilityActivationKind>(
-                    source.activationKind)
-                == AbilityActivationKind.Timed
-                    ? skillAnimation.OriginalAnimationTicks
-                    : 0,
-                source.timedBlinkDistanceCentimetres == 0
+                timedBlinkEffect:
+                    source.timedBlinkDistanceCentimetres == 0
                     ? null
                     : new TimedBlinkEffectDefinition(
                         source.timedBlinkDistanceCentimetres,
@@ -187,9 +408,10 @@ namespace ArknoNights.Battle.Infrastructure
                             ? (skillAnimation
                                    .SegmentOriginalAnimationTicks[0]
                                + 1)
-                              / 2
+                               / 2
                             : 0),
-                source.proximityEntryRadiusCentimetres == 0
+                proximityEntryDamageEffect:
+                    source.proximityEntryRadiusCentimetres == 0
                     ? null
                     : new ProximityEntryDamageEffectDefinition(
                         source.proximityEntryRadiusCentimetres,
@@ -199,56 +421,52 @@ namespace ArknoNights.Battle.Infrastructure
                             .proximityEntryAttackMultiplierPermille,
                         source
                             .proximityEntryGroundTargetsOnly),
-                string.IsNullOrWhiteSpace(source.triggeredSpawnKind)
+                requiredStatusTagCombatModifier:
+                    string.IsNullOrWhiteSpace(
+                        source.requiredStatusTag)
                     ? null
-                    : new TriggeredSpawnEffectDefinition(
-                        ParseEnum<TriggeredSpawnKind>(
-                            source.triggeredSpawnKind),
-                        source.triggeredSpawnFirstTriggerOrdinal,
-                        source.triggeredSpawnRepeatInterval,
-                        source.triggeredSpawnSummonTypeId,
-                        source.triggeredSpawnSideLengthCentimetres,
-                        source.triggeredSpawnMaxActiveSameType,
-                        hasSkillAnimation
-                            ? skillAnimation.AnimationKey
-                            : string.Empty,
-                        hasSkillAnimation
-                            ? skillAnimation.OriginalAnimationTicks
-                            : 0),
-                source.healthThresholdCombatHitPointsPermille == 0
-                    ? null
-                    : new HealthThresholdCombatModifierDefinition(
+                    : new RequiredStatusTagCombatModifierDefinition(
+                        source.requiredStatusTag,
                         source
-                            .healthThresholdCombatHitPointsPermille,
-                        source.healthThresholdCombatInclusive,
-                        source.healthThresholdCombatTriggerOnce,
-                        source.healthThresholdCombatDurationTicks,
+                            .requiredStatusTagAttackMultiplierPermille,
                         source
-                            .healthThresholdCombatAttackMultiplierPermille,
-                        source
-                            .healthThresholdCombatDefenseMultiplierPermille,
-                        source
-                            .healthThresholdCombatBlockCapacityAdditive,
-                        source
-                            .healthThresholdCombatAttackSpeedAdditive,
-                        source
-                            .healthThresholdCombatMoveSpeedMultiplierPermille,
-                        source
-                            .healthThresholdCombatMakesUnblockable),
-                source.healthThresholdAdjacentSpawnHitPointsPermille == 0
-                    ? null
-                    : new HealthThresholdAdjacentSpawnEffectDefinition(
-                        source
-                            .healthThresholdAdjacentSpawnHitPointsPermille,
-                        source
-                            .healthThresholdAdjacentSpawnInclusive,
-                        source.healthThresholdAdjacentSpawnTypeId));
+                            .requiredStatusTagMoveSpeedMultiplierPermille));
         }
 
         private static T ParseEnum<T>(string value) where T : struct => Enum.TryParse(value, true, out T parsed) && Enum.IsDefined(typeof(T), parsed) ? parsed : (T)Enum.ToObject(typeof(T), -1);
         private static AbilityCatalogLoadResult Failure(string code, string message) => new AbilityCatalogLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class AbilityCatalogDto { public string schemaVersion; public string catalogId; public AbilityDto[] abilities; }
-        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable; public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId; }
+        [Serializable] private sealed class AbilityDto
+        {
+            public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration;
+            public string persistentPresentationStateTag;
+            public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster;
+            public string unitTrait; public int onHitDefenseReductionPerStack;
+            public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille;
+            public int hitPointsPerSecond; public int lifetimeTicks;
+            public string onDamageReactionDamageType; public int onDamageReactionDamageAmount;
+            public int unblockedPhysicalDamageTakenPermille; public int unblockedMagicDamageTakenPermille;
+            public int attackSequenceFirstEnhancedAttackOrdinal; public int attackSequenceRepeatInterval; public int attackSequenceAttackMultiplierPermille;
+            public int attackCountTransitionBeforeAttackOrdinal; public int attackCountLockedAttackSpeedAdditive; public int attackCountLockedDefenseAdditive; public int attackCountUnlockedAttackMultiplierPermille; public int attackCountUnlockedMagicResistanceAdditive; public int attackCountUnlockedHitPointsPerSecond; public int attackCountUnlockedTargetDefenseMultiplierPermille; public bool attackCountReleasesAlliedStates;
+            public DeathSpawnOptionDto[] deathSpawnOptions; public int deathSpawnCount; public int deathSpawnDelayTicks; public int deathSpawnSideLengthCentimetres; public bool deathSpawnSnapToNearestPassableCell; public int deathSpawnSummonedMoveSpeedMultiplierPermille;
+            public string auraTargetSide; public bool auraIsGlobal; public int auraRadiusCentimetres; public bool auraExcludeSource; public bool auraNonStackingByAbilityId; public int auraAttackMultiplierPermille; public int auraDefenseAdditive; public int auraMagicResistanceAdditive; public int auraAttackSpeedMultiplierPermille; public int auraMoveSpeedMultiplierPermille; public int auraHitPointsPerSecond; public string auraGrantedStatusTag;
+            public bool blockedCounterpartNonStackingByAbilityId; public int blockedCounterpartAttackSpeedMultiplierPermille;
+            public int nearbySameTypeRadiusCentimetres; public int nearbySameTypeDefenseAdditive;
+            public int evasionPhysicalChancePermille; public int evasionMagicChancePermille;
+            public string deathAreaDamageType; public int deathAreaAttackMultiplierPermille; public int deathAreaRadiusCentimetres; public int deathAreaDelayTicks;
+            public string attackAreaShape; public int attackAreaFirstAttackOrdinal; public int attackAreaRepeatInterval; public string attackAreaDamageType; public int attackAreaAttackMultiplierPermille; public int attackAreaRadiusCentimetres;
+            public int unblockedAttackChargeCheckIntervalTicks; public int unblockedAttackChargeAttackAdditivePerStack; public int unblockedAttackChargeMaxStacks;
+            public int healthThresholdFullHealHitPointsPermille; public bool healthThresholdFullHealInclusive;
+            public string requiredStatusTag; public int requiredStatusTagAttackMultiplierPermille; public int requiredStatusTagMoveSpeedMultiplierPermille;
+            public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly;
+            public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks;
+            public int timedBlinkDistanceCentimetres;
+            public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly;
+            public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType;
+            public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable;
+            public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId;
+        }
+        [Serializable] private sealed class DeathSpawnOptionDto { public string summonTypeId; public int weight; }
     }
 }

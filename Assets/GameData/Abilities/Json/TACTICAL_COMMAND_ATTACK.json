@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "TACTICAL_COMMAND_ATTACK",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "受到<战术命令>强化时，攻击力提升。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "RequiredStatusTagCombatModifier",
+      "requiredStatusTag": "TacticalCommand",
+      "attackMultiplierPermille": 1500,
+      "moveSpeedMultiplierPermille": 1000
+    }
+  ]
+}

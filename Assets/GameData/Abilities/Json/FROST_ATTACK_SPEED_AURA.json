@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "FROST_ATTACK_SPEED_AURA",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "周围的敌方单位的攻击速度大幅度降低。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AuraCombatModifier",
+      "targetSide": "Enemies",
+      "isGlobal": false,
+      "radiusMetres": 2.5,
+      "excludeSource": false,
+      "nonStackingByAbilityId": true,
+      "attackMultiplierPermille": 1000,
+      "defenseAdditive": 0,
+      "magicResistanceAdditive": 0,
+      "attackSpeedMultiplierPermille": 500,
+      "moveSpeedMultiplierPermille": 1000,
+      "hitPointsPerSecond": 0
+    }
+  ]
+}

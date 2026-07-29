@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION",
   "displayNameZhHans": "",
-  "descriptionZhHans": "生命值首次低于100%后，攻击速度+100、移动速度提升100%，持续15秒。",
+  "descriptionZhHans": "首次受伤后短时间提升攻击速度与移动速度。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

@@ -19,7 +19,7 @@
                          "sourceVariant":  "1095_ccripr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "提亚卡乌好战者",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "攻击会永久降低目标防御力。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5500,
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1095_ccripr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "提亚卡乌撕裂者",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "攻击会永久降低目标防御力。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7500,

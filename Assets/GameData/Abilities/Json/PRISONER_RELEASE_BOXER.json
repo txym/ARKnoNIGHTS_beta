@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "PRISONER_RELEASE_BOXER",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "初始处于禁锢状态，禁锢状态下攻击速度降低，攻击数次后解放，解放后提升攻击力，并无视目标部分防御力。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "persistentPresentationStateTag": "red",
+  "effects": [
+    {
+      "kind": "AttackCountStateModifier",
+      "transitionBeforeAttackOrdinal": 4,
+      "lockedAttackSpeedAdditive": -50,
+      "lockedDefenseAdditive": 0,
+      "unlockedAttackMultiplierPermille": 1500,
+      "unlockedMagicResistanceAdditive": 0,
+      "unlockedHitPointsPerSecond": 0,
+      "unlockedTargetDefenseMultiplierPermille": 400,
+      "releasesAlliedAttackCountStates": false
+    }
+  ]
+}

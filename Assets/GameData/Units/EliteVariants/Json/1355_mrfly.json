@@ -19,7 +19,7 @@
                          "sourceVariant":  "1355_mrfly",
                          "statsLevel":  0,
                          "displayNameZhHans":  "护障",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "为周围友方单位持续提供法术抗性。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -53,7 +53,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "UNTARGETABLE_BY_MELEE"
+                                                  "UNTARGETABLE_BY_MELEE",
+                                                  "DRONE_MAGIC_RESISTANCE_AURA_30"
                                               ]
                      },
                      {
@@ -61,7 +62,7 @@
                          "sourceVariant":  "1355_mrfly_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "护障·P",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "为周围友方单位持续提供法术抗性。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  10000,
@@ -95,7 +96,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "UNTARGETABLE_BY_MELEE"
+                                                  "UNTARGETABLE_BY_MELEE",
+                                                  "DRONE_MAGIC_RESISTANCE_AURA_30"
                                               ]
                      }
                  ]

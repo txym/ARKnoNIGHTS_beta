@@ -234,7 +234,10 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.HealthThresholdCombatModifier.BlockCapacityAdditive).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.AttackSpeedAdditive).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille).Append(',')
-                        .Append(ability.HealthThresholdCombatModifier.MakesUnblockable ? 1 : 0);
+                        .Append(ability.HealthThresholdCombatModifier.MakesUnblockable ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.TransitionAnimationKey).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.CompletedPresentationStateTag);
                 if (ability.UnblockedDamageTakenModifier != null)
                     builder.Append("|U:")
                         .Append(ability.UnblockedDamageTakenModifier.PhysicalDamageTakenPermille).Append(',')
@@ -253,7 +256,8 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.AttackCountStateModifier.UnlockedMagicResistanceAdditive).Append(',')
                         .Append(ability.AttackCountStateModifier.UnlockedHitPointsPerSecond).Append(',')
                         .Append(ability.AttackCountStateModifier.UnlockedTargetDefenseMultiplierPermille).Append(',')
-                        .Append(ability.AttackCountStateModifier.ReleasesAlliedAttackCountStates ? 1 : 0);
+                        .Append(ability.AttackCountStateModifier.ReleasesAlliedAttackCountStates ? 1 : 0).Append(',')
+                        .Append(ability.AttackCountStateModifier.UnlockedPresentationStateTag);
                 if (ability.DeathSpawnEffect != null)
                 {
                     builder.Append("|X:")
@@ -285,7 +289,13 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.AuraCombatModifier.MagicResistanceAdditive).Append(',')
                         .Append(ability.AuraCombatModifier.AttackSpeedMultiplierPermille).Append(',')
                         .Append(ability.AuraCombatModifier.MoveSpeedMultiplierPermille).Append(',')
-                        .Append(ability.AuraCombatModifier.HitPointsPerSecond);
+                        .Append(ability.AuraCombatModifier.HitPointsPerSecond).Append(',')
+                        .Append(ability.AuraCombatModifier.GrantedStatusTag);
+                if (ability.RequiredStatusTagCombatModifier != null)
+                    builder.Append("|RT:")
+                        .Append(ability.RequiredStatusTagCombatModifier.RequiredStatusTag).Append(',')
+                        .Append(ability.RequiredStatusTagCombatModifier.AttackMultiplierPermille).Append(',')
+                        .Append(ability.RequiredStatusTagCombatModifier.MoveSpeedMultiplierPermille);
                 if (ability.BlockedCounterpartCombatModifier != null)
                     builder.Append("|J:")
                         .Append(ability.BlockedCounterpartCombatModifier.NonStackingByAbilityId ? 1 : 0).Append(',')
@@ -349,7 +359,8 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.HealthThresholdFullHealEffect.ThresholdHitPointsPermille).Append(',')
                         .Append(ability.HealthThresholdFullHealEffect.InclusiveThreshold ? 1 : 0).Append(',')
                         .Append(ability.HealthThresholdFullHealEffect.AnimationKey).Append(',')
-                        .Append(ability.HealthThresholdFullHealEffect.AnimationOriginalDurationTicks);
+                        .Append(ability.HealthThresholdFullHealEffect.AnimationOriginalDurationTicks).Append(',')
+                        .Append(ability.HealthThresholdFullHealEffect.CompletedPresentationStateTag);
                 if (ability.OnHitDefenseDebuffEffect != null)
                     builder.Append("|W:")
                         .Append(ability.OnHitDefenseDebuffEffect
@@ -555,9 +566,10 @@ namespace ArknoNights.Battle.Core
                         + (ability.HealthThresholdAdjacentSpawnEffect == null ? 0 : 1)
                         + (ability.HealthThresholdFullHealEffect == null ? 0 : 1)
                         + (ability.OnHitDefenseDebuffEffect == null ? 0 : 1)
-                        + (ability.AttackDashEffect == null ? 0 : 1)
-                        + (ability.TimedBlinkEffect == null ? 0 : 1)
-                        + (ability.ProximityEntryDamageEffect == null ? 0 : 1);
+                         + (ability.AttackDashEffect == null ? 0 : 1)
+                         + (ability.TimedBlinkEffect == null ? 0 : 1)
+                         + (ability.ProximityEntryDamageEffect == null ? 0 : 1)
+                         + (ability.RequiredStatusTagCombatModifier == null ? 0 : 1);
                     if (passiveEffectCount != 1)
                         validationErrors.Add(new ValidationError("ability.passive.effect.invalid", "Passive ability requires exactly one supported effect: " + ability.AbilityId));
                     if (ability.UnitTraitEffect != null && !Enum.IsDefined(typeof(UnitTraitEffectKind), ability.UnitTraitEffect.Kind))
@@ -594,7 +606,14 @@ namespace ArknoNights.Battle.Core
                             || ability.HealthThresholdCombatModifier.DefenseMultiplierPermille <= 0
                             || ability.HealthThresholdCombatModifier.BlockCapacityAdditive < 0
                             || ability.HealthThresholdCombatModifier.AttackSpeedAdditive <= -100
-                            || ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille <= 0))
+                            || ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille <= 0
+                            || (ability.HealthThresholdCombatModifier.UsesTransitionAnimation
+                                && ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks <= 0)
+                            || (!ability.HealthThresholdCombatModifier.UsesTransitionAnimation
+                                && ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks != 0)
+                            || (!string.IsNullOrWhiteSpace(
+                                    ability.HealthThresholdCombatModifier.CompletedPresentationStateTag)
+                                && !ability.HealthThresholdCombatModifier.UsesTransitionAnimation)))
                         validationErrors.Add(new ValidationError("ability.healthThreshold.invalid", "Health-threshold combat modifier is invalid: " + ability.AbilityId));
                     if (ability.UnblockedDamageTakenModifier != null
                         && (ability.UnblockedDamageTakenModifier.IsNeutral
@@ -661,6 +680,16 @@ namespace ArknoNights.Battle.Core
                             || ability.AuraCombatModifier.AttackSpeedMultiplierPermille <= 0
                             || ability.AuraCombatModifier.MoveSpeedMultiplierPermille <= 0))
                         validationErrors.Add(new ValidationError("ability.aura.invalid", "Aura combat modifier is invalid: " + ability.AbilityId));
+                    if (ability.RequiredStatusTagCombatModifier != null
+                        && (ability.RequiredStatusTagCombatModifier.IsNeutral
+                            || string.IsNullOrWhiteSpace(
+                                ability.RequiredStatusTagCombatModifier
+                                    .RequiredStatusTag)
+                            || ability.RequiredStatusTagCombatModifier
+                                .AttackMultiplierPermille <= 0
+                            || ability.RequiredStatusTagCombatModifier
+                                .MoveSpeedMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.requiredStatusTag.invalid", "Required-status-tag combat modifier is invalid: " + ability.AbilityId));
                     if (ability.BlockedCounterpartCombatModifier != null
                         && ability.BlockedCounterpartCombatModifier.AttackSpeedMultiplierPermille <= 0)
                         validationErrors.Add(new ValidationError("ability.blockedCounterpart.invalid", "Blocked-counterpart modifier is invalid: " + ability.AbilityId));

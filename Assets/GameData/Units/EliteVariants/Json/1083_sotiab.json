@@ -19,7 +19,7 @@
                          "sourceVariant":  "1083_sotiab",
                          "statsLevel":  0,
                          "displayNameZhHans":  "游击队突袭战士",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到\u003c战术命令\u003e强化时，攻击力提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3800,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TACTICAL_COMMAND_ATTACK"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1083_sotiab_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "游击队突袭战士组长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到\u003c战术命令\u003e强化时，攻击力提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TACTICAL_COMMAND_ATTACK"
                                               ]
                      }
                  ]

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "ANVIL_SUPPORT_AURA",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "到达部署位置后，为周围其他友方单位持续提供防御力与生命回复。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AuraCombatModifier",
+      "targetSide": "Allies",
+      "isGlobal": false,
+      "radiusMetres": 2.5,
+      "excludeSource": true,
+      "nonStackingByAbilityId": true,
+      "attackMultiplierPermille": 1000,
+      "defenseAdditive": 200,
+      "magicResistanceAdditive": 0,
+      "attackSpeedMultiplierPermille": 1000,
+      "moveSpeedMultiplierPermille": 1000,
+      "hitPointsPerSecond": 400
+    }
+  ]
+}

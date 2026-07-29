@@ -19,7 +19,7 @@
                          "sourceVariant":  "1132_sarchn",
                          "statsLevel":  0,
                          "displayNameZhHans":  "变异岩蛛",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "死亡时分裂三个\u003c畸变赘生物\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  2500,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MUTANT_ROCKSPIDER_DEATH_SPAWN"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1132_sarchn_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "变异岩蛛α",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "死亡时分裂两个\u003c畸变恶性瘤\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3500,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO"
                                               ]
                      }
                  ]

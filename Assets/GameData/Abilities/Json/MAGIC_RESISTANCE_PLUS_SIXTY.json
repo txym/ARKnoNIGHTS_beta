@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "MAGIC_RESISTANCE_PLUS_SIXTY",
   "displayNameZhHans": "",
-  "descriptionZhHans": "法术抗性+60。",
+  "descriptionZhHans": "法术抗性提升。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

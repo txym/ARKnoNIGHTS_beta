@@ -64,12 +64,23 @@ public static class SkillAnimationCatalogGenerator
                             ability.animationKey)
                             ? Array.Empty<string>()
                             : new[] { ability.animationKey };
-                if (animationKeys.Length == 0)
+                var presentationStateTag =
+                    ability.persistentPresentationStateTag
+                    ?? string.Empty;
+                if (animationKeys.Length == 0
+                    && string.IsNullOrWhiteSpace(
+                        presentationStateTag))
                     continue;
-                if (animationKeys.Any(
+                if ((animationKeys.Length > 0
+                     && (animationKeys.Any(
                         string.IsNullOrWhiteSpace)
                     || animationKeys.Any(key =>
-                        key.Contains("|"))
+                        key.Contains("|"))))
+                    || (!string.IsNullOrEmpty(
+                            presentationStateTag)
+                        && (string.IsNullOrWhiteSpace(
+                                presentationStateTag)
+                            || presentationStateTag.Contains("|")))
                     || (!string.Equals(
                             ability.activationKind,
                             "Timed",
@@ -87,8 +98,8 @@ public static class SkillAnimationCatalogGenerator
                         + abilityId);
 
                 var animations = animationKeys
-                    .Select(unit.FindAnimation)
-                    .ToArray();
+                        .Select(unit.FindAnimation)
+                        .ToArray();
                 if (animations.Any(animation =>
                         animation == null
                         || string.IsNullOrWhiteSpace(
@@ -102,6 +113,43 @@ public static class SkillAnimationCatalogGenerator
                         + abilityId
                         + " animationKey="
                         + string.Join("|", animationKeys));
+                var stateIdle = string.IsNullOrWhiteSpace(
+                        presentationStateTag)
+                    ? null
+                    : unit.FindAnimation(
+                        "idle." + presentationStateTag);
+                var stateMove = string.IsNullOrWhiteSpace(
+                        presentationStateTag)
+                    ? null
+                    : unit.FindAnimation(
+                        "move." + presentationStateTag);
+                var stateAttack = string.IsNullOrWhiteSpace(
+                        presentationStateTag)
+                    ? null
+                    : unit.FindAnimation(
+                        "attack." + presentationStateTag);
+                var stateDeath = string.IsNullOrWhiteSpace(
+                        presentationStateTag)
+                    ? null
+                    : unit.FindAnimation(
+                        "death." + presentationStateTag);
+                if (!string.IsNullOrWhiteSpace(
+                        presentationStateTag)
+                    && (stateIdle == null
+                        || stateMove == null
+                        || stateAttack == null
+                        || stateDeath == null
+                        || string.IsNullOrWhiteSpace(stateIdle.name)
+                        || string.IsNullOrWhiteSpace(stateMove.name)
+                        || string.IsNullOrWhiteSpace(stateAttack.name)
+                        || string.IsNullOrWhiteSpace(stateDeath.name)))
+                    throw new InvalidOperationException(
+                        "SKILL_ANIMATION_PRESENTATION_STATE_INVALID typeId="
+                        + unit.typeId
+                        + " abilityId="
+                        + abilityId
+                        + " state="
+                        + presentationStateTag);
                 bindings.Add(new SkillAnimationCatalogEntry
                 {
                     typeId = unit.typeId.ToString(
@@ -114,16 +162,33 @@ public static class SkillAnimationCatalogGenerator
                         "|",
                         animations.Select(item =>
                             item.name)),
-                    originalAnimationTicks = Mathf.CeilToInt(
-                        animations.Sum(item =>
-                            item.durationSeconds)
-                        * TicksPerSecond),
+                    originalAnimationTicks =
+                        animations.Length == 0
+                            ? 0
+                            : Mathf.CeilToInt(
+                                animations.Sum(item =>
+                                    item.durationSeconds)
+                                * TicksPerSecond),
                     segmentOriginalAnimationTicks =
                         animations.Select(item =>
                                 Mathf.CeilToInt(
                                     item.durationSeconds
                                     * TicksPerSecond))
-                            .ToArray()
+                            .ToArray(),
+                    presentationStateTag =
+                        presentationStateTag,
+                    stateIdleAnimation = stateIdle == null
+                        ? string.Empty
+                        : stateIdle.name,
+                    stateMoveAnimation = stateMove == null
+                        ? string.Empty
+                        : stateMove.name,
+                    stateAttackAnimation = stateAttack == null
+                        ? string.Empty
+                        : stateAttack.name,
+                    stateDeathAnimation = stateDeath == null
+                        ? string.Empty
+                        : stateDeath.name
                 });
             }
         }
@@ -226,6 +291,11 @@ public static class SkillAnimationCatalogGenerator
         public string animationName;
         public int originalAnimationTicks;
         public int[] segmentOriginalAnimationTicks;
+        public string presentationStateTag;
+        public string stateIdleAnimation;
+        public string stateMoveAnimation;
+        public string stateAttackAnimation;
+        public string stateDeathAnimation;
     }
 
     [Serializable]
@@ -236,5 +306,6 @@ public static class SkillAnimationCatalogGenerator
         public string activationKind;
         public string animationKey;
         public string[] animationKeys;
+        public string persistentPresentationStateTag;
     }
 }

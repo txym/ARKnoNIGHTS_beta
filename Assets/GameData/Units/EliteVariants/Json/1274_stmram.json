@@ -19,7 +19,7 @@
                          "sourceVariant":  "1274_stmram",
                          "statsLevel":  0,
                          "displayNameZhHans":  "蒸汽战车",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "生命值首次低于一半时永久提升攻击速度与移动速度。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  10000,
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1274_stmram_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "极温蒸汽战车",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "生命值首次低于一半时永久提升攻击速度与移动速度。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  13500,

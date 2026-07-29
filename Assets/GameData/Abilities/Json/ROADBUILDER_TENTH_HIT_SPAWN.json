@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "ROADBUILDER_TENTH_HIT_SPAWN",
   "displayNameZhHans": "",
-  "descriptionZhHans": "每受到10次伤害，若场上友方塑路者分形少于8只，则于自身周围召唤1只塑路者分形。",
+  "descriptionZhHans": "每受到十次伤害时，召唤一个<塑路者分形>。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

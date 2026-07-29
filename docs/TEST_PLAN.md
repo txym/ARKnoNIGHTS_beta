@@ -477,7 +477,7 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 
 ### BONDS 特殊索敌、冲门与单场生命损失（2026-07-29）
 
-- `BondsTargetingEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖 `Untargetable`、`UntargetableByMelee` 的攻击方式差异、非攻击单位、零阻挡、无合法目标冲门、边长 `0.8m` 门区、`GateReached`、`lifeDeduct`、较少扣血方胜出，以及退出 Tick 的 Presentation Track 隐藏。
+- `BondsTargetingEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖 `Untargetable`、历史能力 ID `UntargetableByMelee` 均排除近战与远程索敌、非攻击单位、零阻挡、无合法目标冲门、边长 `0.8m` 门区、`GateReached`、`lifeDeduct`、较少扣血方胜出，以及退出 Tick 的 Presentation Track 隐藏。
 - `UnitSourceConsumerEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖被动单位特征的能力目录隔离投影，以及 `1017/1042/1146/1355` 全部 v2 变体对 `UNTARGETABLE_BY_MELEE` 的显式引用。
 - `BattleCoreEditModeTests`：第一次完整回归 `57` 项中发现 `2` 项失败；根因是目标死亡时错误删除待结算攻击并提前解除攻击动画锁。修正为仅清理失效攻击者、目标死亡或冲门只在到期 Tick 取消伤害后，最终完整回归 `57/57` 通过，`failed=0`、`skipped=0`。
 - 额外静态构建：`dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error；警告来自既有 Unity 程序集版本冲突与测试反序列化 DTO 未直接赋值。
@@ -552,6 +552,13 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 数据消费者验证 `1025` 精英 0/2 分别引用 `2000/2800` 攻击倍率的半血持续能力；`1232` 两变体引用严格半血以下、防御 `4000/1000`、阻挡 `+1`；`1264` 两变体引用严格低于满血、一次触发、持续 `300 Tick`、攻速 `+100`、移速 `2000/1000`；`1274` 两变体引用严格半血以下、一次触发、永久加速。
 - 既有 Core 回归覆盖持续阈值随治疗撤销、首次触发限时状态精确到期、永久状态、攻防/阻挡/攻速/移速组合，以及阻挡容量下降时的稳定关系裁剪。
 - Editor 与 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
+### BONDS 全部单位能力与永久表现状态收口（2026-07-29）
+
+- 描述同步后的最终代码定向 EditMode 筛选 BONDS 五组聚焦套件及 `BattlePresentationEditModeTests;BattlePresentationTrackEditModeTests`，结果为 `169/169` 通过、失败 `0`、跳过 `0`、不确定 `0`、未运行 `0`，Unity 正常退出；XML 位于 `Artifacts/BondsAbilities/FinalDescriptions/EditModeResults.xml`。
+- 其中 `BondsTargeting=7`、`BondsPassiveCombatModifier=45`、`BondsSkillAnimation=5`、`UnitSourceConsumer=17`、`BattleCore=59`、`BattlePresentation=23`、`BattlePresentationTrack=13`；覆盖战术命令标签及条件增益、无人机光环、生命周期、死亡后继、囚犯第四击解放、首领群体解放、半血 Skill 排队、二倍速向上取整、永久表现状态、时间轴/回放回归及能力/动画目录投影。`1146` 另覆盖 `250cm` 半径、基础与精英 2 增量光环数值、排除自身、同能力不叠加以及两个精英变体生产接线。静态 `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:q -clp:ErrorsOnly` 为 `0` error（保留既有 `118` 个警告）。
+- 用户确认 `1089` 无需独立地面/空中标签，因为无人机已由公共目标资格从全部索敌与伤害候选排除；`1146` 光环半径确认为 `2.5格`。`BONDS_IMPLEMENTATION.md` 的 `59/59` 条目现均为已实现。未运行 PlayMode 真实 Spine 动画、Windows Player 构建或人工动画检查；冻结 v1 目录未重新生成。
+- 能力描述同步检查使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Sync-BondsUnitDescriptions.ps1 -Check`。检查要求实现台账恰有 `59` 条非空描述，并逐变体匹配生产 v2 JSON；当前结果为 `59` 条描述、`108/108` 个相关变体非空且一致、修改文件数 `0`。全部单位与能力源 JSON 解析错误数为 `0`。
 
 - 2026-07-29 Task 7 独立审查后修复：审查发现解析器已拒绝 `animations[].key == "Default"`，但未拒绝 `animations[].name == "Default"`。提交 `8893b1d` 先加入负向回归测试；RED 为 `44 total / 43 passed / 1 failed / 0 skipped`，唯一失败证明 `key=idle/name=Default` 会被旧实现接受。随后以相同 `StringComparison.Ordinal` 同时校验 key 与 name；GREEN 为 `44/44` 通过、失败 `0`、跳过 `0`，wrapper 退出码 `0`，日志没有编译错误或未处理异常。证据位于 `Artifacts/UnitEliteVariantsV2/DefaultBindingFix/{RED,GREEN}`。两次 Unity 都在结果落盘后超过 runner grace period 并被强制停止，最终确认无 Unity/UnityHub 残留；修复提交经独立只读复审为 `CLEAN`。
 - 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：

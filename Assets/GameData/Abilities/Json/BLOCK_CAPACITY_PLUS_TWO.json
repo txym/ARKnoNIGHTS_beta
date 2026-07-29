@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "BLOCK_CAPACITY_PLUS_TWO",
   "displayNameZhHans": "",
-  "descriptionZhHans": "阻挡数+2。",
+  "descriptionZhHans": "阻挡数提升。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

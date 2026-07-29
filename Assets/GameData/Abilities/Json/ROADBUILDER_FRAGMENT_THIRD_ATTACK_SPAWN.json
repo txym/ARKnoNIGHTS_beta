@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
   "displayNameZhHans": "",
-  "descriptionZhHans": "每第三次攻击使用技能动画，并在造成伤害后于自身周围召唤1只塑路者分形；场上友方塑路者分形上限为12只。",
+  "descriptionZhHans": "每攻击两次，下一次攻击召唤一个<塑路者分形>。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

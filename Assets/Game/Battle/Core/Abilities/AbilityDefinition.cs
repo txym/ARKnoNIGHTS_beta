@@ -136,7 +136,10 @@ namespace ArknoNights.Battle.Core
                 blockCapacityAdditive,
                 attackSpeedAdditive,
                 moveSpeedMultiplierPermille,
-                false)
+                false,
+                string.Empty,
+                0,
+                string.Empty)
         {
         }
 
@@ -150,7 +153,10 @@ namespace ArknoNights.Battle.Core
             int blockCapacityAdditive,
             int attackSpeedAdditive,
             int moveSpeedMultiplierPermille,
-            bool makesUnblockable)
+            bool makesUnblockable,
+            string transitionAnimationKey = "",
+            int transitionAnimationOriginalDurationTicks = 0,
+            string completedPresentationStateTag = "")
         {
             ThresholdHitPointsPermille =
                 thresholdHitPointsPermille;
@@ -167,6 +173,12 @@ namespace ArknoNights.Battle.Core
             MoveSpeedMultiplierPermille =
                 moveSpeedMultiplierPermille;
             MakesUnblockable = makesUnblockable;
+            TransitionAnimationKey =
+                transitionAnimationKey ?? string.Empty;
+            TransitionAnimationOriginalDurationTicks =
+                transitionAnimationOriginalDurationTicks;
+            CompletedPresentationStateTag =
+                completedPresentationStateTag ?? string.Empty;
         }
 
         public int ThresholdHitPointsPermille { get; }
@@ -179,6 +191,13 @@ namespace ArknoNights.Battle.Core
         public int AttackSpeedAdditive { get; }
         public int MoveSpeedMultiplierPermille { get; }
         public bool MakesUnblockable { get; }
+        public string TransitionAnimationKey { get; }
+        public int TransitionAnimationOriginalDurationTicks { get; }
+        public int TransitionAnimationEffectiveDurationTicks =>
+            (TransitionAnimationOriginalDurationTicks + 1) / 2;
+        public string CompletedPresentationStateTag { get; }
+        public bool UsesTransitionAnimation =>
+            !string.IsNullOrWhiteSpace(TransitionAnimationKey);
         public bool IsNeutral =>
             AttackMultiplierPermille
             == NeutralMultiplierPermille
@@ -299,7 +318,8 @@ namespace ArknoNights.Battle.Core
             int unlockedMagicResistanceAdditive,
             int unlockedHitPointsPerSecond,
             int unlockedTargetDefenseMultiplierPermille,
-            bool releasesAlliedAttackCountStates)
+            bool releasesAlliedAttackCountStates,
+            string unlockedPresentationStateTag = "")
         {
             TransitionBeforeAttackOrdinal =
                 transitionBeforeAttackOrdinal;
@@ -316,6 +336,8 @@ namespace ArknoNights.Battle.Core
                 unlockedTargetDefenseMultiplierPermille;
             ReleasesAlliedAttackCountStates =
                 releasesAlliedAttackCountStates;
+            UnlockedPresentationStateTag =
+                unlockedPresentationStateTag ?? string.Empty;
         }
 
         public int TransitionBeforeAttackOrdinal { get; }
@@ -329,6 +351,7 @@ namespace ArknoNights.Battle.Core
             get;
         }
         public bool ReleasesAlliedAttackCountStates { get; }
+        public string UnlockedPresentationStateTag { get; }
         public bool IsNeutral =>
             LockedAttackSpeedAdditive == 0
             && LockedDefenseAdditive == 0
@@ -424,7 +447,8 @@ namespace ArknoNights.Battle.Core
             int magicResistanceAdditive,
             int attackSpeedMultiplierPermille,
             int moveSpeedMultiplierPermille,
-            int hitPointsPerSecond)
+            int hitPointsPerSecond,
+            string grantedStatusTag = "")
         {
             TargetSide = targetSide;
             IsGlobal = isGlobal;
@@ -442,6 +466,7 @@ namespace ArknoNights.Battle.Core
             MoveSpeedMultiplierPermille =
                 moveSpeedMultiplierPermille;
             HitPointsPerSecond = hitPointsPerSecond;
+            GrantedStatusTag = grantedStatusTag ?? string.Empty;
         }
 
         public AuraTargetSide TargetSide { get; }
@@ -455,6 +480,7 @@ namespace ArknoNights.Battle.Core
         public int AttackSpeedMultiplierPermille { get; }
         public int MoveSpeedMultiplierPermille { get; }
         public int HitPointsPerSecond { get; }
+        public string GrantedStatusTag { get; }
         public bool IsNeutral =>
             AttackMultiplierPermille
                 == NeutralMultiplierPermille
@@ -465,6 +491,29 @@ namespace ArknoNights.Battle.Core
             && MoveSpeedMultiplierPermille
                 == NeutralMultiplierPermille
             && HitPointsPerSecond == 0;
+    }
+
+    public sealed class RequiredStatusTagCombatModifierDefinition
+    {
+        public const int NeutralMultiplierPermille = 1000;
+
+        public RequiredStatusTagCombatModifierDefinition(
+            string requiredStatusTag,
+            int attackMultiplierPermille,
+            int moveSpeedMultiplierPermille)
+        {
+            RequiredStatusTag = requiredStatusTag ?? string.Empty;
+            AttackMultiplierPermille = attackMultiplierPermille;
+            MoveSpeedMultiplierPermille = moveSpeedMultiplierPermille;
+        }
+
+        public string RequiredStatusTag { get; }
+        public int AttackMultiplierPermille { get; }
+        public int MoveSpeedMultiplierPermille { get; }
+        public bool IsNeutral =>
+            AttackMultiplierPermille == NeutralMultiplierPermille
+            && MoveSpeedMultiplierPermille
+                == NeutralMultiplierPermille;
     }
 
     public sealed class BlockedCounterpartCombatModifierDefinition
@@ -799,7 +848,8 @@ namespace ArknoNights.Battle.Core
             int thresholdHitPointsPermille,
             bool inclusiveThreshold,
             string animationKey,
-            int animationOriginalDurationTicks)
+            int animationOriginalDurationTicks,
+            string completedPresentationStateTag = "")
         {
             ThresholdHitPointsPermille =
                 thresholdHitPointsPermille;
@@ -807,6 +857,8 @@ namespace ArknoNights.Battle.Core
             AnimationKey = animationKey;
             AnimationOriginalDurationTicks =
                 animationOriginalDurationTicks;
+            CompletedPresentationStateTag =
+                completedPresentationStateTag ?? string.Empty;
         }
 
         public int ThresholdHitPointsPermille { get; }
@@ -815,6 +867,7 @@ namespace ArknoNights.Battle.Core
         public int AnimationOriginalDurationTicks { get; }
         public int AnimationEffectiveDurationTicks =>
             (AnimationOriginalDurationTicks + 1) / 2;
+        public string CompletedPresentationStateTag { get; }
     }
 
     public sealed class SummonEffectDefinition
@@ -982,7 +1035,9 @@ namespace ArknoNights.Battle.Core
             HealthThresholdCombatModifierDefinition
                 healthThresholdCombatModifier = null,
             HealthThresholdAdjacentSpawnEffectDefinition
-                healthThresholdAdjacentSpawnEffect = null)
+                healthThresholdAdjacentSpawnEffect = null,
+            PassiveLifecycleEffectDefinition
+                passiveLifecycleEffect = null)
             : this(
                 abilityId: abilityId,
                 displayNameZhHans: displayNameZhHans,
@@ -995,7 +1050,7 @@ namespace ArknoNights.Battle.Core
                 summonEffect: summonEffect,
                 unitTraitEffect: unitTraitEffect,
                 passiveCombatModifier: passiveCombatModifier,
-                passiveLifecycleEffect: null,
+                passiveLifecycleEffect: passiveLifecycleEffect,
                 onDamageReactionEffect: null,
                 healthThresholdCombatModifier:
                     healthThresholdCombatModifier,
@@ -1533,7 +1588,7 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null, AttackDashEffectDefinition attackDashEffect = null, TimedBlinkEffectDefinition timedBlinkEffect = null, ProximityEntryDamageEffectDefinition proximityEntryDamageEffect = null)
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null, AttackDashEffectDefinition attackDashEffect = null, TimedBlinkEffectDefinition timedBlinkEffect = null, ProximityEntryDamageEffectDefinition proximityEntryDamageEffect = null, RequiredStatusTagCombatModifierDefinition requiredStatusTagCombatModifier = null)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -1582,6 +1637,8 @@ namespace ArknoNights.Battle.Core
             TimedBlinkEffect = timedBlinkEffect;
             ProximityEntryDamageEffect =
                 proximityEntryDamageEffect;
+            RequiredStatusTagCombatModifier =
+                requiredStatusTagCombatModifier;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -1639,6 +1696,8 @@ namespace ArknoNights.Battle.Core
         public TimedBlinkEffectDefinition TimedBlinkEffect { get; }
         public ProximityEntryDamageEffectDefinition
             ProximityEntryDamageEffect { get; }
+        public RequiredStatusTagCombatModifierDefinition
+            RequiredStatusTagCombatModifier { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

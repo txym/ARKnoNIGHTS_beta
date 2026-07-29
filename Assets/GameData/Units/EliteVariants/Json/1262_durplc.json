@@ -19,7 +19,7 @@
                          "sourceVariant":  "1262_durplc",
                          "statsLevel":  0,
                          "displayNameZhHans":  "钢铁冲浪教练",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "未被阻挡时受到的物理与法术伤害大幅降低。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  8000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "UNBLOCKED_DAMAGE_REDUCTION_HALF"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1262_durplc_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "合金冲浪教练",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "未被阻挡时受到的物理与法术伤害大幅降低。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  12000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "UNBLOCKED_DAMAGE_REDUCTION_HALF"
                                               ]
                      }
                  ]

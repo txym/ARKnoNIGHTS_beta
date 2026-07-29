@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "STACKING_DEFENSE_REDUCTION_ON_HIT",
   "displayNameZhHans": "",
-  "descriptionZhHans": "普通攻击造成伤害后，使目标防御力永久降低10，可无限叠加。",
+  "descriptionZhHans": "攻击会永久降低目标防御力。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

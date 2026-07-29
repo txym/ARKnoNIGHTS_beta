@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "REVENGER_HALF_HEALTH_ATTACK_BOOST",
   "displayNameZhHans": "",
-  "descriptionZhHans": "生命值不高于50%时，攻击力提升100%。",
+  "descriptionZhHans": "生命值降至一半以下时攻击力大幅提升。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

@@ -17,6 +17,11 @@ namespace ArknoNights.Battle.Core
         private bool healthThresholdActive;
         private int healthThresholdActiveUntilTick =
             int.MinValue;
+        private bool healthThresholdTransitionQueued;
+        private bool healthThresholdTransitionAnimationStarted;
+        private bool healthThresholdTransitionCompleted;
+        private int healthThresholdTransitionDueTick =
+            int.MinValue;
         private int unblockedAttackChargeStacks;
         private bool attackCountStateForceUnlocked;
         private int damageReceivedCount;
@@ -193,6 +198,36 @@ namespace ArknoNights.Battle.Core
                 effect.DurationTicks > 0
                     ? currentTick + effect.DurationTicks - 1
                     : int.MaxValue;
+            if (effect.UsesTransitionAnimation)
+                healthThresholdTransitionQueued = true;
+        }
+
+        internal bool TryStartHealthThresholdTransition(
+            int currentTick,
+            out HealthThresholdCombatModifierDefinition effect)
+        {
+            effect = Definition.HealthThresholdCombatModifier;
+            if (effect == null
+                || !healthThresholdTransitionQueued
+                || healthThresholdTransitionAnimationStarted
+                || healthThresholdTransitionCompleted)
+                return false;
+            healthThresholdTransitionAnimationStarted = true;
+            healthThresholdTransitionDueTick =
+                currentTick
+                + effect.TransitionAnimationEffectiveDurationTicks;
+            return true;
+        }
+
+        internal bool TryCompleteHealthThresholdTransition(
+            int currentTick)
+        {
+            if (!healthThresholdTransitionAnimationStarted
+                || healthThresholdTransitionCompleted
+                || currentTick < healthThresholdTransitionDueTick)
+                return false;
+            healthThresholdTransitionCompleted = true;
+            return true;
         }
 
         internal bool TryTriggerHealthThresholdAdjacentSpawn(
@@ -280,7 +315,19 @@ namespace ArknoNights.Battle.Core
                     .Append(':')
                     .Append(healthThresholdActive ? 1 : 0)
                     .Append(':')
-                    .Append(healthThresholdActiveUntilTick);
+                    .Append(healthThresholdActiveUntilTick)
+                    .Append(":transition:")
+                    .Append(healthThresholdTransitionQueued ? 1 : 0)
+                    .Append(':')
+                    .Append(
+                        healthThresholdTransitionAnimationStarted
+                            ? 1
+                            : 0)
+                    .Append(':')
+                    .Append(
+                        healthThresholdTransitionCompleted ? 1 : 0)
+                    .Append(':')
+                    .Append(healthThresholdTransitionDueTick);
             if (Definition.UnblockedAttackCharge != null)
                 builder.Append(":charge:")
                     .Append(unblockedAttackChargeStacks);
@@ -356,6 +403,8 @@ namespace ArknoNights.Battle.Core
         private readonly List<IExternalCombatModifierDefinition>
             auraCombatModifiers =
                 new List<IExternalCombatModifierDefinition>();
+        private readonly HashSet<string> externalStatusTags =
+            new HashSet<string>(StringComparer.Ordinal);
         private readonly List<RuntimeDamageOverTimeState>
             damageOverTimeStates =
                 new List<RuntimeDamageOverTimeState>();
@@ -507,14 +556,19 @@ namespace ArknoNights.Battle.Core
             HasDeploymentApproach
             && !Position.Equals(
                 DeploymentApproachDestination.Value);
-        internal bool IsTargetableBy(AttackMethod attackMethod) =>
+        internal bool IsTargetableBy(AttackMethod attackMethod)
+        {
+            _ = attackMethod;
+            return CanReceiveEnemyDamage;
+        }
+
+        internal bool CanReceiveEnemyDamage =>
             abilityStates.All(item =>
                 item.Definition.UnitTraitEffect == null
                 || (item.Definition.UnitTraitEffect.Kind
                         != UnitTraitEffectKind.Untargetable
-                    && (item.Definition.UnitTraitEffect.Kind
-                            != UnitTraitEffectKind.UntargetableByMelee
-                        || attackMethod != AttackMethod.Melee)));
+                    && item.Definition.UnitTraitEffect.Kind
+                        != UnitTraitEffectKind.UntargetableByMelee));
         public int EffectiveBlockCapacity
         {
             get
@@ -593,6 +647,11 @@ namespace ArknoNights.Battle.Core
                     attack = ApplyMultiplier(
                         attack,
                         modifier.AttackMultiplierPermille);
+                foreach (var modifier in
+                         ActiveRequiredStatusTagCombatModifiers)
+                    attack = ApplyMultiplier(
+                        attack,
+                        modifier.AttackMultiplierPermille);
                 var charge = abilityStates.Sum(item =>
                     (long)item.UnblockedAttackChargeAdditive);
                 return (int)Math.Min(
@@ -640,6 +699,11 @@ namespace ArknoNights.Battle.Core
                     speed = ApplyMultiplier(
                         speed,
                         modifier.MoveSpeedMultiplierPermille);
+                foreach (var modifier in
+                         ActiveRequiredStatusTagCombatModifiers)
+                    speed = ApplyMultiplier(
+                        speed,
+                        modifier.MoveSpeedMultiplierPermille);
                 return speed;
             }
         }
@@ -669,6 +733,18 @@ namespace ArknoNights.Battle.Core
             foreach (var ability in abilityStates)
                 ability.ForceUnlockAttackCountState();
         }
+        internal string AttackCountPresentationStateTag =>
+            abilityStates
+                .Where(item =>
+                    item.Definition.AttackCountStateModifier != null
+                    && item.IsAttackCountStateUnlocked(
+                        StartedAttackCount))
+                .Select(item =>
+                    item.Definition.AttackCountStateModifier
+                        .UnlockedPresentationStateTag)
+                .FirstOrDefault(item =>
+                    !string.IsNullOrWhiteSpace(item))
+            ?? string.Empty;
         internal TriggeredSpawnEffectDefinition
             GetTriggeredAttackSkillAnimation(int attackOrdinal)
         {
@@ -980,7 +1056,23 @@ namespace ArknoNights.Battle.Core
             auraCombatModifiers.AddRange(
                 modifiers
                 ?? Enumerable.Empty<IExternalCombatModifierDefinition>());
+            externalStatusTags.Clear();
+            foreach (var tag in auraCombatModifiers
+                         .OfType<AuraCombatModifierDefinition>()
+                         .Select(item => item.GrantedStatusTag)
+                         .Where(item => !string.IsNullOrWhiteSpace(item)))
+                externalStatusTags.Add(tag);
         }
+
+        private IEnumerable<RequiredStatusTagCombatModifierDefinition>
+            ActiveRequiredStatusTagCombatModifiers =>
+            abilityStates
+                .Select(item =>
+                    item.Definition.RequiredStatusTagCombatModifier)
+                .Where(item =>
+                    item != null
+                    && externalStatusTags.Contains(
+                        item.RequiredStatusTag));
 
         private int ApplyThresholdMultiplier(
             int value,
@@ -1224,6 +1316,7 @@ namespace ArknoNights.Battle.Core
             ResolveDueTimedTargetAreaDamage();
             ResolveDueDeathSpawns();
             ResolveDueDeathAreaDamage();
+            ResolveDueHealthThresholdTransitions();
             ResolveDueHealthThresholdFullHeals();
             UpdateHealthThresholdStates();
             ResolveDeathsAndCleanup();
@@ -1455,7 +1548,13 @@ namespace ArknoNights.Battle.Core
                         : GetAttackTarget(unit);
                 if (target == null) continue;
                 if (DistanceSquared(unit.Position, target.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) continue;
+                var previousPresentationState =
+                    unit.AttackCountPresentationStateTag;
                 var attack = unit.BeginAttackAndGetEffectiveAttack();
+                EmitPresentationStateChange(
+                    unit,
+                    previousPresentationState,
+                    unit.AttackCountPresentationStateTag);
                 if (unit.ReleasedAlliesOnLastAttack)
                 {
                     foreach (var ally in runtimeUnits
@@ -1465,7 +1564,15 @@ namespace ArknoNights.Battle.Core
                                  .OrderBy(
                                      item => item.UnitId,
                                      StringComparer.Ordinal))
+                    {
+                        var previousAllyPresentationState =
+                            ally.AttackCountPresentationStateTag;
                         ally.ForceUnlockAttackCountStates();
+                        EmitPresentationStateChange(
+                            ally,
+                            previousAllyPresentationState,
+                            ally.AttackCountPresentationStateTag);
+                    }
                 }
                 var attackIntervalTicks =
                     unit.EffectiveAttackIntervalTicks;
@@ -1618,7 +1725,9 @@ namespace ArknoNights.Battle.Core
             var valid = due
                 .Where(item =>
                     IsInBattle(FindUnit(item.AttackerUnitId))
-                    && IsInBattle(FindUnit(item.TargetUnitId)))
+                    && IsInBattle(FindUnit(item.TargetUnitId))
+                    && FindUnit(item.TargetUnitId)
+                        .CanReceiveEnemyDamage)
                 .SelectMany(ExpandAttackAreaDamage)
                 .ToArray();
             var reactions = new List<DamageReaction>();
@@ -1729,7 +1838,9 @@ namespace ArknoNights.Battle.Core
                          .OrderBy(item => item.Key, StringComparer.Ordinal))
             {
                 var target = FindUnit(reactionGroup.Key);
-                if (target == null || target.CurrentHitPoints <= 0)
+                if (target == null
+                    || target.CurrentHitPoints <= 0
+                    || !target.CanReceiveEnemyDamage)
                     continue;
                 var resolved = reactionGroup
                     .Select(item => new ResolvedDamageReaction(
@@ -1803,7 +1914,7 @@ namespace ArknoNights.Battle.Core
                 new FixedPosition(
                     owner.Position.XUnits + offsetX,
                     owner.Position.YUnits + offsetY),
-                0,
+                owner.EliteLevel,
                 Array.Empty<BuffPlaceholder>(),
                 CurrentTick + 1,
                 CreateAbilityStates(
@@ -1844,7 +1955,7 @@ namespace ArknoNights.Battle.Core
                     owner.Side,
                     definition,
                     FixedPosition.FromCell(coordinate),
-                    0,
+                    owner.EliteLevel,
                     Array.Empty<BuffPlaceholder>(),
                     CurrentTick + 1,
                     CreateAbilityStates(
@@ -1879,6 +1990,7 @@ namespace ArknoNights.Battle.Core
                     .Where(target =>
                         IsActive(target)
                         && target.Side != attacker.Side
+                        && target.CanReceiveEnemyDamage
                         && IsInAttackArea(
                             primaryTarget.Position,
                             target.Position,
@@ -1939,6 +2051,7 @@ namespace ArknoNights.Battle.Core
                         unit.PlayerId,
                         unit.Side,
                         unit.Position,
+                        unit.EliteLevel,
                         effect.Key,
                         effect.Value));
                 foreach (var effect in unit.DeathAreaDamageEffects)
@@ -2008,7 +2121,7 @@ namespace ArknoNights.Battle.Core
                         new FixedPosition(
                             origin.XUnits + offsetX,
                             origin.YUnits + offsetY),
-                        0,
+                        pending.EliteLevel,
                         Array.Empty<BuffPlaceholder>(),
                         CurrentTick + 1,
                         CreateAbilityStates(
@@ -2044,6 +2157,7 @@ namespace ArknoNights.Battle.Core
                     .Where(target =>
                         IsActive(target)
                         && target.Side != pending.Side
+                        && target.CanReceiveEnemyDamage
                         && DistanceSquared(
                             pending.Position,
                             target.Position)
@@ -2255,7 +2369,32 @@ namespace ArknoNights.Battle.Core
                     unit.Definition.MaxHitPoints);
             }
             ReleaseExcessBlockRelations();
+            StartReadyHealthThresholdTransitions();
             StartReadyHealthThresholdFullHeals();
+        }
+
+        private void ResolveDueHealthThresholdTransitions()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+            foreach (var ability in unit.AbilityStates
+                         .OrderBy(
+                             item => item.Definition.AbilityId,
+                             StringComparer.Ordinal))
+            {
+                if (!ability.TryCompleteHealthThresholdTransition(
+                        CurrentTick))
+                    continue;
+                EmitPresentationStateChange(
+                    unit,
+                    string.Empty,
+                    ability.Definition
+                        .HealthThresholdCombatModifier
+                        .CompletedPresentationStateTag);
+            }
         }
 
         private void ResolveDueHealthThresholdFullHeals()
@@ -2277,24 +2416,73 @@ namespace ArknoNights.Battle.Core
                 unit.CurrentHitPoints =
                     unit.Definition.MaxHitPoints;
                 var amount = unit.CurrentHitPoints - before;
-                if (amount <= 0)
+                if (amount > 0)
+                    Emit(
+                        BattleEventType.HealthChanged,
+                        unit.UnitId,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        amount,
+                        before,
+                        unit.CurrentHitPoints,
+                        0,
+                        0,
+                        0,
+                        null,
+                        BattleStopReason.None);
+                EmitPresentationStateChange(
+                    unit,
+                    string.Empty,
+                    ability.Definition
+                        .HealthThresholdFullHealEffect
+                        .CompletedPresentationStateTag);
+            }
+        }
+
+        private void StartReadyHealthThresholdTransitions()
+        {
+            foreach (var caster in runtimeUnits
+                         .Where(IsActive)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+            foreach (var ability in caster.AbilityStates
+                         .OrderBy(
+                             item => item.Definition.AbilityId,
+                             StringComparer.Ordinal))
+            {
+                if (IsAttackAnimationLocked(caster)
+                    || IsSkillAnimationLocked(caster)
+                    || !ability.TryStartHealthThresholdTransition(
+                        CurrentTick,
+                        out var effect))
                     continue;
+                caster.SkillAnimationLockUntilTick =
+                    CurrentTick
+                    + effect
+                        .TransitionAnimationEffectiveDurationTicks;
                 Emit(
-                    BattleEventType.HealthChanged,
-                    unit.UnitId,
+                    BattleEventType.Skill,
+                    caster.UnitId,
                     null,
                     null,
                     null,
                     null,
                     null,
-                    amount,
-                    before,
-                    unit.CurrentHitPoints,
                     0,
                     0,
                     0,
+                    0,
+                    effect
+                        .TransitionAnimationOriginalDurationTicks,
+                    effect
+                        .TransitionAnimationEffectiveDurationTicks,
                     null,
-                    BattleStopReason.None);
+                    BattleStopReason.None,
+                    effect.TransitionAnimationKey);
             }
         }
 
@@ -2596,6 +2784,7 @@ namespace ArknoNights.Battle.Core
                 .Where(candidate =>
                     IsActive(candidate)
                     && candidate.Side != caster.Side
+                    && candidate.CanReceiveEnemyDamage
                     && (!effect.GroundTargetsOnly
                         || candidate.IsTargetableBy(
                             AttackMethod.Melee))
@@ -2647,6 +2836,7 @@ namespace ArknoNights.Battle.Core
                         .Where(target =>
                             IsActive(target)
                             && target.Side != pending.Side
+                            && target.CanReceiveEnemyDamage
                             && (!pending.Effect.GroundTargetsOnly
                                 || target.IsTargetableBy(
                                     AttackMethod.Melee))
@@ -2733,6 +2923,7 @@ namespace ArknoNights.Battle.Core
                     .Where(target =>
                         IsActive(target)
                         && target.Side != source.Side
+                        && target.CanReceiveEnemyDamage
                         && (!effect.GroundTargetsOnly
                             || target.IsTargetableBy(
                                 AttackMethod.Melee))
@@ -2872,7 +3063,7 @@ namespace ArknoNights.Battle.Core
                     caster.Side,
                     summonDefinition,
                     position,
-                    0,
+                    caster.EliteLevel,
                     Array.Empty<BuffPlaceholder>(),
                     CurrentTick + 1,
                     CreateAbilityStates(summonDefinition, abilityDefinitions));
@@ -3052,6 +3243,37 @@ namespace ArknoNights.Battle.Core
             if (string.Equals(unit.TargetUnitId, targetUnitId, StringComparison.Ordinal)) return;
             unit.TargetUnitId = targetUnitId;
             Emit(BattleEventType.TargetChanged, unit.UnitId, null, targetUnitId, null, null, null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None);
+        }
+
+        private void EmitPresentationStateChange(
+            RuntimeUnitState unit,
+            string previousStateTag,
+            string nextStateTag)
+        {
+            if (unit == null
+                || string.IsNullOrWhiteSpace(nextStateTag)
+                || string.Equals(
+                    previousStateTag,
+                    nextStateTag,
+                    StringComparison.Ordinal))
+                return;
+            Emit(
+                BattleEventType.PresentationStateChanged,
+                unit.UnitId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                null,
+                BattleStopReason.None,
+                nextStateTag);
         }
 
         private static bool IsInBattle(RuntimeUnitState unit) =>
@@ -3275,6 +3497,7 @@ namespace ArknoNights.Battle.Core
                 string playerId,
                 BattleSide side,
                 FixedPosition position,
+                int eliteLevel,
                 string abilityId,
                 DeathSpawnEffectDefinition effect)
             {
@@ -3283,6 +3506,7 @@ namespace ArknoNights.Battle.Core
                 PlayerId = playerId;
                 Side = side;
                 Position = position;
+                EliteLevel = eliteLevel;
                 AbilityId = abilityId;
                 Effect = effect;
             }
@@ -3292,6 +3516,7 @@ namespace ArknoNights.Battle.Core
             public string PlayerId { get; }
             public BattleSide Side { get; }
             public FixedPosition Position { get; }
+            public int EliteLevel { get; }
             public string AbilityId { get; }
             public DeathSpawnEffectDefinition Effect { get; }
         }

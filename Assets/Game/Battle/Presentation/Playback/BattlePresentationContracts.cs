@@ -10,6 +10,7 @@ namespace ArknoNights.Battle.Presentation
         void SetWorldPosition(Vector3 position);
         void SetFacing(Vector3 direction);
         void SetPlaybackSpeed(float playbackSpeed);
+        void SetPresentationState(string stateTag) { }
         void PlayIdle() { }
         void PlayMove();
         void PlayAttack(float animationSpeedMultiplier);

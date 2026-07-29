@@ -19,7 +19,7 @@
                          "sourceVariant":  "1078_sotisc",
                          "statsLevel":  0,
                          "displayNameZhHans":  "游击队战士",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到\u003c战术命令\u003e强化时，移动速度提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3300,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TACTICAL_COMMAND_MOVE_SPEED"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1078_sotisc_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "游击队战士组长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "受到\u003c战术命令\u003e强化时，移动速度提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4500,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TACTICAL_COMMAND_MOVE_SPEED"
                                               ]
                      }
                  ]

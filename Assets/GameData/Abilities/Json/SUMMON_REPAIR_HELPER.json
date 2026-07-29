@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "SUMMON_REPAIR_HELPER",
   "displayNameZhHans": "",
-  "descriptionZhHans": "每隔一段时间召唤1个<迷茫的修理小助手>。",
+  "descriptionZhHans": "每隔一段时间召唤一个<迷茫的修理小助手>。",
   "activationKind": "Timed",
   "silencePolicy": "Unaffected",
   "skillPoints": {

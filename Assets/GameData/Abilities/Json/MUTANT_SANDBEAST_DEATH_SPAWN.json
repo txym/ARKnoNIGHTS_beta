@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "MUTANT_SANDBEAST_DEATH_SPAWN",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "死亡时分裂两个<畸变赘生物>。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "DeathSpawn",
+      "options": [ { "summonTypeId": "1137", "weight": 1 } ],
+      "count": 2,
+      "delayTicks": 2,
+      "spawnArea": { "shape": "Square", "center": "NearestPassableCell", "sideLengthMetres": 0.4 },
+      "snapToNearestPassableCell": true,
+      "summonedMoveSpeedMultiplierPermille": 1000
+    }
+  ]
+}

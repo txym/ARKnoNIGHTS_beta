@@ -19,7 +19,7 @@
                          "sourceVariant":  "10001_trslim",
                          "statsLevel":  0,
                          "displayNameZhHans":  "简饲源石虫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "首次低于半血时切换状态，短时间无法被阻挡并大幅加速。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4500,
@@ -83,7 +83,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM"
                                               ]
                      },
                      {
@@ -91,7 +91,7 @@
                          "sourceVariant":  "10001_trslim_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "精饲源石虫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "首次低于半血时切换状态，短时间无法被阻挡并大幅加速。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5000,
@@ -155,7 +155,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM"
                                               ]
                      }
                  ]

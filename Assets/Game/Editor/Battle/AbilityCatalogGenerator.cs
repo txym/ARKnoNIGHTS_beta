@@ -70,6 +70,23 @@ public static class AbilityCatalogGenerator
         if (effects.Length != 1)
             throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_EFFECT_INVALID path=" + sourcePath);
         var effect = effects[0];
+        var persistentPresentationStateTag =
+            source.persistentPresentationStateTag ?? string.Empty;
+        if ((!string.IsNullOrEmpty(
+                    persistentPresentationStateTag)
+                && string.IsNullOrWhiteSpace(
+                    persistentPresentationStateTag))
+            || (!string.IsNullOrWhiteSpace(
+                    persistentPresentationStateTag)
+                && persistentPresentationStateTag.Contains("|"))
+            || (!string.IsNullOrWhiteSpace(
+                    persistentPresentationStateTag)
+                && effect.kind != "AttackCountStateModifier"
+                && effect.kind != "HealthThresholdCombatModifier"
+                && effect.kind != "HealthThresholdFullHeal"))
+            throw new InvalidOperationException(
+                "ABILITY_CATALOG_SOURCE_PRESENTATION_STATE_INVALID path="
+                + sourcePath);
         var entry = new AbilityCatalogEntry
         {
             abilityId = source.abilityId,
@@ -79,7 +96,9 @@ public static class AbilityCatalogGenerator
             silencePolicy = source.silencePolicy,
             initialSkillPoints = source.skillPoints.initial,
             requiredSkillPoints = source.skillPoints.required,
-            skillPointGeneration = source.skillPoints.generation
+            skillPointGeneration = source.skillPoints.generation,
+            persistentPresentationStateTag =
+                persistentPresentationStateTag
         };
         if (effect.kind == "UnitTrait")
         {
@@ -130,6 +149,343 @@ public static class AbilityCatalogGenerator
                 effect.physicalDamageTakenPermille;
             entry.magicDamageTakenPermille =
                 effect.magicDamageTakenPermille;
+            return entry;
+        }
+        if (effect.kind == "PassiveLifecycle")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.lifetimeTicks < 0
+                || (effect.hitPointsPerSecond == 0
+                    && effect.lifetimeTicks == 0))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_PASSIVE_LIFECYCLE_INVALID path=" + sourcePath);
+            entry.hitPointsPerSecond = effect.hitPointsPerSecond;
+            entry.lifetimeTicks = effect.lifetimeTicks;
+            return entry;
+        }
+        if (effect.kind == "OnDamageReaction")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || !Enum.TryParse(
+                    effect.damageType,
+                    true,
+                    out DamageType damageType)
+                || damageType == DamageType.None
+                || effect.damageAmount <= 0)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_ON_DAMAGE_REACTION_INVALID path=" + sourcePath);
+            entry.onDamageReactionDamageType = damageType.ToString();
+            entry.onDamageReactionDamageAmount = effect.damageAmount;
+            return entry;
+        }
+        if (effect.kind == "UnblockedDamageTakenModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.physicalDamageTakenPermille <= 0
+                || effect.physicalDamageTakenPermille > 10000
+                || effect.magicDamageTakenPermille <= 0
+                || effect.magicDamageTakenPermille > 10000
+                || (effect.physicalDamageTakenPermille == 1000
+                    && effect.magicDamageTakenPermille == 1000))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_UNBLOCKED_DAMAGE_TAKEN_INVALID path=" + sourcePath);
+            entry.unblockedPhysicalDamageTakenPermille =
+                effect.physicalDamageTakenPermille;
+            entry.unblockedMagicDamageTakenPermille =
+                effect.magicDamageTakenPermille;
+            return entry;
+        }
+        if (effect.kind == "AttackSequenceModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.firstTriggerOrdinal <= 0
+                || effect.repeatInterval < 0
+                || effect.attackMultiplierPermille <= 0
+                || effect.attackMultiplierPermille == 1000)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_ATTACK_SEQUENCE_INVALID path=" + sourcePath);
+            entry.attackSequenceFirstEnhancedAttackOrdinal =
+                effect.firstTriggerOrdinal;
+            entry.attackSequenceRepeatInterval = effect.repeatInterval;
+            entry.attackSequenceAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            return entry;
+        }
+        if (effect.kind == "AttackCountStateModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.transitionBeforeAttackOrdinal <= 1
+                || effect.lockedAttackSpeedAdditive <= -100
+                || effect.lockedDefenseAdditive < 0
+                || effect.unlockedAttackMultiplierPermille <= 0
+                || effect.unlockedMagicResistanceAdditive < -100
+                || effect.unlockedMagicResistanceAdditive > 100
+                || effect.unlockedHitPointsPerSecond < 0
+                || effect.unlockedTargetDefenseMultiplierPermille <= 0
+                || effect.unlockedTargetDefenseMultiplierPermille > 1000)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_ATTACK_COUNT_STATE_INVALID path=" + sourcePath);
+            entry.attackCountTransitionBeforeAttackOrdinal =
+                effect.transitionBeforeAttackOrdinal;
+            entry.attackCountLockedAttackSpeedAdditive =
+                effect.lockedAttackSpeedAdditive;
+            entry.attackCountLockedDefenseAdditive =
+                effect.lockedDefenseAdditive;
+            entry.attackCountUnlockedAttackMultiplierPermille =
+                effect.unlockedAttackMultiplierPermille;
+            entry.attackCountUnlockedMagicResistanceAdditive =
+                effect.unlockedMagicResistanceAdditive;
+            entry.attackCountUnlockedHitPointsPerSecond =
+                effect.unlockedHitPointsPerSecond;
+            entry.attackCountUnlockedTargetDefenseMultiplierPermille =
+                effect.unlockedTargetDefenseMultiplierPermille;
+            entry.attackCountReleasesAlliedStates =
+                effect.releasesAlliedAttackCountStates;
+            return entry;
+        }
+        if (effect.kind == "DeathSpawn")
+        {
+            var options = (effect.options
+                           ?? Array.Empty<DeathSpawnOptionSource>())
+                .Where(item => item != null)
+                .ToArray();
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.count <= 0
+                || effect.delayTicks < 0
+                || effect.spawnArea == null
+                || effect.spawnArea.shape != "Square"
+                || effect.spawnArea.sideLengthMetres < 0f
+                || effect.summonedMoveSpeedMultiplierPermille <= 0
+                || options.Length == 0
+                || options.Any(item =>
+                    string.IsNullOrWhiteSpace(item.summonTypeId)
+                    || !knownUnitTypeIds.Contains(item.summonTypeId)
+                    || item.weight <= 0)
+                || options.Sum(item => (long)item.weight) > int.MaxValue)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_DEATH_SPAWN_INVALID path=" + sourcePath);
+            var sideLengthCentimetres = Mathf.RoundToInt(
+                effect.spawnArea.sideLengthMetres * 100f);
+            if (Mathf.Abs(
+                    effect.spawnArea.sideLengthMetres * 100f
+                    - sideLengthCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_DEATH_SPAWN_NOT_EXACT path=" + sourcePath);
+            entry.deathSpawnOptions = options.Select(item =>
+                new DeathSpawnOptionEntry
+                {
+                    summonTypeId = item.summonTypeId,
+                    weight = item.weight
+                }).ToArray();
+            entry.deathSpawnCount = effect.count;
+            entry.deathSpawnDelayTicks = effect.delayTicks;
+            entry.deathSpawnSideLengthCentimetres =
+                sideLengthCentimetres;
+            entry.deathSpawnSnapToNearestPassableCell =
+                effect.snapToNearestPassableCell;
+            entry.deathSpawnSummonedMoveSpeedMultiplierPermille =
+                effect.summonedMoveSpeedMultiplierPermille;
+            return entry;
+        }
+        if (effect.kind == "AuraCombatModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || !Enum.TryParse(
+                    effect.targetSide,
+                    true,
+                    out AuraTargetSide targetSide)
+                || !Enum.IsDefined(typeof(AuraTargetSide), targetSide)
+                || (effect.isGlobal
+                    && effect.radiusMetres != 0f)
+                || (!effect.isGlobal
+                    && effect.radiusMetres <= 0f)
+                || effect.attackMultiplierPermille <= 0
+                || effect.defenseAdditive < 0
+                || effect.magicResistanceAdditive < -100
+                || effect.magicResistanceAdditive > 100
+                || effect.attackSpeedMultiplierPermille <= 0
+                || effect.moveSpeedMultiplierPermille <= 0
+                || (effect.attackMultiplierPermille == 1000
+                    && effect.defenseAdditive == 0
+                    && effect.magicResistanceAdditive == 0
+                    && effect.attackSpeedMultiplierPermille == 1000
+                    && effect.moveSpeedMultiplierPermille == 1000
+                    && effect.hitPointsPerSecond == 0
+                    && string.IsNullOrWhiteSpace(
+                        effect.grantedStatusTag)))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_AURA_INVALID path=" + sourcePath);
+            var radiusCentimetres = Mathf.RoundToInt(
+                effect.radiusMetres * 100f);
+            if (Mathf.Abs(
+                    effect.radiusMetres * 100f
+                    - radiusCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_AURA_NOT_EXACT path=" + sourcePath);
+            entry.auraTargetSide = targetSide.ToString();
+            entry.auraIsGlobal = effect.isGlobal;
+            entry.auraRadiusCentimetres = radiusCentimetres;
+            entry.auraExcludeSource = effect.excludeSource;
+            entry.auraNonStackingByAbilityId =
+                effect.nonStackingByAbilityId;
+            entry.auraAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            entry.auraDefenseAdditive = effect.defenseAdditive;
+            entry.auraMagicResistanceAdditive =
+                effect.magicResistanceAdditive;
+            entry.auraAttackSpeedMultiplierPermille =
+                effect.attackSpeedMultiplierPermille;
+            entry.auraMoveSpeedMultiplierPermille =
+                effect.moveSpeedMultiplierPermille;
+            entry.auraHitPointsPerSecond = effect.hitPointsPerSecond;
+            entry.auraGrantedStatusTag =
+                effect.grantedStatusTag ?? string.Empty;
+            return entry;
+        }
+        if (effect.kind == "BlockedCounterpartCombatModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.attackSpeedMultiplierPermille <= 0
+                || effect.attackSpeedMultiplierPermille == 1000)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_BLOCKED_COUNTERPART_INVALID path=" + sourcePath);
+            entry.blockedCounterpartNonStackingByAbilityId =
+                effect.nonStackingByAbilityId;
+            entry.blockedCounterpartAttackSpeedMultiplierPermille =
+                effect.attackSpeedMultiplierPermille;
+            return entry;
+        }
+        if (effect.kind == "NearbySameTypeSelfModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.radiusMetres <= 0f
+                || effect.defenseAdditive <= 0)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_NEARBY_SAME_TYPE_INVALID path=" + sourcePath);
+            var radiusCentimetres = Mathf.RoundToInt(
+                effect.radiusMetres * 100f);
+            if (Mathf.Abs(
+                    effect.radiusMetres * 100f
+                    - radiusCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_NEARBY_SAME_TYPE_NOT_EXACT path=" + sourcePath);
+            entry.nearbySameTypeRadiusCentimetres =
+                radiusCentimetres;
+            entry.nearbySameTypeDefenseAdditive =
+                effect.defenseAdditive;
+            return entry;
+        }
+        if (effect.kind == "EvasionModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.physicalChancePermille < 0
+                || effect.physicalChancePermille > 1000
+                || effect.magicChancePermille < 0
+                || effect.magicChancePermille > 1000
+                || (effect.physicalChancePermille == 0
+                    && effect.magicChancePermille == 0))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_EVASION_INVALID path=" + sourcePath);
+            entry.evasionPhysicalChancePermille =
+                effect.physicalChancePermille;
+            entry.evasionMagicChancePermille =
+                effect.magicChancePermille;
+            return entry;
+        }
+        if (effect.kind == "DeathAreaDamage")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || !Enum.TryParse(
+                    effect.damageType,
+                    true,
+                    out DamageType damageType)
+                || damageType == DamageType.None
+                || effect.attackMultiplierPermille <= 0
+                || effect.radiusMetres <= 0f
+                || effect.delayTicks <= 0)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_DEATH_AREA_DAMAGE_INVALID path=" + sourcePath);
+            var radiusCentimetres = Mathf.RoundToInt(
+                effect.radiusMetres * 100f);
+            if (Mathf.Abs(
+                    effect.radiusMetres * 100f
+                    - radiusCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_DEATH_AREA_DAMAGE_NOT_EXACT path=" + sourcePath);
+            entry.deathAreaDamageType = damageType.ToString();
+            entry.deathAreaAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            entry.deathAreaRadiusCentimetres = radiusCentimetres;
+            entry.deathAreaDelayTicks = effect.delayTicks;
+            return entry;
+        }
+        if (effect.kind == "AttackAreaDamageModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || !Enum.TryParse(
+                    effect.shape,
+                    true,
+                    out AttackAreaShape shape)
+                || !Enum.IsDefined(typeof(AttackAreaShape), shape)
+                || effect.firstTriggerOrdinal <= 0
+                || effect.repeatInterval < 0
+                || !Enum.TryParse(
+                    effect.damageType,
+                    true,
+                    out DamageType damageType)
+                || damageType == DamageType.None
+                || effect.attackMultiplierPermille <= 0
+                || (shape == AttackAreaShape.Radius
+                    && effect.radiusMetres <= 0f)
+                || (shape == AttackAreaShape.OrthogonalAdjacentCells
+                    && effect.radiusMetres != 0f))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_ATTACK_AREA_INVALID path=" + sourcePath);
+            var radiusCentimetres = Mathf.RoundToInt(
+                effect.radiusMetres * 100f);
+            if (Mathf.Abs(
+                    effect.radiusMetres * 100f
+                    - radiusCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_ATTACK_AREA_NOT_EXACT path=" + sourcePath);
+            entry.attackAreaShape = shape.ToString();
+            entry.attackAreaFirstAttackOrdinal =
+                effect.firstTriggerOrdinal;
+            entry.attackAreaRepeatInterval = effect.repeatInterval;
+            entry.attackAreaDamageType = damageType.ToString();
+            entry.attackAreaAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            entry.attackAreaRadiusCentimetres = radiusCentimetres;
+            return entry;
+        }
+        if (effect.kind == "UnblockedAttackCharge")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.checkIntervalTicks <= 0
+                || effect.attackAdditivePerStack <= 0
+                || effect.maxStacks <= 0)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_UNBLOCKED_ATTACK_CHARGE_INVALID path=" + sourcePath);
+            entry.unblockedAttackChargeCheckIntervalTicks =
+                effect.checkIntervalTicks;
+            entry.unblockedAttackChargeAttackAdditivePerStack =
+                effect.attackAdditivePerStack;
+            entry.unblockedAttackChargeMaxStacks = effect.maxStacks;
+            return entry;
+        }
+        if (effect.kind == "HealthThresholdFullHeal")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.thresholdHitPointsPermille <= 0
+                || effect.thresholdHitPointsPermille > 1000
+                || string.IsNullOrWhiteSpace(source.animationKey))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_HEALTH_THRESHOLD_FULL_HEAL_INVALID path=" + sourcePath);
+            entry.healthThresholdFullHealHitPointsPermille =
+                effect.thresholdHitPointsPermille;
+            entry.healthThresholdFullHealInclusive =
+                effect.inclusiveThreshold;
+            return entry;
+        }
+        if (effect.kind == "RequiredStatusTagCombatModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || string.IsNullOrWhiteSpace(effect.requiredStatusTag)
+                || effect.attackMultiplierPermille <= 0
+                || effect.moveSpeedMultiplierPermille <= 0
+                || (!string.IsNullOrWhiteSpace(
+                        persistentPresentationStateTag)
+                    && string.IsNullOrWhiteSpace(
+                        source.animationKey))
+                || (effect.attackMultiplierPermille == 1000
+                    && effect.moveSpeedMultiplierPermille == 1000))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_REQUIRED_STATUS_TAG_INVALID path=" + sourcePath);
+            entry.requiredStatusTag = effect.requiredStatusTag;
+            entry.requiredStatusTagAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            entry.requiredStatusTagMoveSpeedMultiplierPermille =
+                effect.moveSpeedMultiplierPermille;
             return entry;
         }
         if (effect.kind == "TimedTargetAreaDamage")
@@ -368,9 +724,54 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks; public int timedBlinkDistanceCentimetres; public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly; public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType; public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable; public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId; }
-    [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public string animationKey; public AbilityEffect[] effects; }
+    [Serializable] private sealed class AbilityCatalogEntry
+    {
+        public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration;
+        public string persistentPresentationStateTag;
+        public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster;
+        public string unitTrait; public int onHitDefenseReductionPerStack;
+        public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille;
+        public int hitPointsPerSecond; public int lifetimeTicks;
+        public string onDamageReactionDamageType; public int onDamageReactionDamageAmount;
+        public int unblockedPhysicalDamageTakenPermille; public int unblockedMagicDamageTakenPermille;
+        public int attackSequenceFirstEnhancedAttackOrdinal; public int attackSequenceRepeatInterval; public int attackSequenceAttackMultiplierPermille;
+        public int attackCountTransitionBeforeAttackOrdinal; public int attackCountLockedAttackSpeedAdditive; public int attackCountLockedDefenseAdditive; public int attackCountUnlockedAttackMultiplierPermille; public int attackCountUnlockedMagicResistanceAdditive; public int attackCountUnlockedHitPointsPerSecond; public int attackCountUnlockedTargetDefenseMultiplierPermille; public bool attackCountReleasesAlliedStates;
+        public DeathSpawnOptionEntry[] deathSpawnOptions; public int deathSpawnCount; public int deathSpawnDelayTicks; public int deathSpawnSideLengthCentimetres; public bool deathSpawnSnapToNearestPassableCell; public int deathSpawnSummonedMoveSpeedMultiplierPermille;
+        public string auraTargetSide; public bool auraIsGlobal; public int auraRadiusCentimetres; public bool auraExcludeSource; public bool auraNonStackingByAbilityId; public int auraAttackMultiplierPermille; public int auraDefenseAdditive; public int auraMagicResistanceAdditive; public int auraAttackSpeedMultiplierPermille; public int auraMoveSpeedMultiplierPermille; public int auraHitPointsPerSecond; public string auraGrantedStatusTag;
+        public bool blockedCounterpartNonStackingByAbilityId; public int blockedCounterpartAttackSpeedMultiplierPermille;
+        public int nearbySameTypeRadiusCentimetres; public int nearbySameTypeDefenseAdditive;
+        public int evasionPhysicalChancePermille; public int evasionMagicChancePermille;
+        public string deathAreaDamageType; public int deathAreaAttackMultiplierPermille; public int deathAreaRadiusCentimetres; public int deathAreaDelayTicks;
+        public string attackAreaShape; public int attackAreaFirstAttackOrdinal; public int attackAreaRepeatInterval; public string attackAreaDamageType; public int attackAreaAttackMultiplierPermille; public int attackAreaRadiusCentimetres;
+        public int unblockedAttackChargeCheckIntervalTicks; public int unblockedAttackChargeAttackAdditivePerStack; public int unblockedAttackChargeMaxStacks;
+        public int healthThresholdFullHealHitPointsPermille; public bool healthThresholdFullHealInclusive;
+        public string requiredStatusTag; public int requiredStatusTagAttackMultiplierPermille; public int requiredStatusTagMoveSpeedMultiplierPermille;
+        public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly;
+        public int attackDashFirstTriggerOrdinal; public int attackDashRepeatInterval; public int attackDashDistanceCentimetres; public int attackDashUnblockableDurationTicks;
+        public int timedBlinkDistanceCentimetres;
+        public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly;
+        public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType;
+        public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable;
+        public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId;
+    }
+    [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public string animationKey; public string persistentPresentationStateTag; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
-    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; public string triggerKind; public int maxActiveSameType; public int thresholdHitPointsPermille; public bool inclusiveThreshold; public bool triggerOnce; public int durationTicks; public int defenseMultiplierPermille; public int moveSpeedMultiplierPermille; public bool makesUnblockable; }
+    [Serializable] private sealed class AbilityEffect
+    {
+        public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster;
+        public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille;
+        public int hitPointsPerSecond; public int lifetimeTicks;
+        public float targetRangeMetres; public float radiusMetres; public string damageType; public int damageAmount; public int attackMultiplierPermille; public bool groundTargetsOnly;
+        public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; public string triggerKind; public int maxActiveSameType;
+        public int thresholdHitPointsPermille; public bool inclusiveThreshold; public bool triggerOnce; public int durationTicks; public int defenseMultiplierPermille; public int moveSpeedMultiplierPermille; public bool makesUnblockable;
+        public int transitionBeforeAttackOrdinal; public int lockedAttackSpeedAdditive; public int lockedDefenseAdditive; public int unlockedAttackMultiplierPermille; public int unlockedMagicResistanceAdditive; public int unlockedHitPointsPerSecond; public int unlockedTargetDefenseMultiplierPermille; public bool releasesAlliedAttackCountStates;
+        public DeathSpawnOptionSource[] options; public int delayTicks; public bool snapToNearestPassableCell; public int summonedMoveSpeedMultiplierPermille;
+        public string targetSide; public bool isGlobal; public bool excludeSource; public bool nonStackingByAbilityId; public int defenseAdditive; public int attackSpeedMultiplierPermille; public string grantedStatusTag;
+        public int physicalChancePermille; public int magicChancePermille; public string shape;
+        public int checkIntervalTicks; public int attackAdditivePerStack; public int maxStacks;
+        public string requiredStatusTag;
+    }
+    [Serializable] private sealed class DeathSpawnOptionSource { public string summonTypeId; public int weight; }
+    [Serializable] private sealed class DeathSpawnOptionEntry { public string summonTypeId; public int weight; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
 }

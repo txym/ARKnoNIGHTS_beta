@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "FLAUTIST_THIRD_ATTACK_BOOST",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "每攻击两次，下一次攻击伤害提升。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "AttackSequenceModifier",
+      "firstTriggerOrdinal": 3,
+      "repeatInterval": 3,
+      "attackMultiplierPermille": 1300
+    }
+  ]
+}

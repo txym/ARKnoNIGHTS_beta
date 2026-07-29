@@ -19,7 +19,7 @@
                          "sourceVariant":  "1165_duhond",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池侦察犬",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  2800,
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1165_duhond_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深池侦察犬pro",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4000,

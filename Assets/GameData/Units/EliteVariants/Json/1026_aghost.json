@@ -19,7 +19,7 @@
                          "sourceVariant":  "1026_aghost",
                          "statsLevel":  0,
                          "displayNameZhHans":  "幽灵组长",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "无法被阻挡。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3800,

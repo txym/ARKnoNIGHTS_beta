@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "GREY_HAT_THIRD_ATTACK_DASH",
   "displayNameZhHans": "",
-  "descriptionZhHans": "每第三次攻击清除自身阻挡，短暂无视阻挡并向敌方门位移1.5格，对触发前的目标正常造成伤害。",
+  "descriptionZhHans": "每攻击两次，下一次攻击向侵入点方向瞬移。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

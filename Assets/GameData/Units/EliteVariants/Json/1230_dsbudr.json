@@ -19,7 +19,7 @@
                          "sourceVariant":  "1230_dsbudr",
                          "statsLevel":  0,
                          "displayNameZhHans":  "深溟奠基者",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7000,
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1230_dsbudr_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "富营养的奠基者",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "法术抗性提升。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  9000,

@@ -31,6 +31,9 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     [SerializeField] private UnitWorldStatusBar statusBar;
     private readonly Dictionary<string, string> skillAnimations =
         new Dictionary<string, string>(StringComparer.Ordinal);
+    private readonly Dictionary<string, StateAnimations> stateAnimations =
+        new Dictionary<string, StateAnimations>(StringComparer.Ordinal);
+    private string presentationStateTag = string.Empty;
 
     private float playbackSpeed = 1f;
     private bool deathFallbackApplied;
@@ -105,14 +108,22 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
         hitAnimation = hit ?? string.Empty;
         deathAnimation = death ?? string.Empty;
         skillAnimations.Clear();
+        stateAnimations.Clear();
+        presentationStateTag = string.Empty;
         foreach (var skill in skills
                      ?? Array.Empty<ArknoNights.Battle.Infrastructure.SkillAnimationCatalogBinding>())
         {
-            if (skill == null
-                || string.IsNullOrWhiteSpace(skill.AnimationKey))
-                continue;
-            skillAnimations[skill.AnimationKey] =
-                skill.AnimationName ?? string.Empty;
+            if (skill == null) continue;
+            if (skill.HasSkillAnimation)
+                skillAnimations[skill.AnimationKey] =
+                    skill.AnimationName ?? string.Empty;
+            if (skill.HasPresentationState)
+                stateAnimations[skill.PresentationStateTag] =
+                    new StateAnimations(
+                        skill.StateIdleAnimation,
+                        skill.StateMoveAnimation,
+                        skill.StateAttackAnimation,
+                        skill.StateDeathAnimation);
         }
     }
 
@@ -151,14 +162,42 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
         if (statusBar) statusBar.SetState(unitId, isEnemy, maxHitPoints, currentHitPoints, currentShield);
     }
 
-    public void PlayIdle()
+    public void SetPresentationState(string stateTag)
     {
-        if (unitSkel) unitSkel.PlayDefaultPresentationAnimation();
+        presentationStateTag = stateTag ?? string.Empty;
     }
 
-    public void PlayMove() => PlayOrReport(moveAnimation, true, 1f, "move");
+    public void PlayIdle()
+    {
+        var state = ActiveStateAnimations;
+        if (state == null)
+        {
+            if (unitSkel)
+                unitSkel.PlayDefaultPresentationAnimation();
+            return;
+        }
+        PlayOrReport(state.Idle, true, 1f, "idle");
+    }
 
-    public void PlayAttack(float animationSpeedMultiplier) => PlayOrReport(attackAnimation, false, animationSpeedMultiplier, "attack");
+    public void PlayMove()
+    {
+        var state = ActiveStateAnimations;
+        PlayOrReport(
+            state == null ? moveAnimation : state.Move,
+            true,
+            1f,
+            "move");
+    }
+
+    public void PlayAttack(float animationSpeedMultiplier)
+    {
+        var state = ActiveStateAnimations;
+        PlayOrReport(
+            state == null ? attackAnimation : state.Attack,
+            false,
+            animationSpeedMultiplier,
+            "attack");
+    }
 
     public void PlaySkill(string animationKey, float animationSpeedMultiplier)
     {
@@ -214,7 +253,13 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     public void PlayDeath()
     {
         if (deathState != DeathPresentationState.Alive) return;
-        if (PlayOrReport(deathAnimation, false, 1f, "death", out var entry))
+        var state = ActiveStateAnimations;
+        if (PlayOrReport(
+                state == null ? deathAnimation : state.Death,
+                false,
+                1f,
+                "death",
+                out var entry))
         {
             deathState = DeathPresentationState.Animation;
             deathTrackEntry = entry;
@@ -243,6 +288,32 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
 
     private int configuredMaximumHitPoints;
 
+    private StateAnimations ActiveStateAnimations =>
+        stateAnimations.TryGetValue(
+            presentationStateTag,
+            out var value)
+            ? value
+            : null;
+
+    private sealed class StateAnimations
+    {
+        internal StateAnimations(
+            string idle,
+            string move,
+            string attack,
+            string death)
+        {
+            Idle = idle ?? string.Empty;
+            Move = move ?? string.Empty;
+            Attack = attack ?? string.Empty;
+            Death = death ?? string.Empty;
+        }
+
+        internal string Idle { get; }
+        internal string Move { get; }
+        internal string Attack { get; }
+        internal string Death { get; }
+    }
 
     private bool PlayOrReport(string animationName, bool loop, float localSpeed, string action)
         => PlayOrReport(animationName, loop, localSpeed, action, out _);

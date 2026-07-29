@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "HOST_NATURAL_REGENERATION_500",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "能够自然回复生命。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "PassiveLifecycle",
+      "hitPointsPerSecond": 500,
+      "lifetimeTicks": 0
+    }
+  ]
+}

@@ -19,7 +19,7 @@
                          "sourceVariant":  "1146_defspd",
                          "statsLevel":  0,
                          "displayNameZhHans":  "铁砧",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "到达部署位置后，为周围友方单位持续提供防御力与生命回复，出发一段时间后会自动撤退。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5000,
@@ -53,7 +53,9 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "UNTARGETABLE_BY_MELEE"
+                                                  "UNTARGETABLE_BY_MELEE",
+                                                  "ANVIL_LIFETIME",
+                                                  "ANVIL_SUPPORT_AURA"
                                               ]
                      },
                      {
@@ -61,7 +63,7 @@
                          "sourceVariant":  "1146_defspd_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "铁砧B型",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "到达部署位置后，为周围友方单位持续提供防御力与生命回复，出发一段时间后会自动撤退。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  8000,
@@ -95,7 +97,10 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "UNTARGETABLE_BY_MELEE"
+                                                  "UNTARGETABLE_BY_MELEE",
+                                                  "ANVIL_LIFETIME",
+                                                  "ANVIL_SUPPORT_AURA",
+                                                  "ANVIL_SUPPORT_AURA_ELITE_TWO_BONUS"
                                               ]
                      }
                  ]

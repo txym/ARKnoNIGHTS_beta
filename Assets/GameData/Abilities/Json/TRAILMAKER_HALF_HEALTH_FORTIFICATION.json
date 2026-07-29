@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "TRAILMAKER_HALF_HEALTH_FORTIFICATION",
   "displayNameZhHans": "",
-  "descriptionZhHans": "生命值低于50%时，防御力提升300%，阻挡数+1。",
+  "descriptionZhHans": "低于半血时提升防御力与阻挡数。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

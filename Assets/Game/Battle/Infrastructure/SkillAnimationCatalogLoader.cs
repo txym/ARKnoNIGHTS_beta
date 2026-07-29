@@ -15,18 +15,35 @@ namespace ArknoNights.Battle.Infrastructure
             string animationKey,
             string animationName,
             int originalAnimationTicks,
-            IEnumerable<int> segmentOriginalAnimationTicks)
+            IEnumerable<int> segmentOriginalAnimationTicks,
+            string presentationStateTag = "",
+            string stateIdleAnimation = "",
+            string stateMoveAnimation = "",
+            string stateAttackAnimation = "",
+            string stateDeathAnimation = "")
         {
             TypeId = typeId;
             AbilityId = abilityId;
-            AnimationKey = animationKey;
-            AnimationName = animationName;
+            AnimationKey = animationKey ?? string.Empty;
+            AnimationName = animationName ?? string.Empty;
             OriginalAnimationTicks = originalAnimationTicks;
             SegmentOriginalAnimationTicks =
                 new ReadOnlyCollection<int>(
                     (segmentOriginalAnimationTicks
-                     ?? new[] { originalAnimationTicks })
+                     ?? (originalAnimationTicks > 0
+                         ? new[] { originalAnimationTicks }
+                         : Array.Empty<int>()))
                     .ToArray());
+            PresentationStateTag =
+                presentationStateTag ?? string.Empty;
+            StateIdleAnimation =
+                stateIdleAnimation ?? string.Empty;
+            StateMoveAnimation =
+                stateMoveAnimation ?? string.Empty;
+            StateAttackAnimation =
+                stateAttackAnimation ?? string.Empty;
+            StateDeathAnimation =
+                stateDeathAnimation ?? string.Empty;
         }
 
         public string TypeId { get; }
@@ -38,6 +55,15 @@ namespace ArknoNights.Battle.Infrastructure
         {
             get;
         }
+        public string PresentationStateTag { get; }
+        public string StateIdleAnimation { get; }
+        public string StateMoveAnimation { get; }
+        public string StateAttackAnimation { get; }
+        public string StateDeathAnimation { get; }
+        public bool HasSkillAnimation =>
+            !string.IsNullOrWhiteSpace(AnimationKey);
+        public bool HasPresentationState =>
+            !string.IsNullOrWhiteSpace(PresentationStateTag);
     }
 
     public sealed class SkillAnimationCatalog
@@ -137,25 +163,62 @@ namespace ArknoNights.Battle.Infrastructure
                          ? Array.Empty<SkillAnimationBindingDto>()
                          : dto.bindings ?? Array.Empty<SkillAnimationBindingDto>())
             {
+                var hasSkillAnimation = item != null
+                    && !string.IsNullOrWhiteSpace(
+                        item.animationKey);
+                var hasPresentationState = item != null
+                    && !string.IsNullOrWhiteSpace(
+                        item.presentationStateTag);
                 if (item == null
                     || string.IsNullOrWhiteSpace(item.typeId)
                     || string.IsNullOrWhiteSpace(item.abilityId)
-                    || string.IsNullOrWhiteSpace(item.animationKey)
-                    || string.IsNullOrWhiteSpace(item.animationName)
-                    || item.originalAnimationTicks <= 0)
+                    || (!hasSkillAnimation
+                        && !hasPresentationState)
+                    || (hasSkillAnimation
+                        && (string.IsNullOrWhiteSpace(
+                                item.animationName)
+                            || item.originalAnimationTicks <= 0))
+                    || (!hasSkillAnimation
+                        && (!string.IsNullOrEmpty(
+                                item.animationName)
+                            || item.originalAnimationTicks != 0))
+                    || (hasPresentationState
+                        && (string.IsNullOrWhiteSpace(
+                                item.stateIdleAnimation)
+                            || string.IsNullOrWhiteSpace(
+                                item.stateMoveAnimation)
+                            || string.IsNullOrWhiteSpace(
+                                item.stateAttackAnimation)
+                            || string.IsNullOrWhiteSpace(
+                                item.stateDeathAnimation)))
+                    || (!hasPresentationState
+                        && (!string.IsNullOrEmpty(
+                                item.stateIdleAnimation)
+                            || !string.IsNullOrEmpty(
+                                item.stateMoveAnimation)
+                            || !string.IsNullOrEmpty(
+                                item.stateAttackAnimation)
+                            || !string.IsNullOrEmpty(
+                                item.stateDeathAnimation))))
                 {
                     errors.Add(new ValidationError(
                         "skillAnimation.binding.invalid",
                         "Skill animation binding is incomplete."));
                     continue;
                 }
-                var animationKeys = item.animationKey.Split('|');
-                var animationNames = item.animationName.Split('|');
+                var animationKeys = hasSkillAnimation
+                    ? item.animationKey.Split('|')
+                    : Array.Empty<string>();
+                var animationNames = hasSkillAnimation
+                    ? item.animationName.Split('|')
+                    : Array.Empty<string>();
                 var segmentTicks =
                     item.segmentOriginalAnimationTicks != null
                     && item.segmentOriginalAnimationTicks.Length > 0
                         ? item.segmentOriginalAnimationTicks
-                        : new[] { item.originalAnimationTicks };
+                        : hasSkillAnimation
+                            ? new[] { item.originalAnimationTicks }
+                            : Array.Empty<int>();
                 if (animationKeys.Length != animationNames.Length
                     || animationKeys.Length != segmentTicks.Length
                     || animationKeys.Any(string.IsNullOrWhiteSpace)
@@ -182,7 +245,12 @@ namespace ArknoNights.Battle.Infrastructure
                     item.animationKey,
                     item.animationName,
                     item.originalAnimationTicks,
-                    segmentTicks));
+                    segmentTicks,
+                    item.presentationStateTag,
+                    item.stateIdleAnimation,
+                    item.stateMoveAnimation,
+                    item.stateAttackAnimation,
+                    item.stateDeathAnimation));
             }
 
             if (bindings.Count == 0)
@@ -224,6 +292,11 @@ namespace ArknoNights.Battle.Infrastructure
             public string animationName;
             public int originalAnimationTicks;
             public int[] segmentOriginalAnimationTicks;
+            public string presentationStateTag;
+            public string stateIdleAnimation;
+            public string stateMoveAnimation;
+            public string stateAttackAnimation;
+            public string stateDeathAnimation;
         }
     }
 }

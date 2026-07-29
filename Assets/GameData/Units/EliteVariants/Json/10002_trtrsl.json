@@ -19,7 +19,7 @@
                          "sourceVariant":  "10002_trtrsl",
                          "statsLevel":  0,
                          "displayNameZhHans":  "浆果虫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "尝试挖地逃跑。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  5400,
@@ -73,7 +73,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "BERRY_BUG_LIFETIME"
                                               ]
                      },
                      {
@@ -81,7 +81,7 @@
                          "sourceVariant":  "10002_trtrsl_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "硕果虫",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "尝试挖地逃跑。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7200,
@@ -135,7 +135,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "BERRY_BUG_LIFETIME"
                                               ]
                      }
                  ]

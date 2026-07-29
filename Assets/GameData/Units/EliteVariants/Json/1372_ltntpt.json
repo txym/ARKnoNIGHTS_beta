@@ -19,7 +19,7 @@
                          "sourceVariant":  "1372_ltntpt",
                          "statsLevel":  0,
                          "displayNameZhHans":  "残党乐团小号手",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击变为十字范围伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  6000,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TRUMPETER_THIRD_ATTACK_CROSS"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1372_ltntpt_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "巫王乐团小号手",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "每攻击两次，下一次攻击变为十字范围伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  7000,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "TRUMPETER_THIRD_ATTACK_CROSS"
                                               ]
                      }
                  ]

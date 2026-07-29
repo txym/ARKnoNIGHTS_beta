@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "BLOCKED_BLINK_FORWARD",
   "displayNameZhHans": "",
-  "descriptionZhHans": "仅在被阻挡且技力已满时触发，解除阻挡并向敌方门方向闪现1.5格。",
+  "descriptionZhHans": "被阻挡时可以快速移动至其身后。",
   "activationKind": "Timed",
   "silencePolicy": "Unaffected",
   "skillPoints": {

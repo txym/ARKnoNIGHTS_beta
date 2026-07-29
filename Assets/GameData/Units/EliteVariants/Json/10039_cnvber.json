@@ -19,7 +19,7 @@
                          "sourceVariant":  "10039_cnvber",
                          "statsLevel":  0,
                          "displayNameZhHans":  "“开怀畅饮”",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "阻挡数增加，受到的物理和法术伤害大幅降低，蓄力后对目标周围地面敌人造成范围伤害。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  22000,

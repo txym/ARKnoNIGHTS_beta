@@ -41,7 +41,7 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void DroneTrait_ExcludesMeleeAcquisitionButAllowsRangedAcquisition()
+        public void DroneTrait_ExcludesBothMeleeAndRangedAcquisition()
         {
             var input = CreateInput(
                 2,
@@ -78,6 +78,9 @@ namespace ArknoNights.Battle.Tests
             Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.TargetChanged
                 && item.UnitId == "home-ranged"
+                && item.RelatedUnitId == "away-normal"));
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.TargetChanged
                 && item.RelatedUnitId == "away-drone"));
         }
 

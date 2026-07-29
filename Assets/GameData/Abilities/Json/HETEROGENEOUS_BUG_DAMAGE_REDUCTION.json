@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "HETEROGENEOUS_BUG_DAMAGE_REDUCTION",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "降低受到的物理与法术伤害。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    {
+      "kind": "PassiveCombatModifier",
+      "blockCapacityAdditive": 0,
+      "magicResistanceAdditive": 0,
+      "attackSpeedAdditive": 0,
+      "physicalDamageTakenPermille": 500,
+      "magicDamageTakenPermille": 500
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "HETEROGENEOUS_BEAST_FORTIFICATION",
   "displayNameZhHans": "",
-  "descriptionZhHans": "攻击速度+100，受到的物理和法术伤害降低50%。",
+  "descriptionZhHans": "受到伤害降低，攻击速度提升。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

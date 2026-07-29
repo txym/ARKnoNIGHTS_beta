@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "UNTARGETABLE_BY_MELEE",
   "displayNameZhHans": "",
-  "descriptionZhHans": "不会成为近战单位的攻击目标。",
+  "descriptionZhHans": "不会成为攻击或伤害的目标。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": {

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "BERRY_BUG_LIFETIME",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "尝试挖地逃跑。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "effects": [
+    { "kind": "PassiveLifecycle", "hitPointsPerSecond": 0, "lifetimeTicks": 120 }
+  ]
+}

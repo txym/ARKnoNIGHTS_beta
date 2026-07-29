@@ -542,7 +542,10 @@ namespace ArknoNights.Battle.Tests
                         triggerOnce: true,
                         durationTicks: 30,
                         moveSpeedMultiplierPermille: 2500,
-                        makesUnblockable: true)
+                        makesUnblockable: true,
+                        transitionAnimationKey: "Skill_Begin",
+                        transitionAnimationOriginalDurationTicks: 5,
+                        completedPresentationStateTag: "b")
                 },
                 new[] { Unit("runner", "runner", 5, 4) },
                 new[] { Unit("enemy", "enemy", 5, 4) });
@@ -563,6 +566,12 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 runtime.EffectiveMoveSpeedCentimetresPerSecond,
                 Is.EqualTo(250));
+            Assert.That(
+                runner.Events.Any(item =>
+                    item.Type == BattleEventType.Skill
+                    && item.UnitId == "runner"),
+                Is.False,
+                "The threshold skill must not interrupt the attack already in progress.");
 
             while (runner.CurrentTick < 31)
                 runner.Step();
@@ -570,6 +579,22 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 runtime.EffectiveMoveSpeedCentimetresPerSecond,
                 Is.EqualTo(250));
+            var transition = runner.Events.Single(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "runner");
+            Assert.That(transition.Tick, Is.EqualTo(3));
+            Assert.That(
+                transition.OriginalAnimationTicks,
+                Is.EqualTo(5));
+            Assert.That(
+                transition.EffectiveAnimationTicks,
+                Is.EqualTo(3));
+            var state = runner.Events.Single(item =>
+                item.Type
+                    == BattleEventType.PresentationStateChanged
+                && item.UnitId == "runner");
+            Assert.That(state.Tick, Is.EqualTo(6));
+            Assert.That(state.AnimationKey, Is.EqualTo("b"));
 
             runner.Step();
             Assert.That(runtime.EffectiveBlockCapacity, Is.EqualTo(1));
@@ -608,7 +633,8 @@ namespace ArknoNights.Battle.Tests
                         thresholdHitPointsPermille: 500,
                         inclusiveThreshold: false,
                         animationKey: "Skill_A",
-                        animationOriginalDurationTicks: 5)
+                        animationOriginalDurationTicks: 5,
+                        completedPresentationStateTag: "b")
                 },
                 new[] { Unit("healer", "healer", 5, 4) },
                 new[] { Unit("enemy", "enemy", 5, 4) });
@@ -654,6 +680,12 @@ namespace ArknoNights.Battle.Tests
             Assert.That(heal.DamageAmount, Is.EqualTo(600));
             Assert.That(heal.HitPointsBefore, Is.EqualTo(400));
             Assert.That(heal.HitPointsAfter, Is.EqualTo(1000));
+            var state = runner.Events.Single(item =>
+                item.Type
+                    == BattleEventType.PresentationStateChanged
+                && item.UnitId == "healer");
+            Assert.That(state.Tick, Is.EqualTo(10));
+            Assert.That(state.AnimationKey, Is.EqualTo("b"));
         }
 
         [Test]
@@ -787,7 +819,8 @@ namespace ArknoNights.Battle.Tests
                 {
                     PassiveAttackCountState(
                         lockedAttackSpeedAdditive: -50,
-                        unlockedAttackMultiplierPermille: 1500)
+                        unlockedAttackMultiplierPermille: 1500,
+                        unlockedPresentationStateTag: "released")
                 },
                 new[] { Unit("prisoner", "prisoner", 5, 4) },
                 new[] { Unit("target", "target", 5, 4) });
@@ -809,6 +842,33 @@ namespace ArknoNights.Battle.Tests
                     .Select(item => item.DamageAmount)
                     .ToArray(),
                 Is.EqualTo(new[] { 100, 100, 100, 150, 150 }));
+            var state = result.Events.Single(item =>
+                item.Type
+                    == BattleEventType.PresentationStateChanged
+                && item.UnitId == "prisoner");
+            var fourthAttack = result.Events.Single(item =>
+                item.Type == BattleEventType.Attack
+                && item.UnitId == "prisoner"
+                && item.Tick == 13);
+            Assert.That(state.Tick, Is.EqualTo(13));
+            Assert.That(state.AnimationKey, Is.EqualTo("released"));
+            Assert.That(state.Sequence, Is.LessThan(fourthAttack.Sequence));
+
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(
+                compiler.TryCompile(
+                    result,
+                    out var track,
+                    out var diagnostics),
+                Is.True,
+                string.Join(
+                    "; ",
+                    diagnostics.Select(item => item.ToString())));
+            Assert.That(track.TryGetUnit("prisoner", out var prisonerTrack), Is.True);
+            Assert.That(prisonerTrack.Sample(12).PresentationStateTag, Is.Empty);
+            Assert.That(
+                prisonerTrack.Sample(13).PresentationStateTag,
+                Is.EqualTo("released"));
         }
 
         [Test]
@@ -920,10 +980,12 @@ namespace ArknoNights.Battle.Tests
                     PassiveAttackCountState(
                         unlockedAttackMultiplierPermille: 1500,
                         abilityId: "BOSS_STATE",
-                        releasesAlliedAttackCountStates: true),
+                        releasesAlliedAttackCountStates: true,
+                        unlockedPresentationStateTag: "red"),
                     PassiveAttackCountState(
                         unlockedAttackMultiplierPermille: 1500,
-                        abilityId: "ALLY_STATE")
+                        abilityId: "ALLY_STATE",
+                        unlockedPresentationStateTag: "released")
                 },
                 new[]
                 {
@@ -944,6 +1006,19 @@ namespace ArknoNights.Battle.Tests
                 runner.RuntimeUnits.Single(item =>
                     item.UnitId == "boss").EffectiveAttack,
                 Is.EqualTo(150));
+            Assert.That(
+                runner.Events
+                    .Where(item =>
+                        item.Type
+                            == BattleEventType
+                                .PresentationStateChanged)
+                    .Select(item =>
+                        item.UnitId + ":" + item.AnimationKey),
+                Is.EquivalentTo(new[]
+                {
+                    "boss:red",
+                    "ally:released"
+                }));
         }
 
         [Test]
@@ -977,7 +1052,7 @@ namespace ArknoNights.Battle.Tests
                         })
                 },
                 new[] { Unit("killer", "killer", 5, 4) },
-                new[] { Unit("parent", "parent", 5, 4) });
+                new[] { Unit("parent", "parent", 5, 4, 2) });
 
             var result = new BattleRunner(input).RunToCompletion();
             var death = result.Events.Single(item =>
@@ -992,6 +1067,8 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 spawns.Select(item => item.Tick).Distinct().Single(),
                 Is.EqualTo(death.Tick + 4));
+            Assert.That(spawns, Has.All.Matches<BattleEvent>(item =>
+                item.SpawnSnapshot.EliteLevel == 2));
             Assert.That(
                 result.Events.Any(item =>
                     item.Type == BattleEventType.BattleEnded
@@ -1482,7 +1559,7 @@ namespace ArknoNights.Battle.Tests
                         sideLengthCentimetres: 40,
                         maxActiveSameType: 12)
                 },
-                new[] { Unit("builder", "builder", 5, 4) },
+                new[] { Unit("builder", "builder", 5, 4, 2) },
                 new[] { Unit("target", "target", 5, 4) });
 
             var runner = new BattleRunner(input);
@@ -1507,6 +1584,7 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 spawn.SpawnSnapshot.ActivationTick,
                 Is.EqualTo(7));
+            Assert.That(spawn.SpawnSnapshot.EliteLevel, Is.EqualTo(2));
         }
 
         [Test]
@@ -1997,7 +2075,7 @@ namespace ArknoNights.Battle.Tests
                         summonTypeId: "berry")
                 },
                 new[] { Unit("attacker", "attacker", 5, 4) },
-                new[] { Unit("golem", "golem", 5, 4) });
+                new[] { Unit("golem", "golem", 5, 4, 2) });
 
             var result =
                 new BattleRunner(input).RunToCompletion();
@@ -2027,6 +2105,8 @@ namespace ArknoNights.Battle.Tests
                         item.SpawnSnapshot.ActivationTick)
                     .Distinct(),
                 Is.EqualTo(new[] { 3 }));
+            Assert.That(spawns, Has.All.Matches<BattleEvent>(item =>
+                item.SpawnSnapshot.EliteLevel == 2));
             Assert.That(
                 spawns.All(item =>
                     !BattlefieldRules.IsGate(
@@ -2144,6 +2224,60 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void TacticalCommandTag_EnablesConditionalAllyModifiers()
+        {
+            var input = CreateInput(
+                2,
+                new[]
+                {
+                    NonAttacker(
+                        "command-source",
+                        1000,
+                        "TACTICAL_COMMAND_AURA"),
+                    Attacker(
+                        "commanded",
+                        100,
+                        0,
+                        "TACTICAL_COMMAND_ATTACK",
+                        attack: 100)
+                },
+                new[]
+                {
+                    PassiveAura(
+                        "TACTICAL_COMMAND_AURA",
+                        AuraTargetSide.Allies,
+                        isGlobal: true,
+                        radiusCentimetres: 0,
+                        excludeSource: false,
+                        nonStackingByAbilityId: false,
+                        attackMultiplierPermille: 1100,
+                        defenseAdditive: 100,
+                        grantedStatusTag: "TacticalCommand"),
+                    PassiveRequiredStatusTag(
+                        "TACTICAL_COMMAND_ATTACK",
+                        "TacticalCommand",
+                        attackMultiplierPermille: 1500)
+                },
+                new[]
+                {
+                    Unit("source", "command-source", 4, 4),
+                    Unit("commanded", "commanded", 5, 4)
+                },
+                Array.Empty<UnitSnapshot>());
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+
+            var source = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "source");
+            var commanded = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "commanded");
+            Assert.That(source.EffectiveDefense, Is.EqualTo(100));
+            Assert.That(commanded.EffectiveDefense, Is.EqualTo(100));
+            Assert.That(commanded.EffectiveAttack, Is.EqualTo(165));
+        }
+
+        [Test]
         public void DeploymentApproach_StartsAtOwnGateAndEnablesAuraOnlyAtDestination()
         {
             var input = CreateInput(
@@ -2177,7 +2311,7 @@ namespace ArknoNights.Battle.Tests
                         "ANVIL_AURA",
                         AuraTargetSide.Allies,
                         isGlobal: false,
-                        radiusCentimetres: 150,
+                        radiusCentimetres: 250,
                         excludeSource: true,
                         nonStackingByAbilityId: true,
                         defenseAdditive: 200,
@@ -2232,6 +2366,8 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(new FixedPosition(500, 500)));
             Assert.That(homeAlly.EffectiveDefense, Is.EqualTo(300));
             Assert.That(awayAlly.EffectiveDefense, Is.EqualTo(300));
+            Assert.That(homeAlly.PassiveHitPointsPerSecond, Is.EqualTo(400));
+            Assert.That(awayAlly.PassiveHitPointsPerSecond, Is.EqualTo(400));
 
             runner.Step();
 
@@ -2681,7 +2817,10 @@ namespace ArknoNights.Battle.Tests
             int moveSpeedMultiplierPermille =
                 HealthThresholdCombatModifierDefinition
                     .NeutralMultiplierPermille,
-            bool makesUnblockable = false)
+            bool makesUnblockable = false,
+            string transitionAnimationKey = "",
+            int transitionAnimationOriginalDurationTicks = 0,
+            string completedPresentationStateTag = "")
         {
             return new AbilityDefinition(
                 abilityId,
@@ -2707,7 +2846,10 @@ namespace ArknoNights.Battle.Tests
                     blockCapacityAdditive,
                     attackSpeedAdditive,
                     moveSpeedMultiplierPermille,
-                    makesUnblockable),
+                    makesUnblockable,
+                    transitionAnimationKey,
+                    transitionAnimationOriginalDurationTicks,
+                    completedPresentationStateTag),
                 string.Empty,
                 0);
         }
@@ -2777,7 +2919,8 @@ namespace ArknoNights.Battle.Tests
                 AttackCountStateModifierDefinition
                     .NeutralMultiplierPermille,
             string abilityId = "PRISONER_STATE",
-            bool releasesAlliedAttackCountStates = false)
+            bool releasesAlliedAttackCountStates = false,
+            string unlockedPresentationStateTag = "")
         {
             return new AbilityDefinition(
                 abilityId,
@@ -2804,7 +2947,8 @@ namespace ArknoNights.Battle.Tests
                     unlockedMagicResistanceAdditive,
                     unlockedHitPointsPerSecond,
                     unlockedTargetDefenseMultiplierPermille,
-                    releasesAlliedAttackCountStates),
+                    releasesAlliedAttackCountStates,
+                    unlockedPresentationStateTag),
                 string.Empty,
                 0);
         }
@@ -3124,7 +3268,8 @@ namespace ArknoNights.Battle.Tests
                 int thresholdHitPointsPermille,
                 bool inclusiveThreshold,
                 string animationKey,
-                int animationOriginalDurationTicks)
+                int animationOriginalDurationTicks,
+                string completedPresentationStateTag = "")
         {
             return new AbilityDefinition(
                 abilityId,
@@ -3159,7 +3304,8 @@ namespace ArknoNights.Battle.Tests
                     thresholdHitPointsPermille,
                     inclusiveThreshold,
                     animationKey,
-                    animationOriginalDurationTicks),
+                    animationOriginalDurationTicks,
+                    completedPresentationStateTag),
                 string.Empty,
                 0);
         }
@@ -3190,7 +3336,8 @@ namespace ArknoNights.Battle.Tests
             int moveSpeedMultiplierPermille =
                 AuraCombatModifierDefinition
                     .NeutralMultiplierPermille,
-            int hitPointsPerSecond = 0)
+            int hitPointsPerSecond = 0,
+            string grantedStatusTag = "")
         {
             return new AbilityDefinition(
                 abilityId,
@@ -3222,9 +3369,60 @@ namespace ArknoNights.Battle.Tests
                     magicResistanceAdditive,
                     attackSpeedMultiplierPermille,
                     moveSpeedMultiplierPermille,
-                    hitPointsPerSecond),
+                    hitPointsPerSecond,
+                    grantedStatusTag),
                 string.Empty,
                 0);
+        }
+
+        private static AbilityDefinition PassiveRequiredStatusTag(
+            string abilityId,
+            string requiredStatusTag,
+            int attackMultiplierPermille =
+                RequiredStatusTagCombatModifierDefinition
+                    .NeutralMultiplierPermille,
+            int moveSpeedMultiplierPermille =
+                RequiredStatusTagCombatModifierDefinition
+                    .NeutralMultiplierPermille)
+        {
+            return new AbilityDefinition(
+                abilityId: abilityId,
+                displayNameZhHans: string.Empty,
+                descriptionZhHans: string.Empty,
+                activationKind: AbilityActivationKind.Passive,
+                silencePolicy: SilencePolicy.Unaffected,
+                initialSkillPoints: 0,
+                requiredSkillPoints: 0,
+                skillPointGeneration: SkillPointGeneration.None,
+                summonEffect: null,
+                unitTraitEffect: null,
+                passiveCombatModifier: null,
+                passiveLifecycleEffect: null,
+                onDamageReactionEffect: null,
+                healthThresholdCombatModifier: null,
+                unblockedDamageTakenModifier: null,
+                attackSequenceModifier: null,
+                attackCountStateModifier: null,
+                deathSpawnEffect: null,
+                auraCombatModifier: null,
+                blockedCounterpartCombatModifier: null,
+                nearbySameTypeSelfModifier: null,
+                evasionModifier: null,
+                deathAreaDamageEffect: null,
+                attackAreaDamageModifier: null,
+                onHitDamageOverTimeEffect: null,
+                unblockedAttackCharge: null,
+                triggeredSpawnEffect: null,
+                healthThresholdAdjacentSpawnEffect: null,
+                healthThresholdFullHealEffect: null,
+                onHitDefenseDebuffEffect: null,
+                animationKey: string.Empty,
+                skillAnimationOriginalDurationTicks: 0,
+                requiredStatusTagCombatModifier:
+                    new RequiredStatusTagCombatModifierDefinition(
+                        requiredStatusTag,
+                        attackMultiplierPermille,
+                        moveSpeedMultiplierPermille));
         }
 
         private static AbilityDefinition PassiveTrait(
@@ -3490,14 +3688,16 @@ namespace ArknoNights.Battle.Tests
             string unitId,
             string typeId,
             int x,
-            int y)
+            int y,
+            int eliteLevel = 0)
         {
             return new UnitSnapshot(
                 unitId,
                 typeId,
                 UnitZone.Deployed,
                 new FormationCoordinate(x, y),
-                Array.Empty<BuffPlaceholder>());
+                Array.Empty<BuffPlaceholder>(),
+                eliteLevel);
         }
 
         private static BattleInput CreateInput(

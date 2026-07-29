@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "BERRY_CRAB_HALF_HEALTH_FULL_HEAL",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "生命值低于一半时，会吃掉携带的<闪亮果实>，回复自身生命。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
+  "animationKey": "skill",
+  "persistentPresentationStateTag": "b",
+  "effects": [
+    {
+      "kind": "HealthThresholdFullHeal",
+      "thresholdHitPointsPermille": 500,
+      "inclusiveThreshold": false
+    }
+  ]
+}

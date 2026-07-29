@@ -112,14 +112,68 @@ namespace ArknoNights.Battle.Tests
                 document.bindings.Select(item => item.abilityId),
                 Is.EqualTo(new[]
                 {
+                    "BERRY_CRAB_HALF_HEALTH_FULL_HEAL",
                     "BLOCKED_BLINK_FORWARD",
                     "CHARGED_DRINK_AREA_ATTACK",
+                    "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM",
                     "GREY_HAT_THIRD_ATTACK_DASH",
+                    "PRISONER_RELEASE_BOXER",
+                    "PRISONER_RELEASE_LEADER",
+                    "PRISONER_RELEASE_STANDARD",
+                    "PRISONER_RELEASE_STRONG",
                     "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
                     "ROADBUILDER_THIRD_ATTACK_SPAWN",
                     "SUMMON_JELLY_MINIONS",
                     "SUMMON_REPAIR_HELPER"
                 }));
+            var berryCrabBinding = document.bindings.Single(item =>
+                item.abilityId == "BERRY_CRAB_HALF_HEALTH_FULL_HEAL");
+            Assert.That(berryCrabBinding.typeId, Is.EqualTo("10004"));
+            Assert.That(berryCrabBinding.animationKey, Is.EqualTo("skill"));
+            Assert.That(berryCrabBinding.originalAnimationTicks, Is.EqualTo(80));
+            Assert.That(berryCrabBinding.presentationStateTag, Is.EqualTo("b"));
+            Assert.That(berryCrabBinding.stateIdleAnimation, Is.EqualTo("Idle_B"));
+            Assert.That(berryCrabBinding.stateMoveAnimation, Is.EqualTo("Move_B"));
+            Assert.That(berryCrabBinding.stateAttackAnimation, Is.EqualTo("Attack_B"));
+            Assert.That(berryCrabBinding.stateDeathAnimation, Is.EqualTo("Die_B"));
+            var feederBinding = document.bindings.Single(item =>
+                item.abilityId == "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM");
+            Assert.That(feederBinding.typeId, Is.EqualTo("10001"));
+            Assert.That(feederBinding.animationKey, Is.EqualTo("skill.begin"));
+            Assert.That(feederBinding.animationName, Is.EqualTo("Skill_Begin"));
+            Assert.That(feederBinding.originalAnimationTicks, Is.EqualTo(20));
+            Assert.That(feederBinding.presentationStateTag, Is.EqualTo("b"));
+            Assert.That(feederBinding.stateIdleAnimation, Is.EqualTo("Idle_B"));
+            Assert.That(feederBinding.stateMoveAnimation, Is.EqualTo("Move_B"));
+            Assert.That(feederBinding.stateAttackAnimation, Is.EqualTo("Attack_B"));
+            Assert.That(feederBinding.stateDeathAnimation, Is.EqualTo("Die_B"));
+            var standardPrisonerBinding = document.bindings.Single(item =>
+                item.abilityId == "PRISONER_RELEASE_STANDARD");
+            Assert.That(standardPrisonerBinding.typeId, Is.EqualTo("1116"));
+            Assert.That(standardPrisonerBinding.animationKey, Is.Empty);
+            Assert.That(
+                standardPrisonerBinding.presentationStateTag,
+                Is.EqualTo("released"));
+            Assert.That(
+                standardPrisonerBinding.stateIdleAnimation,
+                Is.EqualTo("Idle"));
+            Assert.That(
+                standardPrisonerBinding.stateMoveAnimation,
+                Is.EqualTo("Move"));
+            Assert.That(
+                standardPrisonerBinding.stateAttackAnimation,
+                Is.EqualTo("Attack"));
+            Assert.That(
+                standardPrisonerBinding.stateDeathAnimation,
+                Is.EqualTo("Die"));
+            var boxerBinding = document.bindings.Single(item =>
+                item.abilityId == "PRISONER_RELEASE_BOXER");
+            Assert.That(boxerBinding.typeId, Is.EqualTo("1118"));
+            Assert.That(boxerBinding.presentationStateTag, Is.EqualTo("red"));
+            Assert.That(boxerBinding.stateIdleAnimation, Is.EqualTo("Idle_red"));
+            Assert.That(boxerBinding.stateMoveAnimation, Is.EqualTo("Move_red"));
+            Assert.That(boxerBinding.stateAttackAnimation, Is.EqualTo("Attack_red"));
+            Assert.That(boxerBinding.stateDeathAnimation, Is.EqualTo("Die_red"));
             var blinkBinding = document.bindings.Single(item =>
                 item.abilityId == "BLOCKED_BLINK_FORWARD");
             Assert.That(blinkBinding.typeId, Is.EqualTo("1502"));
@@ -153,6 +207,16 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 loadedBlink.SegmentOriginalAnimationTicks,
                 Is.EqualTo(new[] { 10, 10 }));
+            Assert.That(
+                loaded.Catalog.TryGetAbility(
+                    "PRISONER_RELEASE_STANDARD",
+                    out var loadedPrisoner),
+                Is.True);
+            Assert.That(loadedPrisoner.HasSkillAnimation, Is.False);
+            Assert.That(loadedPrisoner.HasPresentationState, Is.True);
+            Assert.That(
+                loadedPrisoner.PresentationStateTag,
+                Is.EqualTo("released"));
             var chargedBinding = document.bindings.Single(item =>
                 item.abilityId == "CHARGED_DRINK_AREA_ATTACK");
             Assert.That(chargedBinding.typeId, Is.EqualTo("10039"));
@@ -768,6 +832,16 @@ namespace ArknoNights.Battle.Tests
                 sobering
                     .healthThresholdCombatMoveSpeedMultiplierPermille,
                 Is.EqualTo(2000));
+            var eliteSobering = document.abilities.Single(item =>
+                item.abilityId
+                == "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION_ELITE_TWO");
+            Assert.That(
+                eliteSobering.healthThresholdCombatAttackSpeedAdditive,
+                Is.EqualTo(150));
+            Assert.That(
+                eliteSobering
+                    .healthThresholdCombatMoveSpeedMultiplierPermille,
+                Is.EqualTo(2500));
 
             var steamTank = document.abilities.Single(item =>
                 item.abilityId
@@ -806,14 +880,191 @@ namespace ArknoNights.Battle.Tests
                 "1232_dssalr.json",
                 1232,
                 "TRAILMAKER_HALF_HEALTH_FORTIFICATION");
-            AssertUnitAbilityIds(
-                "1264_durgrd.json",
-                1264,
-                "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION");
+            var soberingUnit =
+                JsonUtility.FromJson<UnitAbilitySourceDocument>(
+                    File.ReadAllText(Path.Combine(
+                        RealSourceDirectory(),
+                        "1264_durgrd.json")));
+            Assert.That(soberingUnit.typeId, Is.EqualTo(1264));
+            Assert.That(
+                soberingUnit.variants[0].innateAbilityIds,
+                Is.EqualTo(new[]
+                {
+                    "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION"
+                }));
+            Assert.That(
+                soberingUnit.variants[1].innateAbilityIds,
+                Is.EqualTo(new[]
+                {
+                    "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION_ELITE_TWO"
+                }));
+            var regen160 = document.abilities.Single(item =>
+                item.abilityId == "HOST_NATURAL_REGENERATION_160");
+            Assert.That(regen160.hitPointsPerSecond, Is.EqualTo(160));
+            Assert.That(regen160.lifetimeTicks, Is.Zero);
+            var regen500 = document.abilities.Single(item =>
+                item.abilityId == "HOST_NATURAL_REGENERATION_500");
+            Assert.That(regen500.hitPointsPerSecond, Is.EqualTo(500));
+            var lifeLoss330 = document.abilities.Single(item =>
+                item.abilityId == "RAGING_HOST_LIFE_LOSS_330");
+            Assert.That(lifeLoss330.hitPointsPerSecond, Is.EqualTo(-330));
+            AssertUnitSingleAbilityIds(
+                "1043_zomsabr.json",
+                1043,
+                "HOST_NATURAL_REGENERATION_160",
+                "HOST_NATURAL_REGENERATION_300");
+            AssertUnitSingleAbilityIds(
+                "1044_zomstr.json",
+                1044,
+                "HOST_NATURAL_REGENERATION_400",
+                "HOST_NATURAL_REGENERATION_500");
+            AssertUnitSingleAbilityIds(
+                "1061_zomshd.json",
+                1061,
+                "HOST_NATURAL_REGENERATION_400",
+                "HOST_NATURAL_REGENERATION_500");
+            AssertUnitSingleAbilityIds(
+                "1062_rager.json",
+                1062,
+                "RAGING_HOST_LIFE_LOSS_330",
+                "RAGING_HOST_LIFE_LOSS_500");
             AssertUnitAbilityIds(
                 "1274_stmram.json",
                 1274,
                 "STEAM_TANK_HALF_HEALTH_ACCELERATION");
+        }
+
+        [Test]
+        public void AbilityCatalogGenerator_ProjectsRemainingBondsEffects()
+        {
+            var output = NewIsolatedPath(
+                "ability-expanded-bonds-projection",
+                "ability-catalog-v1.json");
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+
+            Assert.That(document.abilities, Has.Length.EqualTo(67));
+            var tactical = document.abilities.Single(item =>
+                item.abilityId == "TACTICAL_COMMAND_AURA");
+            Assert.That(tactical.auraIsGlobal, Is.True);
+            Assert.That(tactical.auraAttackMultiplierPermille, Is.EqualTo(1100));
+            Assert.That(tactical.auraDefenseAdditive, Is.EqualTo(100));
+            Assert.That(tactical.auraGrantedStatusTag, Is.EqualTo("TacticalCommand"));
+            var tacticalAttack = document.abilities.Single(item =>
+                item.abilityId == "TACTICAL_COMMAND_ATTACK");
+            Assert.That(tacticalAttack.requiredStatusTag, Is.EqualTo("TacticalCommand"));
+            Assert.That(
+                tacticalAttack.requiredStatusTagAttackMultiplierPermille,
+                Is.EqualTo(1500));
+
+            var deathSpawn = document.abilities.Single(item =>
+                item.abilityId == "CORE_FEEDER_DEATH_SPAWN");
+            Assert.That(deathSpawn.deathSpawnOptions, Has.Length.EqualTo(2));
+            Assert.That(deathSpawn.deathSpawnCount, Is.EqualTo(1));
+            Assert.That(
+                deathSpawn.deathSpawnSummonedMoveSpeedMultiplierPermille,
+                Is.EqualTo(3000));
+            var prisoner = document.abilities.Single(item =>
+                item.abilityId == "PRISONER_RELEASE_LEADER");
+            Assert.That(
+                prisoner.attackCountTransitionBeforeAttackOrdinal,
+                Is.EqualTo(4));
+            Assert.That(prisoner.attackCountReleasesAlliedStates, Is.True);
+            Assert.That(
+                prisoner.persistentPresentationStateTag,
+                Is.EqualTo("red"));
+            var cross = document.abilities.Single(item =>
+                item.abilityId == "TRUMPETER_THIRD_ATTACK_CROSS");
+            Assert.That(
+                cross.attackAreaShape,
+                Is.EqualTo("OrthogonalAdjacentCells"));
+            Assert.That(cross.attackAreaFirstAttackOrdinal, Is.EqualTo(3));
+            var reaction = document.abilities.Single(item =>
+                item.abilityId == "VEIN_GUARD_DAMAGE_REACTION");
+            Assert.That(
+                reaction.onDamageReactionDamageType,
+                Is.EqualTo("Magic"));
+            Assert.That(reaction.onDamageReactionDamageAmount, Is.EqualTo(200));
+            var fullHeal = document.abilities.Single(item =>
+                item.abilityId == "BERRY_CRAB_HALF_HEALTH_FULL_HEAL");
+            Assert.That(
+                fullHeal.healthThresholdFullHealHitPointsPermille,
+                Is.EqualTo(500));
+            Assert.That(
+                fullHeal.persistentPresentationStateTag,
+                Is.EqualTo("b"));
+            var feeder = document.abilities.Single(item =>
+                item.abilityId == "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM");
+            Assert.That(
+                feeder.persistentPresentationStateTag,
+                Is.EqualTo("b"));
+            var anvilAura = document.abilities.Single(item =>
+                item.abilityId == "ANVIL_SUPPORT_AURA");
+            Assert.That(anvilAura.auraTargetSide, Is.EqualTo("Allies"));
+            Assert.That(anvilAura.auraIsGlobal, Is.False);
+            Assert.That(anvilAura.auraRadiusCentimetres, Is.EqualTo(250));
+            Assert.That(anvilAura.auraExcludeSource, Is.True);
+            Assert.That(anvilAura.auraNonStackingByAbilityId, Is.True);
+            Assert.That(anvilAura.auraDefenseAdditive, Is.EqualTo(200));
+            Assert.That(anvilAura.auraHitPointsPerSecond, Is.EqualTo(400));
+            var eliteTwoAnvilAura = document.abilities.Single(item =>
+                item.abilityId == "ANVIL_SUPPORT_AURA_ELITE_TWO_BONUS");
+            Assert.That(eliteTwoAnvilAura.auraTargetSide, Is.EqualTo("Allies"));
+            Assert.That(eliteTwoAnvilAura.auraIsGlobal, Is.False);
+            Assert.That(
+                eliteTwoAnvilAura.auraRadiusCentimetres,
+                Is.EqualTo(250));
+            Assert.That(eliteTwoAnvilAura.auraExcludeSource, Is.True);
+            Assert.That(
+                eliteTwoAnvilAura.auraNonStackingByAbilityId,
+                Is.True);
+            Assert.That(eliteTwoAnvilAura.auraDefenseAdditive, Is.EqualTo(100));
+            Assert.That(
+                eliteTwoAnvilAura.auraHitPointsPerSecond,
+                Is.EqualTo(100));
+
+            AssertUnitAbilityIds(
+                "1080_sotidp.json",
+                1080,
+                "TACTICAL_COMMAND_AURA");
+            AssertUnitAbilityIds(
+                "1169_duphx.json",
+                1169,
+                "MAGIC_RESISTANCE_PLUS_SEVENTY",
+                "DEEP_POOL_PHALANX_NEARBY_DEFENSE");
+            AssertUnitAbilityIds(
+                "10126_rkbomb.json",
+                10126,
+                "HETEROGENEOUS_BUG_DAMAGE_REDUCTION",
+                "HETEROGENEOUS_BUG_DAMAGE_REACTION");
+            var anvil = JsonUtility.FromJson<UnitAbilitySourceDocument>(
+                File.ReadAllText(Path.Combine(
+                    RealSourceDirectory(),
+                    "1146_defspd.json")));
+            Assert.That(anvil.typeId, Is.EqualTo(1146));
+            Assert.That(anvil.variants, Has.Length.EqualTo(2));
+            Assert.That(
+                anvil.variants[0].innateAbilityIds,
+                Is.EqualTo(new[]
+                {
+                    "UNTARGETABLE_BY_MELEE",
+                    "ANVIL_LIFETIME",
+                    "ANVIL_SUPPORT_AURA"
+                }));
+            Assert.That(
+                anvil.variants[1].innateAbilityIds,
+                Is.EqualTo(new[]
+                {
+                    "UNTARGETABLE_BY_MELEE",
+                    "ANVIL_LIFETIME",
+                    "ANVIL_SUPPORT_AURA",
+                    "ANVIL_SUPPORT_AURA_ELITE_TWO_BONUS"
+                }));
         }
 
         [Test]
@@ -826,30 +1077,73 @@ namespace ArknoNights.Battle.Tests
 
             Assert.That(ids, Is.EqualTo(new[]
             {
+                "ANVIL_LIFETIME",
+                "ANVIL_SUPPORT_AURA",
+                "ANVIL_SUPPORT_AURA_ELITE_TWO_BONUS",
                 "AVENGER_HALF_HEALTH_ATTACK_BOOST",
+                "BERRY_BUG_LIFETIME",
+                "BERRY_CRAB_HALF_HEALTH_FULL_HEAL",
                 "BLOCKED_BLINK_FORWARD",
                 "BLOCK_CAPACITY_PLUS_ONE",
                 "BLOCK_CAPACITY_PLUS_TWO",
                 "CHARGED_DRINK_AREA_ATTACK",
+                "CORE_FEEDER_DEATH_SPAWN",
                 "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
                 "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED",
+                "DEEP_POOL_PHALANX_NEARBY_DEFENSE",
+                "DEEP_SEA_PREDATOR_EVASION",
+                "DRONE_DEFENSE_AURA_300",
+                "DRONE_MAGIC_RESISTANCE_AURA_30",
+                "FAMILY_CAR_DEATH_SPAWN",
+                "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM",
+                "FLAUTIST_THIRD_ATTACK_BOOST",
                 "FORTIFIED_CATERING_VEHICLE",
+                "FROST_ATTACK_SPEED_AURA",
                 "GREY_HAT_THIRD_ATTACK_DASH",
                 "GROUND_PROXIMITY_COLLISION_DAMAGE",
                 "HETEROGENEOUS_BEAST_FORTIFICATION",
+                "HETEROGENEOUS_BUG_DAMAGE_REACTION",
+                "HETEROGENEOUS_BUG_DAMAGE_REDUCTION",
+                "HOST_NATURAL_REGENERATION_160",
+                "HOST_NATURAL_REGENERATION_300",
+                "HOST_NATURAL_REGENERATION_400",
+                "HOST_NATURAL_REGENERATION_500",
                 "MAGIC_RESISTANCE_PLUS_SEVENTY",
                 "MAGIC_RESISTANCE_PLUS_SIXTY",
+                "MALIGNANT_TUMOR_BLOCKER_SLOW",
+                "MUTANT_ROCKSPIDER_DEATH_SPAWN",
+                "MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO",
+                "MUTANT_SANDBEAST_DEATH_SPAWN",
+                "MUTANT_SANDBEAST_DEATH_SPAWN_ELITE_TWO",
+                "PATHFINDER_FIRST_ATTACK_BOOST",
+                "PRISONER_RELEASE_BOXER",
+                "PRISONER_RELEASE_LEADER",
+                "PRISONER_RELEASE_STANDARD",
+                "PRISONER_RELEASE_STRONG",
+                "RAGING_HOST_LIFE_LOSS_330",
+                "RAGING_HOST_LIFE_LOSS_500",
                 "REVENGER_HALF_HEALTH_ATTACK_BOOST",
                 "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
                 "ROADBUILDER_TENTH_HIT_SPAWN",
                 "ROADBUILDER_THIRD_ATTACK_SPAWN",
                 "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION",
+                "SOBERING_ASSISTANT_FIRST_DAMAGE_ACCELERATION_ELITE_TWO",
+                "SOLIDIFIED_GOLEM_SPLASH_ATTACK",
                 "STACKING_DEFENSE_REDUCTION_ON_HIT",
                 "STEAM_TANK_HALF_HEALTH_ACCELERATION",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
+                "TACTICAL_COMMAND_ATTACK",
+                "TACTICAL_COMMAND_AURA",
+                "TACTICAL_COMMAND_MOVE_SPEED",
                 "TRAILMAKER_HALF_HEALTH_FORTIFICATION",
-                "UNTARGETABLE_BY_MELEE"
+                "TRUMPETER_THIRD_ATTACK_CROSS",
+                "UNBLOCKED_DAMAGE_REDUCTION_HALF",
+                "UNTARGETABLE_BY_MELEE",
+                "VEIN_GUARD_DAMAGE_REACTION",
+                "WIND_PLAYER_UNBLOCKED_ATTACK_CHARGE",
+                "WINTERWISP_DEATH_BLAST",
+                "WINTERWISP_LIFE_LOSS"
             }));
         }
 
@@ -869,6 +1163,32 @@ namespace ArknoNights.Battle.Tests
                     variant.innateAbilityIds,
                     Is.EqualTo(expectedAbilityIds),
                     variant.sourceVariant);
+        }
+
+        private static void AssertUnitSingleAbilityIds(
+            string fileName,
+            int expectedTypeId,
+            params string[] expectedAbilityIdsByVariant)
+        {
+            var unit = JsonUtility.FromJson<UnitAbilitySourceDocument>(
+                File.ReadAllText(Path.Combine(
+                    RealSourceDirectory(),
+                    fileName)));
+            Assert.That(unit.typeId, Is.EqualTo(expectedTypeId), fileName);
+            Assert.That(
+                unit.variants,
+                Has.Length.EqualTo(expectedAbilityIdsByVariant.Length),
+                fileName);
+            for (var index = 0;
+                 index < expectedAbilityIdsByVariant.Length;
+                 index++)
+                Assert.That(
+                    unit.variants[index].innateAbilityIds,
+                    Is.EqualTo(new[]
+                    {
+                        expectedAbilityIdsByVariant[index]
+                    }),
+                    unit.variants[index].sourceVariant);
         }
 
         private static void AssertAtomicFailure(
@@ -1176,6 +1496,11 @@ namespace ArknoNights.Battle.Tests
             public string animationName;
             public int originalAnimationTicks;
             public int[] segmentOriginalAnimationTicks;
+            public string presentationStateTag;
+            public string stateIdleAnimation;
+            public string stateMoveAnimation;
+            public string stateAttackAnimation;
+            public string stateDeathAnimation;
         }
 
         [Serializable]
@@ -1203,6 +1528,30 @@ namespace ArknoNights.Battle.Tests
             public int attackSpeedAdditive;
             public int physicalDamageTakenPermille;
             public int magicDamageTakenPermille;
+            public int hitPointsPerSecond;
+            public int lifetimeTicks;
+            public string onDamageReactionDamageType;
+            public int onDamageReactionDamageAmount;
+            public int attackCountTransitionBeforeAttackOrdinal;
+            public bool attackCountReleasesAlliedStates;
+            public string persistentPresentationStateTag;
+            public DeathSpawnOptionEntry[] deathSpawnOptions;
+            public int deathSpawnCount;
+            public int deathSpawnSummonedMoveSpeedMultiplierPermille;
+            public string auraTargetSide;
+            public bool auraIsGlobal;
+            public int auraRadiusCentimetres;
+            public bool auraExcludeSource;
+            public bool auraNonStackingByAbilityId;
+            public int auraAttackMultiplierPermille;
+            public int auraDefenseAdditive;
+            public int auraHitPointsPerSecond;
+            public string auraGrantedStatusTag;
+            public string attackAreaShape;
+            public int attackAreaFirstAttackOrdinal;
+            public int healthThresholdFullHealHitPointsPermille;
+            public string requiredStatusTag;
+            public int requiredStatusTagAttackMultiplierPermille;
             public int targetRangeCentimetres;
             public int areaRadiusCentimetres;
             public string areaDamageType;
@@ -1236,6 +1585,13 @@ namespace ArknoNights.Battle.Tests
             public int healthThresholdAdjacentSpawnHitPointsPermille;
             public bool healthThresholdAdjacentSpawnInclusive;
             public string healthThresholdAdjacentSpawnTypeId;
+        }
+
+        [Serializable]
+        private sealed class DeathSpawnOptionEntry
+        {
+            public string summonTypeId;
+            public int weight;
         }
 
         [Serializable]

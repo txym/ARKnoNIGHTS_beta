@@ -63,6 +63,122 @@ namespace ArknoNights.Battle.Tests
             Assert.That(ability.SummonEffect.InheritPathFromCaster, Is.False);
         }
 
+        [Test]
+        public void AbilityCatalog_LoadsPassiveLifecycleDefinition()
+        {
+            var unitCatalog =
+                UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(
+                unitCatalog.Success,
+                Is.True,
+                Errors(unitCatalog.Errors));
+            const string json =
+                "{\"schemaVersion\":\"ability-catalog-v1\","
+                + "\"catalogId\":\"passive-lifecycle\","
+                + "\"abilities\":[{"
+                + "\"abilityId\":\"REGEN\","
+                + "\"displayNameZhHans\":\"\","
+                + "\"descriptionZhHans\":\"\","
+                + "\"activationKind\":\"Passive\","
+                + "\"silencePolicy\":\"Unaffected\","
+                + "\"initialSkillPoints\":0,"
+                + "\"requiredSkillPoints\":0,"
+                + "\"skillPointGeneration\":\"None\","
+                + "\"hitPointsPerSecond\":160,"
+                + "\"lifetimeTicks\":0}]}";
+
+            var loaded = AbilityCatalogLoader.LoadFromJson(
+                json,
+                unitCatalog.Catalog);
+
+            Assert.That(
+                loaded.Success,
+                Is.True,
+                Errors(loaded.Errors));
+            var lifecycle = loaded.Catalog.Abilities
+                .Single()
+                .PassiveLifecycleEffect;
+            Assert.That(lifecycle, Is.Not.Null);
+            Assert.That(
+                lifecycle.HitPointsPerSecond,
+                Is.EqualTo(160));
+            Assert.That(lifecycle.LifetimeTicks, Is.Zero);
+        }
+
+        [Test]
+        public void AbilityCatalog_LoadsAuraGrantedTagAndConditionalModifier()
+        {
+            var unitCatalog =
+                UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.That(
+                unitCatalog.Success,
+                Is.True,
+                Errors(unitCatalog.Errors));
+            const string json =
+                "{\"schemaVersion\":\"ability-catalog-v1\","
+                + "\"catalogId\":\"tactical-command\","
+                + "\"abilities\":[{"
+                + "\"abilityId\":\"COMMAND_AURA\","
+                + "\"displayNameZhHans\":\"\","
+                + "\"descriptionZhHans\":\"\","
+                + "\"activationKind\":\"Passive\","
+                + "\"silencePolicy\":\"Unaffected\","
+                + "\"initialSkillPoints\":0,"
+                + "\"requiredSkillPoints\":0,"
+                + "\"skillPointGeneration\":\"None\","
+                + "\"auraTargetSide\":\"Allies\","
+                + "\"auraIsGlobal\":true,"
+                + "\"auraRadiusCentimetres\":0,"
+                + "\"auraExcludeSource\":false,"
+                + "\"auraNonStackingByAbilityId\":false,"
+                + "\"auraAttackMultiplierPermille\":1100,"
+                + "\"auraDefenseAdditive\":100,"
+                + "\"auraMagicResistanceAdditive\":0,"
+                + "\"auraAttackSpeedMultiplierPermille\":1000,"
+                + "\"auraMoveSpeedMultiplierPermille\":1000,"
+                + "\"auraHitPointsPerSecond\":0,"
+                + "\"auraGrantedStatusTag\":\"TacticalCommand\""
+                + "},{"
+                + "\"abilityId\":\"COMMAND_ATTACK\","
+                + "\"displayNameZhHans\":\"\","
+                + "\"descriptionZhHans\":\"\","
+                + "\"activationKind\":\"Passive\","
+                + "\"silencePolicy\":\"Unaffected\","
+                + "\"initialSkillPoints\":0,"
+                + "\"requiredSkillPoints\":0,"
+                + "\"skillPointGeneration\":\"None\","
+                + "\"requiredStatusTag\":\"TacticalCommand\","
+                + "\"requiredStatusTagAttackMultiplierPermille\":1500,"
+                + "\"requiredStatusTagMoveSpeedMultiplierPermille\":1000"
+                + "}]}";
+
+            var loaded = AbilityCatalogLoader.LoadFromJson(
+                json,
+                unitCatalog.Catalog);
+
+            Assert.That(
+                loaded.Success,
+                Is.True,
+                Errors(loaded.Errors));
+            var aura = loaded.Catalog.Abilities.Single(item =>
+                item.AbilityId == "COMMAND_AURA").AuraCombatModifier;
+            Assert.That(aura, Is.Not.Null);
+            Assert.That(aura.IsGlobal, Is.True);
+            Assert.That(
+                aura.GrantedStatusTag,
+                Is.EqualTo("TacticalCommand"));
+            var conditional = loaded.Catalog.Abilities.Single(item =>
+                    item.AbilityId == "COMMAND_ATTACK")
+                .RequiredStatusTagCombatModifier;
+            Assert.That(conditional, Is.Not.Null);
+            Assert.That(
+                conditional.RequiredStatusTag,
+                Is.EqualTo("TacticalCommand"));
+            Assert.That(
+                conditional.AttackMultiplierPermille,
+                Is.EqualTo(1500));
+        }
+
         [TestCase("\"abilityId\":\"\"", "ability.id.invalid")]
         [TestCase("\"initialSkillPoints\":-1", "ability.skillPoints.initial.invalid")]
         [TestCase("\"initialSkillPoints\":16", "ability.skillPoints.order.invalid")]

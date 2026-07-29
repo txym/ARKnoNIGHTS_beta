@@ -19,7 +19,7 @@
                          "sourceVariant":  "1008_ghost",
                          "statsLevel":  0,
                          "displayNameZhHans":  "幽灵",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "无法被阻挡。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  2300,

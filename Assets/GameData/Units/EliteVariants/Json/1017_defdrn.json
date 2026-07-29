@@ -19,7 +19,7 @@
                          "sourceVariant":  "1017_defdrn",
                          "statsLevel":  0,
                          "displayNameZhHans":  "御4",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "为周围友方单位持续提供防御力加成。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  4000,
@@ -53,7 +53,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-                                                  "UNTARGETABLE_BY_MELEE"
+                                                  "UNTARGETABLE_BY_MELEE",
+                                                  "DRONE_DEFENSE_AURA_300"
                                               ]
                      }
                  ]

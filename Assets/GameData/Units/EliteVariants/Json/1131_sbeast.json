@@ -19,7 +19,7 @@
                          "sourceVariant":  "1131_sbeast",
                          "statsLevel":  0,
                          "displayNameZhHans":  "变异沙地兽",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "死亡时分裂两个\u003c畸变赘生物\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  2700,
@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MUTANT_SANDBEAST_DEATH_SPAWN"
                                               ]
                      },
                      {
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1131_sbeast_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "变异沙地兽α",
-                         "skillDescriptionZhHans":  "",
+                         "skillDescriptionZhHans":  "死亡时分裂两个\u003c畸变恶性瘤\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3300,
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MUTANT_SANDBEAST_DEATH_SPAWN_ELITE_TWO"
                                               ]
                      }
                  ]
