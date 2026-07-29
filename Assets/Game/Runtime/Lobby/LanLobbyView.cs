@@ -11,6 +11,7 @@ public sealed class LanLobbyView : MonoBehaviour
     private const int CanvasOrder = 1000;
     private const int MaximumVisibleDiscoveryRooms = 4;
     private const string FontPath = "Fonts/Novecento wide Normal Regular.woff2";
+    private const string ChineseFontPath = "Fonts/FangZhengHeiTiJianTi-1";
     private const string SpriteRoot = "UI/Lobby/";
     private const float RoomReferenceWidth = 1920f;
     private const float RoomReferenceHeight = 1080f;
@@ -30,7 +31,6 @@ public sealed class LanLobbyView : MonoBehaviour
         public Image TopBar;
         public LanLobbyRect WaitingTopBarLayout;
         public LanLobbyRect ReadyTopBarLayout;
-        public Image ReadyOverlay;
         public GameObject EmptyContent;
         public Image EmptyInviteIcon;
         public Text EmptyInviteLabel;
@@ -39,7 +39,10 @@ public sealed class LanLobbyView : MonoBehaviour
         public Image ReadyIcon;
         public Text ReadyLabel;
         public Image LowerDecoration;
+        public Image PlayerAvatar;
+        public Text PlayerName;
         public Image CreatorTag;
+        public int SeatNumber;
     }
 
     private readonly Dictionary<string, LobbyDiscoveryEntry> discoveries = new Dictionary<string, LobbyDiscoveryEntry>(StringComparer.Ordinal);
@@ -48,8 +51,7 @@ public sealed class LanLobbyView : MonoBehaviour
     private RectTransform homeRoot;
     private RectTransform roomRoot;
     private Image legacyGridForeground;
-    private InputField profileNameInput;
-    private Text avatarIndexText;
+    private Text avatarNameText;
     private Image avatarImage;
     private InputField roomCodeInput;
     private Button joinButton;
@@ -114,7 +116,6 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         ShowHome();
         if (profile == null) return;
-        if (profileNameInput != null) profileNameInput.text = profile.DisplayName;
         avatarIndex = Mathf.Clamp(profile.AvatarIndex, LobbyProfile.MinimumAvatarIndex, LobbyProfile.MaximumAvatarIndex);
         RefreshAvatarIndex();
     }
@@ -157,7 +158,7 @@ public sealed class LanLobbyView : MonoBehaviour
     public void BindRoom(LobbyRoomSnapshot room, string localId)
     {
         localPlayerId = localId;
-        roomCodeText.text = room == null ? "------" : room.RoomCode;
+        SetText(roomCodeText, room == null ? "------" : room.RoomCode);
         readyCardCount = 0;
         for (var index = 0; index < roomSlots.Count; index++)
         {
@@ -213,23 +214,23 @@ public sealed class LanLobbyView : MonoBehaviour
         roomPrimaryActionLabel.color = primaryUsesNormalSprite
             ? new Color(33f / 255f, 33f / 255f, 33f / 255f, 1f)
             : new Color(157f / 255f, 157f / 255f, 157f / 255f, 1f);
-        roomPrimaryActionLabel.text = localIsHost
+        SetText(roomPrimaryActionLabel, localIsHost
             ? "协议启动"
             : localMemberReady
                 ? "取消准备"
-                : "准备就绪";
+                : "准备就绪");
         roomPrimaryActionButton.interactable = canMutateRoom && (!localIsHost || allPresentMembersReady);
         roomLeaveButton.interactable = canMutateRoom;
     }
 
     public void SetStatus(string message)
     {
-        if (statusText != null) statusText.text = message ?? string.Empty;
+        if (statusText != null) SetText(statusText, message);
     }
 
     public void SetLocalLatency(long latencyMilliseconds)
     {
-        if (latencyText != null) latencyText.text = Math.Max(0, latencyMilliseconds) + " ms";
+        if (latencyText != null) SetText(latencyText, Math.Max(0, latencyMilliseconds) + " ms");
     }
 
     public void ClickDiscoveredRoomForTests(string roomCode)
@@ -329,13 +330,12 @@ public sealed class LanLobbyView : MonoBehaviour
 
     private void BuildHome(Transform parent)
     {
-        var identity = Image("IdentityPanel", parent, "img_player_bkg");
-        Position(identity.rectTransform, new Vector2(.19f, .5f), new Vector2(520f, 690f));
-        var identityTitle = Text("Title", identity.transform, 34, TextAnchor.UpperLeft, new Color(.3f, .95f, .95f));
-        Position(identityTitle.rectTransform, new Vector2(.08f, .9f), new Vector2(400f, 60f));
-        identityTitle.text = "LOCAL IDENTITY";
-        profileNameInput = Input("NameInput", identity.transform, "DISPLAY NAME", 28);
-        Position(profileNameInput.GetComponent<RectTransform>(), new Vector2(.5f, .6f), new Vector2(410f, 64f));
+        var identity = Rect("IdentityPanel", parent);
+        Position(identity, new Vector2(.225f, .5f), new Vector2(520f, 690f));
+        identity.localScale = Vector3.one * 1.5f;
+        var identityTitle = Text("Title", identity, 34, TextAnchor.MiddleCenter, new Color(.3f, .95f, .95f));
+        Position(identityTitle.rectTransform, new Vector2(.1f, .77f), new Vector2(150f, 96f));
+        SetText(identityTitle, "更改头像");
         var avatarFrame = Image("AvatarSelector", identity.transform, "team_icon_frame");
         Position(avatarFrame.rectTransform, new Vector2(.5f, .77f), new Vector2(96f, 96f));
         avatarFrame.preserveAspect = true;
@@ -344,8 +344,8 @@ public sealed class LanLobbyView : MonoBehaviour
         avatarImage.rectTransform.offsetMin = new Vector2(10f, 10f);
         avatarImage.rectTransform.offsetMax = new Vector2(-10f, -10f);
         avatarImage.preserveAspect = true;
-        avatarIndexText = Text("AvatarIndex", identity.transform, 18, TextAnchor.MiddleCenter, Color.white);
-        Position(avatarIndexText.rectTransform, new Vector2(.5f, .68f), new Vector2(180f, 30f));
+        avatarNameText = Text("AvatarName", identity.transform, 18, TextAnchor.MiddleCenter, Color.white);
+        Position(avatarNameText.rectTransform, new Vector2(.5f, .68f), new Vector2(180f, 30f));
         var previousAvatar = Button("PreviousAvatar", identity.transform, "btn_match_grey", "<", 28);
         Position(previousAvatar.GetComponent<RectTransform>(), new Vector2(.33f, .77f), new Vector2(70f, 56f));
         previousAvatar.onClick.AddListener(() => ChangeAvatar(-1));
@@ -353,9 +353,6 @@ public sealed class LanLobbyView : MonoBehaviour
         Position(nextAvatar.GetComponent<RectTransform>(), new Vector2(.67f, .77f), new Vector2(70f, 56f));
         nextAvatar.onClick.AddListener(() => ChangeAvatar(1));
         RefreshAvatarIndex();
-        var save = Button("SaveProfile", identity.transform, "room_create_btn_bg", "SAVE", 24);
-        Position(save.GetComponent<RectTransform>(), new Vector2(.5f, .42f), new Vector2(250f, 76f));
-        save.onClick.AddListener(() => ProfileSaved?.Invoke(new LobbyProfile("local", profileNameInput.text, avatarIndex)));
 
         BuildRoomSelect(parent);
     }
@@ -365,14 +362,11 @@ public sealed class LanLobbyView : MonoBehaviour
         var roomSelect = Rect("RoomSelect", parent);
         Stretch(roomSelect);
         var layout = LanLobbyLayout.ForSize(1920, 1080, LobbyRoomSnapshot.MaximumMembers);
-        var rightBackground = Image("RightBackground", roomSelect, "Home/room_select_right_bg");
-        PositionSprite(rightBackground, new Vector2(.751f, .79f), 820f);
-
         var titleIcon = Image("TitleIcon", roomSelect, "Home/room_select_title_icon");
         PositionSprite(titleIcon, new Vector2(.56f, .91f), 76f);
         var title = Text("Title", roomSelect, 34, TextAnchor.MiddleLeft, Color.white);
         Position(title.rectTransform, new Vector2(.71f, .91f), new Vector2(420f, 58f));
-        title.text = "选择同盟方式";
+        SetText(title, "选择同盟方式");
         var titleDot = Image("TitleDot", roomSelect, "Home/room_select_dot");
         PositionSprite(titleDot, new Vector2(.88f, .91f), 26f);
         var create = Rect("Create", roomSelect);
@@ -404,7 +398,7 @@ public sealed class LanLobbyView : MonoBehaviour
 
         statusText = Text("Status", roomSelect, 20, TextAnchor.MiddleCenter, Color.white);
         Position(statusText.rectTransform, new Vector2(.751f, .06f), new Vector2(700f, 36f));
-        statusText.text = "DISCOVERING LOCAL ROOMS";
+        SetText(statusText, "DISCOVERING LOCAL ROOMS");
     }
 
     private void BuildCreateSection(RectTransform parent, LanLobbyRect actionRect)
@@ -461,14 +455,13 @@ public sealed class LanLobbyView : MonoBehaviour
     {
         CreateSolidDecorationPanel(
             "InteriorBacking", parent,
-            122f, 11f, 717f, 280f,
+            146f, 11f, 667f, 280f,
             new Color(0f, 0f, 0f, .82f));
         var outlineColor = new Color(48f / 255f, 48f / 255f, 48f / 255f, .55f);
         CreateSolidDecorationPanel("OutlineTop", parent, 122f, 11f, 717f, 2f, outlineColor);
-        CreateSolidDecorationPanel("OutlineLeft", parent, 122f, 11f, 2f, 280f, outlineColor);
-        CreateSolidDecorationPanel("OutlineRight", parent, 837f, 11f, 2f, 280f, outlineColor);
+        CreateSolidDecorationPanel("OutlineLeft", parent, 140f, 11f, 2f, 280f, outlineColor);
+        CreateSolidDecorationPanel("OutlineRight", parent, 814f, 11f, 2f, 280f, outlineColor);
         var guideColor = new Color(1f, 165f / 255f, 0f, .55f);
-        CreateSolidDecorationPanel("GuideHorizontal", parent, 122f, 110f, 717f, 2f, guideColor);
         CreateSolidDecorationPanel("GuideVertical", parent, 474f, 11f, 2f, 196f, guideColor);
 
         for (var index = 0; index < 2; index++)
@@ -539,10 +532,10 @@ public sealed class LanLobbyView : MonoBehaviour
         roomLayout = layout;
         latencyText = Text("LocalLatency", parent, 28, TextAnchor.UpperLeft, new Color(.3f, .95f, .95f));
         PositionBottomLeft(latencyText.rectTransform, layout.Latency);
-        latencyText.text = "0 ms";
+        SetText(latencyText, "0 ms");
         roomCodeText = Text("RoomCode", parent, 42, TextAnchor.UpperCenter, Color.white);
         Position(roomCodeText.rectTransform, new Vector2(.5f, .92f), new Vector2(500f, 70f));
-        roomCodeText.text = "------";
+        SetText(roomCodeText, "------");
 
         for (var index = 0; index < LobbyRoomSnapshot.MaximumMembers; index++)
         {
@@ -597,10 +590,6 @@ public sealed class LanLobbyView : MonoBehaviour
         PositionBottomLeft(cardBody.rectTransform, layout.CardBody);
         cardBody.preserveAspect = false;
 
-        var readyOverlay = Image("ReadyOverlay", root, "player_card_self_frame");
-        PositionBottomLeft(readyOverlay.rectTransform, layout.StateOverlay);
-        readyOverlay.preserveAspect = true;
-
         var emptyContentImage = Image("EmptyContent", root, "card_empty");
         PositionBottomLeft(emptyContentImage.rectTransform, layout.EmptyInvite);
         emptyContentImage.preserveAspect = true;
@@ -614,7 +603,7 @@ public sealed class LanLobbyView : MonoBehaviour
 
         var emptyInviteLabel = Text("EmptyInviteLabel", emptyContentImage.transform, 25, TextAnchor.MiddleLeft, Color.white);
         PositionBottomLeft(emptyInviteLabel.rectTransform, new LanLobbyRect(122f, 61f, 110f, 34f));
-        emptyInviteLabel.text = "邀请";
+        SetText(emptyInviteLabel, "邀请");
 
         var emptyInviteHint = Text(
             "EmptyInviteHint",
@@ -623,7 +612,7 @@ public sealed class LanLobbyView : MonoBehaviour
             TextAnchor.MiddleLeft,
             new Color(.65f, .68f, .7f));
         PositionBottomLeft(emptyInviteHint.rectTransform, new LanLobbyRect(122f, 25f, 190f, 32f));
-        emptyInviteHint.text = "复制同盟密钥以邀请队友";
+        SetText(emptyInviteHint, "复制同盟密钥以邀请队友");
 
         var occupiedContent = Rect("OccupiedContent", root);
         Stretch(occupiedContent);
@@ -633,7 +622,7 @@ public sealed class LanLobbyView : MonoBehaviour
         readyIcon.preserveAspect = true;
 
         var readyLabel = Text("ReadyLabel", occupiedContent, 28, TextAnchor.MiddleLeft, Color.black);
-        readyLabel.text = "已就绪";
+        SetText(readyLabel, "已就绪");
         PositionPreferredText(readyLabel, layout.ReadyLabel);
 
         var topBar = Image("TopBar", root, "bg_top_normal");
@@ -643,6 +632,14 @@ public sealed class LanLobbyView : MonoBehaviour
         var lowerDecoration = Image("LowerDecoration", root, "card_deco_self");
         PositionBottomLeft(lowerDecoration.rectTransform, layout.LowerDecoration);
         lowerDecoration.preserveAspect = true;
+
+        var playerAvatar = Image("PlayerAvatar", lowerDecoration.transform, "Home/" + AvatarSpriteName(0));
+        PositionBottomLeft(playerAvatar.rectTransform, new LanLobbyRect(30f, 10f, 90f, 90f));
+        playerAvatar.preserveAspect = true;
+
+        var playerName = Text("PlayerName", lowerDecoration.transform, 30, TextAnchor.MiddleLeft, Color.white);
+        PositionBottomLeft(playerName.rectTransform, new LanLobbyRect(140f, 10f, 207f, 90f));
+        playerName.horizontalOverflow = HorizontalWrapMode.Overflow;
 
         var creatorTag = Image("CreatorTag", root, "host_top_tag");
         PositionBottomLeft(creatorTag.rectTransform, layout.CreatorTag);
@@ -656,7 +653,6 @@ public sealed class LanLobbyView : MonoBehaviour
             TopBar = topBar,
             WaitingTopBarLayout = layout.TopBar,
             ReadyTopBarLayout = layout.ReadyTopBar,
-            ReadyOverlay = readyOverlay,
             EmptyContent = emptyContentImage.gameObject,
             EmptyInviteIcon = emptyInviteIcon,
             EmptyInviteLabel = emptyInviteLabel,
@@ -665,7 +661,10 @@ public sealed class LanLobbyView : MonoBehaviour
             ReadyIcon = readyIcon,
             ReadyLabel = readyLabel,
             LowerDecoration = lowerDecoration,
-            CreatorTag = creatorTag
+            PlayerAvatar = playerAvatar,
+            PlayerName = playerName,
+            CreatorTag = creatorTag,
+            SeatNumber = index + 1
         };
     }
 
@@ -692,25 +691,35 @@ public sealed class LanLobbyView : MonoBehaviour
         slot.TopBar.sprite = Sprite(isReady ? "bg_top_ready" : "bg_top_normal");
         PositionBottomLeft(slot.TopBar.rectTransform, isReady ? slot.ReadyTopBarLayout : slot.WaitingTopBarLayout);
         slot.TopBar.preserveAspect = !isReady;
-        slot.ReadyOverlay.sprite = Sprite("player_card_self_frame");
         slot.EmptyContent.GetComponent<Image>().sprite = Sprite("card_empty");
         slot.EmptyInviteIcon.sprite = Sprite("bg_plus");
         slot.ReadyIcon.sprite = Sprite("player_card_ready");
         slot.LowerDecoration.sprite = Sprite(isReady ? "card_deco_self" : "card_deco_bg");
         slot.LowerDecoration.color = isReady ? Color.white : new Color(.5f, .5f, .5f, 1f);
+        var hasProfile = member != null && member.Profile != null;
+        if (hasProfile)
+        {
+            slot.PlayerAvatar.sprite = Sprite("Home/" + AvatarSpriteName(member.Profile.AvatarIndex));
+            SetText(slot.PlayerName, member.Profile.DisplayName + "#" + slot.SeatNumber);
+        }
+        else
+        {
+            SetText(slot.PlayerName, string.Empty);
+        }
         slot.CreatorTag.sprite = Sprite("host_top_tag");
-        slot.EmptyInviteLabel.text = "邀请";
-        slot.EmptyInviteHint.text = "复制同盟密钥以邀请队友";
-        slot.ReadyLabel.text = "已就绪";
+        SetText(slot.EmptyInviteLabel, "邀请");
+        SetText(slot.EmptyInviteHint, "复制同盟密钥以邀请队友");
+        SetText(slot.ReadyLabel, "已就绪");
 
         slot.CardBody.gameObject.SetActive(true);
         slot.TopBar.gameObject.SetActive(true);
-        slot.ReadyOverlay.gameObject.SetActive(isReady);
         slot.EmptyContent.SetActive(isEmpty);
         slot.OccupiedContent.SetActive(isReady);
         slot.ReadyIcon.gameObject.SetActive(isReady);
         slot.ReadyLabel.gameObject.SetActive(isReady);
         slot.LowerDecoration.gameObject.SetActive(true);
+        slot.PlayerAvatar.gameObject.SetActive(hasProfile);
+        slot.PlayerName.gameObject.SetActive(hasProfile);
         slot.CreatorTag.gameObject.SetActive(member != null && isHostSlot);
         ResizeToPreferredText(slot.ReadyLabel);
     }
@@ -722,7 +731,9 @@ public sealed class LanLobbyView : MonoBehaviour
         var entries = new List<LobbyDiscoveryEntry>(discoveries.Values);
         entries.Sort((left, right) => string.CompareOrdinal(left.RoomCode, right.RoomCode));
         discoveryOverflowCount = Math.Max(0, entries.Count - MaximumVisibleDiscoveryRooms);
-        discoveryOverflowText.text = discoveryOverflowCount > 0 ? "+" + discoveryOverflowCount + " MORE ROOMS" : string.Empty;
+        SetText(
+            discoveryOverflowText,
+            discoveryOverflowCount > 0 ? "+" + discoveryOverflowCount + " MORE ROOMS" : string.Empty);
         var visibleCount = Math.Min(entries.Count, MaximumVisibleDiscoveryRooms);
         for (var index = 0; index < visibleCount; index++)
         {
@@ -795,12 +806,16 @@ public sealed class LanLobbyView : MonoBehaviour
         var count = LobbyProfile.MaximumAvatarIndex - LobbyProfile.MinimumAvatarIndex + 1;
         avatarIndex = (avatarIndex - LobbyProfile.MinimumAvatarIndex + direction + count) % count + LobbyProfile.MinimumAvatarIndex;
         RefreshAvatarIndex();
+        ProfileSaved?.Invoke(new LobbyProfile(
+            "local",
+            LobbyProfile.DisplayNameForAvatar(avatarIndex),
+            avatarIndex));
     }
 
     private void RefreshAvatarIndex()
     {
         if (avatarImage != null) avatarImage.sprite = Sprite("Home/" + AvatarSpriteName(avatarIndex));
-        if (avatarIndexText != null) avatarIndexText.text = "AVATAR " + (avatarIndex + 1);
+        if (avatarNameText != null) SetText(avatarNameText, LobbyProfile.DisplayNameForAvatar(avatarIndex));
     }
 
     private static string AvatarSpriteName(int index)
@@ -825,7 +840,7 @@ public sealed class LanLobbyView : MonoBehaviour
         button.targetGraphic = image;
         var text = Text("Label", value.transform, fontSize, TextAnchor.MiddleCenter, Color.white);
         Stretch(text.rectTransform);
-        text.text = label;
+        SetText(text, label);
         return button;
     }
 
@@ -842,7 +857,7 @@ public sealed class LanLobbyView : MonoBehaviour
         Stretch(hint.rectTransform);
         hint.rectTransform.offsetMin = new Vector2(18f, 0f);
         hint.rectTransform.offsetMax = new Vector2(-18f, 0f);
-        hint.text = placeholder;
+        SetText(hint, placeholder);
         var input = value.GetComponent<InputField>();
         input.textComponent = text;
         input.placeholder = hint;
@@ -872,6 +887,30 @@ public sealed class LanLobbyView : MonoBehaviour
         text.verticalOverflow = VerticalWrapMode.Overflow;
         text.raycastTarget = false;
         return text;
+    }
+
+    private static void SetText(Text text, string value)
+    {
+        if (text == null) return;
+        value = value ?? string.Empty;
+        text.text = value;
+        text.font = Resources.Load<Font>(ContainsHanCharacter(value) ? ChineseFontPath : FontPath);
+    }
+
+    private static bool ContainsHanCharacter(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return false;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if ((character >= '\u3400' && character <= '\u9fff')
+                || (character >= '\uf900' && character <= '\ufaff'))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static Sprite Sprite(string name)

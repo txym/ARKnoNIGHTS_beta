@@ -1103,3 +1103,20 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
 - `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\PlayerCapture.log`
 
 当前 Cycle 3 target 为 `1020` 个共识像素：canonical-left/right 各 `510`，逐行完全配对且中间列为 `0`。actual normalized set 为 `1004..1026`，intersection 为 `1000..1020`，union 为 `1024..1026`，Jaccard 为 `0.976562..0.994152 >= 0.95`。10 个 PortraitFrame 中 `8/10` 通过；`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 的像素 Jaccard 均通过，但各有 `4 px > 3 px` 的宽度差，所以视觉验收仍是 **FAILED**。`RoomReady.Slot2.ReadyTopBar` 和 `RoomHost.Slot2To3.VisibleContourSpacing` 仍是 Cycle 3 命名回归。图 12/13 第四槽继续为 `ExcludedByReferencePopup` 且 `passed=false`。
+
+## 35. LAN 主界面身份与 RoomCard 信息优化验证（2026-07-29，当前权威补充）
+
+本节取代旧测试合同中对 `RightBackground`、名字输入、Save 按钮、`ReadyOverlay` 和房主资料缺失的要求；历史截图与 2026-07-28 的保留结果不能作为本次变更的新通过证据。
+
+1. `LobbyProtocolEditModeTests` 必须验证四个允许的头像索引分别派生 `Amiy/Clementi/Kirar/Zumam`，且首字母大写；任意仍由旧客户端提交的自由名字在 `LobbyProfile` 构造边界被规范化为头像名。
+2. `LanLobbyViewPlayModeTests` 必须验证：
+   - `IdentityPanel` 没有 `Graphic`、`NameInput`、`SaveProfile` 或 `AvatarIndex` 节点；
+   - 标题为“更改头像”，标题中心 Y 与头像选择器中心 Y 对齐，`IdentityPanel` 整体 UI 缩放为 `1.5×`；
+   - 切换头像立即发出含派生游戏名的资料变更；
+   - `RightBackground` 与所有 `RoomCard/ReadyOverlay` 均不存在；
+   - Join backing 使用顶锚点、左上 pivot，`anchoredPosition=(146,-11)`、`sizeDelta=(667,280)`，不存在 `GuideHorizontal`，左右轮廓 X 分别为 `140/814`；
+   - Empty/Waiting/Ready 重绑不会重建四个 RoomCard；已占用槽位的 LowerDecoration 显示正确头像和 `<DisplayName>#<1..4>`，头像矩形为 `(30,10,90,90)`，名字矩形为 `(140,10,207,90)` 且字号为 `30`，空槽隐藏并清空名字；至少一个用例必须让头像索引与座位索引不同，并在同一槽位重绑另一头像，以证明绑定读取成员快照而非槽位号；
+   - 所有含汉字的 Lobby `Text` 使用 `FangZhengHeiTiJianTi-1`。
+3. `LanLobbyCaptureSuitePlayModeTests` 必须验证清单不再包含 `ReadyOverlay`，已占用槽位包含 `LowerDecoration/PlayerAvatar` 与 `PlayerName`，头像的 Resources/Combined 来源完整，Join backing 的 `1920×1080` screen-bottom-left 诊断矩形为 `(1178,204,667,280)`。
+4. 至少串行运行上述三组 focused suites，要求测试数大于零，失败、跳过、不确定和未运行均为零；同时运行 `LanLobbyControllerPlayModeTests` 检查房间生命周期未回归。
+5. 旧 Figure 9/11–13 像素参考不包含本次新布局，且三次可见 Player 校准额度已用尽。本次不得把旧 visual-diff 结果记为新 UI 视觉通过；如需建立新像素参考或运行新的可见 Player 校准，必须由项目负责人另行授权。

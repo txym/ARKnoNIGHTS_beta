@@ -7,6 +7,24 @@ namespace ArknoNights.Lobby.Tests
 {
     public sealed class LobbyProtocolEditModeTests
     {
+        [TestCase(0, "Amiy")]
+        [TestCase(1, "Clementi")]
+        [TestCase(2, "Kirar")]
+        [TestCase(3, "Zumam")]
+        public void AvatarDisplayName_UsesTheFourApprovedCapitalizedAvatarNames(int avatarIndex, string expected)
+        {
+            Assert.That(LobbyProfile.DisplayNameForAvatar(avatarIndex), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void Profile_NormalizesSubmittedDisplayNameToAvatarName()
+        {
+            var profile = new LobbyProfile("player-1", "Doctor", 2);
+
+            Assert.That(profile.IsValid(), Is.True);
+            Assert.That(profile.DisplayName, Is.EqualTo("Kirar"));
+        }
+
         [Test]
         public void Decode_RejectsFrameAboveMaximumSize()
         {

@@ -689,3 +689,5 @@ NullReferenceException、missing Sprite 或 fatal。前两个 forced-stop 是
 - stale-after-start snapshot 仍可能覆盖 `HasStarted`。
 - accept/stop 生命周期竞态仍未修复。
 - Windows 与 Android 两台物理设备同一 Wi-Fi 下的发现、房间号预填、加入、准备切换、开始、离开和房主解散流程仍未人工验证。
+
+> **2026-07-29 UI 合同变更提示：** 本报告中关于 `RoomSelect/RightBackground`、IdentityPanel 名字输入/Save、旧 Join `InteriorBacking` 矩形、`RoomCard/ReadyOverlay` 以及房主资料隐藏的截图与清单均为历史证据，已被 `docs/SPEC.md` 第 17 节取代。当前实现的 focused Unity 回归记录在 `docs/TEST_PLAN.md` 第 35 节；本轮没有生成新的可见 Player 截图，也不得把本报告的旧像素结果记为新布局通过。

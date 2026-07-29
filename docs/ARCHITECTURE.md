@@ -336,3 +336,5 @@ v2 是唯一人工维护的单位源，当前包含 BONDS 使用的 `99` 个 Typ
 - 依赖方向严格为 `ARKnoNIGHTS.Lobby`（房间 DTO、发现、socket、uGUI View）→ `Assembly-CSharp/Initial` 的 `LanLobbyController`（主线程会话与本地准备阶段门控）→ 既有 UI-009 `PreparationBattleLoopController`。Lobby 不引用 `PlayerState`、Battle Core 或场景序列化对象；网络房间只同步成员、头像索引、准备、延迟与开始。大厅门控只冻结运行时准备倒计时；收到权威开始状态后解除门控，随后仍由 UI-009 的四玩家封存和多战斗演示流程推进。
 - `LanLobbyCaptureSuite` 位于 Initial 展示层，只在 Player 显式收到 `-lanLobbyCaptureSuite` 时启动。它以生产 `LanLobbyView` 产生五种固定证据状态，并将截图与 JSON 清单写入调用方指定的忽略目录；它不写入 `Assets`、不改场景、Prefab 或玩家战斗数据。
 - 清单中的 Sprite 来源由 capture suite 限制为已审批的 `UI/Lobby` 白名单，`ExportLanLobbyEvidence.ps1` 再逐项和 `docs/references/ui/lobby/ASSET_MAP.md` 对照。任何未知 Sprite、缺图、缺参考图或不完整清单都会令导出失败，而不会生成看似有效的证据。
+
+2026-07-29 的主界面/房间 UI 优化保持上述模块边界不变：`LanLobbyController` 只持久化四选一头像索引，并用 `LobbyProfile.DisplayNameForAvatar` 派生本地游戏名；`LobbyProfile` 构造边界也会把旧客户端或网络提交的自由名字规范化为对应头像名，同时保留既有字段长度校验，因此房间权威状态不会携带头像与游戏名不一致的资料。`LanLobbyView` 继续只读 `LobbyRoomSnapshot`，把成员 `AvatarIndex` 与 `DisplayName` 投影到对应 `RoomCard/LowerDecoration`，座位号来自当前成员索引 `+1`。该投影不写回房间状态，也不向 `PlayerState` 或 Battle Core 注入资料。`LanLobbyCaptureSuite` 同步导出活动头像、扩展名字和更新后的节点清单。

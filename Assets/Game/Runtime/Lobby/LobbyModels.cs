@@ -24,12 +24,14 @@ namespace ArknoNights.Lobby
     {
         public const int MaximumDisplayNameCharacters = 20;
         public const int MinimumAvatarIndex = 0;
-        public const int MaximumAvatarIndex = 7;
+        public const int MaximumAvatarIndex = 3;
+        private readonly string submittedDisplayName;
 
         public LobbyProfile(string playerId, string displayName, int avatarIndex)
         {
             PlayerId = playerId;
-            DisplayName = displayName;
+            submittedDisplayName = displayName;
+            DisplayName = DisplayNameForAvatar(avatarIndex);
             AvatarIndex = avatarIndex;
         }
 
@@ -40,10 +42,21 @@ namespace ArknoNights.Lobby
         public bool IsValid()
         {
             return !string.IsNullOrWhiteSpace(PlayerId)
-                && !string.IsNullOrWhiteSpace(DisplayName)
-                && DisplayName.Length <= MaximumDisplayNameCharacters
+                && !string.IsNullOrWhiteSpace(submittedDisplayName)
+                && submittedDisplayName.Length <= MaximumDisplayNameCharacters
                 && AvatarIndex >= MinimumAvatarIndex
                 && AvatarIndex <= MaximumAvatarIndex;
+        }
+
+        public static string DisplayNameForAvatar(int avatarIndex)
+        {
+            switch (avatarIndex)
+            {
+                case 0: return "Amiy";
+                case 1: return "Clementi";
+                case 2: return "Kirar";
+                default: return "Zumam";
+            }
         }
     }
 
