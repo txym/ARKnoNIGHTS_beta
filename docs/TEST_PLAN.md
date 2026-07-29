@@ -1,1158 +1,163 @@
 # 测试计划
 
-## 1. 目的与适用范围
+> 状态：当前验证入口与完成标准。
+>
+> 历次任务的命令、结果、失败和证据位置已归档到 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)。历史通过只证明当时的提交，不代表当前工作树已经重新验证。
 
-本文档定义当前 Unity 项目的验证层级、执行证据和后续自动化方向。测试期望以 `docs/SPEC.md` 已确认规则为准；未确认的机制不得通过测试代码被固化为事实。
+## 1. 原则
 
-TASK-006 已于 2026-07-18 以 Unity `2022.3.62f1c1` 复核第一阶段闭环。早期 TASK-001 的 Standalone 失败保留为历史基线；当前状态、实际命令、日志与未验证项以本文末尾的 TASK-006 验收记录为准。
+- 测试期望以 [`SPEC.md`](SPEC.md) 的已确认规则为准。
+- 优先验证可观察行为和结构化结果，不以“能编译”代替功能验收。
+- 测试数为 `0`、XML 缺失、Unity 超时、许可证失败、项目被占用、跳过或日志不完整时，结果均为“未验证”。
+- 同一项目路径不能同时由多个 Unity Editor 或 batchmode 进程打开。
+- Unity 运行前后都要检查 `git status --short`，避免导入或测试产生意外资源修改。
+- 截图只能验证表现，不能替代状态、事件、结果和错误路径断言。
 
-## 2. 当前验证基线
+## 2. 验证层级
 
-- Unity 版本为 `2022.3.62f1c1`。
-- Build Settings 当前只启用 `Assets/Scenes/SampleScene.unity`。
-- `packages-lock.json` 中存在 Unity Test Framework 间接依赖，但 `manifest.json` 没有直接声明测试框架。
-- Battle Core、Infrastructure、Presentation、Demo 和测试均已有第一方 `.asmdef`；Core 保持 `noEngineReferences`。
-- 第一方 EditMode/PlayMode 测试程序集已覆盖固定真实输入、回放、视角和表现桥接。
-- `EventTest.cs`、`MoveTest.cs` 和 `UITest.cs` 是场景调试脚本，不是自动化测试。
+按改动相关性依次执行：
 
-| 验证层 | 当前状态 |
-|---|---|
-| 静态文件、场景、程序集与测试清单 | 已完成只读盘点 |
-| Editor 导入与脚本编译 | 已验证通过：Unity batchmode 返回码 `0`，未发现 C# 编译错误 |
-| EditMode 测试 | 最新动画回归：34 项通过、0 失败、0 跳过；XML 可解析 |
-| PlayMode 测试 | 最新动画回归：6 项通过、0 失败、0 跳过；XML 可解析 |
-| Player 构建 | TASK-006 实际执行 Windows x86_64 构建成功，退出码 `0`；真实 Player 验收退出码 `0` |
-| 人工游戏流程 | 未验证：当前没有可靠的 Unity GUI 自动化能力，未以静态场景文本替代运行证据 |
+1. 静态检查与最终 diff；
+2. Editor 导入和 C# 编译；
+3. 相关 EditMode 测试；
+4. 相关 PlayMode 测试；
+5. Windows x86_64 或目标平台构建；
+6. 真实 Player 流程、结构化日志和必要截图；
+7. 独立审查生命周期、事件订阅、序列化、异步与测试缺口。
 
-测试数为 0、测试结果文件缺失、Unity 超时、许可证错误、项目被占用或日志不完整时，结果必须记为“未验证”，不能记为“通过”。
+纯文档改动通常只需要链接、格式、引用和 diff 检查；不应据此声称 Unity 编译或游戏流程已重新通过。
 
-## 3. 通用执行与记录规则
+## 3. 环境基线
 
-每次验证至少记录：
+- Unity：`2022.3.62f1c1`。
+- 唯一启用场景：`Assets/Scenes/SampleScene.unity`。
+- 测试程序集：
+  - `ARKnoNIGHTS.Battle.EditModeTests`
+  - `ARKnoNIGHTS.Battle.PlayModeTests`
+  - `ARKnoNIGHTS.Lobby.EditModeTests`
+  - `ARKnoNIGHTS.Lobby.PlayModeTests`
+- 项目测试启动器：`scripts/Invoke-UnityTests.ps1`。
+- 默认结果目录：`Temp/UnityTests/<UTC 时间戳>/`，包含 NUnit XML、Unity 日志和 `summary.txt`。
 
-- 实际 Unity 版本和执行命令；
-- 验证日期、代码版本或提交；
-- 退出码；
-- 测试总数、通过数、失败数和忽略数；
-- 失败测试名称及首个有效堆栈；
-- 构建目标、输出路径和构建结果；
-- Editor、测试、构建和 Player 日志位置；
-- 与本次改动相关的新错误、异常或资源加载失败。
+## 4. 常用命令
 
-同一个项目路径不得同时由多个 Unity Editor 或 batchmode 进程打开。运行前应检查工作区状态，运行后应检查 diff，防止测试或导入过程产生意外资源修改。
+以下示例从项目根目录执行，并使用仓库当前已安装位置；其他机器应替换 `UnityPath`。
 
-## 4. 编译验证
-
-### 4.1 当前状态
-
-TASK-006 的 Editor batchmode 编译与 Windows x86_64 构建均返回 `0`，日志未包含 `error CS`、`Scripts have compiler errors`、`Compilation failed` 或未处理异常。早期 `targetSprite` 的四个 `CS0103` 诊断已由一次局部变量作用域修复消除；Editor 与 Player 两条原加载分支未改变。
-
-### 4.2 验证步骤
-
-1. 使用 `2022.3.62f1c1` 打开项目或执行 batchmode 导入；
-2. 等待脚本编译和资源导入完成；
-3. 检查 Editor 日志，确认没有 C# 编译错误和未处理异常；
-4. 额外执行一次目标 Player 的脚本编译或构建，覆盖条件编译分支；
-5. 检查最终 diff，确认没有意外的场景、Prefab、Package、项目设置或 `.meta` 修改。
-
-Editor batchmode 编译模板：
+### 4.1 Editor 编译
 
 ```powershell
-& "<UnityEditorPath>\Unity.exe" `
-  -batchmode `
-  -nographics `
-  -quit `
-  -projectPath "G:\ARKnoNIGHTS_beta" `
-  -logFile "<OutputDirectory>\editor-compile.log"
-```
-
-### 4.3 通过标准
-
-- Unity 进程正常退出；
-- 日志中没有 `error CS`、`Scripts have compiler errors`、`Compilation failed` 或未处理异常；
-- Player 编译没有因 `UNITY_EDITOR` 条件差异产生错误；
-- 没有与验证无关的资源变化。
-
-## 5. EditMode 测试
-
-### 5.1 当前状态
-
-最新完整 EditMode 结果 XML 为 34/34 通过、0 失败、0 跳过。覆盖范围包含 Core 输入/runner/事件、真实目录与 `local-battle-v1` 连接、十次确定性、回放控制器、结构化失败诊断，以及阻挡满容量下的攻击演出和暂停动画冻结。
-
-### 5.2 基于现有代码的候选测试
-
-以下测试可覆盖当前已经存在的纯 C# 或低 Unity 依赖逻辑：
-
-1. `BitSet64` 的置位、清除、包含、并集和边界行为；
-2. `TagRegistry` 和 `TagMask` 的标签注册、查询及未知标签处理；
-3. `PlayerUnitCollection.SetRows` 对空输入、容量上限和重复单位 ID 的处理；
-4. `PlayerUnitCollection.ApplyZoneOrder` 对完整集合、重复项、缺失项和跨区域单位的拒绝；
-5. `PlayerUnitCollection.SetDeployedPlacementsStrict` 对重复单位、重复格位、越界和失败原子性的处理；
-6. 单位 JSON 字段到 `UnitTemplate` 的映射、重复 `typeID` 和无效 JSON 处理，但现有实现包含文件系统与 Unity 对象创建，测试夹具需要谨慎隔离。
-
-`PlayerUnitCollection` 当前没有调用方，并且其零基位置索引、固定容量和区域模型尚未与 SPEC 对齐。相关测试只能证明这段现有代码的行为，不应把这些数值固化为玩家可见规则。
-
-### 5.3 战斗规则测试计划
-
-确定性战斗核心实现后，EditMode 应优先覆盖：
-
-- 一基 `9×4` 本地阵型、`9×8` 战场、两个门格和 180 度旋转；
-- 相同输入产生相同事件序列、最终状态和胜方；
-- 状态只在逻辑帧变化，并且不读取 Unity Physics 或渲染帧时间作为权威结果；
-- 最近敌人索敌、移动、阻挡建立与容量、攻击范围；
-- 物理、法术、真实伤害以及 5% 最低伤害；
-- 死亡后不再行动和单场胜方输出；
-- 主客场视角共享同一战斗结果，视角转换不修改原始阵型或计算状态。
-
-TASK-003 已确认同距索敌、目标死亡后的下一 Tick 重选、同帧批量伤害/统一死亡、伤害向下取整、超时/同时全灭返回 Unresolved，以及多单位阻挡的目标/嘲讽/到门距离/ID 决胜和双向容量。对应 EditMode 测试必须覆盖这些规则；非整数 Tick 时间仍不得作为正式 fixture 的期望。
-
-测试程序集建立后的命令模板：
-
-```powershell
-& "<UnityEditorPath>\Unity.exe" `
-  -batchmode `
-  -nographics `
-  -projectPath "G:\ARKnoNIGHTS_beta" `
-  -runTests `
-  -testPlatform editmode `
-  -testResults "<OutputDirectory>\editmode-results.xml" `
-  -logFile "<OutputDirectory>\editmode.log"
-```
-
-通过时必须同时满足进程成功退出、结果 XML 可解析、相关测试数大于 0、失败数为 0。
-
-## 6. PlayMode 测试
-
-### 6.1 当前状态
-
-最新完整 PlayMode 结果 XML 为 6/6 通过、0 失败、0 跳过。覆盖真实 `SampleScene` Demo、真实 `gopro`/`arcslma` 视图、暂停、Home/Away、Replay 和释放。
-
-### 6.2 基于当前原型的候选测试
-
-- `SampleScene` 能加载和退出，且没有未处理异常；
-- 触发初始化后，仓库内两个单位 JSON 能生成对应单位模板、单位对象和单位栏项目；
-- 点击单位 UI 能打开详情面板并路由正确的 `Payload`；
-- 折叠按钮能切换当前商店面板状态；
-- 从单位 UI 拖拽到现有有效格位时生成并吸附单位；
-- 拖拽到场外或两个门格时销毁本次克隆；
-- 移动调试按钮能让最近记录的单位到达当前脚本定义的终点；
-- 退出并重进 Play Mode 后，静态缓存、单例、事件订阅和调试列表不残留旧状态。
-
-这些用例只描述当前原型可观察行为，不证明回合、部署费用、阻挡、伤害或结算已实现。
-
-### 6.3 战斗演示测试计划
-
-计算与演示分离实现后，PlayMode 应验证：
-
-- 演示层读取预先计算的结构化战斗事件，不反向修改计算状态；
-- 不同渲染帧率下播放同一事件序列时，最终单位状态和胜方一致；
-- 主场直接演示基础坐标，客场只转换坐标和方向；
-- 移动、攻击、受击、死亡事件触发对应表现；
-- 场景重载不会保留上一场事件、协程或静态订阅。
-
-PlayMode 命令模板：
-
-```powershell
-& "<UnityEditorPath>\Unity.exe" `
-  -batchmode `
-  -nographics `
-  -projectPath "G:\ARKnoNIGHTS_beta" `
-  -runTests `
-  -testPlatform playmode `
-  -testResults "<OutputDirectory>\playmode-results.xml" `
-  -logFile "<OutputDirectory>\playmode.log"
-```
-
-截图或肉眼观察只能作为表现证据，不能替代结构化状态和胜方断言。
-
-### 6.4 UI 自动截图与视觉判断计划
-
-UI-005 应建立一个不依赖人工点击的自动截图入口，用固定本地 fixture 和选择状态构造正式 UI 画面。该能力在实际交付并运行前属于“计划”，不得写成已经可用。
-
-自动截图闭环为：
-
-```text
-固定玩家/阶段输入
-→ 正式 UI 和场景布局
-→ 固定分辨率渲染
-→ PNG + 状态/布局 manifest
-→ Agent 打开参考图和实拍图
-→ 数值关系与视觉问题报告
-→ 有实质差异的调整
-→ 复拍和最终结论
-```
-
-最低截图集合在 `1920×1080` 下包括：
-
-- Preparation、10 槽未选中；
-- Preparation、13 槽未选中；
-- 13 槽首项、中间项、末项分别被选中；
-- 已部署单位选择效果与撤退入口；
-- Battle 顶部状态栏和初始敌人击败进度；
-- 待部署、已部署、敌方三个来源的单位信息面板。
-
-每张截图必须有同名或可关联的结构化 manifest，至少记录：
-
-- 场景、分辨率、Canvas scale 和截图状态名；
-- fixture/schema、阶段、选中 slot/unit；
-- 槽顺序、各槽宽度和关键 RectTransform 的屏幕矩形；
-- Cost、准备倒计时、敌人数等当前显示值；
-- PNG 路径和捕获时间点。
-
-捕获要求：
-
-1. 使用正式布局和绑定代码构造画面，不允许为截图单独硬编码最终位置；
-2. 捕获前刷新 Canvas，并等待到明确稳定帧；
-3. 退出前确认 PNG 已写完、可解码、尺寸正确且不是全黑、全透明或单色空帧；
-4. `-batchmode -nographics` 产生的画面必须先证明有效；否则改用带图形上下文的 Editor 或固定窗口 Standalone Player；
-5. 产物写入 `Artifacts/UI-005/Captures/`、`Temp/UI-Captures/` 或其他忽略目录，不写入 `Assets`，不生成截图 `.meta`；
-6. 保存实际命令、退出码、日志、PNG 清单和 manifest 清单。
-
-Agent 必须实际打开本地参考图和每张实拍图，并逐状态记录：
-
-- 结论：通过、需调整或无法判断；
-- 锚点、尺寸、重叠、越界和层级；
-- 头像变形、遮罩裁切和选中槽宽度过渡；
-- 文字截断、阴影主体对齐和地图上可读性；
-- 参考关系、实际偏差、建议调整和复拍结果。
-
-已确认比例优先用 manifest 与 UI_SPEC 公式判断；并排图、透明叠加和差异热图只用于定位。由于参考图的背景、文字或场景内容可能不同，不以全屏逐像素相等作为唯一通过条件。可归因问题最多进行三轮有实质差异的调整，仍无法收敛时保存证据并停止。
-
-若当前 Agent 已能读取本地 PNG，不需要额外安装。能力不足时，允许按 UI-005 和 `AGENTS.md` 的受限预授权创建或安装只进行本地截图读取/比较、不会上传数据且可回滚的 Skill。必须记录来源、版本、许可证、权限、网络、冒烟和卸载方式；需要第三方 Unity Package、MCP、账号、密钥、管理员权限、后台服务、外部上传、未知二进制或来源不明时必须停止询问。
-
-自动截图不能验证点击区域、射线、PlayerState、Cost 原子性、阶段转换或 winner；这些仍由 EditMode、PlayMode、日志、manifest 和人工交互分别证明。只有 PNG 有效、manifest 完整、Agent 实际审查且问题有复拍/遗留结论时，自动视觉判断才能记为通过。
-
-## 7. 构建验证
-
-### 7.1 当前状态
-
-TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006StandaloneBuild.BuildWindowsX64` 构建入口成功生成 Windows x86_64 Player。入口只读取当前启用的 Build Settings 场景，默认输出到 `Temp/TASK-006/WindowsStandalone`，不修改 ProjectSettings。
-
-### 7.2 已知构建风险
-
-1. `UITest.targetSprite` 条件编译作用域阻塞已修复并通过 Standalone 构建复测。
-2. 旧 `UnitFactory` 仍从 `Application.dataPath/GameData/Units/EliteVariants/Json` 读取 v2 源文档；它是待销毁的 legacy/debug 原型风险，不是正式 Demo 数据链。正式 Demo 使用 `Resources` 中冻结的 `unit-catalog-v1` 与 `local-battle-v1`，已在 Player 实际加载。
-3. 当前只启用 `SampleScene`，还没有独立启动或正式战斗场景可供构建流程选择。
-
-### 7.3 目标平台确认后的验证步骤
-
-1. 使用固定 Unity 版本和明确的构建目标；
-2. 构建 Build Settings 中启用的场景；
-3. 保存完整构建日志并确认退出码；
-4. 启动 Player，检查单位 JSON、默认单位 Prefab、Spine 数据和 UI Prefab 加载；
-5. 完成当前原型冒烟流程；
-6. 确定性战斗实现后，以相同输入比较 Editor 与 Player 的事件序列、最终状态和胜方；
-7. 检查 Player 日志没有未处理异常或资源加载失败。
-
-当前不存在可供 `-executeMethod` 调用的项目构建方法。TASK-001 的基线使用 Unity `-buildWindows64Player` 命令行参数；正式发布构建参数仍需在目标平台确认后单独定义。
-
-## 8. 人工游戏流程验证
-
-### 8.1 当前原型诊断流程
-
-该流程用于记录现有场景真实行为，不等同于 SPEC 战斗验收：
-
-1. 使用指定 Unity 版本进入 `SampleScene`；
-2. 进入 Play Mode，记录初始 Console 错误和警告；
-3. 点击初始化按钮，确认两个单位类型的资源和单位栏项目是否出现；
-4. 点击单位头像，确认详情面板显示对应数据；
-5. 使用折叠按钮打开和关闭商店面板；
-6. 分别拖拽单位到普通有效格、场外和两个门格；
-7. 再把两个单位拖到同一普通格，记录当前重叠行为；该项用于暴露缺口，不应按完整部署规则判为通过；
-8. 点击移动调试按钮，观察被记录单位是否到达固定终点并播放移动表现；
-9. 退出 Play Mode，检查是否出现异常；
-10. 检查工作区 diff，确认 Unity 没有产生意外受版本控制资源变化。
-
-建议保存 Console 日志和关键截图，但内部状态仍应以后续断言或结构化日志为准。
-
-### 8.2 完整战斗流程验收计划
-
-完整战斗闭环实现后，人工验证应至少包含：
-
-1. 从固定测试数据加载双方单位、阵型和 Buff；
-2. 记录输入数据版本或哈希；
-3. 完成一次战斗计算并保存事件序列、最终状态和胜方；
-4. 分别以主场和客场视角演示同一结果；
-5. 确认客场只发生坐标和方向转换，双方视角的胜方和存活状态一致；
-6. 尝试在演示中操作单位，确认不能改变权威计算结果；
-7. 改变窗口大小、渲染帧率或机器负载后重放，确认结果不变；
-8. 退出并重新进入场景，确认没有上一场状态残留；
-9. 检查 Editor 或 Player 日志。
-
-## 9. 当前暂时无法自动验证的项目
-
-### 9.1 因尚未实现而无法验证
-
-- 回合、准备、战斗和结算状态转换；
-- 测试对战数据的正式格式与加载流程；
-- 阵型配对、主客场旋转及观察视角转换；
-- 寻路；
-- 计算事件流到演示层的回放；
-- 多玩家同步、断线和重连。
-
-### 9.2 因规则未确认而无法建立精确期望
-
-- 逻辑帧时长和同帧行动顺序；
-- 同距离索敌决胜规则；
-- 目标失效后的重新索敌时机；
-- 伤害取整及异常防御、法抗数值处理；
-- 同时全灭、超时和平局处理；
-- 待部署区容量是否最终固定为 13；
-- Buff 严格相等需要比较的完整字段；
-- 商店价格、刷新、出售及赤金返还比例；
-- 正式目标平台和发布构建参数。
-
-### 9.3 仍需人工判断的表现项
-
-- 动画是否流畅、动作与事件节奏是否匹配；
-- 镜头、朝向、遮挡和 UI 可读性；
-- 不同分辨率和宽高比下的布局；
-- Spine 资源的视觉完整性和美术质量。
-
-人工判断不能替代战斗输入、事件序列、最终状态和胜方的结构化验证。
-
-## 15. TASK-006 最终验收记录（2026-07-18）
-
-- 前置矩阵：TASK-001 的 Editor 编译证据仍有效但 Standalone 失败证据已过期；TASK-002～005 的测试证据因工作区新增闭环代码而过期，均已在本任务重跑。Unity `2022.3.62f1c1` 和 Windows Standalone 模块均已安装；运行前后未发现其他 Unity 进程。
-- 复现与修复：Windows x86_64 构建先以退出码 `1` 复现 `UITest.cs` 的 4 个同根因 `targetSprite`/`CS0103` 诊断。仅将 `Sprite targetSprite` 的局部声明移至条件编译块外，两分支仅赋值；随后四个诊断消失。
-- 编译和测试：Editor 编译退出码 `0`；替换为 3 对 4 的真实快照后，`Artifacts/TASK-006/multibattle-editmode-retry-results.xml` 为 30/30/0/0，`Artifacts/TASK-006/multibattle-playmode-results.xml` 为 5/5/0/0。Unity Test Framework 在写入 EditMode XML 后保持驻留，已只终止本次测试启动的进程；最终 XML 和日志均保留在忽略的 `Artifacts/TASK-006`。
-- 构建：`Task006StandaloneBuild.BuildWindowsX64` 读取当前唯一启用场景 `Assets/Scenes/SampleScene.unity`，最终构建 Windows x86_64 到 `Artifacts/TASK-006/WindowsStandalone/ARKnoNIGHTS.exe`；退出码 `0`，`BuildReport` 为 `Succeeded`、错误 `0`、警告 `2`、总大小 `108422052`。
-- Editor/Player 摘要：Editor 和实际 Player 均得到 `inputDigest=0160DA1D`、`eventDigest=F247BEA4`、`finalStateDigest=C578716F`、`winnerOrReason=Away`、`away-1000-alpha:False,away-1000-bravo:False,away-5503-alpha:True,away-5503-bravo:True,home-1000-alpha:False,home-1000-bravo:False,home-5503-alpha:False`。真实快照为 Home 3 对 Away 4，双方混用 `gopro`/`arcslma` 并打乱部署坐标；两端均对该快照完整计算十次。Player 在显式 `-task006-acceptance` 模式下完成 Home、Away、Replay 和 7 个视图的清理，退出码 `0`。
-- 命令：Editor/构建使用 `D:\\2022.3.62f1c1\\Editor\\Unity.exe -batchmode -nographics -quit -projectPath G:\\ARKnoNIGHTS_beta -executeMethod <method> -logFile <log>`；测试分别使用 `-runTests -testPlatform EditMode|PlayMode`；Player 使用 `Artifacts\\TASK-006\\WindowsStandalone\\ARKnoNIGHTS.exe -task006-acceptance -logFile Artifacts\\TASK-006\\player-acceptance.log`。
-- 未验证：人工 GUI 按钮序列、动画流畅度/朝向观感/UI 可读性和跨分辨率布局；旧 `UnitFactory` 按钮在 Player 的松散源 JSON 路径；尚未实现的多人、准备、商店、完整回合及同时全灭的长期对局规则。
-
-## 10. 当前 SPEC 验收追踪
-
-| 验收方向 | 主要验证层 | 当前状态 |
-|---|---|---|
-| Unity 正常编译 | 编译、构建 | Editor 编译与 Windows Standalone 构建均通过 |
-| `SampleScene` 正常进入和退出 | PlayMode、人工 | PlayMode 真实 Demo 流程通过；人工 GUI 仍未验证 |
-| 从测试输入初始化双方数据 | EditMode、PlayMode、Player | 真实 `local-battle-v1`/目录连接在三层均已验证 |
-| `9×4`、`9×8`、门格和旋转 | EditMode | 10 项 TASK-002 EditMode 测试中已覆盖并通过 |
-| 计算不依赖物理和渲染帧率 | EditMode、PlayMode | Core 边界和显式 Tick 已由 EditMode 覆盖；PlayMode 未验证 |
-| 相同输入产生相同结果 | EditMode、Editor/Player 对比 | Editor 与 Player 都得到 input/event/final-state `0160DA1D/F247BEA4/C578716F`，Away 胜；各自十次运行一致 |
-| 移动、索敌、阻挡、伤害和死亡 | EditMode | TASK-003 已覆盖；2026-07-18 XML 中 17 项 EditMode 测试全部通过 |
-| 输出明确单场胜方 | EditMode | TASK-003 已覆盖；2026-07-18 XML 中 17 项 EditMode 测试全部通过 |
-| 主客场演示共享结果 | EditMode、PlayMode、Player、人工 | 自动验证通过；人工观感仍未验证 |
-| 无未处理异常 | 所有层 | 本轮 Editor、测试、构建和 Player 验收日志未见未处理异常 |
-
-## 11. TASK-002 Battle Core 自动化验证（2026-07-17）
-
-- 新增 `ARKnoNIGHTS.Battle.EditModeTests`，覆盖 9×4/9×8 边界、门格、主客场映射与双旋转、厘米定点尺度、fixture 验证错误矩阵、仅 Deployed 参战、重复加载摘要、10 次重复 runner trace/摘要、`maxTicks` 未解决结果和 Core 无 UnityEngine 引用。
-- 实际执行：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform EditMode -testResults G:\ARKnoNIGHTS_beta\Temp\TASK-002\EditModeResults.xml -logFile G:\ARKnoNIGHTS_beta\Temp\TASK-002\EditMode.log`。
-- 结果 XML：`Temp/TASK-002/EditModeResults.xml`；总计 10，通过 10，失败 0，跳过 0。Unity 在写入结果后因在线配置请求收尾未退出，本轮已结束由该命令启动的残留进程；不影响已落盘的测试结果。
-- Editor 脚本编译随测试启动实际完成（日志中 `ScriptAssemblies` 成功）；本任务未执行 PlayMode、Standalone 构建或 Player fixture 加载。已知 `UITest.targetSprite` Standalone 阻塞保持未修改。
-
-## 12. TASK-003 Battle Core 测试清单（2026-07-18）
-
-- `BattleCoreEditModeTests` 新增固定 1v1 完整闭环、事件类型与顺序、10 次逐项事件重复性、同距索敌 unit ID 决胜、低速余量、`< 0.25` 米阻挡边界与对称关系、移动中被非目标拦截、阻挡容量、目标/嘲讽/到门距离/ID 决胜、三类伤害/5% 下限、同 Tick 双方致死和未解决结果断言；原 TASK-002 的 fixture、输入验证和 maxTicks 回归继续保留。
-- `task003-minimal-v1` 只使用 1v1、容量 1、整数 Tick、非负属性与 `0..100` 法抗；多单位阻挡竞争使用构造输入覆盖；不覆盖 Buff、远程、异常属性或非整数 Tick。
-- 首次带 `-quit` 的尝试只完成脚本编译后提前退出；最终实际执行：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform EditMode -testResults G:\ARKnoNIGHTS_beta\Temp\TASK-003\validated\EditModeResults.xml -logFile G:\ARKnoNIGHTS_beta\Temp\TASK-003\validated\EditMode.log`。
-- 结果：通过。XML：`Temp/TASK-003/validated/EditModeResults.xml`；总计 17，通过 17，失败 0，跳过 0。Unity 在结果生成后仍驻留，已仅终止本次测试启动的 Unity 进程（PID 48992）；日志中无 `error CS`、`Scripts have compiler errors` 或 `Compilation failed`。
-
-## 13. TASK-004 Presentation 回放测试清单（2026-07-18）
-
-- `BattlePresentationEditModeTests` 覆盖主场直投影、客场整数/连续定点 180 度投影、双转换恢复、`Spawn` 的 type/side/位置契约、唯一 `unitId → view` 创建、事件消费计数、Move 插值、Attack 动画压缩倍率、Damage/Death 命令、暂停、调速、重播清理，以及回放终态与 `BattleRunResult.FinalUnits` 的 HP/位置/阵营/生死逐项一致性。
-- 首次执行在 Core `BattleEnded` 的 DTO 参数迁移处报 `CS7036`，未产生 XML；已补齐缺失的 `damageType` 空值参数后重跑。
-- 实际执行：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform EditMode -testResults G:\ARKnoNIGHTS_beta\Temp\TASK-004\EditModeResults-rerun.xml -logFile G:\ARKnoNIGHTS_beta\Temp\TASK-004\EditMode-rerun.log`。
-- 结果：通过。XML 总计 23，通过 23，失败 0，跳过 0；其中 `BattlePresentationEditModeTests` 6 项全部通过。结果文件写入后 batchmode Unity 仍驻留，已仅终止本次测试启动的 PID 19544；成功日志无 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
-- 最小 PlayMode 实际执行：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform PlayMode -testResults G:\ARKnoNIGHTS_beta\Temp\TASK-004\PlayModeResults.xml -logFile G:\ARKnoNIGHTS_beta\Temp\TASK-004\PlayMode.log`。结果：1 项通过、0 失败、0 跳过；验证跨渲染帧回放不会改变 Core 结果。XML 写入后已仅终止本次测试启动的 PID 28636；日志无编译错误标记。
-- 真实 `gopro`/`arcslma` Spine 资源播放、缺失动画日志、场景卸载和实际资源映射仍未验证。`home-striker`/`away-guard` 是合成算法测试类型，不应被强行映射为真实资源；规划中的 TASK-004A 先用真实单位 JSON、`unit-catalog-v1` 和 `local-battle-v1` 完成资源连接与回归，之后 TASK-005 再接场景。
-
-## 14. TASK-004A 真实数据回测（2026-07-18）
-
-- 先执行 `D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod Task004aSpineProbe.Run -logFile G:\ARKnoNIGHTS_beta\Temp\task004a-spine-probe.log`，通过 Unity/Spine API 得到 `gopro: Attack=1s, Die=0.666667s, Run_Loop=0.533333s` 与 `arcslma: Attack=2.666667s, Die=1s, Move=1s`。非整数 Tick 的向上取整规则随后由项目负责人确认。
-- 生成目录命令：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\task004a-catalog-generate.log`。日志输出 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`；生成器同时校验真实资源、稳定排序和源 JSON 转换。
-- EditMode 命令：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform EditMode -testResults G:\ARKnoNIGHTS_beta\Temp\task004a-editmode-results.xml -logFile G:\ARKnoNIGHTS_beta\Temp\task004a-editmode.log`。结果 XML：27 项，通过 27，失败 0，跳过 0；覆盖旧 TASK-002～004 fixture 回归、真实目录、资源缺失诊断、`local-battle-v1` 连接和真实输入十次确定性运行（Away 胜，`Victory`）。
-- PlayMode 命令：同一 Unity 以 `-testPlatform PlayMode` 运行；PlayMode 会清理项目 `Temp`，结果 XML 实际写到系统临时目录 `C:\Users\wzy\AppData\Local\Temp\task004a-playmode-results.xml`。结果：2 项通过、0 失败、0 跳过；其中 `RealCatalog_DefaultUnitViewsInitializeMoveAttackAndDispose` 使用真实 `DefaultUnit`、`gopro` 和 `arcslma` 的 SkeletonDataAsset，完成 Spawn、Move、Attack、回放结束及销毁清理。
-- 未验证：没有修改或人工打开正式场景；未做 Standalone 构建（既有 `UITest.targetSprite` 非本任务债务）；未进行视觉质量、镜头与动画节奏人工验收。批处理测试结果写出后 UnityConnect 在线配置超时会使 Unity 退出滞后，仅结束了本次由测试命令创建的残留进程，XML 已在结束前落盘。
-
-## 15. TASK-005 Demo 控制器与场景接线验证（2026-07-18）
-
-- Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\TASK-005-compile-2.log`。结果为 `Tundra build success`，无 `error CS`。
-- 受控场景接线：执行 `BattleDemoSceneSetup.SetupSampleScene`，日志记录 `[BattleDemo][scene.wired]`。仅向 `SampleScene` 添加 `BattleDemoRoot`、`BattleDemoViews` 和 `BattleDemoUI`；保留旧 UnityEvent、Prefab、Build Settings 和项目设置。接线过程中 `VirtualSlotPanel` 的 `ExecuteAlways` 回调曾修改旧 Panel 尺寸，已恢复，最终 scene diff 不包含该无关变更。
-- EditMode：`Temp/TASK-005-EditMode-All.xml`，总计 29，通过 29，失败 0。新增 `BattleDemoCoordinatorEditModeTests` 覆盖真实 `local-battle-v1`/`unit-catalog-v1` 加载、封存后播放、暂停/继续、Away 投影、调速、同一结果 Replay、摘要不变、重复视图释放以及缺失对战输入进入包含 `localBattle.resource.missing` 的 Error。
-- PlayMode：最新执行 `D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform PlayMode -testResults C:\Users\wzy\AppData\Local\Temp\TASK-005-PlayMode-rotation.xml -logFile G:\ARKnoNIGHTS_beta\Temp\TASK-005-playmode-redgate.log`，XML 总计 4，通过 4，失败 0，跳过 0。`SampleScene_BattleDemoRootRunsTheRealCatalogToCompletion` 实际加载 `SampleScene`，通过场景控制器运行 `1000/gopro` 对 `5503/arcslma`，验证 Away 胜、暂停不消费事件、Home/Away 不改变源事件摘要和 winner、完成状态、连续两次 Replay；同时断言双方真实 `DefaultUnit` 视图在 Home/Away 下均固定为向红门倾倒的世界 X 轴 60 度旋转。既有真实 Spine 回归继续覆盖 `DefaultUnit`、Spawn、Move、Attack 和释放。
-- 运行命令在测试 XML 写出后会受 UnityConnect 在线配置超时影响而滞留；每次只终止了本任务启动且 XML 已落盘的 Unity 进程。未执行 Windows Standalone 构建；该项仍留给 TASK-006。未进行人工的 UI 可读性、镜头、动画节奏和不同分辨率检查。
-
-## 16. TASK-003 攻击动画与出伤时序回归（2026-07-18）
-
-- 人工观察到 `arcslma` 最后一次 Attack 在低速播放时会被 `gopro` 的 Death 视觉事件抢先。检查确认 Core 未提前出伤：真实目录中的 `arcslma` Attack 为 54 Tick，Damage 固定在 `Attack.tick + 54`，Death 与该有效 Damage 同 Tick。
-- 根因是 `UnitSkelPresentationView` 同时把全局播放倍率设置给 `SkeletonAnimation.timeScale`，又把它乘进单次 `TrackEntry.TimeScale`；0.5× 时动画实际以 0.25× 播放，而事件以 0.5× 推进。修正后全局倍率只应用一次，单次 entry 只接收 Attack 事件的原始/有效时长倍率。
-- EditMode：`Temp/TASK-003-animation-timing/EditModeResults.xml`，总计 30，通过 30，失败 0，跳过 0；新增真实 `arcslma` 54 Tick Attack/Damage/Death 时序断言。
-- PlayMode：`Temp/TASK-003-animation-timing/PlayModeResults.xml`，总计 5，通过 5，失败 0，跳过 0；新增真实 Spine 断言，验证 0.5× 时 `arcslma` Attack entry 不重复叠加播放倍率。
-
-## 17. TASK-003 多单位双向阻挡竞争回归（2026-07-18）
-
-- 真实单位目录重新由 `UnitCatalogGenerator.Generate` 生成；`gopro` 与 `arcslma` 源 JSON 的既有 `narrowTitle: 0` 均映射为目录和 Core 的 `tauntLevel: 0`。生成日志：`Temp/TASK-003-blocking-catalog.log`，包含 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，脚本编译成功。
-- EditMode：`Temp/TASK-003-blocking-EditModeResults.xml`，总计 32，通过 32，失败 0，跳过 0。新增回归覆盖移动单位被非当前目标拦截、双方对称关系、多阻挡容量，以及候选的当前目标、嘲讽、到本方门格距离和 unit ID 决胜。
-- PlayMode：`Temp/TASK-003-blocking-PlayModeResults.xml`，总计 5，通过 5，失败 0，跳过 0。运行完成后 UnityConnect 在线配置请求超时导致 batchmode 进程未自行退出；结果 XML 已先落盘，只终止了本轮测试启动的 Unity 进程。
-
-## 18. 动画回放覆盖与暂停回归（2026-07-19）
-
-- 三单位构造输入确认 Core 行为：当 B 已与 C 建立满容量阻挡、A 以 B 为当前目标后进入攻击半径时，A 在进入范围的 Tick 先产生 `Move` 再产生 `Attack`，但不会与 B 建立第二条阻挡关系，且后续不再继续 Move。
-- Presentation 修复：连续 `Move` 事件只触发一次循环移动动画；进入攻击范围后不再为该单位生成 Move，Attack Track 不会被覆盖；Pause 将所有视图播放倍率置为 `0`，在暂停期间调速仍保持冻结，Resume 才应用新倍率。
-- EditMode：`C:\Users\wzy\AppData\Local\Temp\battle-animation-regression-editmode.xml`，总计 34，通过 34，失败 0，跳过 0。日志：`Temp/battle-animation-regression-editmode-rerun.log`。
-- PlayMode：`C:\Users\wzy\AppData\Local\Temp\battle-animation-regression-playmode.xml`，总计 6，通过 6，失败 0，跳过 0。真实 `DefaultUnit` 断言 Pause 将 `SkeletonAnimation.timeScale` 置为 0，暂停中调速仍为 0，Resume 才恢复新倍率。日志：`Temp/battle-animation-regression-playmode-final3.log`。
-
-## 21. 阻挡期间的攻击目标回归（2026-07-19）
-
-- 使用固定真实对战数据验证：`away-5503-alpha` 被 `gopro` 阻挡后，仍保留常规索敌目标用于解除阻挡后的移动，但必须向该存活 gopro 产生 Attack 事件；该规则同时适用于任一被拦截单位。
-
-## 22. 共享攻击/阻挡范围单 Tick 穿透回归（2026-07-19）
-
-- 使用单 Tick 移动距离大于初始间距的高速构造输入验证：单位在进入严格小于 `0.25` 米的共享攻击/阻挡范围时，必须停在非零距离的范围内位置并立刻产生 Attack；不得因任一方阻挡位耗尽而继续走到目标中心。
-
-## 19. 目标死亡后的攻击动画锁回归（2026-07-19）
-
-- Core 回归场景使用 A、B、C 和存活的后续目标：A 与 C 同时攻击 B，C 先在 Tick 2 击杀 B，A 的有效攻击动画原定在 Tick 5 结束。B 死亡后 A 会在下一 Tick 重新锁定存活目标，但直到 Tick 5（含）都不得移动；B 不接收 A 的 Damage，A 在 Tick 6 才可恢复移动。
-- EditMode：`Temp/TASK-003-target-death-lock-EditModeResults.xml`，总计 35，通过 35，失败 0，跳过 0。首次编译发现并修正移动筛选中的局部变量名错误；随后全量 Core、目录和表现回归通过。
-- PlayMode：`Temp/TASK-003-target-death-lock-PlayModeResults.xml`，总计 6，通过 6，失败 0，跳过 0。
-
-## 20. 移动与攻击左右朝向回归（2026-07-20）
-
-- `UnitSkelPresentationView` 默认面向世界右方；Move 的世界 X 正向保持默认，X 负向在 Y 轴翻转 180 度，纯 Z 位移保持现有左右朝向。Attack 事件以攻击者和目标在该 Tick 的权威位置更新左右朝向；攻击方向为纯 Z 时保持现有左右朝向，后续 Move 可覆盖攻击朝向。
-- PlayMode 自动化测试覆盖默认、左移、右移和两种纯 Z 位移；`SampleScene` 真实视图回归只要求其保持右/左两种合法朝向，不再错误地要求所有单位固定朝向同一门格。
-- EditMode 回归覆盖 Attack 目标方向及其持续到后续 Move 的规则；PlayMode 覆盖真实视图的默认、左右与纯 Z 朝向行为。
-
-## 23. UI-001 本地玩家状态与 Player-safe 类型目录（2026-07-21）
-
-- 目录生成兼脚本编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UI-001\catalog-generate-final.log`。日志包含 `Tundra build success` 和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，无 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
-- UI-001 EditMode：`Temp/UI-001/playerstate-editmode-results-projection.xml`，总计 7，通过 7，失败 0，跳过 0。覆盖真实目录 UI 字段、资源加载、Cost=99、重复加载摘要、严格堆叠/排序/数量、加载失败矩阵、13 槽容量、一基边界/门格、部署/撤退原子性、费用与 Overflow 清理。
-- Player-safe Resources 加载已由上述 EditMode 直接验证；未执行 PlayMode、Windows Standalone 构建和人工 UI 检查，本任务未修改场景或 UI。
-- 历史全量 EditMode：`Temp/UI-001/editmode-results-post-projection.xml` 曾为 51 项中的 50 通过、1 失败；失败测试把合成 fixture 的初始 HP 写死为 `100`，但权威 Spawn 分别为 `home-1=1000`、`away-1=240`，且完整回放后 `home-1=980`。已改为从 Spawn/最终只读结果断言状态条输入；2026-07-21 `BattlePresentationEditModeTests` 回归 `Temp/battle-presentation-editmode-results.xml` 为 10 通过、0 失败、0 跳过。尚未据此重跑全量 EditMode，不能把历史全量结果记为通过。
-- UnityConnect 在线配置请求超时会在 XML 写入后使 batchmode 进程驻留或退出异常；仅在结果 XML 已落盘后终止了本任务启动的 Unity 进程，未影响 XML 中的测试统计。
-
-## 24. UI-002 正式待部署 HUD 验证（2026-07-21）
-
-- 场景接线与脚本编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UI002SampleSceneSetup.SetupSampleScene -logFile G:\ARKnoNIGHTS_beta\Temp\UI002-setup.log`。Unity 完成脚本编译和幂等场景接线，日志含 `[StagingHud][scene.wired]`；`VirtualSlotPanel` 的既有 `[ExecuteAlways]` 调试日志在场景打开/关闭时出现，但最终旧对象已失活，正式 HUD 不引用它。
-- 首次携带 `-quit` 的 Test Runner 命令只完成了编译而未写 XML；按既有测试约定改用无 `-quit` 命令。布局 EditMode：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform EditMode -testFilter ArknoNights.Battle.Tests.StagingHudLayoutEditModeTests -testResults G:\ARKnoNIGHTS_beta\Temp\UI002-EditMode.xml -logFile G:\ARKnoNIGHTS_beta\Temp\UI002-EditMode.log`。XML 为 9 项通过、0 失败、0 跳过，覆盖 0/1/10/12/13 槽、1920 宽度下自然右对齐/压缩、首中末选择、最小宽度、取消选择和 PlayerState 顺序/稳定选择 ID。
-- 真实场景 PlayMode：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform PlayMode -testFilter ArknoNights.Battle.Tests.StagingHudScenePlayModeTests -testResults G:\ARKnoNIGHTS_beta\Temp\UI002-PlayMode.xml -logFile G:\ARKnoNIGHTS_beta\Temp\UI002-PlayMode.log`。XML 为 1 项通过、0 失败、0 跳过；加载 `SampleScene` 后断言唯一正式 HUD、自动 PlayerState、Cost `99`、有序 `1000/5503` 槽、旧 Init/商店/折叠/调试按钮不在激活层级、BattleDemoRoot 持续启用，且调试 UI 显隐和玩家状态刷新清除选择 ID 均不销毁根控制器。
-- UnityConnect 在线配置在 XML 写入后仍会导致测试启动进程滞留；每次仅终止本轮命令启动、XML 已落盘的 Unity PID。日志未见本次改动引起的 `error CS`、`Scripts have compiler errors`、未处理异常或 `[StagingHud]` 初始化失败。
-- 未验证：没有可用 GUI 自动化来观察 `1920×1080` 和另一种 16:9 分辨率下的头像裁切、图层、字体、边距、压缩视觉和组合键输入；未执行 Windows Standalone 构建（UI-002 不要求）。
-
-## 25. UI-003 状态驱动部署与撤退验证（2026-07-21）
-
-- 场景接线与编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UI003SampleSceneSetup.SetupSampleScene -logFile G:\ARKnoNIGHTS_beta\Temp\UI003-setup.log`。结果码 `0`，日志包含 `[UI-003][scene.wired]`；随后编译日志 `Temp/UI003-compile.log` 包含 `Tundra build success`，无 C# 编译错误。
-- EditMode：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform EditMode -testFilter ArknoNights.Battle.Tests.LocalPlayerStateEditModeTests -testResults G:\ARKnoNIGHTS_beta\Temp\UI003-EditMode.xml -logFile G:\ARKnoNIGHTS_beta\Temp\UI003-EditMode.log`。XML 为 7 项通过、0 失败、0 跳过；覆盖一基边界、门格、占位、Cost、原子部署/撤退与 13 槽撤退容量失败。
-- PlayMode：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -projectPath G:\ARKnoNIGHTS_beta -runTests -testPlatform PlayMode -testFilter ArknoNights.Battle.Tests.StagingHudScenePlayModeTests -testResults G:\ARKnoNIGHTS_beta\Temp\UI003-PlayMode.xml -logFile G:\ARKnoNIGHTS_beta\Temp\UI003-PlayMode.log`。XML 为 3 项通过、0 失败、0 跳过；真实目录/`DefaultUnit` 冒烟驱动一个稳定 unit ID 进入 `(5,2)`、验证 Cost `99→97` 和唯一准备视图，再撤退验证 `97→99` 与槽恢复；门格失败和交互锁确认 PlayerState 与预览清理无副作用。
-- 未验证：没有执行真实鼠标拖拽、点击世界撤退按钮、选择菱形/图标位置、Sprite 排序和 TASK-007 状态条遮挡的人工 Editor 观察；未执行 Standalone 构建（UI-003 不要求）。
-
-- 后续交互修正：待部署槽补齐 `IDragHandler`，使 Unity EventSystem 实际建立 `pointerDrag`；准备格世界 Z 偏移修正为 `-100`，预览改为松手前自由跟随。PlayMode 重跑 `Temp/UI003-visual-fix-PlayMode.xml`：3 项通过、0 失败、0 跳过，并断言单位锚点、水平选择菱形、图标大小命中框、稳定 Player unit ID 和自由预览坐标。
-
-## 26. TASK-007 世界空间状态条验证（2026-07-22）
-
-- 公式 EditMode：`Temp/TASK-007/LayoutEditModeResults.xml`，3 项通过、0 失败、0 跳过。覆盖满血无盾隐藏、受伤/有盾显示、`100/50/50` 的 `60/30/30` 两层宽度，以及无效最大 HP 的隐藏与零宽度。
-- Prefab 与转向 PlayMode：`Temp/TASK-007/UnitWorldStatusBarPlayMode.xml`，1 项通过、0 失败、0 跳过。创建真实 `Prefabs/DefaultUnit`，验证 Renderer/层级引用、世界宽度、左右锚点、左朝向后 HP/护盾的世界左右语义，以及清理。
-- 最终全量 PlayMode：`Temp/TASK-007/AllPlayModeFinal.xml`，11 项通过、0 失败、0 跳过。该次在 `_ForceWhite` 局部 Shader 修正后运行；日志未见 `error CS`、`Compilation failed`、`Scripts have compiler errors` 或未处理异常。UnityConnect 在线配置超时出现在测试结束后，结果 XML 已落盘。
-- 未验证：未执行 Windows Standalone 构建；无可用 GUI 自动化或本轮人工 Editor 观察来确认地图遮挡、两单位重叠时的层级、贴图观感、用户调节后的局部偏移，以及 Home/Away、Replay、死亡期间的视觉效果。状态条材质明确使用 `ZTest LEqual`，不会通过强制置顶掩盖此项。
-
-## 27. UI-004 准备—战斗循环验证（2026-07-22）
-
-- 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\UI-004-compile-2.log` 返回码 0；日志未含 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
-- EditMode：`Temp/UnityTests/20260722-144751/EditModeResults.xml`，全量共 65 项、通过 65、失败 0、跳过 0；其中 `PreparationBattlePhaseEditModeTests` 覆盖 30 秒单次转换、Overflow 永久删除、唯一最高可支付自动部署到 `(5,2)`/Cost 扣除、高价不可支付时的下一最高可支付候选、运行时输入冻结与空 Home 的固定 Away 胜。
-- PlayMode：`Temp/UnityTests/20260722-144919/PlayModeResults.xml`，全量共 12 项、通过 12、失败 0、跳过 0；其中 `PreparationBattleLoopPlayModeTests` 实际重载 SampleScene，验证自动进入 Preparation、测试时钟直接跨越 30 秒、交互锁、运行时输入、Overflow/自动部署、完整 Presentation Completed 后返回 Preparation、30 秒重置、准备视图恢复和 PlayerState 不接收战斗结果。既有固定 Resources Demo 场景回归通过显式关闭 formal 模式验证其兼容入口。
-
-## 28. UI-005 HUD 与集成验收审计（2026-07-23）
-
-- HUD PlayMode：`Artifacts/UI-005/ui005-cost-health-elite-final-retry.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 5 项、通过 5、失败 0、跳过 0。覆盖正式 HUD 自动加载、真实部署/撤退、交互锁、待部署/已部署/战斗信息选择互斥，以及仅显示已声明资源占位。
-- 完整循环 PlayMode：`Artifacts/UI-005/ui005-phase-loop-audit.xml`，筛选 `ArknoNights.Battle.Tests.PreparationBattleLoopPlayModeTests`，共 1 项、通过 1、失败 0、跳过 0。覆盖 SampleScene 自动经历 Preparation→Battle→Preparation，且战斗结果不回写 `PlayerState`。
-- Windows Standalone：`Artifacts/UI-005/ui005-build-cost-health-elite-final.log` 记录 `build.succeeded`、`errors=0`；`Artifacts/UI-005/player-capture-cost-health-elite-final.log` 记录 6 张 Player PNG 已捕获到 `Artifacts/UI-005/CapturesCostHealthEliteFinal/`。PNG 已检查关键 HUD 状态可读，且不为黑屏/空白帧。
-- 未通过完成条件：该目录 `manifest.json` 只记录图片路径、分辨率、阶段、选中单位 ID、Cost、准备倒计时，缺少场景、Canvas scale、fixture/schema、选中 slot、槽顺序/宽度、关键 RectTransform、敌人数和捕获时间点；不满足 UI-005 第 39 条。因此自动截图证据不完整。
-- 未验证：未在本轮 Windows Player 手工走完部署、点击/拖拽命中与完整返回准备；尚无逐图对照图 1～图 6 的持久化视觉差异报告；共享脏工作树下的最终无关差异审查尚未完成。故本节只证明部分验收，不将 UI-005 记为完成。详细审计见 `docs/UI-005-REPORT.md`。
-- UnityConnect 在线请求可能在测试完成后滞留；本轮由 `scripts/Invoke-UnityTests.ps1` 在 XML 已写入且测试数大于零后管理其子进程。未执行人工 GUI 完整一轮或 Windows Player 构建，均为未验证。
-
-## 29. UNIT-DATA-001 与单位精英变体 v2 源迁移验证（2026-07-23、2026-07-28）
-
-- v2 EditMode 覆盖：`unit-elite-variants-v2` schema、精英 0 完整性、高阶最近低阶继承、`combat`/`shared`/`model` 原子块、`sourceVariant`、动画 key/名称/必需时长、旧源字段消失、合法不攻击/不阻挡数据，以及三个真实源的数值、资源和动画事实。
-- 消费者 EditMode 覆盖：`UnitCatalogGenerator`、`AbilityCatalogGenerator`、`UnitJsonBake` 只读取 v2，未知召唤与不可表示的 v1 投影显式失败；真实目录回归同时区分 authored v2 事实与 frozen `unit-catalog-v1` 事实，不修改冻结目录期望。
-- Task 6 的静态验收分别扫描生产 C#/JSON 与测试 C#/JSON。生产扫描必须为零匹配；测试扫描只允许无效 schema fixture、旧目录不存在断言和旧根 DTO 销毁断言，不能删除或混淆这些负向回归字符串。
-- 精确定向 GREEN 使用 `UnitEliteVariantSourceEditModeTests;UnitSourceConsumerEditModeTests;BattleCoreEditModeTests`，输出到 `Temp/UnitEliteVariantsV2/Task6-Green`；必须核对非零测试数、零失败、零跳过或明确记录跳过、编译/异常日志和 Unity 退出状态。
-- 2026-07-29 Task 6 实际结果：生产扫描零匹配；测试扫描保留 `6` 个 allowlisted 行。定向 EditMode 为 `105/105` 通过、失败 `0`、跳过 `0`，其中 v2 source `43/43`、consumer `5/5`、BattleCore `57/57`；日志未命中编译错误、编译失败、未处理异常、空引用或断言失败。结果位于 `Temp/UnitEliteVariantsV2/Task6-Green/EditModeResults.xml` 与 `EditMode.log`。结果落盘后 Unity 未在 `20` 秒 grace period 内自然退出，runner 强制停止；随后确认无 Unity 进程残留。
-- 首批迁移禁止执行目录生成器，`unit-catalog-v1.json` 与 `ability-catalog-v1.json` 必须保持冻结哈希。PlayMode、目标平台构建和其余单位/独立动画层不属于 Task 6 精确定向验收，未执行时必须标记为未验证。
-- 2026-07-29 Task 7 全量 EditMode：`Artifacts/UnitEliteVariantsV2/Full-EditMode/EditModeResults.xml` 为 `232 total / 227 passed / 5 failed / 0 skipped / 0 inconclusive`，wrapper 退出码 `1`，Unity 在结果落盘后正常退出；其中任务范围内 v2 source `43/43`、consumer `5/5`、BattleCore `57/57` 均通过。五项失败均来自并发 BONDS 资源导入工作：四项 `BondsUnitAnimationAuditEditModeTests` 报告 `expected=93 parsed=99 unique=99`，一项未跟踪的 `BondsUnitResourceImportEditModeTests` 断言 `Expected: 93 / But was: 99`；`docs/bonds/BONDS_SPEC.md` 已并发扩展为 `99` 个 TypeId，而对应审计代码和测试仍硬编码 `93`。这些失败不属于本次单位精英变体 v2 迁移，Task 7 未修改或重跑 BONDS 工作，但因此不能把本轮全量 EditMode 记为通过。XML 与日志 SHA-256 分别为 `037DBE5BA36EA997FD699779E712E48E37DBF8AC20B790801E84855CCA9B7CE1`、`D892B7881EB2CB4D7BD5A6C3F3B5A0F1BCCA7AB06A5D118116A59F881B6095F2`。
-- 2026-07-29 Task 7 全量 PlayMode：`Artifacts/UnitEliteVariantsV2/Full-PlayMode/PlayModeResults.xml` 为 `27 total / 27 passed / 0 failed / 0 skipped / 0 inconclusive`，wrapper 退出码 `0`，Unity 正常退出；XML 与日志 SHA-256 分别为 `68B4677F0D7FCADF3637E62C1753CF71E03E337E9985C20FAC1EA40E4BD8831C`、`7213A123211732CDC85B470AB3490D3025A36E94A6AE60003247C0DBD527A582`。
-- 2026-07-29 Task 7 Windows x64 StrictMode：首次完整构建的结构化日志为 `result=Succeeded`、`errors=0`、`warnings=2`，两条均为既有 `Assets/Game/Runtime/Bitset/TagRegistry.cs(11,39) warning CS0414`，但当前 PowerShell 主机异步返回 GUI `Unity.exe`，没有捕获该次 Unity OS 退出码；日志在覆盖前的 SHA-256 为 `EDC6DA6AAF98AD2105F87D3D083ACC8A75D313121286A3579D9D7A87EC973279`。随后在全机 Unity 队列为空时使用相同 Unity 参数和 `Start-Process -Wait -PassThru` 复建，捕获 Unity 退出码 `0`；增量构建日志 `Artifacts/UnitEliteVariantsV2/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=0`，SHA-256 为 `6BFE96FE6E08E2E319C6DC84774582606AF51A3131C34F8C0A995C6B9E00565F`。产物为 `143` 个文件、总计 `282952109` 字节，主 EXE SHA-256 为 `F49CDCB9E27CF2AA5C6F63BC961B4364E93363071533661593549AEC421AD60B`。
-- 2026-07-29 Task 7 冻结目录与静态审计：`unit-catalog-v1.json` SHA-256 为 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`，`ability-catalog-v1.json` SHA-256 为 `BA76A69BFC5AFB186863ECF28AB36EBD504F14CD503347BE09CEEC652ECB3466`。人工维护目录恰好包含 `1000_gopro.json`、`5503_arcslma.json`、`5504_arcslmi.json`，旧目录不存在；源 JSON 禁用字段扫描为零匹配。计划列出的 `16` 个迁移提交及单独的计划更正提交 `1ef5d16` 均存在于当前 HEAD 祖先链且通过 `git show --check`；共审计 `38` 个唯一提交路径，没有场景、Prefab、ScriptableObject、Package、ProjectSettings 或冻结目录文件，当前相关 Unity 资产没有缺失或孤立 `.meta`。Task 7 前后工作树脏状态数量均为 `703`（已跟踪修改 `14`、未跟踪 `689`），任务范围路径保持干净，暂存区保持为空。
-
-### BONDS 特殊索敌、冲门与单场生命损失（2026-07-29）
-
-- `BondsTargetingEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖 `Untargetable`、历史能力 ID `UntargetableByMelee` 均排除近战与远程索敌、非攻击单位、零阻挡、无合法目标冲门、边长 `0.8m` 门区、`GateReached`、`lifeDeduct`、较少扣血方胜出，以及退出 Tick 的 Presentation Track 隐藏。
-- `UnitSourceConsumerEditModeTests`：`7/7` 通过，`failed=0`、`skipped=0`。覆盖被动单位特征的能力目录隔离投影，以及 `1017/1042/1146/1355` 全部 v2 变体对 `UNTARGETABLE_BY_MELEE` 的显式引用。
-- `BattleCoreEditModeTests`：第一次完整回归 `57` 项中发现 `2` 项失败；根因是目标死亡时错误删除待结算攻击并提前解除攻击动画锁。修正为仅清理失效攻击者、目标死亡或冲门只在到期 Tick 取消伤害后，最终完整回归 `57/57` 通过，`failed=0`、`skipped=0`。
-- 额外静态构建：`dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error；警告来自既有 Unity 程序集版本冲突与测试反序列化 DTO 未直接赋值。
-- Unity 两次测试均在结构化 XML 写入后通过；中国版配置请求令 Editor 未在 10 秒收尾窗口内自行退出，脚本随后结束对应 batchmode 进程。未运行 PlayMode 与 Player 构建。
-
-### BONDS `10077` 自助出餐终端召唤（2026-07-29）
-
-- `BondsSkillAnimationEditModeTests`：`4/4` 通过，覆盖 `10077` 在 Tick `20` 发出 `Skill`、`50 → 25 Tick` 二倍速占用、同 Tick 精确中心 Spawn，以及 `10073` 在下一 Tick 激活并按普通规则索敌。结果位于 `Artifacts/BondsAbilities/RepairSummonSkill/EditModeResults.xml`。
-- `UnitSourceConsumerEditModeTests`：`8/8` 通过，覆盖 `10077 → SUMMON_REPAIR_HELPER → 10073` 的 v2 引用、初始/需求 SP `3/5`、单体中心召唤、无路径继承，以及真实 `Skill/2.5s` 动画目录投影。结果位于 `Artifacts/BondsAbilities/RepairSummonSources/EditModeResults.xml`。
-- `BattleCoreEditModeTests.AbilityCatalog_RejectsInvalidDefinitions`：参数化用例 `8/8` 通过，确认 `0cm` 是合法中心召唤而负边长仍被拒绝。结果位于 `Artifacts/BondsAbilities/SummonValidation/EditModeResults.xml`。
-- `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 人工动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS `1095` 永久叠加减防（2026-07-29）
-
-- `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests` 合并定向运行 `49/49` 通过，`failed=0`、`skipped=0`、`inconclusive=0`。最终结果位于 `Artifacts/BondsAbilities/DefenseDebuffFinal/EditModeResults.xml`。
-- Core 断言使用 `100 ATK / 30 DEF`，连续四次伤害严格为 `70/80/90/100`，证明当前 Hit 先按旧防御结算、之后每次永久叠加 `-10`，累计减防为 `40` 且有效防御下限为 `0`。
-- 数据消费者断言 `1095` 全部 v2 变体显式引用 `STACKING_DEFENSE_REDUCTION_ON_HIT`，能力源投影为 Passive/None、每层减防 `10`；Skill 动画目录仍只包含两个真实 Timed 技能。
-- `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:minimal` 为 `0` error。Unity 在 XML 落盘后超过 20 秒收尾窗口并由脚本停止对应 batchmode；未运行 PlayMode、Player 构建或可见 Editor 检查。
-
-### BONDS `10038/10039` 防御被动与蓄力范围攻击（2026-07-29）
-
-- 最终定向 Unity EditMode 筛选 `BondsSkillAnimationEditModeTests;UnitSourceConsumerEditModeTests;BondsPassiveCombatModifierEditModeTests`，结果为 `55/55` 通过、失败 `0`、跳过 `0`，并正常退出；XML 位于 `Artifacts/BondsAbilities/ChargedDrinkFinal/EditModeResults.xml`。
-- Core 用例断言 `10039` 在 Tick `100` 选定地面目标并发出 Skill，源动画 `57 Tick` 按二倍速向上取整为 `29 Tick`；Tick `129` 才对主目标与 `150cm` 内地面目标各造成 `900` 物理伤害，范围外单位与无人机均不受伤。
-- 数据消费者覆盖 `10038/10039 → FORTIFIED_CATERING_VEHICLE`、`10039 → CHARGED_DRINK_AREA_ATTACK` 的 v2 引用，以及阻挡 `+2`、物理/法术承伤 `100/1000`、目标范围 `220cm`、范围半径 `150cm` 和真实 `Skill/2.833333s` 投影。
-- `dotnet build ARKnoNIGHTS.Battle.Core.csproj --no-restore -v:minimal` 与 `dotnet build Assembly-CSharp-Editor.csproj --no-restore -v:minimal` 均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS `1322` 第三击灰礼帽位移（2026-07-29）
-
-- 最终定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `52/52` 通过、失败 `0`、跳过 `0`、未运行 `0`，并正常退出；XML 位于 `Artifacts/BondsAbilities/GreyHatFocusedFinal/EditModeResults.xml`。
-- Core 用例断言前两击在 Tick `1/3` 发出普通 Attack，第三击在 Tick `5` 发出源 `40 Tick → 20 Tick` 的 Skill 并立即解除阻挡；Tick `9` 才在 `Skill_Begin` 完整二倍速播放后位移并对原阻挡者造成 `100` 点正常物理伤害，Tick `6..24` 不重建阻挡，Tick `25` 才恢复阻挡资格。
-- 数据消费者断言 `1322` 全部 v2 变体显式引用 `GREY_HAT_THIRD_ATTACK_DASH`，能力目录投影为第 `3` 击起每 `3` 击触发、位移 `150cm`、不可阻挡 `20 Tick`；技能动画目录投影为 `skill.begin|skill.loop|skill.end`、真实名称 `Skill_Begin|Skill_Loop|Skill_End`、总源 `40 Tick` 与片段源 `7/4/30 Tick`。
-- `dotnet build ARKnoNIGHTS.Battle.Core.csproj -nologo -v:minimal` 与 `dotnet build Assembly-CSharp-Editor.csproj -nologo -v:minimal` 均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS `1502` 被阻挡闪现（2026-07-29）
-
-- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `55/55` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/BlockedBlinkFinal/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
-- Core 覆盖满 SP 但未阻挡时不施放，以及攻击进行中 SP 回满后等待出伤/动画完成才施放；施放 Tick 解除阻挡，`Disappear` 的 `10` 个源 Tick 二倍速为 `5 Tick`，到期朝敌方门迁移 `150cm`，随后由 `Appear` 继续持有总计 `10 Tick` 的 Skill。
-- 数据消费者覆盖 `1502 → BLOCKED_BLINK_FORWARD`、初始/需求 `15/15 SP`、目录位移 `150cm`，以及 `blink.disappear|blink.appear → Disappear|Appear`、总源 `20 Tick`、逐段 `10/10 Tick`；生成的技能动画 JSON 还需通过运行时 `SkillAnimationCatalogLoader.LoadFromJson` 往返验证。
-- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS `10038` 地面进入半径碰撞（2026-07-29）
-
-- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `56/56` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/CollisionFocused/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
-- Core 用例令地面目标与近战不可选无人机在 Tick `1` 同时移动到车辆恰好 `50cm` 处；只有地面目标受到 `100 ATK - 20 DEF = 80` 物理伤害，Tick `2` 继续停留不重复触发，无人机保持满血。
-- 数据消费者断言 `10038` v2 变体同时引用 `FORTIFIED_CATERING_VEHICLE` 与 `GROUND_PROXIMITY_COLLISION_DAMAGE`；能力目录投影为 Passive/None、半径 `50cm`、Physical、攻击倍率 `1000/1000`、仅地面目标。该被动不进入技能动画目录。
-- 提交前最终静态构建的 Core、Editor 和 EditMode Tests 均为 `0` error；`git diff --check` 通过。未运行 PlayMode、Windows Player 构建或可见 Editor 检查。
-
-### BONDS `2031/2033` 计数触发召唤生产接线（2026-07-29）
-
-- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `57/57` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/RoadbuilderFocused/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
-- 既有 Core 回归覆盖第三击使用 Skill、奇数源 Tick 二倍速向上取整、动画到期出伤与生成、`40cm` 方形确定性位置、下一 Tick 激活、每10次受伤生成以及 `8/12` 同类存活上限。
-- 数据消费者新增断言：`2031` 引用第三击与每10次受伤两项能力，`2033` 引用其有上限第三击能力；三项 `TriggeredSpawn` 投影分别为 `SuccessfulAttack/3/3/2033/40cm/0`、`DamageReceived/10/10/2033/40cm/8` 和 `SuccessfulAttack/3/3/2033/40cm/12`。两项攻击触发动画均由真实 v2 数据生成 `attack.skill → Skill`、源 `40 Tick`、二倍速有效 `20 Tick`。
-- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor Spine 动画检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS `10006` 首次半血召唤与移速生产接线（2026-07-29）
-
-- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `58/58` 通过、失败 `0`、跳过 `0`、未运行 `0`；XML 位于 `Artifacts/BondsAbilities/CorruptedGolemFocused/EditModeResults.xml`。结果落盘后 Unity 超过 `20s` 收尾窗口，由脚本停止对应 batchmode 进程。
-- 既有 Core 回归断言 `10006` 首次严格低于 `50%` 后仅在四个非门正交格中心各生成一个 `10002`，动态单位下一 Tick 激活且后续不重复生成；既有一次性生命阈值修正覆盖永久移速倍率。
-- 数据消费者新增断言：两个 `10006` v2 变体均引用 `CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN` 与 `CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED`；生成投影分别为严格低于 `500/1000`、召唤类型 `10002`，以及一次性、永久、移速 `2500/1000` 且其他战斗倍率中性。
-- Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS 常驻自身战斗属性生产接线（2026-07-29）
-
-- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `59/59` 通过、失败 `0`、跳过 `0`、未运行 `0`，Unity 在结果写入后正常退出；XML 位于 `Artifacts/BondsAbilities/ConstantSelfModifiersFocused/EditModeResults.xml`。
-- 数据消费者以一个新增用例覆盖五条共享能力投影，并逐一读取 8 份真实 v2 文档的全部 16 个变体：`1058/1081 → BLOCK_CAPACITY_PLUS_TWO`、`1240 → BLOCK_CAPACITY_PLUS_ONE`、`1165/1166/1170 → MAGIC_RESISTANCE_PLUS_SEVENTY`、`1230 → MAGIC_RESISTANCE_PLUS_SIXTY`、`10127 → HETEROGENEOUS_BEAST_FORTIFICATION`。
-- 投影断言阻挡加算 `2/1`、法抗加算 `70/60`、`10127` 攻速加算 `100` 和物理/法术承伤 `500/1000`；中性承伤字段保持 `1000/1000`。既有 Core 回归继续覆盖阻挡、法抗上限、攻速向上取整和承伤类型边界。
-- Editor 与 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS 生命阈值战斗属性生产接线（2026-07-29）
-
-- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `60/60` 通过、失败 `0`、跳过 `0`、未运行 `0`，Unity 在结果写入后正常退出；XML 位于 `Artifacts/BondsAbilities/HealthThresholdModifiersFocused/EditModeResults.xml`。
-- 数据消费者验证 `1025` 精英 0/2 分别引用 `2000/2800` 攻击倍率的半血持续能力；`1232` 两变体引用严格半血以下、防御 `4000/1000`、阻挡 `+1`；`1264` 两变体引用严格低于满血、一次触发、持续 `300 Tick`、攻速 `+100`、移速 `2000/1000`；`1274` 两变体引用严格半血以下、一次触发、永久加速。
-- 既有 Core 回归覆盖持续阈值随治疗撤销、首次触发限时状态精确到期、永久状态、攻防/阻挡/攻速/移速组合，以及阻挡容量下降时的稳定关系裁剪。
-- Editor 与 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
-
-### BONDS 全部单位能力与永久表现状态收口（2026-07-29）
-
-- 描述同步后的最终代码定向 EditMode 筛选 BONDS 五组聚焦套件及 `BattlePresentationEditModeTests;BattlePresentationTrackEditModeTests`，结果为 `169/169` 通过、失败 `0`、跳过 `0`、不确定 `0`、未运行 `0`，Unity 正常退出；XML 位于 `Artifacts/BondsAbilities/FinalDescriptions/EditModeResults.xml`。
-- 其中 `BondsTargeting=7`、`BondsPassiveCombatModifier=45`、`BondsSkillAnimation=5`、`UnitSourceConsumer=17`、`BattleCore=59`、`BattlePresentation=23`、`BattlePresentationTrack=13`；覆盖战术命令标签及条件增益、无人机光环、生命周期、死亡后继、囚犯第四击解放、首领群体解放、半血 Skill 排队、二倍速向上取整、永久表现状态、时间轴/回放回归及能力/动画目录投影。`1146` 另覆盖 `250cm` 半径、基础与精英 2 增量光环数值、排除自身、同能力不叠加以及两个精英变体生产接线。静态 `dotnet build ARKnoNIGHTS.Battle.EditModeTests.csproj --no-restore --nologo -v:q -clp:ErrorsOnly` 为 `0` error（保留既有 `118` 个警告）。
-- 用户确认 `1089` 无需独立地面/空中标签，因为无人机已由公共目标资格从全部索敌与伤害候选排除；`1146` 光环半径确认为 `2.5格`。`BONDS_IMPLEMENTATION.md` 的 `59/59` 条目现均为已实现。未运行 PlayMode 真实 Spine 动画、Windows Player 构建或人工动画检查；冻结 v1 目录未重新生成。
-- 能力描述同步检查使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Sync-BondsUnitDescriptions.ps1 -Check`。检查要求实现台账恰有 `59` 条非空描述，并逐变体匹配生产 v2 JSON；当前结果为 `59` 条描述、`108/108` 个相关变体非空且一致、修改文件数 `0`。全部单位与能力源 JSON 解析错误数为 `0`。
-
-- 2026-07-29 Task 7 独立审查后修复：审查发现解析器已拒绝 `animations[].key == "Default"`，但未拒绝 `animations[].name == "Default"`。提交 `8893b1d` 先加入负向回归测试；RED 为 `44 total / 43 passed / 1 failed / 0 skipped`，唯一失败证明 `key=idle/name=Default` 会被旧实现接受。随后以相同 `StringComparison.Ordinal` 同时校验 key 与 name；GREEN 为 `44/44` 通过、失败 `0`、跳过 `0`，wrapper 退出码 `0`，日志没有编译错误或未处理异常。证据位于 `Artifacts/UnitEliteVariantsV2/DefaultBindingFix/{RED,GREEN}`。两次 Unity 都在结果落盘后超过 runner grace period 并被强制停止，最终确认无 Unity/UnityHub 残留；修复提交经独立只读复审为 `CLEAN`。
-- 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：
-- 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。
-- 实际测试：仓库 `scripts/Invoke-UnityTests.ps1` 分别运行全量 EditMode 与 PlayMode；脚本在结果 XML 写入后验证非零测试数并解析结果。EditMode 为 `66` 通过、`0` 失败、`0` 跳过；PlayMode 为 `14` 通过、`0` 失败、`0` 跳过。Unity 清理 `Temp` 时删除了这些短生命周期 XML，因此计数以脚本当场解析的结果为准；无测试失败或编译错误。
-- 实际 Windows Standalone 构建：`Task006StandaloneBuild.BuildWindowsX64` 成功，日志 `Temp/UNIT-DATA-001/WindowsStandaloneBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=2`，产物输出到忽略的 `Temp/TASK-006/WindowsStandalone/`。未执行人工 GUI 验收；中文名和技能说明仍等待用户填写。
-
-## 30. PREP-DEPLOY-001 已部署单位选中后拖动换位（2026-07-24）
-
-- 状态层 EditMode：`Temp/PREP-DEPLOY-001/final-focused-edit/EditModeResults.xml`，筛选 `ArknoNights.Battle.Tests.LocalPlayerStateEditModeTests`，共 `12` 项、通过 `12`、失败 `0`、跳过 `0`。新增断言覆盖空格移动、己方占格原子交换、同格成功 no-op、越界/门格/不存在/非部署失败、费用不变、version/Changed 次数、CanonicalSummary 变化和重复固定序列确定性。
-- 场景 PlayMode：`Temp/PREP-DEPLOY-001/green-review-fixes/PlayModeResults.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。新增断言覆盖未选中单位不能开始重定位、选中单位交换后的两个视图位置、原始 unit ID 选择保持、门格失败恢复、交互锁取消不改状态、屏幕 UI 上松手取消，以及撤退命中框不启动换位。`Temp/PREP-DEPLOY-001/phase-loop/PlayModeResults.xml` 中 `PreparationBattleLoopPlayModeTests` 为 `1/1` 通过，确认准备→战斗→准备循环回归。
-- 全量 PlayMode：`Temp/PREP-DEPLOY-001/final2-full-play/PlayModeResults.xml`，共 `18` 项、通过 `18`、失败 `0`、跳过 `0`。
-- 全量 EditMode：`Temp/PREP-DEPLOY-001/final2-full-edit/EditModeResults.xml`，共 `70` 项、通过 `69`、失败 `1`、跳过 `0`，因此不得记为全量通过。失败项为既有 `BattleCoreEditModeTests.RealCatalog_ParsesSourceValuesAndLoadsDeterministicallyFromResources`：当时 `HEAD` 中 `Assets/GameData/Units/Json/1000_gopro.json` 的 `displayNameZhHans` 已为 `狂暴的猎狗pro`，该既有测试仍断言空字符串；两者都不在该历史任务 diff。本任务范围的 `LocalPlayerStateEditModeTests` 已在上述定向 XML 中全数通过。
-- Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001\final2\compile.log` 退出码 `0`；日志含 `Tundra build success`，未含 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
-- Windows Standalone：`Task006StandaloneBuild.BuildWindowsX64` 输出 `Temp/PREP-DEPLOY-001/final2/WindowsStandalone/ARKnoNIGHTS.exe`，构建摘要为 `result=Succeeded`、`errors=0`、`warnings=1`、总大小 `165411244` 字节。
-- 结果保留说明：上述测试脚本均在 XML 首次完整写入、确认测试数大于零后立即解析并输出结果；随后 Unity 的 AssetDatabase 清理了这些 `Temp/PREP-DEPLOY-001` 短生命周期 XML。因此计数以本轮脚本的当场结构化解析输出为准，未将已清理文件视为持续可用证据。
-- 未验证：当前无可靠的交互式 Unity Editor/Player GUI 驱动，未手工执行第一次点击、真实鼠标阈值拖动、空格移动、两单位交换、门格失败及战斗后返回准备的视觉流程；也未在生成的 Windows Player 内人工验收。自动断言不替代这些视觉/手势检查。
-
-## 31. PREP-DEPLOY 已部署单位拖动时隐藏选择框（2026-07-24）
-
-## Home room-select capture refresh (historical; superseded, 2026-07-26)
-
-1. Run `LanLobbyCaptureSuitePlayModeTests`; the `home` manifest must include both a `[uc]autochessouter/room_select_*` source and a `Combined/[uc]autochesscommon/icon_*` avatar source.
-2. Build with `Task006StandaloneBuild.BuildWindowsX64`, then launch the resulting Player visibly with `-force-d3d11 -lanLobbyCaptureSuite -lanLobbyCaptureOutput Artifacts/LAN-LOBBY/HomeRoomSelect/CapturesFinal -screen-width 1920 -screen-height 1080`.
-3. Require five decodeable non-empty `1920x1080` captures and `manifest.json` in `Artifacts/LAN-LOBBY/HomeRoomSelect/CapturesFinal/`.
-4. With the output directory absent, export `Artifacts/LAN-LOBBY/HomeRoomSelect/VisualDiff/` through `scripts/ExportLanLobbyVisualDiff.ps1` and explicitly pass read-only `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud`.
-5. Inspect `home.png`, `home-overlay.png`, `home-heatmap.png`, and both visual-diff reports. The reports are non-blocking but must record the reference dimensions, normalized masks, and a source table with Resources path, approved source path, SHA-256, and occurrence count for each rendered Sprite.
-
-## Home room-select action-bar historical Player evidence (2026-07-26)
-
-1. These suites were run sequentially with `scripts/Invoke-UnityTests.ps1`: `LanLobbyLayoutEditModeTests` to `Temp/ROOM-SELECT-ACTION-BARS/FinalLayout`, then `LanLobbyViewPlayModeTests`, `LanLobbyCaptureSuitePlayModeTests`, and `LanLobbyControllerPlayModeTests` to distinct `Final*` directories. The script parsed `6/6`, `13/13`, `3/3`, and `3/3` at run time, but Unity later cleaned those short-lived `Temp/` XML files. They are historical results, not retained evidence; use the persistent `Artifacts/` evidence below.
-2. With an absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/` directory, set `ARKNIGHTS_BUILD_OUTPUT` to `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/WindowsStandalone/ARKnoNIGHTS.exe`, call `Task006StandaloneBuild.BuildWindowsX64`, and retain `WindowsStandaloneBuild.log`. Require `BuildReport result=Succeeded` and `errors=0`; record warnings exactly. The retained run had one CS0414 warning for unused `TagRegistry.freezeAppend`.
-3. Start that Player visibly with `-force-d3d11 -screen-width 1920 -screen-height 1080 -lanLobbyCaptureSuite -lanLobbyCaptureOutput Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/CapturesFinal`. Require Player exit `0`, five decodeable `1920x1080` PNGs, and `manifest.json`; Home must identify `create_icon` and `join_icon` as their approved normal source paths, with no `$0` Unpacked source.
-4. With an absent `VisualDiff` output directory, run `scripts/ExportLanLobbyVisualDiff.ps1` with the capture directory, `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/VisualDiff`, and read-only `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud`. Inspect `home-create-action-overlay.png`, `home-create-action-heatmap.png`, `home-join-action-overlay.png`, and `home-join-action-heatmap.png`; retain their measured actual/reference Rects and local metrics. ATTENTION or other non-blocking difference metrics remain evidence for follow-up and must not be hidden or treated as acceptance.
-5. Treat all decoration placement except the two action-bar anchors as out of scope for this iteration. The next visual implementation review uses the anchors to rotate a repeated `room_select_create_left_line` by `180°` for the Create right side and composes Join decorations with overlap.
-
-## Home room-select action-bar final-review-fix verification (historical; superseded, 2026-07-26)
-
-1. The superseded historical test root is `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-FinalFix-20260726-163314/`; do not cite it or the earlier `Temp/ROOM-SELECT-ACTION-BARS/Final*` paths as current evidence. The run used `scripts/Invoke-UnityTests.ps1` sequentially with Unity `D:\2022.3.62f1c1\Editor\Unity.exe`, project `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`, and these platform/filter/output triples:
-   - EditMode / `ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests` / `Layout`: `6/6/0/0`, `result=Passed`, shutdown `forced-stop-after-results` after XML, `graceSeconds=20`.
-   - PlayMode / `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests` / `View`: `14/14/0/0`, `result=Passed`, shutdown `normal-exit-after-results`.
-   - PlayMode / `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests` / `Capture`: `3/3/0/0`, `result=Passed`, shutdown `forced-stop-after-results` after XML, `graceSeconds=20`.
-   - PlayMode / `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests` / `Controller`: `3/3/0/0`, `result=Passed`, shutdown `normal-exit-after-results`.
-2. `HomeRoomSelect_JoinActionIsUnobstructedBeforeAndAfterDiscoveryPrefill` is the regression gate for this review: before and after discovery/prefill, it verifies the approved Join Rect, explicit Status/discovered-room Button non-overlap, all later active RoomSelect graphics non-overlap, the first interactable EventSystem raycast hit at the Join center, and the unchanged Join request.
-3. Build to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsFinalFix/WindowsStandalone/ARKnoNIGHTS.exe` using `Task006StandaloneBuild.BuildWindowsX64`. Retain `WindowsStandaloneBuild.log`; the recorded BuildReport is `Succeeded`, `errors=0`, `warnings=0`. The transient licensing handshake diagnostic before successful entitlement resolution is environmental and must remain visible in the log.
-4. Start that Player visibly with `-force-d3d11 -screen-width 1920 -screen-height 1080 -lanLobbyCaptureSuite -lanLobbyCaptureOutput Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsFinalFix/CapturesFinal -logFile Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsFinalFix/PlayerCapture.log`. Require exit `0`, `[LanLobby][capture.completed] count=5`, five decodeable non-empty `1920x1080` PNGs, `manifest.json`, and no forbidden `$0`/`#0` Unpacked source.
-5. Export to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsFinalFix/VisualDiff/` using explicit read-only `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud`. JSON/Markdown must expose `approvedTargetRectPx1920x1080`, `positionDeviationPx1920x1080` with unit `px`, `locallyResizedReferenceSizePx`, and `sizeDeviationPxAfterLocalReferenceResize` with unit `px`; this superseded run recorded zero Create and Join deviations. Material usage must remain split into bitmap Sprite, Unity Text, and code-generated geometry.
-6. Open and inspect `CapturesFinal/home.png`, `CapturesFinal/discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `VisualDiff/home-join-action-overlay.png`. The retained run has no Status/discovered-room overlay on Join. Local Create/Join difference ratios `0.536508741529662` and `0.45764478818872123` remain non-blocking, and other decoration placement remains outside this iteration's acceptance.
-7. Run `scripts/TestLanLobbyVisualDiffSmoke.ps1`, `scripts/TestExportLanLobbyEvidenceSmoke.ps1`, `git diff --check`, `git status --short`, and `git ls-files 'Artifacts/*' 'Temp/*'`. The smoke scripts must exit `0`; generated evidence must stay ignored and untracked.
-
-## Home room-select evidence-derived manifest verification (historical; superseded for Join, 2026-07-26)
-
-1. This historical proof is limited to the persistent test root `Artifacts/LAN-LOBBY/HomeRoomSelectActionBars/Verification-EvidenceFix-20260726-165954/` and the retained build/capture/report root `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/`. Its Layout `6/6/0/0`, View `14/14/0/0`, Capture `3/3/0/0`, Controller `3/3/0/0`, aggregate `26/26` results describe the pre-reconstruction Join hierarchy; they are not the current Join acceptance record.
-2. In this historical run, `LanLobbyCaptureSuitePlayModeTests` required each active rendered Sprite instance to have a stable node/source row and each Home capture to contain two `join_icon` instances because `SimulationInvite` still existed. That inventory is superseded; the current Join contract requires one `join_icon` per Home state. The historical run also required dynamic active Unity Text rows with runtime font name/explicit no-bitmap-source fields and both action Rects to declare `screen-bottom-left`/`px`.
-3. Build to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/WindowsStandalone/ARKnoNIGHTS.exe` with `Task006StandaloneBuild.BuildWindowsX64`. Retain `WindowsStandaloneBuild.log`; the current BuildReport is `Succeeded`, `errors=0`, `warnings=1`, with only the existing `TagRegistry.freezeAppend` CS0414 warning.
-4. Start that Player visibly with D3D11 at `1920x1080`, output to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/CapturesFinal/`, and retain `PlayerCapture.log`. Require exit `0`, completion count `5`, five decodeable non-empty PNGs, and BOM-less UTF-8 manifest parsing without fallback or transcoding.
-5. Before creating output, the visual exporter must reject each table-driven Home Create action Rect case independently: missing, duplicated, non-numeric `x`, wrong `coordinateOrigin`, wrong `unit`, zero width, zero height, and out-of-bounds. Every case copies the valid fixture into its own capture directory, rewrites every capture path, and proves the requested output directory remains absent after failure. Convert the captured bottom-left Rect to `1920x1080` top-left coordinates. The report must distinguish the approved/local-reference target size (`717x99`) from `comparisonReferenceSizePx`; compute position as actual top-left minus target and size as actual minus the `717x99` local-reference target.
-6. The smoke fixture must use a non-zero Create actual delta and assert both JSON and Markdown values exactly; the fixture expects actual `(1161,449,711,95)`, position `(+7,-4)`, local target `717x99`, comparison `711x95`, and size `(-6,-4)`. Join remains zero. `TestLanLobbyVisualDiffSmoke.ps1` must preserve its existing staging/reference-file/decoded-size/non-zero-delta checks and prove a BOM-less UTF-8 manifest with Chinese text parses correctly.
-7. Export the real capture to the absent `Artifacts/LAN-LOBBY/HomeRoomSelectActionBarsEvidenceFix/VisualDiff/` using the explicit read-only Figure 9/10 directory. Require real Create/Join actual/target Rects `(1154,453,717,99)` and `(1154,876,717,99)`, zero position/size deltas, explicit local/comparison sizes `717x99`, and local ratios `0.53635377484749869` / `0.45760252454813122`.
-8. Historical capture/asset totals were 128 Sprite instances aggregated to 34 `bitmapSprites` rows, 59 active Text instances aggregated to 37 `unityText` rows, and six `codeGeneratedGeometry` rows. Historical `join_icon` totalled four only because `SimulationInvite` still rendered; the current total is two. No forbidden Unpacked `$0`/`#0` source was allowed.
-9. Open `CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`; confirm the bars are unobstructed and both captured/reference contours are visible. Other decoration placement and non-blocking difference metrics remain outside visual acceptance.
-10. Run `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, `TestLanLobbyEvidenceCommonSmoke.ps1`, `git diff --check`, `git status --short`, and `git ls-files 'Artifacts/*' 'Temp/*'`. Generated evidence must remain ignored and untracked.
-
-## Home action-content visual-center verification (historical action baseline; superseded for Join, 2026-07-26)
-
-1. Historical focused test proof is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Verification-Final-20260726-183809/`. It was run sequentially with Unity `D:\2022.3.62f1c1\Editor\Unity.exe` and project `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`:
-   - EditMode `ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests`: `6/6/0/0`, `result=Passed`; valid XML was retained before forced shutdown after the 20-second grace period.
-   - PlayMode `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests`: `14/14/0/0`, `result=Passed`, normal exit.
-   - PlayMode `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests`: `3/3/0/0`, `result=Passed`, normal exit.
-   - PlayMode `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests`: `3/3/0/0`, `result=Passed`, normal exit.
-   - Total: `26/26` passed, failed `0`, skipped `0`.
-2. `HomeRoomSelect_ActionBarsUseMeasuredRectsStretchSpritesAndOwnCreateInput` additionally locks the icon RectTransforms and independent label offsets. Create icon uses top-left local `(47,25)` and width `38`; Join icon uses `(47,19)` and width `47`, both preserving source aspect. Create label offsets are `(108,5)` / `(-220,5)` and Join label offsets are `(103,2)` / `(-220,2)`, both at font size `38`.
-3. The retained final build/capture/report is `Artifacts/LAN-LOBBY/ActionContentVisualCenters/Calibration2/`. `WindowsStandaloneBuild.log` records `result=Succeeded`, `errors=0`, `warnings=0`, size `184752794`. The visible D3D11 Player exited `0`, logged `[LanLobby][capture.completed] count=5`, and retained five non-empty `1920x1080` PNGs plus `manifest.json`.
-4. Export with explicit read-only `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud` to `Calibration2/VisualDiff/`. Create and Join background actual/target Rects remain `(1154,453,717,99)` and `(1154,876,717,99)`, with position and size deltas all `0 px`.
-5. The exporter measures actual and locally resized Figure 9 crops with integer luminance `<45`. Icons merge only four-neighbour dark components with at least `40` pixels and component aspect ratio at most `4.0`, excluding thin background texture; labels use all qualifying dark pixels. The four final rows must be:
-
-   | Element | Expected | Reference measured | Actual measured | Center delta | Size delta | Passed |
-   | --- | --- | --- | --- | --- | --- | --- |
-   | Create icon | `47,25,36,37` | `46,25,37,37` | `47,25,36,36` | `0,-0.5` | `0,-1` | `true` |
-   | Create label | `109,28,148,32` | `108,27,149,34` | `109,27,149,34` | `0.5,0` | `1,2` | `true` |
-   | Join icon | `47,20,44,50` | `47,20,44,50` | `47,20,44,50` | `0,0` | `0,0` | `true` |
-   | Join label | `104,31,150,34` | `104,31,150,34` | `104,30,150,35` | `0,-0.5` | `0,1` | `true` |
-
-6. The smoke fixture includes detached thin dark strips and proves they do not enlarge icon bounds. `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, and `TestLanLobbyEvidenceCommonSmoke.ps1` must each print `PASS` and exit `0`.
-7. Material provenance remains capture-derived: `128` Sprite instances aggregate to `34` bitmap rows, `59` Text instances to `37` Unity Text rows, and code-generated geometry to `6` rows. `create_icon`, `join_icon`, and both action backgrounds use their registered non-`$0/#0` `[uc]autochessouter` sources; Create/Join labels remain `UnityEngine.UI.Text` with `hasBitmapSource=false`.
-8. Inspect `Calibration2/CapturesFinal/home.png`, `discovered-prefill.png`, `VisualDiff/home-create-action-overlay.png`, and `home-join-action-overlay.png`. Both bars must remain unobstructed. Decoration outside the two bars remains outside this iteration’s acceptance and must not be described as fully reproduced.
-9. Fresh full-suite evidence is retained under `Artifacts/LAN-LOBBY/ActionContentVisualCenters/FullSuiteFinal-20260726-184300/`; the repository-wide suite is not green and must not be reported as passed:
-   - EditMode: total `118`, failed `2`, skipped `0`. The unchanged failures are `BattleCoreEditModeTests.Fixture_InvalidInputMatrixReturnsStructuredErrors` and `BattleCoreEditModeTests.RealCatalog_ParsesSourceValuesAndLoadsDeterministicallyFromResources`; the latter still expects an empty `displayNameZhHans` while unchanged source `gopro.json` contains `狂暴的猎狗pro`.
-   - PlayMode: total `39`, failed `1`, skipped `0`. The unchanged failure is `PreparationBattleLoopPlayModeTests.SampleScene_AutoLoopsPreparationToBattleAndBackWithoutWritingCombatResultToPlayerState`, which expected `Preparation` and observed `Battle`.
-   - These tests and their Battle/source-data inputs are outside this action-content diff. They block treating the whole branch as integration-ready but do not invalidate the focused `26/26`, successful Player build, or screenshot acceptance above.
-
-## 32. UI-INFO-001 验证（2026-07-24）
-
-- Focused EditMode：42 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135249/EditModeResults.xml`。
-- Focused PlayMode：10 passed / 0 failed / 0 skipped，`Temp/UnityTests/20260724-135337/PlayModeResults.xml`。
-- Windows Player 构建、capture suite 运行与人工视觉比对尚未执行。
-
-## 33. UI-INFO-002 信息面板局部视觉验证（2026-07-25）
-
-- Player 证据位于 `Artifacts/UI-INFO-002/00-baseline` 至 `10-final`。`scripts/ExportUiInfoEvidence.ps1` 为各阶段生成原始 PNG、面板裁切、JSON manifest、图 6 并排图和调整记录；最终证据为 `Artifacts/UI-INFO-002/10-final/captures/`。
-- TDD 夹具入口先按预期失败（入口不存在），实现后单项 PlayMode 转绿。夹具仅经 `-uiCaptureVisualFixture` 显式触发，覆盖 `--`、中等长度中文名和 `18000/18000` 的 20pt HP 文本。
-- 全量 EditMode：`Artifacts/UI-INFO-002/10-final/verification/EditModeResults.xml`，`77 passed / 0 failed / 0 skipped`。全量 PlayMode：`Artifacts/UI-INFO-002/10-final/verification/PlayModeResults.xml`，`19 passed / 0 failed / 0 skipped`。
-- Windows Player 构建日志 `Artifacts/UI-INFO-002/10-final/verification/WindowsStandaloneBuild.log` 为 `Succeeded`、`errors=0`、`warnings=1`（未修改的 `TagRegistry.freezeAppend`，CS0414）；最终 Player 日志 `Artifacts/UI-INFO-002/10-final/verification/PlayerCapture.log` 为 `capture.completed count=8`。用户已人工确认鼠标交互通过，并已目检最终空名、中等中文名及并排图。
-
-- TDD 红灯：`Temp/PREP-DEPLOY-001-indicator/red/PlayModeResults.xml`，筛选 `ArknoNights.Battle.Tests.StagingHudScenePlayModeTests`，共 `9` 项、通过 `6`、失败 `3`、跳过 `0`。三个失败均为新断言：开始已选中单位的重定位后 `DeployedUnitSelectionIndicator.activeSelf` 仍为 `true`，证实测试捕获的是本次需求缺口。
-- 定向 PlayMode：`Temp/PREP-DEPLOY-001-indicator/green-review/PlayModeResults.xml`，同一筛选共 `9` 项、通过 `9`、失败 `0`、跳过 `0`。覆盖拖动开始隐藏选择框、成功换位与同格 no-op 后恢复、门格失败后恢复、UI 上松手与失焦取消后恢复，以及交互锁仍清除选择框。
-- Editor 编译：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -logFile G:\ARKnoNIGHTS_beta\Temp\PREP-DEPLOY-001-indicator\compile-final.log` 退出码 `0`；日志含 `Tundra build success` 并以 `Exiting batchmode successfully now!` 结束，未发现 `error CS`、`Compilation failed` 或 `Scripts have compiler errors`。
-- 未验证：无可靠的交互式 Unity Editor/Player GUI 驱动，尚未以真实鼠标拖动目视检查隐藏和恢复的逐帧表现；自动场景断言验证的是实际控制器生命周期而非人工视觉体验。
-## 34. UI-009 四玩家双战斗场景集成验证（2026-07-26）
-
-- EditMode：通过 `scripts/Invoke-UnityTests.ps1` 对本 worktree 运行全量 EditMode，结果为 `130 passed / 0 failed / 0 skipped`，结果文件为 `Temp/UI-009/full-edit-final-replay/EditModeResults.xml`。新增覆盖四玩家固定配对、每名玩家只封存一次、严格相同最高费用堆叠按 `unitId` 稳定选取、输入单位 ID 不交叉、结果不回写 PlayerState，以及两份独立结果/Track 的稳定摘要。
-- Presentation 回归：`BattlePresentationEditModeTests.TrackPlayback_ViewStatesSampleTheCurrentPresentationTickInsteadOfTheFinalResult` 先以当前 Tick 和最终 Tick 的 HP 差异复现失败，修正后通过；`MultiBattlePresentationCoordinatorEditModeTests` 还先复现“重播只改 Tick、不重建视图”的失败，再在 `Temp/UI-009/green-replay-rebind/EditModeResults.xml` 通过。两项断言分别防止场景 HUD 在 Tick 0 提前显示最终死亡/HP，以及重播时画面停留在结尾。
-- PlayMode：同一脚本的全量 PlayMode 结果为 `19 passed / 0 failed / 0 skipped`，文件为 `Temp/UI-009/full-play-final-replay/PlayModeResults.xml`。`PreparationBattleLoopPlayModeTests` 实际加载 `SampleScene`，覆盖 Preparation 到双 Battle、`MatchAB`/`MatchCD`、共同 Tick、P4 Away 观察、结果对象不重算、两场结束后只返回一次 Preparation，及四名玩家的持久局内状态不被战斗结果覆盖。`StagingHudScenePlayModeTests` 回归了战斗单位选择和正式 HUD 的信息互斥。
-- Windows Standalone：执行 `Task006StandaloneBuild.BuildWindowsX64`，日志 `Temp/UI-009/WindowsStandaloneBuild-final-replay.log` 记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=2`，输出目录为忽略的 `Temp/TASK-006/WindowsStandalone/`。本次没有改动场景、Prefab、Package 或项目设置。
-- 未验证：没有在交互式 Editor 或 Windows Player 中人工观察 `MatchAB`/`MatchCD` Home/Away 的相机、朝向、动画速度、世界状态条和最终视觉布局；尚未由左侧玩家列表的真实按钮触发 `TryObserveBattlePlayer`，因为该图形挂接和截图 manifest 扩展属于 UI-010。自动断言与构建成功不替代上述视觉和鼠标流程检查。
-
-## 35. 正式 HUD 场景集成与截图闭环（2026-07-26）
-
-- 合并审查基线：`txym` 已合并 UI-009 的 four-player Track 变化后，先运行全量 EditMode，`Artifacts/UI-010/EditMode/EditModeResults.xml` 为 `130 passed / 0 failed / 0 skipped`。该入口在 XML 完整写入后等待 Unity 正常退出；本次记录为 `forced-stop-after-results; graceSeconds=20`，结果 XML 已成功解析，不能误写为 Unity 自然退出。
-- `BattleHudSceneIntegrationPlayModeTests` 实际重载 `SampleScene`，覆盖自动挂载、两个 HUD 根的全屏锚定、五槽横向卡片几何与真实贴图、左侧头像卡和断线图标、断线时仍使用普通生命背景、远端观察只读快照、远端单位信息面板与玩家列表互斥、观察时阵型命令锁定、本地 ready 只锁阵型不锁商店、战斗阶段 Player4 切换到 `MatchCD`，以及战斗完成后观察目标和 ready 重置。断线生命背景修正先产生 `1 failed` 的 Red，再以 `Artifacts/BattleHudVisualAudit/green-disconnect-health/PlayModeResults.xml` 定向复测为 `1 passed / 0 failed / 0 skipped`。
-- 最终全量测试：`Artifacts/BattleHudVisualAudit/final-validation-3/EditMode/EditModeResults.xml` 为 `131 passed / 0 failed / 0 skipped`，结果写入后超过 20 秒退出宽限而被脚本终止；`Artifacts/BattleHudVisualAudit/final-validation-3/PlayMode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`，Unity 正常退出。新增 EditMode 覆盖赤金不足时升级入口不得进入无效二次确认。
-- 全量 PlayMode：`Artifacts/UI-010/PlayMode-rerun/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。一次初跑发现旧 UI-005 测试仍断言赤金/生命为 `--`；这与本地测试数据和 UI-010 的显示规则冲突，故将该断言更新为 `7`/`400` 并复跑通过。
-- Windows Standalone：既有构建入口输出到忽略目录 `Artifacts/BattleHudVisualAudit/iteration-4/WindowsStandalone/`。构建日志 `Artifacts/BattleHudVisualAudit/iteration-4/windows-build.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`；唯一警告仍是既有 `TagRegistry.freezeAppend` 未使用。没有修改场景、Prefab、Package 或项目设置。
-- 截图入口：以可见 Windows Player 运行 `-battleHudCapture -uiCaptureOutput <dir>`，连续四轮生成并逐张检查关键截图。第四轮 `Artifacts/BattleHudVisualAudit/iteration-4/captures/` 含 `17` 张 `1920×1080` PNG 和 `battle-hud-manifest.json`；Player 正常退出 `0`，日志没有捕获失败、运行时异常或空白图。已核对准备关闭、商店打开、买不起、购买确认、冻结、真实空槽、升级确认、已准备、观察/返回、远端信息面板互斥、断线、两场战斗 Home/Away 与共同 Tick 状态；后两张对照图的 manifest 均为 Tick `11.66647419333458`。
-- 截图闭环修正：修前基线确认商店和玩家列表以默认 `100×100` 根节点为坐标系、商品为纵向白色调试行且 Texture 贴图加载失败；第一轮修正为全屏根、真实卡片和兼容贴图加载；第二轮根据截图把等级按钮视觉中心与设置按钮对称，并补齐远端单位信息面板截图状态；继续逐图核对发现“空槽”证据实际仍处于购买确认且不足赤金可被调试入口置为升级确认，第三轮修正命令前置可行性检查与截图顺序后，manifest 明确记录槽 `0:empty`、赤金 `1`；独立审查又发现两张“共同 Tick”截图间时钟仍在推进且断线误用扣血背景，第四轮在截图前暂停共享演示时钟，并将断线表现恢复为普通生命背景加断线图标。截图只证明可见结果，权威状态仍由测试断言和 manifest 共同核对。
-- 仍需人工鼠标检查：实际点击五张商品卡、冻结/刷新/升级/准备按钮及四张玩家头像，确认点击热区与视觉一致；连续观察 Spine 动画、Home/Away 朝向和切换瞬间是否自然。自动截图使用真实运行状态但通过代码发起命令，不等价于人工鼠标流程。
-
-## 36. 正式 HUD 视觉修正与字体比较（2026-07-26）
-
-- 商店命令 TDD：`Artifacts/BattleHudVisualAudit/bulk-shop-red/controller/EditModeResults.xml` 与 `state/EditModeResults.xml` 各按预期出现 `2` 项失败，分别暴露冻结只影响单槽、刷新仍进入二次确认和领域层缺少批量状态入口；实现后 `bulk-shop-green/controller/EditModeResults.xml` 为 `10 passed / 0 failed / 0 skipped`，`bulk-shop-green/state/EditModeResults.xml` 为 `13 passed / 0 failed / 0 skipped`。
-- 布局 TDD：`layout-red/player-list-2/EditModeResults.xml` 与 `layout-red/scene/PlayModeResults.xml` 各按预期 `1` 项失败，证明共享 `bg_player_list`、内部生命几何、商店居右、升级价格背景、字体和准备图标映射尚未接入；实现后 `layout-green/player-list-strong/EditModeResults.xml` 为 `6 passed / 0 failed / 0 skipped`，`layout-green/scene/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。
-- 字体 A/B：使用同一份源代码、固定测试数据和 `1920×1080` 截图入口分别构建 `font-hanyi` 与 `font-fangzheng` Windows Player，两次构建均 `Succeeded`、`errors=0`。逐图比较 `02_shop_open`、`06_shop_frozen` 和 `08_ready_shop_still_available` 后，汉仪粗黑简在 `16～24px` 中文商品名与按钮标签上更接近参考图的粗度，且没有图标碰撞；因此最终选择仓库已有 `Assets/Resources/Fonts/HanYiCuHeiJian-1.ttf`，未下载字体、未新增依赖。
-- 截图复查发现玩家生命虽已移入头像并使用数字字体，但默认 `Text` 垂直裁剪使 `400` 完全不可见。`life-overflow-red/PlayModeResults.xml` 先以 `1 failed` 固化该缺陷；放开该生命文本的横纵溢出后，`life-overflow-green/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。最终局部截图 `Artifacts/BattleHudVisualAudit/final/player-list-crop.png` 可见四个头像内部的 `400`。
-- 最终截图：`Artifacts/BattleHudVisualAudit/final/captures/` 包含 `17` 张互不重名的 `1920×1080` PNG 和结构化 manifest；Player 日志记录 `[BattleHudCapture][completed] count=17` 并正常退出 `0`。本地解析实际图片和 manifest 后确认：冻结状态的五个非空槽均为 `frozen=True`，购买状态含真实空槽，全部 Battle 状态均隐藏商店，两张共同 Tick 截图均为 `11.999635696411133`，且每条记录都含等级、商店、准备、首尾玩家、信息面板和状态栏矩形。
-- 最终全量测试：`Artifacts/BattleHudVisualAudit/final/EditMode/EditModeResults.xml` 为 `135 passed / 0 failed / 0 skipped`；独立审查补齐升级费用背景中心断言后，`Artifacts/BattleHudVisualAudit/final/PlayMode-review/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。两次 Unity 均在结果写入后正常退出。
-- 严格 Windows x64 构建：`Artifacts/BattleHudVisualAudit/final/windows-build.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到 `Artifacts/BattleHudVisualAudit/final/WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告仍为既有 `TagRegistry.freezeAppend` 未使用，与本轮 HUD 修改无关。
-- 尚未自动验证：真实鼠标点击热区、连续悬停效果、按钮在不同 Windows DPI/宽高比下的视觉一致性，以及长时间观察 Spine 动画切换。自动截图命令直接调用正式命令入口，不能替代这些人工交互检查。
-
-## 37. 商店放大与视觉中心修正（2026-07-26）
-
-- Red 基线：`Artifacts/BattleHudVisualAudit/requested-adjustment/red-editmode/EditModeResults.xml` 为 `135 total / 133 passed / 2 failed / 0 skipped`，两项失败分别确认旧商店仍为 `1070×280`、左侧玩家列表仍保留 `24px` 边距；`requested-adjustment/red-playmode/PlayModeResults.xml` 为 `1 failed`，确认场景尚未满足新几何约束。
-- 最终 EditMode：`Artifacts/BattleHudVisualAudit/requested-adjustment/final-editmode/EditModeResults.xml` 为 `135 passed / 0 failed / 0 skipped`。新增断言覆盖商店 `1.5×` 尺寸、等级按钮与商店上/右边缘连接、准备按钮中垂线、玩家列表 `8px` 左边距及 `0.85×` 行尺寸。
-- 最终 PlayMode：`Artifacts/BattleHudVisualAudit/requested-adjustment/final-playmode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。场景集成断言覆盖五张 `237×262.5` 商品卡、`12px` 间距、刷新价格背景、三类价格文字 `3px` 视觉上移、冻结/刷新内容 `9px` 视觉上移、两种等级数字颜色、准备按钮与资源面板共中垂线，以及玩家头像缩放。
-- 严格 Windows x64 构建：`Artifacts/BattleHudVisualAudit/requested-adjustment/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`；唯一警告仍为既有未使用字段。
-- 可见 Player 截图：`Artifacts/BattleHudVisualAudit/requested-adjustment/iteration-1/captures/` 包含 `17` 张互不重复的 `1920×1080` PNG 和结构化 manifest。已逐图检查商店打开、全部非空槽冻结和已准备状态；manifest 记录等级按钮 `1735,30,130,120`、商店 `260,150,1605,420`、准备按钮 `1740,620,180,60`、首名玩家 `8,164,98.6,107.1`，并确认冻结截图中五个非空槽均为 `frozen=True`。Player 日志记录 `[BattleHudCapture][completed] count=17`，未发现捕获失败或运行时异常。
-- 尚未自动验证：真实鼠标点击热区、不同 Windows DPI/非 `16:9` 分辨率下的视觉观感，以及用户对本轮 `1.5×` 商店和 `0.85×` 玩家头像最终大小的主观确认。PlayMode 会在 `4:3` 测试画布验证右锚定关系，但不能替代目标 `1920×1080` 的截图判断。
-
-## 38. 六槽商店、战斗期操作与玩家列表纠正（2026-07-26）
-
-- Red 基线：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/red-editmode/EditModeResults.xml` 为 `136 total / 10 failed / 0 skipped`，失败均来自六槽领域数据、战斗期商店命令、固定玩家列表背景及新几何断言；`red-playmode-8/PlayModeResults.xml` 为 `1 failed`，首个失败明确显示背景仍被错误缩小为 `98.6×453.9`，而期望为 `116×534`。
-- 最终 EditMode：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/green-editmode/EditModeResults.xml` 为 `136 passed / 0 failed / 0 skipped`。覆盖六槽加载、购买/刷新/冻结、战斗阶段购买/刷新/冻结/升级、商店左移以及玩家条目在固定背景内的尺寸和间距。
-- 最终 PlayMode：第一次 Green 仅因旧的“商店右边缘与等级按钮共线”断言失败，实际正好按新规则左移 `10`；更新为本轮明确几何后，`Artifacts/BattleHudVisualAudit/requested-adjustment-2/green-playmode-2/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。场景断言覆盖六张商品卡、三类费用位置、刷新费用贴底、升级确认渐变、商店/单位面板双向互斥、战斗期等级入口与完整商店命令。
-- 严格 Windows x64 构建：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告仍为既有未使用字段。
-- 可见 Player 截图：`Artifacts/BattleHudVisualAudit/requested-adjustment-2/iteration-1/captures/` 包含 `17` 张互不重复的 `1920×1080` PNG 和结构化 manifest。逐图核对确认：`bg_player_list` 保持 `116×534`；四个 `Player_*` 条目为 `98.6×107.1`、左侧 `x=16.7`，以 `13` 间距在背景内居中；商店为六槽且整体左移 `10`；商品/升级费用下移、商品费用左移、刷新费用贴底和升级确认渐变均可见；单位信息面板出现时商店关闭；`12_battle_match_ab_home.png` 明确记录并显示战斗阶段商店已打开。manifest 的所有记录均含 `6` 个商店槽，Player 日志记录 `[BattleHudCapture][completed] count=17`，未发现捕获失败、空白图或运行时异常。
-- 尚未自动验证：真实鼠标连续执行战斗期购买、刷新、冻结和升级；六张商品卡及越过商店面板左边缘的升级按钮在非 `16:9`、不同 DPI 下的点击热区；不同分辨率下玩家头像条目间距的主观观感。自动测试和截图使用正式命令入口，但不能替代上述人工鼠标检查。
-
-## 39. 商店纵向位置、按钮贴边与方正字体修正（2026-07-26）
-
-- Red：`Artifacts/BattleHudVisualAudit/requested-adjustment-3/red-editmode/EditModeResults.xml` 为 `136 total / 2 failed / 0 skipped`，分别证明玩家行仍在 `x=16.7`、商店仍未上移 `40`。随后同一个场景 PlayMode 按断言顺序依次在 `red-playmode-buttons`、`red-playmode-refresh-cost`、`red-playmode-font` 中暴露冻结/刷新按钮旧位置、刷新费用背景仍以中心贴边，以及中文仍为汉仪字体。
-- Green：`Artifacts/BattleHudVisualAudit/requested-adjustment-3/green-editmode/EditModeResults.xml` 为 `136 passed / 0 failed / 0 skipped`；`green-playmode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`。断言覆盖玩家行 `x=15.7`、商店面板上移 `40`、冻结右移 `10`、刷新右移 `15`、刷新费用背景底边贴按钮底边，以及商店/准备中文统一使用 `FangZhengHeiTiJianTi-1`。
-- Windows x64：`Artifacts/BattleHudVisualAudit/requested-adjustment-3/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`；唯一警告仍为既有 `TagRegistry.freezeAppend` 未使用。
-- 截图：同目录 `captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest。`02_shop_open.png` 已逐项复核方正字体、商店及按钮位置和刷新价格贴边；manifest 记录商店屏幕矩形为 `(250,110,1605,420)`、首名玩家为 `(15.7,197.3,98.6,107.1)`，并记录 `[BattleHudCapture][completed] count=17`，未发现运行时异常或空白图。
-- 尚未自动验证：真实鼠标点击在新按钮位置的主观手感，以及非 `16:9`、不同 DPI 下字体清晰度和按钮阴影的视觉中心。
-
-## 40. 冻结/刷新下移与退出玩家头像替换（2026-07-26）
-
-- Red：`Artifacts/BattleHudVisualAudit/requested-adjustment-4/red-playmode/PlayModeResults.xml` 以 `1 failed` 证明冻结和刷新按钮仍位于旧的局部 `y=0`；`red-editmode` 与 `red-editmode-overlay` 分别证明领域快照尚无独立退出状态、退出行尚未显式抑制掉线覆盖图。固定 fixture 验收开始后，`red-fixture-editmode/EditModeResults.xml` 为 `7 total / 2 failed / 0 skipped`，两项失败分别确认 Player3 尚未作为掉线样本、Player4 尚未作为退出样本。
-- Green：`Artifacts/BattleHudVisualAudit/requested-adjustment-4/final-editmode/EditModeResults.xml` 为 `137 passed / 0 failed / 0 skipped`；`final-playmode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`，两次 Unity 均在结果写入后正常退出。该轮按当时解释断言冻结/刷新按钮局部 `y=-20`、Player3 继续显示掉线覆盖图，以及 Player4 使用 `equip_replace_avatart_bg` 且不创建 `LostConnection` 子物体；其中退出玩家不显示掉线图标的解释已被第 41 节的用户纠正取代。
-- Windows x64：`Artifacts/BattleHudVisualAudit/requested-adjustment-4/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=2`，输出到同目录 `WindowsStandalone/ARKnoNIGHTS.exe`。日志中的唯一不同警告文本仍是既有 `TagRegistry.freezeAppend` 未使用；本轮没有新增编译诊断。
-- 截图：同目录 `captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest，Player 日志记录 `[BattleHudCapture][completed] count=17`。已检查 `02_shop_open.png` 的冻结/刷新整体下移效果，以及 `11_player_disconnect_and_exit_list.png` 中 Player3 的掉线头像和 Player4 的退出替换头像；未发现截图失败、空白图或运行时异常。
-- 尚未自动验证：联网系统真实触发“已退出”的状态迁移、退出后是否仍可观察或参与后续配对，以及真实鼠标在按钮新位置的点击手感；当前本地 Demo 仅从固定 JSON 读取该显示状态。
-
-## 41. 退出玩家掉线图标层级与商店按钮再次下移（2026-07-26）
-
-- Red：`Artifacts/BattleHudVisualAudit/requested-adjustment-5/red-editmode/EditModeResults.xml` 为 `1 failed`，确认旧投影错误地用 `HasExited` 抑制掉线图标；`red-playmode/PlayModeResults.xml` 为 `1 failed`，确认真实场景中的退出玩家缺少 `LostConnection`，且冻结/刷新仍位于旧的局部 `y=-20`。
-- 针对性 Green：未运行全量测试。`green-editmode/EditModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`；`green-playmode/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。场景断言同时核对 Player4 的替换头像、`LostConnection` 子物体晚于头像绘制，以及冻结/刷新按钮局部 `y=-30`。
-- Windows x64：`Artifacts/BattleHudVisualAudit/requested-adjustment-5/iteration-1/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=0`。
-- 截图：同目录 `captures/02_shop_open.png` 和 `11_player_disconnect_and_exit_list.png` 已人工复核；冻结/刷新相对上一轮继续下移 `10`，Player4 的 `icon_lost_connect` 可见于 `equip_replace_avatart_bg` 之上。Player 日志记录 `[BattleHudCapture][completed] count=17`，没有捕获失败或运行时异常。
-- 未验证：本轮按用户要求未运行全量 EditMode/PlayMode；联网系统触发退出的真实流程和真实鼠标热区仍未验证。
-
-## 42. 刷新免费费用 UI-only 接口（2026-07-26）
-
-- Red：`Artifacts/BattleHudVisualAudit/refresh-free-interface/red-playmode/PlayModeResults.xml` 为 `1 failed`；真实 `SampleScene` 已有刷新费用节点，但 `ShopReadyHudController` 尚无可调用的免费表现接口。
-- 针对性 Green：`green-playmode/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。测试直接调用正式控制器的 `SetRefreshFreePresentation(true)`，确认背景切换为 `cost_free`、费用数字隐藏且玩家赤金不变；再调用 `false`，确认恢复 `cost_bg_1` 与费用数字。
-- 未运行全量测试或新一轮截图构建。该接口默认关闭，当前截图流程与实际刷新扣费行为不变。
-
-## 43. HUD 更新最终全量回归与提交前验收（2026-07-26）
-
-- 全量 EditMode：`Artifacts/BattleHudVisualAudit/final-regression/EditMode/EditModeResults.xml` 为 `137 passed / 0 failed / 0 skipped`。结果 XML 完整写入后 Unity 超过 `20` 秒退出宽限，由测试脚本只终止该次测试进程；测试结果已成功解析。
-- 全量 PlayMode：`Artifacts/BattleHudVisualAudit/final-regression/PlayMode/PlayModeResults.xml` 为 `20 passed / 0 failed / 0 skipped`，Unity 在结果写入后正常退出。
-- 严格 Windows x64：`Artifacts/BattleHudVisualAudit/final-regression/WindowsBuild.log` 记录 `result=Succeeded`、`errors=0`、`warnings=1`，输出为 `WindowsStandalone/ARKnoNIGHTS.exe`。唯一警告是既有 `TagRegistry.freezeAppend` 未使用。
-- 可见 Player 截图：`Artifacts/BattleHudVisualAudit/final-regression/captures/` 包含 `17` 张 `1920×1080` PNG 和结构化 manifest；日志记录 `[BattleHudCapture][completed] count=17`。已重点复核商店、冻结/刷新位置、Player3 掉线表现及 Player4 退出替换头像与掉线图标层级，未发现捕获失败或运行时异常。
-- 提交前范围检查：新退出头像贴图与 `.meta` 成对保留；`.superpowers/` 和 `docs/bonds/` 属于无关未跟踪内容，不纳入 HUD 最终提交。
-
-## 44. Mainline 果冻召唤最终集成验证（2026-07-26）
-
-- 数据、Core、演出与准备阶段的定向证据保存在能力分支的 `.superpowers/sdd/2026-07-26-mainline-jelly-summon/evidence/`。覆盖 5504 目录、能力目录、全局 2 SP/s 的私有技力、Tick 100/250、终局 Tick 不施放、1 格方形固定点 Spawn、下一 Tick 激活、独立索敌、动态轨道、真实 5504 工厂和 Replay。
-- 功能分支最终全量验证为 EditMode `159/159`、PlayMode `22/22`，均为非零 XML、零失败、零跳过；批处理编译退出码为 `0`，日志未见 C# 编译错误或未处理异常。合并后必须重新运行相关全量测试，合并结果才是最终验收依据。
-- 未验证：交互式 Unity Editor/Windows Player 中对三个 5504 一格分布、Tick 100/250 出现、重新索敌、死亡清理、Home/Away 投影、暂停/变速和 Replay 连续性的人工视觉检查；自动断言不能替代此检查。
-
-## 45. 基础攻击间隔采用源 JSON 一半（2026-07-26）
-
-- 规则与生成：源 `attackIntervalSeconds` 保持不变，目录生成器使用 `ceil(attackIntervalSeconds × 0.5 × 20)` 产生 Core 实际间隔。执行 `D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\AttackInterval\CatalogGenerate-AfterTests.log`，进程退出码为 `0`；生成目录中的 `1000/5503/5504` 分别为 `14/40/15 Tick`，攻击动画时长仍为 `20/54/24 Tick`。日志包含 `TASK004A_CATALOG_GENERATED`，未命中 `error CS`、`Compilation failed`、`Scripts have compiler errors` 或 `Unhandled Exception`。
-- Core RED：先只修改真实目录和出伤时序断言，运行 `BattleCoreEditModeTests` 得到 `57 total / 2 failed / 0 skipped`。两项失败分别为 gopro 期望 `14` 实际 `28`，以及 arcslma 有效动画期望 `40` 实际 `54`，证明旧目录尚未应用折半规则。
-- Core GREEN：生成 `14/40/15` 目录后首次运行得到 `57 total / 1 failed / 0 skipped`。剩余失败不是 Core 计算错误，而是阻挡回归把“真实 arcslma 快照和清理契约”绑定到旧时间线中的固定 `away-5503-alpha`；新时间线中 `home-5503-alpha` 仍在 Tick `27` 建立、Tick `107` 解除阻挡。测试改为从封存输入选择实际参与阻挡的 arcslma，仍严格断言双方权威快照、敌对阵营和对应 `BlockEnded`。复跑结果为 `57 passed / 0 failed / 0 skipped`。
-- UI RED/GREEN：`UnitDetailNumberFormatter.AttackInterval(15)` 的 RED 为 `1 total / 1 failed / 0 skipped`，期望 `0.75`、实际 `0.8`；格式从 `0.#` 改为 `0.##` 后为 `1 passed / 0 failed / 0 skipped`，同时验证 `14/40/15 Tick` 显示为 `0.7/2/0.75`。旧 `UnitFactory` 调试适配改为读取共享的 `BaseAttackIntervalSeconds`，不在 UI 内重复折半。
-- 固定真实对战的合法结果变化：折半后对战在 Tick `528` 结束，只发生 Tick `100/250/400` 三轮果冻召唤，动态 5504 总数从旧时间线的 `42` 变为 `27`；EditMode/PlayMode 的固定输入断言据此更新。arcslma 原始攻击动画仍为 `54 Tick`，有效动画为 `40 Tick`，Spine `TrackEntry.TimeScale` 为仅包含动画压缩的 `54/40 = 1.35`；全局 `0.5×` 播放速度仍只由 `SkeletonAnimation.timeScale` 应用一次。
-- 最终全量 EditMode：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath D:\2022.3.62f1c1\Editor\Unity.exe -TestPlatform EditMode -OutputDirectory Temp\AttackInterval\Full-EditMode-Final -NoGraphics`。`Temp/AttackInterval/Full-EditMode-Final/EditModeResults.xml` 为 `168 passed / 0 failed / 0 skipped`，Unity 正常退出；日志为同目录 `EditMode.log`。
-- 最终全量 PlayMode：同一脚本使用 `-TestPlatform PlayMode -OutputDirectory Temp\AttackInterval\Full-PlayMode-2 -NoGraphics`。`Temp/AttackInterval/Full-PlayMode-2/PlayModeResults.xml` 为 `22 passed / 0 failed / 0 skipped`，Unity 正常退出；日志为同目录 `PlayMode.log`。PlayMode 启动会清理项目 `Temp`，因此在 PlayMode 后重新运行 EditMode，并在最后再次执行生成器；生成目录内容没有新增 diff，两份最终 XML/日志和生成日志得以同时保留。
-- 最终日志未命中 C# 编译错误、编译失败或未处理异常。未执行 Windows Standalone 构建、交互式 Unity Editor/Player 人工观感检查、真实鼠标检查或不同 DPI/分辨率检查；攻击间隔文本与真实 Spine 压速已由自动化覆盖，但这些未执行项仍标记为“未验证”。
-
-## 46. 单位死亡动画、变黑隐藏与 Track 切入（2026-07-27）
-
-- Track TDD：先只增加死亡点采样、死亡 Tick 切入、连续跨过 Death 和回退重建断言。定向 EditMode 当场结果为 `36 total / 3 failed / 0 skipped`；三项失败分别证明旧采样的 `ShouldDisplay` 在死亡后仍为 `true`、切入死亡 Tick 仍创建死亡单位，以及回退用例的初始死亡节点仍错误创建。把死亡后点采样改为 `ShouldDisplay=false`，并只在“尚无视图记录”时应用创建过滤后，定向结果为 `36 passed / 0 failed / 0 skipped`；已有视图连续跨过 Death 仍只收到一次死亡命令。
-- 真实 Spine TDD：`Temp/UnitDeathPresentation/Task2-Red/PlayModeResults.xml` 为 `9 total / 2 failed / 0 skipped`，分别确认旧视图在死亡动画结束后 RGB 不变化、`Dispose` 在帧末销毁前仍保持激活。实现保留死亡 `TrackEntry`、监听 `Complete`、用 `Time.unscaledDeltaTime` 在 `0.5` 秒内线性降低 Skeleton RGB、保持 Alpha，并在结束后停用 GameObject；`Task2-Green/PlayModeResults.xml` 为 `9 passed / 0 failed / 0 skipped`。独立审查后加强同一真实 5504 测试：在私有死亡状态仍为 Animation 时逐帧断言 RGB 不变，在 Blackening 约 `0.2` 秒处断言 RGB 已下降但未归零且 Alpha 不变，并按累计 `Time.unscaledDeltaTime` 断言在 `0.45..0.65` 秒内停用；定向类复跑为 `9 passed / 0 failed / 0 skipped`。
-- 正式回合终局 TDD：独立审查发现 `MultiBattlePresentationCoordinator` 在最大 EndTick 派发最终 Death 后同帧 Completed，`PreparationBattleLoopController` 随即 Reset，导致终局死亡动画和变黑都不可见。`Temp/UnitDeathPresentation/Terminal-Red/PlayModeResults.xml` 的正式回合测试按预期为 `1 total / 1 failed / 0 skipped`，失败点是跳到终局后 Phase 已错误回到 Preparation。实现为 `IBattlePresentationView` 增加默认 `false` 的待完成终局表现契约，真实 Spine 视图在 Animation/Blackening 上报，Track 播放器聚合，协调器在最大 EndTick 保持 Playing 直到聚合值清零；定向正式回合 PlayMode、协调器 EditMode 分别为 `1 passed / 0 failed / 0 skipped`。协调器测试还覆盖待完成期间暂停不进入 Completed、完成后 Resume 才完成；缺动画或中断隐藏因视图立即进入 Hidden，不产生固定等待。
-- 第一次修复后的全量 PlayMode 为 `24 total / 1 failed / 0 skipped`：既有 `BattleHudSceneIntegrationPlayModeTests` 仍固定等待两帧后断言观察目标已复位，与新增的终局表现等待语义冲突。测试改为先等待 Phase 进入 Preparation，再额外等待一帧让 `BattleHudSceneCoordinator` 清除临时观察目标；定向复跑为 `1 passed / 0 failed / 0 skipped`，没有为此修改生产逻辑或降低断言。
-- 复审防御性生命周期 TDD：若播放器之外直接停用正在死亡的 GameObject，旧实现仍报告 pending，定向 PlayMode 为 `10 total / 1 failed / 0 skipped`。`OnDisable`/`OnDestroy` 现在把视图转为 Hidden 并退订 TrackEntry，避免已无法 Update 的对象永久阻塞正式回合；定向复跑为 `10 passed / 0 failed / 0 skipped`。
-- 最终全量 PlayMode：`Temp/UnitDeathPresentation/Final-PlayMode-3/PlayModeResults.xml` 为 `25 passed / 0 failed / 0 skipped`，Unity 在结果写入后正常退出。
-- 最终全量 EditMode：PlayMode 启动按项目既有行为清理项目 `Temp`，因此在最终 PlayMode 后运行并保留 `Temp/UnitDeathPresentation/Final-EditMode-AfterPlay-2/EditModeResults.xml`；结果为 `171 passed / 0 failed / 0 skipped`，Unity 在结果写入后正常退出。两份最终日志均未命中 `error CS`、`Compilation failed`、`Scripts have compiler errors`、未处理异常、`NullReferenceException` 或本次新增的死亡中断/缺 Skeleton 诊断。
-- Windows x64 StrictMode：使用既有 `Task006StandaloneBuild.BuildWindowsX64`、唯一启用场景 `Assets/Scenes/SampleScene.unity` 构建到忽略目录 `Artifacts/UnitDeathPresentation/WindowsStandalone/ARKnoNIGHTS.exe`。Unity 进程退出码为 `0`；`Artifacts/UnitDeathPresentation/WindowsStandaloneBuild.log` 记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=0`、总大小 `164976837` 字节。产物共 `143` 个文件，主 EXE SHA-256 为 `F49CDCB9E27CF2AA5C6F63BC961B4364E93363071533661593549AEC421AD60B`。
-- Windows Player 正式流程冒烟：直接启动上述生产 Player，`Artifacts/UnitDeathPresentation/PlayerFormalLoopSmoke.log` 依次记录 `Preparation`、`ui009-round-1` 两场 Track 封存且 `state=Playing`、`battle.completed`、再次进入 `Preparation`，并记录 `playersUnchangedDuringBattle=True`；命中完整回合证据后只终止本轮启动的 PID `54584`。日志未命中未处理异常、`NullReferenceException`、阶段错误或本次死亡表现诊断。旧 `-task006-acceptance` 因正式模式明确阻止 legacy `BattleDemoController.StartOrContinue` 而退出 `1`；隐藏窗口下 `-battleHudCapture` 因首张截图不可见而退出 `1`，两者均未作为当前正式流程通过证据。
-- 范围检查：没有修改 Core、Death 事件格式、目录 JSON、场景、Prefab、Shader、Package 或 ProjectSettings；`.superpowers/` 与 `docs/bonds/` 仍是用户的无关未跟踪内容。
-- 人工验收：项目负责人于 2026-07-27 反馈整体人工观感“还行”，据此记录本次死亡动画、变黑与隐藏的整体视觉验收为可接受。尚未分别记录多单位同时死亡、Home/Away 切换瞬间以及不同 DPI/分辨率的专项人工验收；这些细分项仍不能由自动 RGB、激活状态和 Track 断言完全替代。
-
-## 47. 精英变体源数据与 Texture2D 单位头像（2026-07-27）
-
-- 目录生成：执行 `D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UnitEliteVariants\CatalogGenerate.log`，日志记录 `TASK004A_CATALOG_GENERATED ... units=3 summary=1000:20|5503:54|5504:24`，未命中 C# 编译错误、编译失败或未处理异常。连续两次生成的 `Assets/Resources/BattleData/unit-catalog-v1.json` SHA-256 均为 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`。
-- 精英变体解析器：`Temp/UnitEliteVariants/Resolver-Final/EditModeResults.xml` 为 `5 passed / 0 failed / 0 skipped`，覆盖精英 0/1 基础选择、精英 2/3 专用模型与名称、缺少较高条目时只向低级继承、块级继承、显式空能力列表和非法模型块。
-- 真实目录与头像聚焦回归：`Temp/UnitEliteVariants/BattleCore-Final-2/EditModeResults.xml` 为 `57 passed / 0 failed / 0 skipped`；`Temp/UnitEliteVariants/TDD-Portrait-Green/EditModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`，确认精英 0 目录为猎狗 `820 HP / 190 ATK`、基础 Skeleton 路径，且 Default Texture 头像只经 `Texture2D` 加载后创建一次缓存 Sprite。
-- 全量 EditMode 首次运行 `177 total / 8 failed / 0 skipped`。其中一项仍期待精三名称，另七项的 Tick 100 召唤夹具把真实 1000 的旧精三生命值当作保活条件；精零 820 HP 使战斗提前终局。测试改为期待精零名称，并只在召唤夹具中克隆一个显式高生命陪练，未修改生产战斗规则。完成前在最新提交状态复跑 `Artifacts/UnitEliteVariants/Final-EditMode/EditModeResults.xml`，结果为 `177 passed / 0 failed / 0 skipped`，Unity 正常退出。
-- PlayMode：完成前在最新提交状态运行 `Artifacts/UnitEliteVariants/Final-Presentation-PlayMode/PlayModeResults.xml`，结果为 `10 passed / 0 failed / 0 skipped`；`Artifacts/UnitEliteVariants/Final-Demo-PlayMode/PlayModeResults.xml` 为 `2 passed / 0 failed / 0 skipped`，两次 Unity 均正常退出。播放层首次同样因旧精三保活夹具产生 `10 total / 1 failed / 0 skipped`，按上述隔离方式修正后通过。
-- Windows x64 StrictMode：通过环境变量把输出从 Unity 会自动清理的项目 `Temp` 改到忽略目录 `Artifacts/UnitEliteVariants/WindowsStandalone/ARKnoNIGHTS.exe`。Unity 进程退出码为 `0`；`Artifacts/UnitEliteVariants/WindowsStandaloneBuild.log` 记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=0`、总大小 `165680381` 字节。产物共 `143` 个文件，主 EXE 为 `666624` 字节，SHA-256 为 `F49CDCB9E27CF2AA5C6F63BC961B4364E93363071533661593549AEC421AD60B`。
-- 尚未实现或验证：精英 2/3 的运行时目录选择、精英 1 数值系数、合成系数、局内升阶，以及新头像在所有目标分辨率/DPI 下的专项人工视觉检查。当前运行时只保证精英 0。
-- 初始实现提交未创作或暂存工作区中已有的 `1000_gopro` 基础/`_2`/`_3` 模型资源、三个头像及其 `.meta`、基础 `1000_gopro.json` 变更。项目负责人随后明确要求一并提交；资源与 `.meta` 已完成配对和 GUID 唯一性检查，并在全量 EditMode 与 Windows x64 构建通过后纳入版本控制。`.superpowers/` 与 `docs/bonds/` 仍保持在本次提交之外。
-
-## 48. 玩家商店刷新排序与整轮被动刷新（2026-07-28）
-
-- Task 1 EditMode Red：`Artifacts/ShopRefreshSorting/Task1-Red/EditModeResults.xml` 为 `15 total / 11 passed / 4 failed / 0 skipped`，四项失败分别暴露旧实现未提供领域排序器、初始四玩家商店未彼此独立、初始加载顺序不符合夹具，以及付费主动刷新仍保留冻结商品。Green：`Artifacts/ShopRefreshSorting/Task1-Green/EditModeResults.xml` 为 `15 passed / 0 failed / 0 skipped`；日志分别为同目录 `EditMode.log`。
-- Task 2 EditMode Red：`Artifacts/ShopRefreshSorting/Task2-Red/EditModeResults.xml` 为 `16 total / 15 passed / 1 failed / 0 skipped`，失败项确认领域层尚无整轮四玩家被动刷新操作。Green：`Artifacts/ShopRefreshSorting/Task2-Green/EditModeResults.xml` 为 `16 passed / 0 failed / 0 skipped`；该测试覆盖免费刷新、四个独立商店、冻结商品保留原物理槽位，以及其余槽按排序结果填入；日志分别为同目录 `EditMode.log`。
-- Task 3 PlayMode Red：`Artifacts/ShopRefreshSorting/Task3-Red/PlayModeResults.xml` 为 `1 total / 0 passed / 1 failed / 0 skipped`；演出完成前商店未刷新且本地赤金未改变的前置断言已执行通过，返回 Preparation 后在四店刷新结果断言处失败。Green：`Artifacts/ShopRefreshSorting/Task3-Green/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`，确认演出完成前仍不刷新、回到 Preparation 后四名玩家商店一起刷新且本地赤金保持不变；日志分别为同目录 `PlayMode.log`。
-- 最终全量 EditMode：命令脚本退出码为 `0`，`Artifacts/ShopRefreshSorting/Final-EditMode/EditModeResults.xml` 为 `187 total / 187 passed / 0 failed / 0 skipped`，Unity 在写入结果后正常退出；日志为 `Artifacts/ShopRefreshSorting/Final-EditMode/EditMode.log`。
-- 初次最终全量 PlayMode：命令脚本退出码为 `1`，`Artifacts/ShopRefreshSorting/Final-PlayMode/PlayModeResults.xml` 为 `25 total / 24 passed / 1 failed / 0 skipped`，Unity 在写入结果后正常退出。唯一失败为 `StagingHudScenePlayModeTests.SampleScene_FormalHudUsesExistingHudAndShowsLoopOwnedSessionValues`：当前精英 0 目录和对应 EditMode 断言使用名称“猎狗”，该旧 PlayMode 断言仍期待精英 3 名称“狂暴的猎狗pro”；定向复现 `Artifacts/ShopRefreshSorting/PlayMode-Failure-Repro/PlayModeResults.xml` 同样为 `1 failed / 0 skipped`。这两份结果保留为过时期望修正前的 Red 证据。
-- Fix Round 1 经项目负责人明确批准，只把上述测试的过时名称期望改为当前权威“猎狗”，不修改生产代码或降低其他断言。聚焦 Green 的命令脚本退出码为 `0`，`Artifacts/ShopRefreshSorting/FixRound1-Focused-PlayMode/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`；随后当前检出的全量 PlayMode 命令脚本退出码为 `0`，`Artifacts/ShopRefreshSorting/FixRound1-Full-PlayMode/PlayModeResults.xml` 为 `25 passed / 0 failed / 0 skipped`。两次 Unity 均在写入结果后正常退出，日志分别为对应目录的 `PlayMode.log`。
-- Windows x64 StrictMode：同步构建进程退出码为 `0`；`Artifacts/ShopRefreshSorting/WindowsBuild.log` 记录 `[TASK-006][build.succeeded] result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、`warnings=0`、`totalSize=279058885`，输出 `Artifacts/ShopRefreshSorting/WindowsStandalone/ARKnoNIGHTS.exe` 存在。项目负责人在 Fix Round 1 明确批准本任务的 Windows 证据合同为“同步退出码 `0` + 上述结构化成功日志 + EXE 存在”；项目内重复摘要文件不属于本任务验收要求，因此未修改 `Task006StandaloneBuild`，也未为生成摘要单独重跑构建。
-- 日志扫描：最终 EditMode、Fix Round 1 聚焦/全量 PlayMode 与 Windows 构建日志均未命中 `error CS`、`Compilation failed`、`Scripts have compiler errors`、`Unhandled Exception`、`NullReferenceException` 或 `round.observer.switch.failed`。
-- 范围检查：Task 4 原提交只修改三份权威文档；Fix Round 1 只修改过时的 PlayMode 名称期望和本节测试记录。未修改生产代码、商店 UI、场景、Prefab、Package、ProjectSettings，也未纳入工作区中既有的 ShopReady、Bonds、经济文档或大量角色资源改动。
-- 未验证：交互式 Editor/Windows Player 中用真实鼠标观察刷新后的卡片视觉顺序，以及未来按玩家等级概率随机生成商品的实现。
-
-## 49. 待部署区与商店地区/种类 UI（2026-07-29）
-
-- 数据镜像 TDD：最新版 `docs/bonds/BONDS_SPEC.md` 含 `94` 个正式商店单位，其中 `81` 个有地区、`86` 个有种类；当前 Demo 仍引用但已从正式名单移除的 `1000` 只保留显式兼容映射 `整合运动 + 感染生物`。`Artifacts/AffinityUi/Task1-Red-OptionalOccupation/EditModeResults.xml` 为 `3 total / 1 passed / 2 failed / 0 skipped`，分别暴露旧解析器不接受仅地区单位以及运行时 JSON 尚不存在；实现并导出后，`Task1-Green-CurrentBonds/EditModeResults.xml` 为 `3 passed / 0 failed / 0 skipped`。导出摘要为 `canonicalUnits=94 / compatibilityUnits=1 / totalUnits=95 / canonicalRegions=81 / canonicalNoRegion=13 / canonicalOccupations=86 / canonicalNoOccupation=8`，JSON 为 UTF-8 无 BOM，八个地区与五个非空种类图标均可通过 Resources 加载。
-- 部署费用投影 TDD：`Task2-Red-DeploymentCost/EditMode.log` 记录两项预期 `CS1061`，证明商店领域快照和 HUD 投影尚未暴露 `DeploymentCost`；实现后 `Task2-Green-ShopReadyState/EditModeResults.xml` 为 `12 passed / 0 failed / 0 skipped`，`Task2-Green-LocalSnapshot/EditModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`，固定 `1000` 同时保持购买价格 `1`、部署费用 `2`。
-- 待部署槽 TDD：`Task3-Red-StagingAffinity/PlayModeResults.xml` 为 `1 failed / 0 skipped`；实现后 `Task3-Green-StagingAffinity/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。完成前补强后的 `Final-StagingFallback/PlayModeResults.xml` 同样为 `1 passed / 0 failed / 0 skipped`：场景断言确认 `Header/HeaderLeft/AffinityIcon` 对 `1000` 使用 `logo_reunionMovement`，`20 × 20`、中心锚定、保持宽高比且不接收射线；“其他”且无图标的 `5503` 隐藏该节点，并通过测试映射直接确认无地区坍缩体回退显示 `logo_sami`。
-- 商店三行 TDD：`Task4-Red-ShopRows/EditModeResults.xml` 为 `1 failed / 0 skipped`；`Task4-Green-ShopRowsFallbacks/EditModeResults.xml` 和 `Task4-Green-ShopRowsScene/PlayModeResults.xml` 各为 `1 passed / 0 failed / 0 skipped`。断言覆盖 `PortraitClip` 内从下到上的 cost/地区/种类固定三行、`DeploymentCostPanelIcon`、地区与种类 Sprite、图标等比和水平中心、Novecento 数字字体、方正中文字体、无地区隐藏、“其他”保留文字但无图标，以及空槽清理。
-- 最终全量 PlayMode：补强回退断言后，`Artifacts/AffinityUi/Final-PlayMode-AfterFallback/PlayModeResults.xml` 为 `27 passed / 0 failed / 0 skipped`，Unity 正常退出；覆盖正式场景商店、待部署区、部署/撤退、观察、战斗阶段和既有 HUD 交互。
-- 最终全量 EditMode：`Artifacts/AffinityUi/Final-EditMode/EditModeResults.xml` 为 `235 total / 233 passed / 2 failed / 0 skipped`。两项失败均来自同时存在的 BONDS 资源迁移工作区：旧动画审计仍要求已从正式 BONDS 删除的 `1000_gopro`，新资源导入测试期望 `10001_trslim` 头像宽 `158`、实际为 `128`；本任务相关测试均通过，未擅自修改该迁移。
-- Windows x64 StrictMode：`Artifacts/AffinityUi/WindowsBuild.log` 记录 `[TASK-006][build.succeeded]`、`errors=0`、`warnings=2`、`totalSize=296068765`，产物为 `Artifacts/AffinityUi/WindowsStandalone/ARKnoNIGHTS.exe`。两条构建警告均为既有 `TagRegistry.freezeAppend` 的重复 `CS0414`。
-- 可见截图未验证：按安全规则以隐藏窗口启动正式 Player 截图入口，`Artifacts/AffinityUi/Captures/battle-hud-capture-failed.txt` 明确记录 `screenshot.invalid:01_preparation_closed`；两张输出 PNG 哈希相同且为黑屏，因此不作为视觉通过证据。仍需在可见 Windows Player 或交互式 Editor 中人工检查 `1920 × 1080` 下三行文字对比度、头像遮挡、HeaderLeft 图标和不同宽高比/DPI 的观感。
-
-## 50. BONDS 单位资源与完整 v2 authored 数据导入（2026-07-29）
-
-- 数据范围：`Assets/GameData/Units/EliteVariants/Json` 含 `100` 份 `unit-elite-variants-v2` 文档和 `185` 个模型变体，组成是当前 BONDS `99` 个 TypeId / `182` 个资源变体加保留的 legacy/demo `1000` 三个变体；`1021` 已排除。100 份 JSON 与 100 份 `.meta` 成对，禁用字段、`Default` key/name 绑定扫描为零匹配。
-- 确定性生成器：`scripts/tests/Test-BondsUnitEliteVariantsV2Export.ps1` 连续生成两次并比较哈希，结果均为 `documents=97 / variants=180`，与保留的 `1000/5503/5504` 合并后为 `100` 份文档。测试覆盖统一 `deploymentCost=2`、四种 `actionMethod`、不攻击/不可阻挡集合、完整变体数值与资源身份、1322 反向源映射、1116 三状态动画和全部非基础动画时长。生成器同时拒绝 level 0 核心数值缺失、`null`、非数字或非有限值。
-- 定向 EditMode 的首次有效 XML 为 `56 total / 54 passed / 2 failed / 0 skipped`：旧动画样本仍查找已退出 BONDS 的 `1000`；头像 PNG 原文件均为 `158×158`，但 Unity 默认 NPOT 导入把 `10001_trslim` 缩为 `128×128`。修正样本并加入统一 Default Texture + `TextureImporterNPOTScale.None` 导入规则后，`Artifacts/UnitDataImport20260729/Targeted-EditMode-Green/EditModeResults.xml` 为 `56/56` 通过；XML/日志 SHA-256 分别为 `D4C58F68540D7AB0848372961B6663B5A99A510C1732688BEBE337CE2E457C29`、`79FD4B0E240C5A68FF8DC775F556B9C1F2A5985AAB624487902E8B7B4849471C`。覆盖全部 `185` 个变体的真实 Spine 动画/时长、`182` 个 BONDS 资源、`185` 张加载后仍为 `158×158` 的头像、100 份 v2 源和隔离的三单位 legacy v1 投影。
-- `UnitFactory` 定向 PlayMode：`Artifacts/UnitDataImport20260729/Targeted-PlayMode-UnitFactory/PlayModeResults.xml` 为 `2/2` 通过，确认 legacy/debug 适配器一次加载全部 `100` 个精英 0 模板与 SkeletonDataAsset，并为 `10002` 保持空攻击动画；XML/日志 SHA-256 分别为 `3821FE91DD17E548C5DB32614CE4C81FFAB411B5B4B2C5E8CBB12B7EAAF9D7B0`、`D878BA8B966D2FCFEBCF1EF62EFAA767B6F337488CE60ED124501484F2C26AD4`。
-- 全量 Unity：`Artifacts/UnitDataImport20260729/Full-EditMode/EditModeResults.xml` 为 `236 passed / 0 failed / 0 skipped`，`Full-PlayMode/PlayModeResults.xml` 为 `27 passed / 0 failed / 0 skipped`；两次 Unity 均在结果落盘后正常退出。EditMode XML/日志 SHA-256 为 `708CF77827B91A64AE8352499E9CDA410956ECDAD3D733BCACD6278BA8CBB55E`、`05DC92C205D8407B8680255BD1BD6650FA8D8E1DF017B78CED5A7DF65920D1FA`，PlayMode 为 `357F132C60A76222C8FD686E87FB0C21813E41153EF656CD4183F2B42D50681F`、`3BED73556BAF9533E99EDA1F2A006460E3FF0B94A98AAE123154CBF42176785E`。
-- Windows x64 StrictMode：使用 `Start-Process -Wait -PassThru` 捕获 Unity 退出码 `0`。`Artifacts/UnitDataImport20260729/WindowsBuild.log` 记录 `[TASK-006][build.succeeded] result=Succeeded`、`errors=0`、`warnings=1`、`totalSize=316427309`；日志 SHA-256 为 `D031348694BBF60BD6E55B9858A89067D4E2EB7AA5EC6458E44223615CAF9ABB`。产物共 `143` 个文件，主 EXE 为 `666624` 字节，SHA-256 为 `F49CDCB9E27CF2AA5C6F63BC961B4364E93363071533661593549AEC421AD60B`。
-- 外部事实源复核：新增输出 `G:\ARKnoNIGHTS_tools\spine-fetcher-output-bonds-delta-20260729` 含 `15` 个完整目录、`105` 个文件、`0` 个 reparse point；每个 manifest 的六个文件哈希、非空伤害类型、`158×158` 头像及导入项目的四个 raw 文件哈希均一致，`report.json` 为 `15` 个 completed，`invalid-portraits.zh-Hans.txt` 为空。原输出的 `report.json` SHA-256 仍为 `96AF3B49F67B50B23C4E3A176AA59EC7844834B1228BDAC396B355D87619596D`，旧 staging 仍为 `1981` 文件、`1516624` 字节。外部下载器单元测试 `40/40` 通过。
-- 冻结边界：没有执行正式目录生成命令；`unit-catalog-v1.json` SHA-256 仍为 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`，`ability-catalog-v1.json` 仍为 `BA76A69BFC5AFB186863ECF28AB36EBD504F14CD503347BE09CEEC652ECB3466`，正式 Player 继续只暴露原 `1000/5503/5504`。
-- 未验证：未在可见 Editor/Windows Player 中逐一人工观察 185 个模型与头像；`1502` 的 `Appear`/`Disappear` 时长已保存，但闪现能力的实际播放次序仍待实现动画层前由项目负责人确认。
-
-## 51. 玩家等级商店概率与测试赤金（2026-07-29）
-
-- 修改前基线：`Artifacts/ShopRefreshOdds/Baseline-LocalMatch/EditModeResults.xml` 为 `16 passed / 0 failed / 0 skipped`，确认既有商店领域测试在改动前通过。
-- TDD Red：`Artifacts/ShopRefreshOdds/Task1-Red/EditModeResults.xml` 为 `18 total / 12 passed / 6 failed / 0 skipped`。两项失败确认等级概率生成器尚不存在，其余失败分别暴露初始加载/主动刷新/战后刷新仍使用固定页面，以及测试玩家初始赤金仍为 `7`；没有 C# 编译错误或无关失败。
-- 领域与 HUD 定向 Green：`Task1-Green-Final/EditModeResults.xml` 为 `18/18`，逐级断言 1—9 级六稀有度权重，覆盖当前候选池缺少稀有度时的条件重抽、初始自然刷新、主动刷新、四玩家战后刷新、冻结和失败原子性。`ShopReady-Green/EditModeResults.xml` 为 `13/13`，`PlayerList-Green/EditModeResults.xml` 为 `7/7`，`PreparationLoop-Green/PlayModeResults.xml` 为 `1/1`。
-- 最终全量 Unity：显式 `shopTypeIds` 候选池和旧 `shopPages` 兼容加载完成后，最新核验 `Artifacts/ShopRefreshOdds/Verify-EditMode/EditModeResults.xml` 为 `238 passed / 0 failed / 0 skipped`，`Artifacts/ShopRefreshOdds/Verify-PlayMode/PlayModeResults.xml` 为 `27 passed / 0 failed / 0 skipped`；两次 Unity 均正常退出。此前全量 PlayMode 的唯一失败只是场景测试仍期待旧 HUD 赤金文本 `7`，更新为任务要求的 `200` 后全量通过。
-- Windows x64 StrictMode：最新同步核验捕获 Unity 退出码 `0`；`Artifacts/ShopRefreshOdds/Verify-WindowsBuild.log` 记录 `[TASK-006][build.succeeded] result=Succeeded`、`errors=0`、`warnings=0`、`totalSize=316432445`，输出为 `Artifacts/ShopRefreshOdds/Verify-WindowsStandalone/ARKnoNIGHTS.exe`。
-- 边界：本轮只应用等级稀有度概率和无可用稀有度时重抽；当前 Player-safe fixture 的 `shopTypeIds` 仍只有 `1000/5503`，并继续使用冻结目录中的运行时稀有度（`1000=R1`、`5503=R4`）。共享卡池副本扣留、购买占用、刷新返池，以及完整 94 商店单位迁移均未实现；没有把这些未完成项记为通过。未在可见 Player 中人工连续刷新观察分布，自动测试以精确权重表、确定性 seed 和领域断言作为证据。
-
-## LAN 房间 UI 与局域网验收（2026-07-25）
-
-1. 定向 EditMode：运行 `LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、`LanSocketIntegrationEditModeTests` 和 `LobbyAssetMapEditModeTests`，确认每个 NUnit XML 的测试数大于零且失败为零。
-2. 定向 PlayMode：运行 `LanLobbyViewPlayModeTests`、`LanLobbyControllerPlayModeTests`、`AndroidMulticastLockPlayModeTests` 和 `LanLobbyCaptureSuitePlayModeTests`；最后一个实际写出五个 PNG 和包含 Canvas scale、房间、成员/ready、延迟、rect 和 Sprite 来源的 JSON 清单。
-3. Windows Player：以固定 Unity `D:\2022.3.62f1c1\Editor\Unity.exe` 执行 `Task006StandaloneBuild.BuildWindowsX64`；随后从产物启动 `ARKnoNIGHTS.exe -lanLobbyCaptureSuite -lanLobbyCaptureOutput Temp/LAN-LOBBY/Captures`，等待退出码 0、五张可解码 PNG 和 manifest。只有项目忽略的 `Temp/` 或 `Artifacts/` 输出可用；不得传入 `Assets/`、项目根或外部目录。
-4. 本地导出：执行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\ExportLanLobbyEvidence.ps1 -CaptureDirectory Temp/LAN-LOBBY/Captures -OutputDirectory Temp/LAN-LOBBY/Evidence`。脚本必须在创建输出目录前拒绝任一未映射 Sprite、非忽略输出和缺失/多重精确参考图，并生成五张实际/参考并排图；逐图检查布局、文本、顶部延迟、四人卡片、预填房间号和没有 IP/端口输入。
-5. 真实局域网：在同一非隔离 Wi-Fi 上让 Windows 与 Android Player 按 `docs/LAN-LOBBY-REPORT.md` 的五步流程完成创建、发现、预填、明确加入、延迟、双端准备、开始及断连恢复。Editor loopback、截图或单机 Player 不能替代此验收；没有两台实体设备时必须标记为未验证。
-6. 视觉差异报告：先由可见 `-force-d3d11` Windows Player 在 `1920x1080` 写入五个 `LanLobbyCaptureSuite` 状态到保留且忽略的 `Artifacts/LAN-LOBBY/CapturesFinal/`；再运行 `scripts/ExportLanLobbyVisualDiff.ps1`，在隔离 worktree 中必须显式传入只读的 `G:\ARKnoNIGHTS_beta\docs\references\ui\battle_hud`，并导出到 `Artifacts/LAN-LOBBY/VisualDiff/`。导出只允许写入忽略的 `Temp/` 或 `Artifacts/`，必须核查 JSON 和 Markdown 动态记录的原始参考尺寸、独立 X/Y 归一化、命名遮罩、至少一项 `ATTENTION`（仅信息性）以及每个渲染 Sprite 的 Resources 路径、素材库相对路径、SHA-256 和出现次数。不得因视觉指标改变 UI 来获取更低差异；默认参考目录不含精确图9/图10、错误尺寸截图、未映射 Sprite 或不安全输出路径必须在输出目录创建前失败。
-
-## Create open-frame final verification (current authoritative, 2026-07-27)
-
-1. The former closed-frame bottom gate is **superseded**. The visible `home-create-action` bar is Create's lower boundary: `VisualDiff-2/visual-diff-report.{json,md}` must record `createFrame.bottomBoundary` as `action-bar` / `home-create-action`, `visibleTopScreenY=460`, `frameLocalY=212`, zero position/size deviation, `contentPassed=true`, `passed=true`, and no `bottom` member in `createFrame.edges`.
-2. `Captures-2/manifest.json` must contain seven `doc_frame_line` Sprite nodes per Home state (`home` and `discovered-prefill`): `Top_0`, `Top_1`, `Top_2`, `LeftUpper`, `LeftLower`, `RightUpper`, and `RightLower`; aggregate `14` occurrences. They use `[uc]autochessouter/doc_frame_line.png`, project asset `Assets/Resources/UI/Lobby/Home/doc_frame_line.png`, SHA-256 `4E4D96093514340112A0799D61611A65DA41153ACBD21F271184E0C0BB311C97`. Require `img_pointer=8` and active `room_select_create_logo=0` across the two Home states.
-3. The only Create code-native backing is `LanLobbyRoot/Home/RoomSelect/Create/InteriorBacking`: `code-native-geometry`, `isBitmap=false`, no Sprite/custom material/raycast, color `#000000C7`, and `(1179,620,666,224)` in both Home manifest records.
-4. The open-frame report must expose `createFrame.actualRect`, `referenceRect`, `edges`, `bottomBoundary`, and overall `passed`. Cycle 2 rows are: top `2973/0.9625/gap 16/contrast 15.31 of 18` failed; left `2772/1/gap 0/20.24 of 18` passed; right `2207/1/gap 0/12.30 of 18` failed; top-left joint `496/1/gap 0/22.77 of 18` passed; top-right joint `228/0.7857/gap 3/20.51 of 18` passed. Therefore `createFrame.passed=false` and the final visual acceptance is **FAILED**.
-5. Read final retained evidence directly: `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/Layout/EditModeResults.xml` `6/6/0/0`, `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/View/PlayModeResults.xml` `14/14/0/0`, `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/Capture/PlayModeResults.xml` `3/3/0/0`, and `Artifacts/LAN-LOBBY/CreateOpenFrameCorrection/Verification-Final/Controller/PlayModeResults.xml` `3/3/0/0`, aggregate `26/26/0/0`; each matching `summary.txt` must agree. `WindowsStandaloneBuild-2.log` must record `Succeeded`, `errors=0`, `warnings=0`; Task 3 execution/runner evidence records Player exit `0`, while `PlayerCapture-2.log` itself must contain `[LanLobby][capture.completed] count=5`; `Captures-2` must have five non-empty decodable `1920x1080` PNGs and its manifest. `TestLanLobbyVisualDiffSmoke.ps1`, `TestExportLanLobbyEvidenceSmoke.ps1`, and `TestLanLobbyEvidenceCommonSmoke.ps1` must print `PASS` and exit `0`. These passing gates do not override the visual-acceptance failure.
-
-## Home Join decoration final verification (current authoritative, 2026-07-27)
-
-This section is the current acceptance procedure and retained evidence for the Figure 9 `加入同盟` upper decoration at commit `b645e5bed8db106f23a7a73f55b69ba75468b987` (`fix: align join block topology`). It supersedes earlier authoritative Join layout/evidence claims while preserving the five visible-Player runs as history. It does not supersede or repair the separate Create open-frame result above: that historical Create visual gate remains failed and out of scope for this Join task.
-
-### Focused Unity regression
-
-Run the four suites serially; each output directory must be absent before the run:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyLayoutEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\Layout' -TimeoutSeconds 900
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\View' -TimeoutSeconds 900
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\Capture' -TimeoutSeconds 900
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\JoinDecoration\PostReview-Verification-Final\Controller' -TimeoutSeconds 900
-```
-
-Fresh XML and matching `summary.txt` counts are Layout `6/6/0/0`, View `16/16/0/0`, Capture `3/3/0/0`, and Controller `3/3/0/0`: aggregate `28/28`, failed `0`, skipped `0`, inconclusive `0`. Every suite discovered at least one test. Layout used the runner's bounded stop only after complete passing results; View, Capture, and Controller exited normally. The four logs contain no compiler or fatal error match.
-
-### Evidence smokes
-
-Run exactly:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyVisualDiffSmoke.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestExportLanLobbyEvidenceSmoke.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyEvidenceCommonSmoke.ps1
-```
-
-All three must exit `0` and print, respectively, `LAN lobby visual-diff smoke: PASS`, `Export LAN lobby evidence smoke: PASS`, and `LAN lobby evidence common smoke: PASS`.
-
-### Join crop, targets, and blocking gates
-
-- Native Figure 9 crop: `(1257,635,763,297)` on the decoded `2102×1149` reference.
-- Normalized Player crop and backing target: `(1154,596,717,280)` in `1920×1080` top-left screen pixels.
-- Accepted Join action target: `(1154,876,717,99)`; the crop/backing bottom and action top are both `y=876`.
-- Component coordinates below are local to the `717×280` Join crop. The tolerance applies independently to center X/Y and width/height deltas after the report's recorded symmetric decoded-pixel adjustment. Measurement must be available; an unavailable row fails.
-
-| Row | Expected crop-local visible bounds | Tolerance |
-| --- | --- | ---: |
-| `logo` | `(91,64,118,20)` | `2 px` |
-| `text-01` | `(391,56,65,8)` | `2 px` |
-| `text-02` | `(526,62,89,11)` | `2 px` |
-| `triangle` | `(338,47,30,17)` | `2 px` |
-| `central-blank` | `(323,68,60,61)` | `2 px` |
-| `block-bank` | `(45,107,639,89)` | `4 px` |
-| `input` | `(115,204,482,60)` | `2 px` |
-
-`joinDecoration.passed` is blocking and requires all seven rows plus all structural gates: backing position/size within `1 px`; no Join geometry below its backing; no Join decoration Graphic or geometry crossing `y=876`; boundary data available; `SimulationInvite` absent; `OutlineBottom` absent; accepted `home-join-action` content/action pass; exact repeated Sprite inventory and approved provenance pass. Full-image difference metrics remain informational and do not replace these named gates.
-
-The `block-bank` row must pass both its outer bounds and nested blocking `internalTopology`. The topology ROI is `(35,107,660,89)` in crop-top-left pixels. Qualifying orange pixels use `R>=100`, `R-G>=15`, `B<=130`; a column is occupied with at least `3` qualifying pixels. Gates are maximum span-edge deviation `4 px`, maximum occupied-column-count delta `20`, and minimum binary-profile Jaccard `0.95`. Current reference runs are `150..219/222..587` with `436` occupied columns; current actual runs are `150..219/222..483/485..587` with `435` columns. Jaccard is `0.997706`, count delta is `-1`, and start/end/width deltas are `0/0/0`, so the topology passes.
-
-The placeholder is additionally measured inside crop search `x=200..550,y=205..263` using neutral pixels with channel spread `<=12` and mean luminance `>=160`. The final Player produces actual `(273,220,165,27)` against normalized Figure 9 `(272,221,167,25)`; both centers are `(355,233)`, and the text does not overlap the baked input icon. The isolated central-blank raw actual bounds must be `(324,69,58,58)`.
-
-### Bounded calibration history and stopping rule
-
-The original plan allowed at most three calibration cycles. The complete run accounting is retained because that limit was exceeded before final review, and the user then authorized exactly one additional post-review correction cycle:
-
-1. `Cycle-1` retained five valid Player captures, but its legacy manifest lacked the explicit Sprite/geometry coordinate schema. Export failed before output with the real/synthetic schema mismatch; `Cycle-1\VisualDiff` is absent and Cycle 1 is not acceptance evidence.
-2. `Cycle-2` retained a successful build and Player capture. Its first report exposed decoded-pixel detector defects and failed; after the detector fix, `Cycle-2\VisualDiff-DetectorFix-R2` made all seven rows measurable but `triangle` and `block-bank` still failed unchanged tolerances.
-3. `Cycle-3` applied only the measured triangle/end-block geometry correction. `Cycle-3\VisualDiff` passed all seven rows and structural gates, but manual inspection retained a placeholder position/font-size caveat.
-4. `Verification-Final` was a fresh build and visible Player run after the placeholder-only correction at `24806571`. It was the fourth visible Player run; the earlier wording that it “did not count” was incorrect and is retained as a process deviation. Final review then proved its outer block union was a false positive: the reference topology was `150..219/222..587`, `436` columns, while actual was `214..517`, `304` columns, Jaccard `0.689498`, count delta `-132`, and edge deltas `+64/-70`.
-5. Under the user's one-shot exception, `PostReview-Cycle-1` was the fifth visible Player run and the only post-review Player. It used middle Rects `(left,top,width)` `271,118,74`, `343,118,106`, `504,118,108`, and `606,118,108`. Its first report passed topology but the broad central detector included a neighboring block; an evidence-only detector correction replayed the same screenshot. No sixth Player and no second post-review build, capture, or runtime correction occurred.
-
-### Final retained build, Player, and visual evidence
-
-The current authoritative runtime evidence is the retained fifth run. Build output:
-
-`Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/WindowsStandalone/ARKnoNIGHTS.exe`
-
-The retained build has numeric Unity exit `0`, `BuildReport result=Succeeded`, `errors=0`, `warnings=0`, and `totalSize=184845930`. Its visible D3D11 Player ran at `1920×1080` in interactive session `1` (PID `50776`) and exited `0`. Capture output:
-
-`Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/Captures`
-
-The Player log contains `[LanLobby][capture.completed] count=5` and no case-insensitive `error|exception|warning`; the directory contains five non-empty decodable `1920×1080` PNGs and a BOM-less, parseable five-record `manifest.json`.
-
-The final accepted evidence-only replay is:
-
-`Artifacts/LAN-LOBBY/JoinDecoration/PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final`
-
-Retain and inspect:
-
-- `PostReview-Cycle-1/WindowsStandaloneBuild.log`;
-- `PostReview-Cycle-1/PlayerCapture.log`;
-- `PostReview-Cycle-1/Captures/{home,discovered-prefill,room-host,room-ready,room-full}.png`;
-- `PostReview-Cycle-1/Captures/manifest.json`;
-- `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/visual-diff-report.json`;
-- `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/visual-diff-report.md`;
-- `PostReview-Cycle-1/VisualDiff-CentralAnchorFix-Final/home-join-decoration-{actual,reference,overlay,heatmap}.png`.
-
-Binary/source correspondence is independently checkable: the current runtime and test files equal their `b645e5b` blobs; `LanLobbyView.cs` was written at `20:11:44.610`, and the retained `Assembly-CSharp.dll` at `20:13:50.883`; the manifest's middle-block screen X/width values `1303/74`, `1375/106`, `1536/108`, `1638/108`, minus Join screen X `1032`, equal the four committed local values above. The old implementation's `335/108`, `402/108`, `469/108`, `536/108` cannot produce the retained manifest geometry.
-
-The final manifest/report audit must require five captures; one `join_icon` per Home state and `2` aggregate; two left/four middle/two right block instances per Home state; one mask, one blank, four bans, one triangle, one logo, two header texts, and one input background per Home state; six Join code-native, sprite-null, non-raycast geometry rows per Home state; no `SimulationInvite`, `OutlineBottom`, `$0`, `#0`, atlas, or derived source; and a Resources path, approved source, uppercase SHA-256, capture list, and positive occurrence count for every bitmap row.
-
-Final manual verification must open the two Home screenshots and all four Join crop images. It must confirm the accepted Join action remains visible/unobstructed, discovered room `654321` is prefilled without joining, the centered placeholder clears the baked icon, and the intended visual delta is confined to the input rectangle. The final Create crop may be compared to Cycle 3 to prove this Join correction did not alter Create; that invariance does **not** convert the separate historical `createFrame.passed=false` into a pass.
-
-## 33. LAN 房间槽位状态最终验证（2026-07-28，当前权威）
-
-### 行为与文档契约
-
-以下事实必须同时由 Domain、Socket、View、Controller 测试和三份 LAN 文档保持一致：
-
-- 创建房间时，房主初始为已准备。
-- 新加入的成员初始为未准备。
-- 开始游戏只要求当前房间内所有成员已准备；空槽位不参与判断，也不要求满四人。
-- 仅房主一人的房间可以立即开始游戏。
-- 房主离开会解散房间并停止权威房间服务。
-- 不支持房主迁移或将其他成员晋升为房主。
-- 成员操作标签为“准备就绪”与“取消准备”。
-- 房主操作标签为“协议启动”。
-
-非房主离开只移除该成员并恢复空槽。房主离开后其余成员不得被晋升。房主仅在所有当前成员已准备时发出开始请求，空槽位不阻塞开始。
-
-### 串行自动测试
-
-Unity Editor 固定使用 `D:\2022.3.62f1c1\Editor\Unity.exe`，项目路径固定为 `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`。以下过滤器必须逐个串行运行，不得让两个 Editor 或 Player 同时占用项目：
-
-| 平台 | 精确过滤器 | 结果 | 保留目录 |
-| --- | --- | ---: | --- |
-| EditMode | `ArknoNights.Lobby.Tests.LobbyRoomStateEditModeTests` | 15/15 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Domain` |
-| EditMode | `ArknoNights.Lobby.Tests.LanSocketIntegrationEditModeTests` | 8/8 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Socket` |
-| EditMode | `ArknoNights.Lobby.Tests.LobbyAssetMapEditModeTests` | 30/30 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Assets` |
-| EditMode | `ArknoNights.Lobby.Tests.LanLobbyRoomLayoutEditModeTests` | 12/12 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Layout` |
-| PlayMode | `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests` | 27/27 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/View` |
-| PlayMode | `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Capture` |
-| PlayMode | `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests` | 4/4 | `Artifacts/LAN-LOBBY/RoomSlotStates/PrePlayer/Controller` |
-
-每个过滤器用以下命令形态运行：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\Invoke-UnityTests.ps1 `
-  -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' `
-  -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' `
-  -TestPlatform <EditMode-or-PlayMode> `
-  -TestFilter '<exact-filter-above>' `
-  -OutputDirectory '<retained-directory-above>'
-```
-
-每个目录必须有完整 XML、日志和 `summary.txt`，测试数必须大于零，且失败、跳过、不确定均为零。最终串行结果是 100/100 通过、0 失败、0 跳过。
-
-### Windows 构建与可见 Player 截图
-
-每个校准周期都从源代码重新构建 Windows x64 Player；Cycle 3 实际命令形态如下：
-
-```powershell
-$env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\WindowsStandalone\ARKnoNIGHTS.exe'
 & 'D:\2022.3.62f1c1\Editor\Unity.exe' `
-  -batchmode -accept-apiupdate -quit `
-  -projectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' `
+  -batchmode -nographics -quit `
+  -projectPath 'G:\ARKnoNIGHTS_beta' `
+  -logFile 'Temp/UnityTests/compile.log'
+```
+
+通过标准：
+
+- 进程退出码为 `0`；
+- 日志无 `error CS`、`Scripts have compiler errors`、`Compilation failed` 或未处理异常；
+- 没有意外修改场景、Prefab、`.meta` 或生成目录。
+
+### 4.2 EditMode
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File '.\scripts\Invoke-UnityTests.ps1' `
+  -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -TestPlatform EditMode `
+  -NoGraphics
+```
+
+优先按受影响领域运行 `-TestFilter`：
+
+- 战斗计算与能力：`BattleCoreEditModeTests`、`Bonds*EditModeTests`；
+- 数据源和目录：`UnitSourceConsumerEditModeTests`、`UnitEliteVariantSourceEditModeTests`；
+- 回放与 Track：`BattlePresentation*EditModeTests`；
+- 玩家与回合：`LocalMatchStateEditModeTests`、`FourPlayerBattleRoundSealerEditModeTests`；
+- HUD：`ShopReadyHudStateEditModeTests`、`PlayerListObserverEditModeTests`；
+- Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试。
+
+规则或公共基础设施变化后再运行完整 EditMode。
+
+### 4.3 PlayMode
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File '.\scripts\Invoke-UnityTests.ps1' `
+  -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -TestPlatform PlayMode `
+  -NoGraphics
+```
+
+PlayMode 重点覆盖：
+
+- `SampleScene` 自动接线与准备/战斗循环；
+- 真实目录、Prefab、Spine 和动态视图生命周期；
+- HUD/详情/状态条场景集成；
+- Lobby Controller、View、Capture Suite 与平台适配。
+
+场景、Prefab、资源引用、自动 Bootstrap 或 Unity 生命周期发生变化时，不能只跑 EditMode。
+
+### 4.4 Windows x86_64 构建
+
+```powershell
+$env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
+& 'D:\2022.3.62f1c1\Editor\Unity.exe' `
+  -batchmode -nographics `
+  -projectPath 'G:\ARKnoNIGHTS_beta' `
   -executeMethod Task006StandaloneBuild.BuildWindowsX64 `
-  -logFile 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Build.log'
+  -logFile 'G:\ARKnoNIGHTS_beta\Temp\Build\build.log'
 ```
 
-构建成功后只允许以可见窗口运行 Player：
+通过标准：
 
-```powershell
-& 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\WindowsStandalone\ARKnoNIGHTS.exe' `
-  -force-d3d11 -lanLobbyCaptureSuite `
-  -lanLobbyCaptureOutput 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Captures' `
-  -screen-width 1920 -screen-height 1080 `
-  -logFile 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\RoomSlotStates\Cycle-3\Player.log'
-```
+- 命令退出码为 `0`；
+- `Temp/TASK-006/windows-standalone-build-summary.txt` 或指定日志记录 `Succeeded`；
+- 错误数为 `0`；
+- 实际启动 Player 后，相关验收入口退出码和结构化日志符合预期。
 
-本任务校准上限是三次新的可见 Windows Player 启动。Cycle 1、2、3 已分别用完第 1/3、2/3、3/3 次；没有发生第四次 Player 启动。达到 Cycle 3 后，即使仍有阻塞式差异，也必须停止并如实报告。
+目标平台、Package、场景或运行时程序集变化时必须执行对应构建；普通文档改动不要求构建。
 
-### 图11–13映射、排除与阻塞阈值
+## 5. 领域验收重点
 
-| 捕获 | 参考 | 阻塞状态 |
-| --- | --- | --- |
-| `room-host` | 图11 | 房主已准备、三个完整空槽、青色“协议启动”；第四空槽可验收 |
-| `room-full` | 图12 | 房主已准备、成员未准备、灰色“协议启动”；完整第四槽排除 |
-| `room-ready` | 图13 | 所有当前成员已准备、青色“协议启动”、左上离开；完整第四槽排除 |
+### Battle Core
 
-图12与图13因右侧弹窗遮挡而排除完整的第四个玩家槽，且排除项不记为通过。
+- 相同输入、版本和目录哈希产生相同事件、终态与胜方；
+- 整数 Tick、排序和决胜规则不依赖集合遍历、Unity 物理或渲染帧率；
+- 同 Tick 伤害、死亡、阻挡释放、Spawn、冲门和终局顺序有明确断言；
+- 新能力同时覆盖数据投影、运行时加载、Core 语义和必要表现事件。
 
-所有参考图上方滚动弹幕、图12/13右侧弹窗像素、角色立绘和资料卡内容都不进入阻塞式比较；这些 mask/exclusion 不得使其他命名门自动通过。图11是第四个空槽的唯一无遮挡权威参考。
+### Presentation
 
-视觉验收以实际渲染的可见图形为准，而不是纹理矩形或RectTransform中心。
+- Home/Away 只做视图投影，不修改源结果；
+- Replay/Seek 不重新运行 Core；
+- 动态 Spawn/Death/GateReached 的视图创建和释放不泄漏；
+- 暂停、倍速和动画占用不改变权威事件。
 
-- 图标/标签：`1920×1080` 下可见中心每轴误差 `<= 2 px`，可见宽高误差 `<= 3 px`。
-- 长轮廓/组合槽：每条可见边误差 `<= 4 px`，命名 ROI 内可见轮廓 Jaccard `>= 0.95`。
-- 结构化缺失与素材来源门必须单独通过；全图差异比例仅供诊断，不能覆盖命名门结果。
+### Player、Round 与 HUD
 
-最终 `Cycle-3/VisualDiff/visual-diff-report.json` 有 52 个命名房间门：24 Passed、26 Failed、2 `ExcludedByReferencePopup`，两个排除项均为 `passed=false`；素材/来源失败为 0。因此实现、构建和自动测试已验证，但图11–13视觉验收仍为 **FAILED**。
+- 玩家快照、商店、购买、冻结、刷新、等级、部署和观察权限保持单一状态源；
+- 进入战斗前封存，战斗中不回写玩家单位；
+- 四玩家配对和两场演示共享时钟；
+- UI 只投影快照，不保存第二份权威状态。
 
-### 证据与人工设备检查
+### Lobby 与未来 Match
 
-最终证据保留在：
+- 当前 Lobby 覆盖发现、创建、加入、准备、开始、离开和房主解散；
+- socket、消息长度、主线程派发和生命周期必须有结构化失败路径；
+- 正式 Match 实施后必须新增版本握手、命令排序、快照、重连、AI 接管、回合结算和跨端摘要一致性验证；
+- 不得把“收到 Lobby Start”记为正式联网对局通过。
 
-- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Captures`
-- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Evidence`
-- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/VisualDiff`
-- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Build.log`
-- `Artifacts/LAN-LOBBY/RoomSlotStates/Cycle-3/Player.log`
+## 6. 证据记录
 
-Windows 与 Android 实机连接到同一 Wi-Fi 后的发现、房间号预填、加入、准备切换、开始广播、非房主离开和房主解散流程仍为人工且未验证；不得由单机 Editor、PlayMode 或 Windows 截图推断为已通过。
+每次有意义的验证至少记录：
 
-## 34. LAN 房间统一 PortraitFrame 最终验证（2026-07-28，当前权威补充）
+- 日期、提交或工作树状态；
+- Unity 版本和完整命令；
+- 退出码；
+- 测试总数、通过、失败、跳过、不确定和未运行数；
+- 首个有效失败与堆栈；
+- XML、日志、构建摘要和截图清单位置；
+- 未执行项、人工项和剩余风险。
 
-### 几何、层级与测试合同
-
-运行时兼容名 `CardBody` 表示玩家可见的 PortraitFrame。以下新增/替换测试直接覆盖统一几何：
-
-- `RoomLayout_UsesOneCompensatedPortraitFrameWithDeepLowerOverlap`
-- `RoomLayout_EnlargesOnlyPortraitFrameAndPreservesExistingSlotChildren`
-- `RoomSlot_AllStatesKeepOnePortraitFrameFootprint`
-- `RoomSlot_LayersFrameBehindContentAndBars`
-- `CaptureDimensions_RejectUnsupportedSizesBeforeCoordinateExport`
-
-`RoomSlot_AllStatesKeepOnePortraitFrameFootprint` 必须用归一化世界角证明 Empty、Waiting、Ready 和 host 的同槽/跨槽 footprint 一致；Ready 的 `localScale=(1,-1,1)` 不得改变归一化结果。层级必须保持 `CardBody` 在状态内容之后、`TopBar` 与 `LowerDecoration` 之前，并继续验证其他组件矩形和非交互装饰未移动。
-
-### 实际像素相对坐标门
-
-PortraitFrame 阻塞式比较使用成对的左右可见 side pixels，并把每个已解码像素恰好映射一次到该条记录自身锚点定义的 `257×513` 网格：
-
-- 每个已解码 `(leftX,y,rightX,y)` 观测对直接映射为 canonical `x=0/256`；不得按 TopBar 宽度把语义 side pixel 分散到中间列；
-- 纵向锚点是自身已解码 `TopBar` 下沿和 `LowerDecoration` 上沿；
-- eligible contributor 恰好为 10 条：图 11 槽 1–4、图 12 槽 1–3、图 13 槽 1–3；
-- 每个网格 cell 至少由 `6/10` 个贡献者观察到才进入确定性 target；
-- target 必须 fail-closed 地证明左右均非空、只含 `x=0/256`、数量相等且逐行集合一致；单边 target 必须失败，合法配对 fixture 必须通过；
-- 不填充 bounds、线段、内部区域、源 aperture、manifest backing 或 ROI。
-
-阻塞阈值保持：中心每轴 `<=2 px`、可见宽度 `<=3 px`、每边 `<=4 px`、实际像素 Jaccard `>=0.95`、backing/下横条重叠 `>=60 px`、连续背景缝隙 `<=1 px`，并同时要求共享几何和精确 `card_bg` 素材关联通过。绝对屏幕坐标只作诊断。
-
-VisualDiff smoke 必须包含：
-
-- PortraitFrame、`TopBar` 与 `LowerDecoration` 水平联合平移仍通过，frame-only 水平平移失败；
-- 三者纵向联合平移仍通过，绝对 Y 诊断发生变化，frame-only 纵向平移失败；
-- bounds/extrema 保持不变但删除足够实际轮廓像素时，Jaccard 必须低于 `0.95` 并阻塞；
-- `4 px` 可见宽度、`2 px` 缝隙、状态几何不一致、素材错误和 popup 排除错误必须阻塞。
-
-### 最终 focused suites 与实际命令
-
-开始前必须确认工作区干净，且没有 Unity/Player 进程占用
-`G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby`。Unity 固定为
-`D:\2022.3.62f1c1\Editor\Unity.exe`，每项超时 `900` 秒并严格串行运行：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyRoomLayoutEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Layout' -TimeoutSeconds 900
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform EditMode -TestFilter 'ArknoNights.Lobby.Tests.LobbyAssetMapEditModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Assets' -TimeoutSeconds 900
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\View' -TimeoutSeconds 900
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Capture' -TimeoutSeconds 900
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-UnityTests.ps1 -UnityPath 'D:\2022.3.62f1c1\Editor\Unity.exe' -ProjectPath 'G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby' -TestPlatform PlayMode -TestFilter 'ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests' -OutputDirectory 'Artifacts\LAN-LOBBY\PortraitFrame\Final\Controller' -TimeoutSeconds 900
-```
-
-最终结果：
-
-| 过滤器 | 结果 | 失败/跳过/不确定/未运行 | shutdown | 保留目录 |
-| --- | ---: | ---: | --- | --- |
-| `ArknoNights.Lobby.Tests.LanLobbyRoomLayoutEditModeTests` | 12/12 | 0/0/0/0 | `forced-stop-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Layout` |
-| `ArknoNights.Lobby.Tests.LobbyAssetMapEditModeTests` | 30/30 | 0/0/0/0 | `forced-stop-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Assets` |
-| `ArknoNights.Lobby.Tests.LanLobbyViewPlayModeTests` | 31/31 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/View` |
-| `ArknoNights.Lobby.Tests.LanLobbyCaptureSuitePlayModeTests` | 5/5 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Capture` |
-| `ArknoNights.Lobby.Tests.LanLobbyControllerPlayModeTests` | 4/4 | 0/0/0/0 | `normal-exit-after-results` | `Artifacts/LAN-LOBBY/PortraitFrame/Final/Controller` |
-
-合计 `82/82`。前两个 `forced-stop-after-results` 都是在完整可读、非零、全绿 XML 写出后的有界清理路径，不是 timeout 或跳过。这是 Task 6 保留的最终 Unity 证据；本次 final-review 修复波只改离线脚本/文档，没有重跑 Unity、构建或 Player，不得把 `82/82` 记成本波新执行。
-
-三项 smoke 的实际命令与结果：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyVisualDiffSmoke.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestExportLanLobbyEvidenceSmoke.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\TestLanLobbyEvidenceCommonSmoke.ps1
-```
-
-- VisualDiff：`48 fixtures / 2043 assertions`，PASS；
-- Evidence exporter：`5 / 15`，PASS；
-- Evidence common：`13 / 53`，PASS。
-
-### Player 周期、最终证据与真实失败
-
-本任务最多允许三次新的可见 Windows Player 校准。Cycle 1、2、3 已分别消耗第 1/3、2/3、3/3 次；最终成对 side-pixel 重导出后 Cycle 1 为 `0/10`、Cycle 2 为 `0/10`、Cycle 3 为 `8/10` PortraitFrame 通过。三轮视觉验收均仍失败；不得创建 Cycle 4。
-
-Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可解码、非黑、非单色的 `1920×1080` PNG 和 UTF-8 五记录 manifest。`24f1280` 与本次 final-review paired-side 修复都只修改离线 evidence exporter/smoke，并从既有 Cycle 1/2/3 PNG 重导出 canonical Evidence/VisualDiff；它们没有修改 runtime、layout、capture 或这些 PNG。因此一般计划中的“detector 后再跑一次 fresh Player”条件因三周期硬停止而**未执行**，不得记作通过。
-
-最终路径：
-
-- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\Captures`
-- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\Evidence`
-- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\VisualDiff`
-- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\WindowsStandaloneBuild.log`
-- `G:\ARKnoNIGHTS_beta\.worktrees\lan-lobby\Artifacts\LAN-LOBBY\PortraitFrame\Cycle-3\PlayerCapture.log`
-
-当前 Cycle 3 target 为 `1020` 个共识像素：canonical-left/right 各 `510`，逐行完全配对且中间列为 `0`。actual normalized set 为 `1004..1026`，intersection 为 `1000..1020`，union 为 `1024..1026`，Jaccard 为 `0.976562..0.994152 >= 0.95`。10 个 PortraitFrame 中 `8/10` 通过；`RoomHost.Slot2.PortraitFrame` 与 `RoomFull.Slot2.PortraitFrame` 的像素 Jaccard 均通过，但各有 `4 px > 3 px` 的宽度差，所以视觉验收仍是 **FAILED**。`RoomReady.Slot2.ReadyTopBar` 和 `RoomHost.Slot2To3.VisibleContourSpacing` 仍是 Cycle 3 命名回归。图 12/13 第四槽继续为 `ExcludedByReferencePopup` 且 `passed=false`。
-
-## 35. LAN 主界面身份与 RoomCard 信息优化验证（2026-07-29，当前权威补充）
-
-本节取代旧测试合同中对 `RightBackground`、名字输入、Save 按钮、`ReadyOverlay` 和房主资料缺失的要求；历史截图与 2026-07-28 的保留结果不能作为本次变更的新通过证据。
-
-1. `LobbyProtocolEditModeTests` 必须验证四个允许的头像索引分别派生 `Amiy/Clementi/Kirar/Zumam`，且首字母大写；任意仍由旧客户端提交的自由名字在 `LobbyProfile` 构造边界被规范化为头像名。
-2. `LanLobbyViewPlayModeTests` 必须验证：
-   - `IdentityPanel` 没有 `Graphic`、`NameInput`、`SaveProfile` 或 `AvatarIndex` 节点；
-   - 标题为“更改头像”，标题中心 Y 与头像选择器中心 Y 对齐，`IdentityPanel` 整体 UI 缩放为 `1.5×`；
-   - 切换头像立即发出含派生游戏名的资料变更；
-   - `RightBackground` 与所有 `RoomCard/ReadyOverlay` 均不存在；
-   - Join backing 使用顶锚点、左上 pivot，`anchoredPosition=(146,-11)`、`sizeDelta=(667,280)`，不存在 `GuideHorizontal`，左右轮廓 X 分别为 `140/814`；
-   - Empty/Waiting/Ready 重绑不会重建四个 RoomCard；已占用槽位的 LowerDecoration 显示正确头像和 `<DisplayName>#<1..4>`，头像矩形为 `(30,10,90,90)`，名字矩形为 `(140,10,207,90)` 且字号为 `30`，空槽隐藏并清空名字；至少一个用例必须让头像索引与座位索引不同，并在同一槽位重绑另一头像，以证明绑定读取成员快照而非槽位号；
-   - 所有含汉字的 Lobby `Text` 使用 `FangZhengHeiTiJianTi-1`。
-3. `LanLobbyCaptureSuitePlayModeTests` 必须验证清单不再包含 `ReadyOverlay`，已占用槽位包含 `LowerDecoration/PlayerAvatar` 与 `PlayerName`，头像的 Resources/Combined 来源完整，Join backing 的 `1920×1080` screen-bottom-left 诊断矩形为 `(1178,204,667,280)`。
-4. 至少串行运行上述三组 focused suites，要求测试数大于零，失败、跳过、不确定和未运行均为零；同时运行 `LanLobbyControllerPlayModeTests` 检查房间生命周期未回归。
-5. 旧 Figure 9/11–13 像素参考不包含本次新布局，且三次可见 Player 校准额度已用尽。本次不得把旧 visual-diff 结果记为新 UI 视觉通过；如需建立新像素参考或运行新的可见 Player 校准，必须由项目负责人另行授权。
+提交前执行 `git diff --check`、检查最终 diff，并确认没有无关修改、生成目录或用户改动丢失。
