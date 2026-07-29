@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SIXTY"
                                               ]
                      },
                      {
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "MAGIC_RESISTANCE_PLUS_SIXTY"
                                               ]
                      }
                  ]

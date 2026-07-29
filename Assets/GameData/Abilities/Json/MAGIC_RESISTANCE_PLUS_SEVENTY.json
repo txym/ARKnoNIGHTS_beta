@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "MAGIC_RESISTANCE_PLUS_SEVENTY",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "法术抗性+70。",
+  "activationKind": "Passive",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 0,
+    "required": 0,
+    "generation": "None"
+  },
+  "effects": [
+    {
+      "kind": "PassiveCombatModifier",
+      "blockCapacityAdditive": 0,
+      "magicResistanceAdditive": 70,
+      "attackSpeedAdditive": 0,
+      "physicalDamageTakenPermille": 1000,
+      "magicDamageTakenPermille": 1000
+    }
+  ]
+}

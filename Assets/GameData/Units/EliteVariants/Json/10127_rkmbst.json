@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HETEROGENEOUS_BEAST_FORTIFICATION"
                                               ]
                      },
                      {
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "HETEROGENEOUS_BEAST_FORTIFICATION"
                                               ]
                      }
                  ]

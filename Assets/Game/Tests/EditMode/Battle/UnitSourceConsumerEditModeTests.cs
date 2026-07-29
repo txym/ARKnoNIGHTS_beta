@@ -609,6 +609,95 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsAndWiresConstantSelfModifiers()
+        {
+            var output = NewIsolatedPath(
+                "ability-constant-self-modifier-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var blockTwo = document.abilities.Single(item =>
+                item.abilityId == "BLOCK_CAPACITY_PLUS_TWO");
+            Assert.That(blockTwo.blockCapacityAdditive, Is.EqualTo(2));
+            Assert.That(
+                blockTwo.physicalDamageTakenPermille,
+                Is.EqualTo(1000));
+            Assert.That(
+                blockTwo.magicDamageTakenPermille,
+                Is.EqualTo(1000));
+
+            var blockOne = document.abilities.Single(item =>
+                item.abilityId == "BLOCK_CAPACITY_PLUS_ONE");
+            Assert.That(blockOne.blockCapacityAdditive, Is.EqualTo(1));
+
+            var resistanceSeventy = document.abilities.Single(item =>
+                item.abilityId
+                == "MAGIC_RESISTANCE_PLUS_SEVENTY");
+            Assert.That(
+                resistanceSeventy.magicResistanceAdditive,
+                Is.EqualTo(70));
+            var resistanceSixty = document.abilities.Single(item =>
+                item.abilityId
+                == "MAGIC_RESISTANCE_PLUS_SIXTY");
+            Assert.That(
+                resistanceSixty.magicResistanceAdditive,
+                Is.EqualTo(60));
+
+            var heterogeneous = document.abilities.Single(item =>
+                item.abilityId
+                == "HETEROGENEOUS_BEAST_FORTIFICATION");
+            Assert.That(
+                heterogeneous.attackSpeedAdditive,
+                Is.EqualTo(100));
+            Assert.That(
+                heterogeneous.physicalDamageTakenPermille,
+                Is.EqualTo(500));
+            Assert.That(
+                heterogeneous.magicDamageTakenPermille,
+                Is.EqualTo(500));
+
+            AssertUnitAbilityIds(
+                "1058_traink.json",
+                1058,
+                "BLOCK_CAPACITY_PLUS_TWO");
+            AssertUnitAbilityIds(
+                "1081_sotisd.json",
+                1081,
+                "BLOCK_CAPACITY_PLUS_TWO");
+            AssertUnitAbilityIds(
+                "1240_ltgint.json",
+                1240,
+                "BLOCK_CAPACITY_PLUS_ONE");
+            AssertUnitAbilityIds(
+                "1165_duhond.json",
+                1165,
+                "MAGIC_RESISTANCE_PLUS_SEVENTY");
+            AssertUnitAbilityIds(
+                "1166_dusbr.json",
+                1166,
+                "MAGIC_RESISTANCE_PLUS_SEVENTY");
+            AssertUnitAbilityIds(
+                "1170_dushld.json",
+                1170,
+                "MAGIC_RESISTANCE_PLUS_SEVENTY");
+            AssertUnitAbilityIds(
+                "1230_dsbudr.json",
+                1230,
+                "MAGIC_RESISTANCE_PLUS_SIXTY");
+            AssertUnitAbilityIds(
+                "10127_rkmbst.json",
+                10127,
+                "HETEROGENEOUS_BEAST_FORTIFICATION");
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -619,12 +708,17 @@ namespace ArknoNights.Battle.Tests
             Assert.That(ids, Is.EqualTo(new[]
             {
                 "BLOCKED_BLINK_FORWARD",
+                "BLOCK_CAPACITY_PLUS_ONE",
+                "BLOCK_CAPACITY_PLUS_TWO",
                 "CHARGED_DRINK_AREA_ATTACK",
                 "CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN",
                 "CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED",
                 "FORTIFIED_CATERING_VEHICLE",
                 "GREY_HAT_THIRD_ATTACK_DASH",
                 "GROUND_PROXIMITY_COLLISION_DAMAGE",
+                "HETEROGENEOUS_BEAST_FORTIFICATION",
+                "MAGIC_RESISTANCE_PLUS_SEVENTY",
+                "MAGIC_RESISTANCE_PLUS_SIXTY",
                 "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
                 "ROADBUILDER_TENTH_HIT_SPAWN",
                 "ROADBUILDER_THIRD_ATTACK_SPAWN",
@@ -633,6 +727,24 @@ namespace ArknoNights.Battle.Tests
                 "SUMMON_REPAIR_HELPER",
                 "UNTARGETABLE_BY_MELEE"
             }));
+        }
+
+        private static void AssertUnitAbilityIds(
+            string fileName,
+            int expectedTypeId,
+            params string[] expectedAbilityIds)
+        {
+            var unit = JsonUtility.FromJson<UnitAbilitySourceDocument>(
+                File.ReadAllText(Path.Combine(
+                    RealSourceDirectory(),
+                    fileName)));
+            Assert.That(unit.typeId, Is.EqualTo(expectedTypeId), fileName);
+            Assert.That(unit.variants, Is.Not.Empty, fileName);
+            foreach (var variant in unit.variants)
+                Assert.That(
+                    variant.innateAbilityIds,
+                    Is.EqualTo(expectedAbilityIds),
+                    variant.sourceVariant);
         }
 
         private static void AssertAtomicFailure(

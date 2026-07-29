@@ -539,6 +539,13 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 数据消费者新增断言：两个 `10006` v2 变体均引用 `CORRUPTED_GOLEM_THRESHOLD_ADJACENT_SPAWN` 与 `CORRUPTED_GOLEM_THRESHOLD_MOVE_SPEED`；生成投影分别为严格低于 `500/1000`、召唤类型 `10002`，以及一次性、永久、移速 `2500/1000` 且其他战斗倍率中性。
 - Core、Editor 和 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
 
+### BONDS 常驻自身战斗属性生产接线（2026-07-29）
+
+- 定向 Unity EditMode 筛选 `BondsPassiveCombatModifierEditModeTests;UnitSourceConsumerEditModeTests`，结果为 `59/59` 通过、失败 `0`、跳过 `0`、未运行 `0`，Unity 在结果写入后正常退出；XML 位于 `Artifacts/BondsAbilities/ConstantSelfModifiersFocused/EditModeResults.xml`。
+- 数据消费者以一个新增用例覆盖五条共享能力投影，并逐一读取 8 份真实 v2 文档的全部 16 个变体：`1058/1081 → BLOCK_CAPACITY_PLUS_TWO`、`1240 → BLOCK_CAPACITY_PLUS_ONE`、`1165/1166/1170 → MAGIC_RESISTANCE_PLUS_SEVENTY`、`1230 → MAGIC_RESISTANCE_PLUS_SIXTY`、`10127 → HETEROGENEOUS_BEAST_FORTIFICATION`。
+- 投影断言阻挡加算 `2/1`、法抗加算 `70/60`、`10127` 攻速加算 `100` 和物理/法术承伤 `500/1000`；中性承伤字段保持 `1000/1000`。既有 Core 回归继续覆盖阻挡、法抗上限、攻速向上取整和承伤类型边界。
+- Editor 与 EditMode Tests 静态构建均为 `0` error。未运行 PlayMode、Windows Player 构建或可见 Editor 检查；本批没有修改场景、Prefab、Package 或冻结 v1 目录。
+
 - 2026-07-29 Task 7 独立审查后修复：审查发现解析器已拒绝 `animations[].key == "Default"`，但未拒绝 `animations[].name == "Default"`。提交 `8893b1d` 先加入负向回归测试；RED 为 `44 total / 43 passed / 1 failed / 0 skipped`，唯一失败证明 `key=idle/name=Default` 会被旧实现接受。随后以相同 `StringComparison.Ordinal` 同时校验 key 与 name；GREEN 为 `44/44` 通过、失败 `0`、跳过 `0`，wrapper 退出码 `0`，日志没有编译错误或未处理异常。证据位于 `Artifacts/UnitEliteVariantsV2/DefaultBindingFix/{RED,GREEN}`。两次 Unity 都在结果落盘后超过 runner grace period 并被强制停止，最终确认无 Unity/UnityHub 残留；修复提交经独立只读复审为 `CLEAN`。
 - 以下三项是 2026-07-23 v1 规范化阶段的历史证据，不是 Task 6 重跑结果，也不能替代上述 v2 冻结边界验收：
 - 实际目录生成：`D:\2022.3.62f1c1\Editor\Unity.exe -batchmode -nographics -quit -projectPath G:\ARKnoNIGHTS_beta -executeMethod UnitCatalogGenerator.Generate -logFile G:\ARKnoNIGHTS_beta\Temp\UNIT-DATA-001\catalog-generate.log`，退出码 `0`；运行时日志包含两条未配置显示名诊断和 `TASK004A_CATALOG_GENERATED ... summary=1000:20|5503:54`，没有 C# 编译错误。第二次生成后的 SHA-256 与首次相同：`3DCB9B8CF8A346D0A4AE17301DB8E178C143194C5A50EDB8CA5DF24FCC3EA81E`。Unity 后续清理了这两份 `Temp` 生成日志。

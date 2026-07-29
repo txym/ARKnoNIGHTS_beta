@@ -720,6 +720,13 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 移动速度“增加 `150%`”表达为基础及其他既有结算后速度乘 `2500/1000`，永久生效。该效果不改变攻击、阻挡、防御或攻速，也不播放 Skill、不占用或打断 Attack/Skill。
 - `10006` 的两个 v2 精英变体均显式引用召唤和移速两条单效果被动能力。能力源由生成器投影至运行时阈值定义；冻结的 v1 目录不在本批次重新生成。
 
+## 24. 常驻自身战斗属性生产接线（2026-07-29）
+
+- `1058` 与 `1081` 的全部 v2 变体常驻阻挡数 `+2`；`1240` 的全部 v2 变体常驻阻挡数 `+1`。加算发生在基础阻挡容量之后，容量变化继续沿用稳定阻挡关系裁剪规则。
+- `1165/1166/1170` 的全部 v2 变体常驻法术抗性 `+70`；`1230` 的全部 v2 变体常驻法术抗性 `+60`。最终法术抗性仍限制在 `0..100`。
+- `10127` 的全部 v2 变体常驻攻击速度 `+100`，并令最终物理/法术承伤分别乘 `500/1000`；真实伤害不受该承伤修正影响。攻击间隔继续按 `ceil(BaseIntervalTicks × 100 / (100 + AttackSpeedAdditive))` 计算。
+- 上述能力均为无 Skill 动画的被动，不占用或打断 Attack/Skill。相同数值的单位共享同一能力定义，单位源只保存稳定 ability ID；冻结的 v1 目录不在本批次重新生成。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.
