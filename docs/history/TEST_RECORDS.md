@@ -1159,3 +1159,16 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
 3. `LanLobbyCaptureSuitePlayModeTests` 必须验证清单不再包含 `ReadyOverlay`，已占用槽位包含 `LowerDecoration/PlayerAvatar` 与 `PlayerName`，头像的 Resources/Combined 来源完整，Join backing 的 `1920×1080` screen-bottom-left 诊断矩形为 `(1178,204,667,280)`。
 4. 至少串行运行上述三组 focused suites，要求测试数大于零，失败、跳过、不确定和未运行均为零；同时运行 `LanLobbyControllerPlayModeTests` 检查房间生命周期未回归。
 5. 旧 Figure 9/11–13 像素参考不包含本次新布局，且三次可见 Player 校准额度已用尽。本次不得把旧 visual-diff 结果记为新 UI 视觉通过；如需建立新像素参考或运行新的可见 Player 校准，必须由项目负责人另行授权。
+
+## 52. LAN Match M1 房主权威领域骨架（2026-07-29）
+
+- 实现分支为 `codex/lan-match-domain`，实现提交为 `861f198`，基线为 `6289285`。新增 `ARKnoNIGHTS.Match` 纯 C#、`noEngineReferences=true`、零程序集引用的领域程序集，以及 `ARKnoNIGHTS.Match.EditModeTests`；没有修改 Scene、Prefab、Package、ProjectSettings、Lobby Socket、`LocalMatchState` 或 Battle 实现。
+- M1 范围只包括固定四席位初始化、权威 `MatchState`、单调 `StateRevision`、CommandId 幂等、准备命令、连接状态内部事务、兼容清单、稳定规范摘要及 Public/Owner/Host 分权限快照。共享牌库、商店经济、合成、Overflow、回合/配对/结算、AI、LAN Match 协议、重连、Battle 流式计算和最终场景/UI 接入均未实现。
+- 最终 focused Match EditMode：`21 total / 21 passed / 0 failed / 0 skipped / 0 inconclusive`，结果位于 `Artifacts/LanMatchDomain/Final-Focused-EditMode`。
+- 最终定向回归：`LocalMatchStateEditModeTests` 为 `18/18`，`PreparationBattlePhaseEditModeTests` 为 `6/6`，Lobby EditMode 为 `94/94`；结果分别位于 `Final-Regression-LocalMatch`、`Final-Regression-PreparationPhase` 和 `Final-Regression-Lobby-EditMode`。
+- 首次最终全量 EditMode 的 wrapper 在 Unity 尚未完成 XML 写入时读取结果，留下不可解析的未完成 XML，摘要为 `unverified / forced-stop-before-valid-results`；该次不能计为通过或失败。确认无 Unity 进程占用后，使用新目录 `Final-Full-EditMode-Retry1` 完整重跑，得到 `424 total / 419 passed / 5 failed / 0 skipped / 0 inconclusive`。
+- 全量 EditMode 的五项失败都位于既有 Battle 测试：动态果冻数量期望 `27`、实际 `24`；`5503` 精英 0 技能描述期望为空、实际 authored 源为“每隔一段时间，分裂出三个<果冻丁>。”；三项 `UnitSourceConsumerEditModeTests` 的原始文件字节哈希期望 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`、实际 `BE09A6CE835369A52040B76F967AA0D853CD481D83CE909D0DCDFD3C033C1BD8`。
+- 哈希差异已经定位为 Windows 换行转换：当前工作树启用 `core.autocrlf=true`，检出文件含 `107` 个 CRLF；将其规范化为 LF 后 SHA-256 仍为冻结常量 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`。这不是目录内容漂移，不应把期望改成 `BE09...`；测试应规范化换行后计算，或由仓库明确固定该文件为 LF。
+- 最终全量 PlayMode 位于 `Final-Full-PlayMode`，结果为 `72 total / 70 passed / 2 failed / 0 skipped / 0 inconclusive`。一项真实对局动态果冻数量期望 `27`、实际 `24`；另一项隔离夹具预期重放动态 ID `-1/-2/-3`，实际集合为空。后者的 `MaxTicks=101` 已不能覆盖攻击动画锁结束后的延迟施法，应该修正夹具而不是删除召唤期望；前者没有对应的 `5503` 规则或数据变更，仍需定位 Core 时间线回归，不能直接接受 `24`。
+- 上述全量结果不是全绿，不能记为 M1 全量回归通过；但失败列表中没有 `ArknoNights.Match.Tests`，且 M1 focused 与要求的三个定向回归均通过。`5503` 描述测试应同步已确认 authored 事实；动态召唤测试应分别修正隔离夹具和调查真实时间线；冻结哈希测试应消除平台换行敏感性。
+- 未执行 Windows/Android 构建、LAN/场景人工流程或设备验证，因为 M1 没有平台、Socket、场景或 UI 接入。

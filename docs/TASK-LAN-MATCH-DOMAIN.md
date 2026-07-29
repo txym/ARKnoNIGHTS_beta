@@ -1,6 +1,6 @@
 # M1：Match 房主权威领域骨架 Agent 提示词
 
-> 状态：待在独立 worktree 中实施。
+> 状态：实现候选已提交到 `codex/lan-match-domain` 的 `861f198`，等待主 Planner 集成；验证证据见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md) 的“LAN Match M1”记录。
 >
 > 本文件可以直接作为实现 Agent 的任务提示词。本文只覆盖 M1，不得提前实现 M2—M8。
 

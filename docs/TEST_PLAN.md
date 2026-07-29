@@ -36,8 +36,10 @@
   - `ARKnoNIGHTS.Battle.PlayModeTests`
   - `ARKnoNIGHTS.Lobby.EditModeTests`
   - `ARKnoNIGHTS.Lobby.PlayModeTests`
+  - `ARKnoNIGHTS.Match.EditModeTests`
 - 项目测试启动器：`scripts/Invoke-UnityTests.ps1`。
 - 默认结果目录：`Temp/UnityTests/<UTC 时间戳>/`，包含 NUnit XML、Unity 日志和 `summary.txt`。
+- 每次运行必须使用新的结果目录。若脚本在 Unity 完成写入前读到不完整 XML，该次结果记为未验证；确认无 Unity 进程占用后，换新目录完整重跑，不覆盖或复用旧 XML。
 
 ## 4. 常用命令
 
@@ -75,7 +77,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - 回放与 Track：`BattlePresentation*EditModeTests`；
 - 玩家与回合：`LocalMatchStateEditModeTests`、`FourPlayerBattleRoundSealerEditModeTests`；
 - HUD：`ShopReadyHudStateEditModeTests`、`PlayerListObserverEditModeTests`；
-- Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试。
+- Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试；
+- Match M1 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、规范摘要和权限裁剪。
 
 规则或公共基础设施变化后再运行完整 EditMode。
 
@@ -141,11 +144,13 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 - 四玩家配对和两场演示共享时钟；
 - UI 只投影快照，不保存第二份权威状态。
 
-### Lobby 与未来 Match
+### Lobby 与 Match
 
 - 当前 Lobby 覆盖发现、创建、加入、准备、开始、离开和房主解散；
 - socket、消息长度、主线程派发和生命周期必须有结构化失败路径；
-- 正式 Match 实施后必须新增版本握手、命令排序、快照、重连、AI 接管、回合结算和跨端摘要一致性验证；
+- Match M1 focused EditMode 必须验证固定四席位、初始化拒绝路径、单调 revision、重复 CommandId、稳定摘要、连接内部事务以及 Public/Owner/Host 权限隔离；
+- M1 没有 PlayMode、Socket、场景或 UI 接入，不能用纯领域测试推断局域网流程可玩；
+- 后续 Match 里程碑必须逐步新增版本握手传输、命令排序、共享牌库、快照同步、重连、AI 接管、回合结算和跨端摘要一致性验证；
 - 不得把“收到 Lobby Start”记为正式联网对局通过。
 
 ## 6. 证据记录

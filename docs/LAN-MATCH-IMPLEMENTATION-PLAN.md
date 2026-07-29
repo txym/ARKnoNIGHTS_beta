@@ -99,6 +99,16 @@ Assembly-CSharp 场景接线与 HUD
 
 ### M1：Match 纯领域骨架
 
+状态（2026-07-29）：
+
+- 实现候选位于 `codex/lan-match-domain`，实现提交为 `861f198`；
+- 已新增独立 `ARKnoNIGHTS.Match` 与 `ARKnoNIGHTS.Match.EditModeTests`，但尚未由主 Planner 集成到主开发分支；
+- Match focused EditMode 为 `21/21`，LocalMatch、PreparationPhase、Lobby 回归分别为 `18/18`、`6/6`、`94/94`；
+- 全量 EditMode 重跑为 `419/424`，全量 PlayMode 为 `70/72`；失败均位于既有 Battle 数据或测试期望，详见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)；
+- 未执行 Windows/Android 构建、LAN 或场景人工流程；M2—M8 未实现。
+
+M2 开始前必须由主 Planner 指定已经包含 M1 的集成 commit；不得直接从尚未包含 `ARKnoNIGHTS.Match` 的分支实现第二套权威状态。
+
 建议新建：
 
 ```text
@@ -146,6 +156,15 @@ Assets/Game/Runtime/Match/
 - 相同初始数据和命令序列得到相同摘要；
 - 权限投影不泄漏其他玩家商店、赤金、Cost 和 HostOnly 字段；
 - 重复 CommandId 不重复产生副作用。
+
+M1 暴露出的 Battle 基线漂移必须作为独立任务处理，不能在 M1 或 M2 中顺手改测试期望：
+
+- 真实对局动态果冻数量期望 `27`、实际 `24`；`SUMMON_JELLY_MINIONS` 的源、目录与 SPEC 没有对应规则变更，不能直接把期望改成 `24`，应先定位 Core 时间线回归；
+- PlayMode 召唤隔离夹具预期动态 ID `-1..-3`、实际为空；该夹具的 `MaxTicks=101` 已不能覆盖攻击动画锁结束后的延迟施法，应修正夹具并保留三只召唤及规范负 ID 的语义期望；
+- `5503` 精英 0 技能描述测试期望为空，但 authored 源和 BONDS 规范已明确为“每隔一段时间，分裂出三个<果冻丁>。”，应同步测试事实；
+- 三项 `UnitSourceConsumerEditModeTests` 的常量 `359C...` 仍正确：当前检出文件含 `107` 个 CRLF，原始字节哈希为 `BE09...`，规范化为 LF 后仍精确得到 `359C...`。应让测试按规范换行计算哈希或用 `.gitattributes` 固定 LF，不得把常量改成机器相关的 `BE09...`。
+
+修复必须重跑对应 focused 测试以及全量 EditMode/PlayMode；不得用批量替换当前实际值的方式消除断言。
 
 ### M2：共享牌库、商店、UnitId 与经济
 
