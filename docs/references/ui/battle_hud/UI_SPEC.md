@@ -374,7 +374,7 @@ HeaderWidth = PortraitSize ÷ 2
 HeaderHalfWidth = PortraitSize ÷ 4
 ```
 
-- 左半区预留给单位阵营，本阶段暂不显示具体内容；
+- 左半区显示单位归属图标：有地区时显示地区图标，无地区时回退到种类图标；
 - 右半区显示部署费用；
 - 两半都使用 `StagingSlotHeaderHalfBackground`；
 - 图集中只提供右半区贴图，左半区使用同一贴图水平翻转得到；
@@ -386,7 +386,7 @@ HeaderHalfWidth = PortraitSize ÷ 4
 - `StagingSlotCostIcon`：费用标记贴图；
 - `StagingSlotCostText`：具体费用数字，不是图集 Sprite。
 
-`StagingSlotCostIcon` 的中心与右半区 `StagingSlotHeaderHalfBackground` 的顶部中点对齐。在自然宽度为 `180` 的槽位中，图标尺寸为 `20 × 20`，即边长为 `PortraitSize ÷ 9`。费用数字显示在右半区内；左半区当前只显示翻转后的背景，不显示阵营图标或文字。
+`StagingSlotCostIcon` 的中心与右半区 `StagingSlotHeaderHalfBackground` 的顶部中点对齐。在自然宽度为 `180` 的槽位中，图标尺寸为 `20 × 20`，即边长为 `PortraitSize ÷ 9`。费用数字显示在右半区内。左半区归属图标同样使用 `20 × 20`，锚点、轴心和位置均为左半区中心，保持源贴图宽高比；没有可用图标时隐藏，不显示错误替代图。
 
 精英化图标锚定在头像区域左下角，并保留 `PortraitSize ÷ 30` 的左、下边距；在 `1920 × 1080` 下即为 `(6, 6)`。部署费用面板的数字与 `DeploymentCostPanelIcon` 使用相同的垂直中心 `y=40`。
 
@@ -1035,8 +1035,31 @@ RetreatAnchorY = +DiamondSize ÷ 4
 - 单位头像显示在槽位主体区域，视觉上靠右上放置；头像的最终尺寸、裁剪范围和精确偏移仍需参照图7拟合；
 - 边框根据单位稀有度选择；
 - 三个边框底部自带横向信息区域，单位名称显示在该区域；
-- 名称区域之外的左下区域显示单位阵营和种类；
+- `PortraitClip` 左下区域从下到上显示单位部署费用、地区和种类；
 - 商品价格区域位于槽位上方中央。
+
+头像内三行使用固定位置，不因缺少某一归属而重新排布。以下数值先以槽位自然尺寸表示，再统一应用既有 `ShopVisualScale=1.5`：
+
+| 行 | 左边距 | 底边 | 宽 × 高 |
+|---|---:|---:|---:|
+| 部署费用 `CostInfo` | 6 | 4 | `132 × 20` |
+| 地区 `RegionInfo` | 6 | 26 | `132 × 20` |
+| 种类 `OccupationInfo` | 6 | 48 | `132 × 20` |
+
+每行内部图标为 `18 × 18`，左边距为 `0`、下边距为 `1`；文字从 `x=22` 开始，占 `110 × 20`。图标保持宽高比，图标与文字共享行中心。部署费用使用图集 `SpriteAtlasTexture-UI_BATTLE (Group 0)-2048x2048-fmt34_Merged` 中的 `DeploymentCostPanelIcon`，数字使用 `Novecento wide Normal Regular`；地区和种类文字使用 `FangZhengHeiTiJianTi-1`。
+
+地区图标从 `Assets/Resources/UI/Texture/region/` 加载。种类图标从 `Assets/Resources/UI/Texture/occupation/` 加载，当前映射为：
+
+| 种类 | 图标 |
+|---|---|
+| 坍缩体 | `logo_sami` |
+| 机械 | `CHIPS` |
+| 无人机 | `r_defdrn_up_2` |
+| 感染生物 | `r_enemy_slime_repbsl_3` |
+| 造物 | `r_global_magic_resist_2` |
+| 其他 | 空 |
+
+归属以 `docs/bonds/BONDS_SPEC.md` 为事实源。无地区时隐藏地区行；无种类时隐藏种类行；“其他”显示文字但隐藏图标。三行绘制在头像之上，同时仍位于不可购买遮罩、购买确认、稀有度边框和冻结效果之下。
 
 稀有度边框映射为：
 
@@ -1050,7 +1073,7 @@ RetreatAnchorY = +DiamondSize ÷ 4
 
 商品被购买后，槽位进入空状态：
 
-- 清除单位头像、名称、阵营、种类、价格、冻结特效和购买确认状态；
+- 清除单位头像、名称、部署费用、地区、种类、价格、冻结特效和购买确认状态；
 - 使用 `bg_empty.png` 显示空槽位；
 - 空槽位不再响应商品购买。
 
@@ -1258,7 +1281,7 @@ RetreatAnchorY = +DiamondSize ÷ 4
 以下细节不影响继续完善需求，但在制作槽位 Prefab 前需要确认：
 
 1. 不同槽位框贴图中，哪些部分适合直接横向缩放，哪些部分需要通过九宫格切片保持边角比例。
-2. 商店和准备按钮的紧凑中文已经确定使用汉仪粗黑简；其他中文区域继续使用 Noto Sans SC（思源黑体）Normal，字间距 `0`。费用、堆叠、倒计时、战斗计数、玩家生命和单位生命数值使用项目内的 Novecento Wide Normal Regular（Unity 字体名 `Novecento wide`）；堆叠数量为 `30px`，相对头像右下角的具体边距仍以截图为准。
+2. 商店、准备按钮以及商品地区/种类行的紧凑中文已经确定使用方正黑体简体 `FangZhengHeiTiJianTi-1`；其他中文区域继续使用 Noto Sans SC（思源黑体）Normal，字间距 `0`。费用、堆叠、倒计时、战斗计数、玩家生命和单位生命数值使用项目内的 Novecento Wide Normal Regular（Unity 字体名 `Novecento wide`）；堆叠数量为 `30px`，相对头像右下角的具体边距仍以截图为准。
 3. 部署费用为 `54px`，待部署槽费用为 `24px` 且锚点 Y 为 `0`；赤金沿用部署费用的字体与字号，当前以图1～图4作为视觉匹配参考。
 4. 设置按钮的精确显示尺寸、位置和点击区域；当前需要通过参考图进行视觉拟合。
 5. `DeployedUnitSelectionOverlay` 的最终世界尺寸、坐标偏移和渲染排序。
@@ -1274,7 +1297,7 @@ RetreatAnchorY = +DiamondSize ÷ 4
 15. 三个页签的默认页面、选中/未选中颜色，以及是否需要切换动画。
 16. 灰显、已部署标记和拖拽中的视觉状态后续单独定义；这些状态不属于待部署区基础布局规则。
 18. 商品头像在 `158 × 175` 槽位内的尺寸、裁剪方式和右上角视觉偏移。
-19. 商品槽位阵营、种类图标的资源映射和精确位置；名称、价格、二次确认和冻结特效的当前层级已经由截图闭环记录。
+19. 商品槽位新增部署费用、地区、种类三行在 `1920 × 1080` 可见 Player 中的最终字重、对比度和头像遮挡观感；资源映射、几何和层级已经确定并由自动化断言覆盖。
 20. `frame_outline.png` 放在稀有度边框下方时是否具有足够清晰的悬停效果。
 21. 商店刷新不可用的条件，以及 `refresh_icon_lock.png` 是否需要配套的禁用背景。
 23. 多人情况下全部玩家准备后是否提前进入战斗；当前本地 Demo 中点击准备不影响剩余时间。

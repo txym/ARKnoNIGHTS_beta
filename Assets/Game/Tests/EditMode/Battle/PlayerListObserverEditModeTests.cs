@@ -44,7 +44,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(PlayerListObserverCommandPermission.ReadOnlyObservedPlayer, coordinator.GetFormationCommandPermission());
             Assert.AreEqual("local-ui-player", coordinator.LocalEconomyState.PlayerId);
             Assert.AreEqual(2, coordinator.LocalEconomyState.Level);
-            Assert.AreEqual(3, coordinator.LocalEconomyState.Gold);
+            Assert.AreEqual(196, coordinator.LocalEconomyState.Gold);
             Assert.IsTrue(coordinator.LocalEconomyState.IsReady);
             Assert.AreEqual(6, coordinator.LocalEconomyState.ShopSlots.Count);
         }

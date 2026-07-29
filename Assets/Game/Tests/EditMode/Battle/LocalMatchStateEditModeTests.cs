@@ -16,7 +16,7 @@ namespace ArknoNights.Battle.Tests
         private const string MatchPath = "PlayerData/local-match-state-v1";
 
         [Test]
-        public void FixedMatch_LoadsFourIndependentPlayersAndTheInitialSixSlotShopDeterministically()
+        public void Match_LoadsFourIndependentPlayersAndTheInitialNaturalRefreshDeterministically()
         {
             var first = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath);
             var second = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath);
@@ -33,27 +33,84 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(first.State.Snapshot.Players.All(player =>
                 player.ShopSlots.Select(slot => slot.UnitTypeId).SequenceEqual(
                     new[] { "1000", "1000", "1000", "1000", "1000", "1000" })));
+            Assert.IsTrue(first.State.Snapshot.Players.All(player =>
+                player.ShopSlots.All(slot => slot.DeploymentCost == 2)));
             Assert.AreEqual(1, first.State.Snapshot.LocalPlayer.Level);
-            Assert.AreEqual(7, first.State.Snapshot.LocalPlayer.Gold);
+            Assert.AreEqual(200, first.State.Snapshot.LocalPlayer.Gold);
             Assert.AreEqual(400, first.State.Snapshot.LocalPlayer.Life);
             Assert.IsFalse(first.State.Snapshot.LocalPlayer.IsReady);
             Assert.AreEqual(first.State.Snapshot.CanonicalSummary, second.State.Snapshot.CanonicalSummary);
         }
 
         [Test]
-        public void InitialShop_KeepsConfiguredGenerationOrderForEveryPlayer()
+        public void InitialNaturalRefresh_UsesLevelOneOddsForEveryPlayer()
         {
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
             var source = Resources.Load<TextAsset>(MatchPath).text.Replace(
-                "\"typeIds\": [\"1000\", \"1000\", \"1000\", \"1000\", \"1000\", \"1000\"]",
-                "\"typeIds\": [\"5503\", \"1000\", \"5503\", \"1000\", \"5503\", \"1000\"]");
+                "\"shopTypeIds\": [\"1000\", \"5503\"]",
+                "\"shopTypeIds\": [\"5503\", \"1000\"]");
             var loaded = LocalMatchStateLoader.LoadFromJson(catalog, source);
 
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
             foreach (var player in loaded.State.Snapshot.Players)
                 CollectionAssert.AreEqual(
-                    new[] { "5503", "1000", "5503", "1000", "5503", "1000" },
+                    new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                     player.ShopSlots.Select(slot => slot.UnitTypeId));
+        }
+
+        [Test]
+        public void ShopOfferGenerator_ExposesTheConfirmedRarityWeightsForEveryLevel()
+        {
+            var generatorType = typeof(LocalMatchState).Assembly.GetType("ArknoNights.Player.ShopOfferGenerator");
+            Assert.NotNull(generatorType, "The level-based shop offer generator is missing.");
+            var weights = generatorType.GetMethod(
+                "GetRarityWeights",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(weights);
+            var expected = new[]
+            {
+                new[] { 80, 20, 0, 0, 0, 0 },
+                new[] { 65, 35, 0, 0, 0, 0 },
+                new[] { 50, 40, 10, 0, 0, 0 },
+                new[] { 38, 40, 20, 2, 0, 0 },
+                new[] { 27, 38, 27, 8, 0, 0 },
+                new[] { 18, 32, 30, 18, 2, 0 },
+                new[] { 11, 24, 30, 28, 6, 1 },
+                new[] { 5, 14, 24, 39, 16, 2 },
+                new[] { 2, 7, 11, 40, 30, 10 }
+            };
+
+            for (var level = LocalMatchState.InitialLevel; level <= LocalMatchState.MaximumLevel; level++)
+                CollectionAssert.AreEqual(expected[level - 1], (int[])weights.Invoke(null, new object[] { level }));
+        }
+
+        [Test]
+        public void ShopOfferGenerator_ConditionallyReweightsRaritiesMissingFromTheCurrentPool()
+        {
+            var generatorType = typeof(LocalMatchState).Assembly.GetType("ArknoNights.Player.ShopOfferGenerator");
+            Assert.NotNull(generatorType, "The level-based shop offer generator is missing.");
+            var generate = generatorType.GetMethod(
+                "Generate",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(generate);
+            var rarities = new Dictionary<string, int>
+            {
+                ["1000"] = 1,
+                ["5503"] = 4
+            };
+            var values = new Queue<int>(new[] { 38, 0 });
+            var actual = (string[])generate.Invoke(
+                null,
+                new object[]
+                {
+                    4,
+                    1,
+                    new[] { "1000", "5503" },
+                    new Func<string, int>(typeId => rarities[typeId]),
+                    new Func<int, int>(maximumExclusive => values.Dequeue())
+                });
+
+            CollectionAssert.AreEqual(new[] { "5503" }, actual);
         }
 
         [Test]
@@ -120,7 +177,7 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void FailedShopCommands_LeaveGoldSlotsAndPlayerStateUntouched()
         {
-            var state = Load();
+            var state = LoadWithGold(7);
             Assert.IsTrue(state.TryPurchase(0).Success);
             Assert.IsTrue(state.TryPurchase(1).Success);
             Assert.IsTrue(state.TryPurchase(2).Success);
@@ -157,10 +214,10 @@ namespace ArknoNights.Battle.Tests
             var first = state.TryRefresh();
 
             Assert.IsTrue(first.Success);
-            Assert.AreEqual(6, first.Snapshot.LocalPlayer.Gold);
+            Assert.AreEqual(199, first.Snapshot.LocalPlayer.Gold);
             Assert.IsTrue(first.Snapshot.LocalPlayer.ShopSlots.All(slot => !slot.IsFrozen));
             CollectionAssert.AreEqual(
-                new[] { "5503", "5503", "5503", "5503", "5503", "5503" },
+                new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                 first.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
             foreach (var remote in first.Snapshot.Players.Where(player => player.PlayerId != state.LocalPlayerId))
                 CollectionAssert.AreEqual(remoteBefore[remote.PlayerId], remote.ShopSlots.Select(slot => slot.UnitTypeId));
@@ -169,7 +226,7 @@ namespace ArknoNights.Battle.Tests
 
             Assert.IsTrue(second.Success);
             CollectionAssert.AreEqual(
-                new[] { "1000", "1000", "1000", "5503", "5503", "5503" },
+                new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                 second.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
         }
 
@@ -192,14 +249,14 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(before.Version + 1, result.Snapshot.Version);
             Assert.AreEqual(1, changes);
             CollectionAssert.AreEqual(
-                new[] { "5503", "1000", "1000", "5503", "5503", "5503" },
+                new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                 result.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
             Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[0].IsFrozen);
             Assert.IsTrue(result.Snapshot.LocalPlayer.ShopSlots[5].IsFrozen);
             foreach (var remote in result.Snapshot.Players.Where(player => player.PlayerId != state.LocalPlayerId))
             {
                 CollectionAssert.AreEqual(
-                    new[] { "1000", "1000", "1000", "5503", "5503", "5503" },
+                    new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                     remote.ShopSlots.Select(slot => slot.UnitTypeId));
                 Assert.IsTrue(remote.ShopSlots.All(slot => !slot.IsFrozen));
             }
@@ -246,7 +303,7 @@ namespace ArknoNights.Battle.Tests
             var upgrade = state.TryUpgrade();
             Assert.IsTrue(upgrade.Success);
             Assert.AreEqual(2, upgrade.Snapshot.LocalPlayer.Level);
-            Assert.AreEqual(3, upgrade.Snapshot.LocalPlayer.Gold);
+            Assert.AreEqual(196, upgrade.Snapshot.LocalPlayer.Gold);
 
             Assert.IsTrue(state.TryToggleReady().Success);
             Assert.IsTrue(state.Snapshot.LocalPlayer.IsReady);
@@ -263,7 +320,7 @@ namespace ArknoNights.Battle.Tests
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
             var source = Resources.Load<TextAsset>(MatchPath).text
                 .Replace("\"initialLevel\": 1", "\"initialLevel\": 9")
-                .Replace("\"initialGold\": 7", "\"initialGold\": 100");
+                .Replace("\"initialGold\": 200", "\"initialGold\": 100");
             var loaded = LocalMatchStateLoader.LoadFromJson(catalog, source);
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
             var before = loaded.State.Snapshot.CanonicalSummary;
@@ -326,7 +383,7 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void Purchase_WhenGoldIsInsufficient_LeavesMatchAndPlayerVersionsAndEventCountsUnchanged()
         {
-            var state = Load();
+            var state = LoadWithGold(7);
             Assert.IsTrue(state.TryPurchase(0).Success);
             Assert.IsTrue(state.TryPurchase(1).Success);
             Assert.IsTrue(state.TryPurchase(2).Success);
@@ -350,6 +407,17 @@ namespace ArknoNights.Battle.Tests
         private static LocalMatchState Load()
         {
             var result = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath);
+            Assert.IsTrue(result.Success, Errors(result.Errors));
+            return result.State;
+        }
+
+        private static LocalMatchState LoadWithGold(int gold)
+        {
+            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
+            var json = Resources.Load<TextAsset>(MatchPath).text.Replace(
+                "\"initialGold\": 200",
+                "\"initialGold\": " + gold);
+            var result = LocalMatchStateLoader.LoadFromJson(catalog, json);
             Assert.IsTrue(result.Success, Errors(result.Errors));
             return result.State;
         }

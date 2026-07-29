@@ -21,6 +21,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(6, state.Slots.Count);
             CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5 }, state.Slots.Select(slot => slot.ShopSlotId));
             CollectionAssert.AreEqual(new[] { 1, 1, 1, 1, 1, 1 }, state.Slots.Select(slot => slot.Price));
+            CollectionAssert.AreEqual(new[] { 2, 2, 2, 2, 2, 2 }, state.Slots.Select(slot => slot.DeploymentCost));
             Assert.IsTrue(state.ShopCommandsEnabled);
         }
 
@@ -179,9 +180,30 @@ namespace ArknoNights.Battle.Tests
 
                 Assert.AreEqual(before.LocalPlayer.Gold - LocalMatchState.RefreshCost, match.Snapshot.LocalPlayer.Gold);
                 CollectionAssert.AreEqual(
-                    new[] { "5503", "5503", "5503", "5503", "5503", "5503" },
+                    new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                     match.Snapshot.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
                 Assert.AreEqual(ShopReadyConfirmation.None, controller.State.PendingConfirmation);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void Controller_ReadyArtworkUsesSlicedImagesWithoutChangingTheHitTarget()
+        {
+            var match = Load();
+            var root = new GameObject("ReadyArtworkTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+                var readyRoot = root.transform.Find("ReadyButton");
+
+                Assert.AreEqual(Image.Type.Sliced, readyRoot.Find("Background").GetComponent<Image>().type);
+                Assert.AreEqual(Image.Type.Sliced, readyRoot.Find("Frame").GetComponent<Image>().type);
+                Assert.AreEqual(Image.Type.Simple, readyRoot.GetComponent<Image>().type);
             }
             finally
             {
@@ -209,10 +231,10 @@ namespace ArknoNights.Battle.Tests
                 controller.Purchase(0);
                 controller.Purchase(0);
                 Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots[0].IsEmpty);
-                Assert.AreEqual(6, match.Snapshot.LocalPlayer.Gold);
+                Assert.AreEqual(199, match.Snapshot.LocalPlayer.Gold);
 
                 controller.RequestRefresh();
-                Assert.AreEqual(5, match.Snapshot.LocalPlayer.Gold);
+                Assert.AreEqual(198, match.Snapshot.LocalPlayer.Gold);
                 Assert.IsTrue(match.Snapshot.LocalPlayer.ShopSlots.All(slot => !slot.IsEmpty));
 
                 controller.ToggleAllFrozen();
@@ -221,7 +243,43 @@ namespace ArknoNights.Battle.Tests
                 controller.RequestUpgrade();
                 controller.RequestUpgrade();
                 Assert.AreEqual(2, match.Snapshot.LocalPlayer.Level);
-                Assert.AreEqual(1, match.Snapshot.LocalPlayer.Gold);
+                Assert.AreEqual(194, match.Snapshot.LocalPlayer.Gold);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void Controller_AffinityRowsHideMissingRegionAndClearAfterSlotBecomesEmpty()
+        {
+            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
+            var json = Resources.Load<TextAsset>(MatchPath).text
+                .Replace("\"initialLevel\": 1", "\"initialLevel\": 9")
+                .Replace(
+                    "\"shopTypeIds\": [\"1000\", \"5503\"]",
+                    "\"shopTypeIds\": [\"5503\"]");
+            var loaded = LocalMatchStateLoader.LoadFromJson(catalog, json);
+            Assert.IsTrue(loaded.Success, string.Join("; ", loaded.Errors.Select(error => error.ToString())));
+            var root = new GameObject("AffinityRowsTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(loaded.State);
+                var firstSlot = root.transform.Find("ShopPanel/ShopSlot_0/PortraitClip");
+                Assert.IsTrue(firstSlot.Find("CostInfo").gameObject.activeSelf);
+                Assert.IsFalse(firstSlot.Find("RegionInfo").gameObject.activeSelf);
+                Assert.IsTrue(firstSlot.Find("OccupationInfo").gameObject.activeSelf);
+                Assert.AreEqual("其他", firstSlot.Find("OccupationInfo/Value").GetComponent<Text>().text);
+                Assert.IsFalse(firstSlot.Find("OccupationInfo/Icon").gameObject.activeSelf);
+
+                controller.Purchase(0);
+                controller.Purchase(0);
+
+                Assert.IsFalse(firstSlot.Find("CostInfo").gameObject.activeSelf);
+                Assert.IsFalse(firstSlot.Find("RegionInfo").gameObject.activeSelf);
+                Assert.IsFalse(firstSlot.Find("OccupationInfo").gameObject.activeSelf);
             }
             finally
             {
@@ -267,7 +325,7 @@ namespace ArknoNights.Battle.Tests
         private static LocalMatchState LoadWithGold(int gold)
         {
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
-            var json = Resources.Load<TextAsset>(MatchPath).text.Replace("\"initialGold\": 7", "\"initialGold\": " + gold);
+            var json = Resources.Load<TextAsset>(MatchPath).text.Replace("\"initialGold\": 200", "\"initialGold\": " + gold);
             var result = LocalMatchStateLoader.LoadFromJson(catalog, json);
             Assert.IsTrue(result.Success, string.Join("; ", result.Errors.Select(error => error.ToString())));
             return result.State;

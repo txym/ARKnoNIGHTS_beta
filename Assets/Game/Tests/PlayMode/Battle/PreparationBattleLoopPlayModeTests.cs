@@ -91,13 +91,13 @@ namespace ArknoNights.Battle.Tests
             var afterRound = match.Snapshot;
             Assert.AreEqual(goldBeforeBattle, afterRound.LocalPlayer.Gold);
             CollectionAssert.AreEqual(
-                new[] { "5503", "1000", "1000", "5503", "5503", "5503" },
+                new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                 afterRound.LocalPlayer.ShopSlots.Select(slot => slot.UnitTypeId));
             Assert.IsTrue(afterRound.LocalPlayer.ShopSlots[0].IsFrozen);
             Assert.IsTrue(afterRound.LocalPlayer.ShopSlots.Skip(1).All(slot => !slot.IsFrozen));
             foreach (var remote in afterRound.Players.Where(player => player.PlayerId != match.LocalPlayerId))
                 CollectionAssert.AreEqual(
-                    new[] { "1000", "1000", "1000", "5503", "5503", "5503" },
+                    new[] { "1000", "1000", "1000", "1000", "1000", "1000" },
                     remote.ShopSlots.Select(slot => slot.UnitTypeId));
         }
     }

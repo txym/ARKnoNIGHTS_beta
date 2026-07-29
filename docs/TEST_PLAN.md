@@ -652,6 +652,17 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 范围检查：Task 4 原提交只修改三份权威文档；Fix Round 1 只修改过时的 PlayMode 名称期望和本节测试记录。未修改生产代码、商店 UI、场景、Prefab、Package、ProjectSettings，也未纳入工作区中既有的 ShopReady、Bonds、经济文档或大量角色资源改动。
 - 未验证：交互式 Editor/Windows Player 中用真实鼠标观察刷新后的卡片视觉顺序，以及未来按玩家等级概率随机生成商品的实现。
 
+## 49. 待部署区与商店地区/种类 UI（2026-07-29）
+
+- 数据镜像 TDD：最新版 `docs/bonds/BONDS_SPEC.md` 含 `94` 个正式商店单位，其中 `81` 个有地区、`86` 个有种类；当前 Demo 仍引用但已从正式名单移除的 `1000` 只保留显式兼容映射 `整合运动 + 感染生物`。`Artifacts/AffinityUi/Task1-Red-OptionalOccupation/EditModeResults.xml` 为 `3 total / 1 passed / 2 failed / 0 skipped`，分别暴露旧解析器不接受仅地区单位以及运行时 JSON 尚不存在；实现并导出后，`Task1-Green-CurrentBonds/EditModeResults.xml` 为 `3 passed / 0 failed / 0 skipped`。导出摘要为 `canonicalUnits=94 / compatibilityUnits=1 / totalUnits=95 / canonicalRegions=81 / canonicalNoRegion=13 / canonicalOccupations=86 / canonicalNoOccupation=8`，JSON 为 UTF-8 无 BOM，八个地区与五个非空种类图标均可通过 Resources 加载。
+- 部署费用投影 TDD：`Task2-Red-DeploymentCost/EditMode.log` 记录两项预期 `CS1061`，证明商店领域快照和 HUD 投影尚未暴露 `DeploymentCost`；实现后 `Task2-Green-ShopReadyState/EditModeResults.xml` 为 `12 passed / 0 failed / 0 skipped`，`Task2-Green-LocalSnapshot/EditModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`，固定 `1000` 同时保持购买价格 `1`、部署费用 `2`。
+- 待部署槽 TDD：`Task3-Red-StagingAffinity/PlayModeResults.xml` 为 `1 failed / 0 skipped`；实现后 `Task3-Green-StagingAffinity/PlayModeResults.xml` 为 `1 passed / 0 failed / 0 skipped`。完成前补强后的 `Final-StagingFallback/PlayModeResults.xml` 同样为 `1 passed / 0 failed / 0 skipped`：场景断言确认 `Header/HeaderLeft/AffinityIcon` 对 `1000` 使用 `logo_reunionMovement`，`20 × 20`、中心锚定、保持宽高比且不接收射线；“其他”且无图标的 `5503` 隐藏该节点，并通过测试映射直接确认无地区坍缩体回退显示 `logo_sami`。
+- 商店三行 TDD：`Task4-Red-ShopRows/EditModeResults.xml` 为 `1 failed / 0 skipped`；`Task4-Green-ShopRowsFallbacks/EditModeResults.xml` 和 `Task4-Green-ShopRowsScene/PlayModeResults.xml` 各为 `1 passed / 0 failed / 0 skipped`。断言覆盖 `PortraitClip` 内从下到上的 cost/地区/种类固定三行、`DeploymentCostPanelIcon`、地区与种类 Sprite、图标等比和水平中心、Novecento 数字字体、方正中文字体、无地区隐藏、“其他”保留文字但无图标，以及空槽清理。
+- 最终全量 PlayMode：补强回退断言后，`Artifacts/AffinityUi/Final-PlayMode-AfterFallback/PlayModeResults.xml` 为 `27 passed / 0 failed / 0 skipped`，Unity 正常退出；覆盖正式场景商店、待部署区、部署/撤退、观察、战斗阶段和既有 HUD 交互。
+- 最终全量 EditMode：`Artifacts/AffinityUi/Final-EditMode/EditModeResults.xml` 为 `235 total / 233 passed / 2 failed / 0 skipped`。两项失败均来自同时存在的 BONDS 资源迁移工作区：旧动画审计仍要求已从正式 BONDS 删除的 `1000_gopro`，新资源导入测试期望 `10001_trslim` 头像宽 `158`、实际为 `128`；本任务相关测试均通过，未擅自修改该迁移。
+- Windows x64 StrictMode：`Artifacts/AffinityUi/WindowsBuild.log` 记录 `[TASK-006][build.succeeded]`、`errors=0`、`warnings=2`、`totalSize=296068765`，产物为 `Artifacts/AffinityUi/WindowsStandalone/ARKnoNIGHTS.exe`。两条构建警告均为既有 `TagRegistry.freezeAppend` 的重复 `CS0414`。
+- 可见截图未验证：按安全规则以隐藏窗口启动正式 Player 截图入口，`Artifacts/AffinityUi/Captures/battle-hud-capture-failed.txt` 明确记录 `screenshot.invalid:01_preparation_closed`；两张输出 PNG 哈希相同且为黑屏，因此不作为视觉通过证据。仍需在可见 Windows Player 或交互式 Editor 中人工检查 `1920 × 1080` 下三行文字对比度、头像遮挡、HeaderLeft 图标和不同宽高比/DPI 的观感。
+
 ## 50. BONDS 单位资源与完整 v2 authored 数据导入（2026-07-29）
 
 - 数据范围：`Assets/GameData/Units/EliteVariants/Json` 含 `100` 份 `unit-elite-variants-v2` 文档和 `185` 个模型变体，组成是当前 BONDS `99` 个 TypeId / `182` 个资源变体加保留的 legacy/demo `1000` 三个变体；`1021` 已排除。100 份 JSON 与 100 份 `.meta` 成对，禁用字段、`Default` key/name 绑定扫描为零匹配。
@@ -663,3 +674,12 @@ TASK-006 使用已安装的 Windows Standalone 支持模块和 `Task006Standalon
 - 外部事实源复核：新增输出 `G:\ARKnoNIGHTS_tools\spine-fetcher-output-bonds-delta-20260729` 含 `15` 个完整目录、`105` 个文件、`0` 个 reparse point；每个 manifest 的六个文件哈希、非空伤害类型、`158×158` 头像及导入项目的四个 raw 文件哈希均一致，`report.json` 为 `15` 个 completed，`invalid-portraits.zh-Hans.txt` 为空。原输出的 `report.json` SHA-256 仍为 `96AF3B49F67B50B23C4E3A176AA59EC7844834B1228BDAC396B355D87619596D`，旧 staging 仍为 `1981` 文件、`1516624` 字节。外部下载器单元测试 `40/40` 通过。
 - 冻结边界：没有执行正式目录生成命令；`unit-catalog-v1.json` SHA-256 仍为 `359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA`，`ability-catalog-v1.json` 仍为 `BA76A69BFC5AFB186863ECF28AB36EBD504F14CD503347BE09CEEC652ECB3466`，正式 Player 继续只暴露原 `1000/5503/5504`。
 - 未验证：未在可见 Editor/Windows Player 中逐一人工观察 185 个模型与头像；`1502` 的 `Appear`/`Disappear` 时长已保存，但闪现能力的实际播放次序仍待实现动画层前由项目负责人确认。
+
+## 51. 玩家等级商店概率与测试赤金（2026-07-29）
+
+- 修改前基线：`Artifacts/ShopRefreshOdds/Baseline-LocalMatch/EditModeResults.xml` 为 `16 passed / 0 failed / 0 skipped`，确认既有商店领域测试在改动前通过。
+- TDD Red：`Artifacts/ShopRefreshOdds/Task1-Red/EditModeResults.xml` 为 `18 total / 12 passed / 6 failed / 0 skipped`。两项失败确认等级概率生成器尚不存在，其余失败分别暴露初始加载/主动刷新/战后刷新仍使用固定页面，以及测试玩家初始赤金仍为 `7`；没有 C# 编译错误或无关失败。
+- 领域与 HUD 定向 Green：`Task1-Green-Final/EditModeResults.xml` 为 `18/18`，逐级断言 1—9 级六稀有度权重，覆盖当前候选池缺少稀有度时的条件重抽、初始自然刷新、主动刷新、四玩家战后刷新、冻结和失败原子性。`ShopReady-Green/EditModeResults.xml` 为 `13/13`，`PlayerList-Green/EditModeResults.xml` 为 `7/7`，`PreparationLoop-Green/PlayModeResults.xml` 为 `1/1`。
+- 最终全量 Unity：显式 `shopTypeIds` 候选池和旧 `shopPages` 兼容加载完成后，最新核验 `Artifacts/ShopRefreshOdds/Verify-EditMode/EditModeResults.xml` 为 `238 passed / 0 failed / 0 skipped`，`Artifacts/ShopRefreshOdds/Verify-PlayMode/PlayModeResults.xml` 为 `27 passed / 0 failed / 0 skipped`；两次 Unity 均正常退出。此前全量 PlayMode 的唯一失败只是场景测试仍期待旧 HUD 赤金文本 `7`，更新为任务要求的 `200` 后全量通过。
+- Windows x64 StrictMode：最新同步核验捕获 Unity 退出码 `0`；`Artifacts/ShopRefreshOdds/Verify-WindowsBuild.log` 记录 `[TASK-006][build.succeeded] result=Succeeded`、`errors=0`、`warnings=0`、`totalSize=316432445`，输出为 `Artifacts/ShopRefreshOdds/Verify-WindowsStandalone/ARKnoNIGHTS.exe`。
+- 边界：本轮只应用等级稀有度概率和无可用稀有度时重抽；当前 Player-safe fixture 的 `shopTypeIds` 仍只有 `1000/5503`，并继续使用冻结目录中的运行时稀有度（`1000=R1`、`5503=R4`）。共享卡池副本扣留、购买占用、刷新返池，以及完整 94 商店单位迁移均未实现；没有把这些未完成项记为通过。未在可见 Player 中人工连续刷新观察分布，自动测试以精确权重表、确定性 seed 和领域断言作为证据。

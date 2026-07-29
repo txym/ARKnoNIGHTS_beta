@@ -132,6 +132,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             ShopSlotId = source.ShopSlotId;
             UnitTypeId = source.UnitTypeId;
             Price = source.Price;
+            DeploymentCost = source.DeploymentCost;
             Rarity = source.Rarity;
             DisplayName = source.DisplayName;
             PortraitResourcePath = source.PortraitResourcePath;
@@ -144,6 +145,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         public int ShopSlotId { get; }
         public string UnitTypeId { get; }
         public int Price { get; }
+        public int DeploymentCost { get; }
         public int Rarity { get; }
         public string DisplayName { get; }
         public string PortraitResourcePath { get; }
