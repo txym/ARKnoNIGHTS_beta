@@ -77,7 +77,7 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod)
+        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod, int lifeDeduct = 1)
         {
             TypeId = typeId;
             MaxHitPoints = maxHitPoints;
@@ -94,6 +94,7 @@ namespace ArknoNights.Battle.Core
             IsSyntheticFixtureData = isSyntheticFixtureData;
             InnateAbilityIds = new ReadOnlyCollection<string>((innateAbilityIds ?? Enumerable.Empty<string>()).ToArray());
             ActionMethod = actionMethod;
+            LifeDeduct = lifeDeduct;
         }
 
         public string TypeId { get; }
@@ -111,6 +112,7 @@ namespace ArknoNights.Battle.Core
         public bool IsSyntheticFixtureData { get; }
         public IReadOnlyList<string> InnateAbilityIds { get; }
         public int ActionMethod { get; }
+        public int LifeDeduct { get; }
         public bool CanAttack => AttackMethod != AttackMethod.None;
     }
 
@@ -197,6 +199,8 @@ namespace ArknoNights.Battle.Core
                 builder.Append("|T:").Append(definition.TypeId).Append(',').Append(definition.MaxHitPoints).Append(',').Append(definition.Attack).Append(',').Append(definition.Defense).Append(',').Append(definition.MagicResistance).Append(',').Append(definition.MoveSpeedCentimetresPerSecond).Append(',').Append(definition.AttackIntervalTicks).Append(',').Append(definition.AttackAnimationDurationTicks).Append(',').Append((int)definition.DamageType).Append(',').Append((int)definition.AttackMethod).Append(',').Append(definition.BlockCapacity).Append(',').Append(definition.TauntLevel).Append(',').Append(definition.IsSyntheticFixtureData ? 1 : 0);
                 if (definition.ActionMethod != 1)
                     builder.Append("|M:").Append(definition.ActionMethod);
+                if (definition.LifeDeduct != 1)
+                    builder.Append("|D:").Append(definition.LifeDeduct);
                 foreach (var innateId in definition.InnateAbilityIds.OrderBy(item => item, StringComparer.Ordinal)) builder.Append("|I:").Append(innateId);
             }
             foreach (var ability in AbilityDefinitions.OrderBy(item => item.AbilityId, StringComparer.Ordinal))
@@ -385,7 +389,7 @@ namespace ArknoNights.Battle.Core
                 if (definition == null) { validationErrors.Add(new ValidationError("type.missing", "Unit definition is missing.")); continue; }
                 if (string.IsNullOrWhiteSpace(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.invalid", "Type ID is required."));
                 else if (!typeIds.Add(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.duplicate", "Duplicate type ID: " + definition.TypeId));
-                if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.BlockCapacity < 0 || definition.TauntLevel < 0 || definition.ActionMethod < 1 || definition.ActionMethod > 4)
+                if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.BlockCapacity < 0 || definition.TauntLevel < 0 || definition.ActionMethod < 1 || definition.ActionMethod > 4 || definition.LifeDeduct < 0)
                     validationErrors.Add(new ValidationError("type.values.invalid", "Unit definition has invalid numeric values: " + (definition.TypeId ?? "<missing>")));
                 if (!Enum.IsDefined(typeof(DamageType), definition.DamageType) || !Enum.IsDefined(typeof(AttackMethod), definition.AttackMethod)) validationErrors.Add(new ValidationError("type.enum.invalid", "Unit definition has invalid enum values: " + (definition.TypeId ?? "<missing>")));
                 else if (definition.CanAttack)

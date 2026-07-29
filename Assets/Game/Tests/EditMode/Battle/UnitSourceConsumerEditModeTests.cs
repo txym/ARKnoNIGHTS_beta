@@ -147,6 +147,30 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsPassiveMeleeTargetingTrait()
+        {
+            var output = NewIsolatedPath(
+                "ability-trait-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var trait = document.abilities.Single(item =>
+                item.abilityId == "UNTARGETABLE_BY_MELEE");
+            Assert.That(trait.activationKind, Is.EqualTo("Passive"));
+            Assert.That(trait.skillPointGeneration, Is.EqualTo("None"));
+            Assert.That(
+                trait.unitTrait,
+                Is.EqualTo("UntargetableByMelee"));
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -154,7 +178,11 @@ namespace ArknoNights.Battle.Tests
                     Application.dataPath,
                     "GameData/Units/EliteVariants/Json"));
 
-            Assert.That(ids, Is.EqualTo(new[] { "SUMMON_JELLY_MINIONS" }));
+            Assert.That(ids, Is.EqualTo(new[]
+            {
+                "SUMMON_JELLY_MINIONS",
+                "UNTARGETABLE_BY_MELEE"
+            }));
         }
 
         private static void AssertAtomicFailure(
@@ -267,6 +295,14 @@ namespace ArknoNights.Battle.Tests
             string sourceDirectory,
             string outputPath)
         {
+            return Assert.Throws<TargetInvocationException>(
+                () => RunAbilityGenerator(sourceDirectory, outputPath));
+        }
+
+        private static void RunAbilityGenerator(
+            string sourceDirectory,
+            string outputPath)
+        {
             var generator = Type.GetType(
                 "AbilityCatalogGenerator, Assembly-CSharp-Editor");
             Assert.That(
@@ -283,10 +319,9 @@ namespace ArknoNights.Battle.Tests
                 generate,
                 Is.Not.Null,
                 "Generate(string, string) must exist and remain private.");
-            return Assert.Throws<TargetInvocationException>(
-                () => generate.Invoke(
-                    null,
-                    new object[] { sourceDirectory, outputPath }));
+            generate.Invoke(
+                null,
+                new object[] { sourceDirectory, outputPath });
         }
 
         private static void InvokeSkillAnimationGenerator(
@@ -454,6 +489,21 @@ namespace ArknoNights.Battle.Tests
             public string animationKey;
             public string animationName;
             public int originalAnimationTicks;
+        }
+
+        [Serializable]
+        private sealed class AbilityCatalogDocument
+        {
+            public AbilityCatalogEntry[] abilities;
+        }
+
+        [Serializable]
+        private sealed class AbilityCatalogEntry
+        {
+            public string abilityId;
+            public string activationKind;
+            public string skillPointGeneration;
+            public string unitTrait;
         }
     }
 }

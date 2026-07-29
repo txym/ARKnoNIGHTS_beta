@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ArknoNights.Battle.Core;
+using ArknoNights.Battle.Presentation;
 using NUnit.Framework;
 
 namespace ArknoNights.Battle.Tests
@@ -36,6 +37,47 @@ namespace ArknoNights.Battle.Tests
             Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.TargetChanged
                 && item.UnitId == "home"
+                && item.RelatedUnitId == "away-drone"));
+        }
+
+        [Test]
+        public void DroneTrait_ExcludesMeleeAcquisitionButAllowsRangedAcquisition()
+        {
+            var input = CreateInput(
+                2,
+                new[]
+                {
+                    Attacker("melee"),
+                    Attacker("ranged", 0, AttackMethod.Ranged),
+                    NonAttacker(
+                        "drone",
+                        0,
+                        0,
+                        "UNTARGETABLE_BY_MELEE",
+                        4),
+                    Attacker("away-normal")
+                },
+                new[] { UntargetableByMeleeAbility() },
+                new[]
+                {
+                    Unit("home-melee", "melee", 4, 4),
+                    Unit("home-ranged", "ranged", 6, 4)
+                },
+                new[]
+                {
+                    Unit("away-drone", "drone", 5, 4),
+                    Unit("away-normal", "away-normal", 9, 4)
+                });
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.TargetChanged
+                && item.UnitId == "home-melee"
+                && item.RelatedUnitId == "away-normal"));
+            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.TargetChanged
+                && item.UnitId == "home-ranged"
                 && item.RelatedUnitId == "away-drone"));
         }
 
@@ -145,7 +187,65 @@ namespace ArknoNights.Battle.Tests
                 && item.UnitId == "stationary"));
         }
 
-        private static UnitDefinition Attacker(string typeId, int speed = 0)
+        [Test]
+        public void NoEligibleTarget_ReachesGateBoundaryExitsAndSettlesLifeLoss()
+        {
+            var input = CreateInput(
+                100,
+                new[]
+                {
+                    Attacker("runner", 100, AttackMethod.Melee, 3),
+                    NonAttacker(
+                        "drone",
+                        0,
+                        0,
+                        "UNTARGETABLE_BY_MELEE",
+                        4,
+                        0)
+                },
+                new[] { UntargetableByMeleeAbility() },
+                new[] { Unit("runner", "runner", 5, 4) },
+                new[] { Unit("drone", "drone", 5, 4) });
+
+            var runner = new BattleRunner(input);
+            var result = runner.RunToCompletion();
+
+            var reached = result.Events.Single(item =>
+                item.Type == BattleEventType.GateReached
+                && item.UnitId == "runner");
+            Assert.That(reached.Tick, Is.EqualTo(72));
+            Assert.That(reached.ToPosition.Value, Is.EqualTo(
+                new FixedPosition(500, 760)));
+            Assert.That(reached.DamageAmount, Is.EqualTo(3));
+            Assert.That(result.HomeLifeLoss, Is.Zero);
+            Assert.That(result.AwayLifeLoss, Is.EqualTo(3));
+            Assert.That(result.Winner, Is.EqualTo(BattleSide.Home));
+            Assert.That(
+                result.FinalUnits.Single(item => item.UnitId == "runner")
+                    .HasExitedBattle,
+                Is.True);
+
+            var compiler = new BattlePresentationTrackCompiler();
+            Assert.That(
+                compiler.TryCompile(
+                    result,
+                    out var track,
+                    out var diagnostics),
+                Is.True,
+                string.Join("; ", diagnostics));
+            Assert.That(
+                track.TryGetUnit("runner", out var runnerTrack),
+                Is.True);
+            Assert.That(runnerTrack.Sample(71).ShouldDisplay, Is.True);
+            Assert.That(runnerTrack.Sample(72).HasExitedBattle, Is.True);
+            Assert.That(runnerTrack.Sample(72).ShouldDisplay, Is.False);
+        }
+
+        private static UnitDefinition Attacker(
+            string typeId,
+            int speed = 0,
+            AttackMethod attackMethod = AttackMethod.Melee,
+            int lifeDeduct = 1)
         {
             return new UnitDefinition(
                 typeId,
@@ -157,10 +257,13 @@ namespace ArknoNights.Battle.Tests
                 20,
                 1,
                 DamageType.Physical,
-                AttackMethod.Melee,
+                attackMethod,
                 1,
                 0,
-                true);
+                true,
+                Array.Empty<string>(),
+                1,
+                lifeDeduct);
         }
 
         private static UnitDefinition NonAttacker(
@@ -168,7 +271,8 @@ namespace ArknoNights.Battle.Tests
             int speed,
             int blockCapacity,
             string abilityId = null,
-            int actionMethod = 1)
+            int actionMethod = 1,
+            int lifeDeduct = 1)
         {
             return new UnitDefinition(
                 typeId,
@@ -185,7 +289,8 @@ namespace ArknoNights.Battle.Tests
                 0,
                 true,
                 abilityId == null ? Array.Empty<string>() : new[] { abilityId },
-                actionMethod);
+                actionMethod,
+                lifeDeduct);
         }
 
         private static AbilityDefinition UntargetableAbility()
@@ -201,6 +306,22 @@ namespace ArknoNights.Battle.Tests
                 SkillPointGeneration.None,
                 null,
                 new UnitTraitEffectDefinition(UnitTraitEffectKind.Untargetable));
+        }
+
+        private static AbilityDefinition UntargetableByMeleeAbility()
+        {
+            return new AbilityDefinition(
+                "UNTARGETABLE_BY_MELEE",
+                string.Empty,
+                "不会成为近战单位的攻击目标。",
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                new UnitTraitEffectDefinition(
+                    UnitTraitEffectKind.UntargetableByMelee));
         }
 
         private static UnitSnapshot Unit(

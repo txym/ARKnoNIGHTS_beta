@@ -11,6 +11,7 @@ namespace ArknoNights.Battle.Core
     public enum UnitTraitEffectKind
     {
         Untargetable,
+        UntargetableByMelee,
         MoveFromOwnGateToDeploymentPosition
     }
 

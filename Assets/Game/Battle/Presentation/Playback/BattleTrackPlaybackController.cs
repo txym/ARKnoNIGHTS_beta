@@ -64,6 +64,15 @@ namespace ArknoNights.Battle.Presentation
             {
                 var sample = unit.Sample(PresentationTick);
                 if (!sample.HasSpawned) continue;
+                if (sample.HasExitedBattle)
+                {
+                    if (views.TryGetValue(unit.UnitId, out var exited))
+                    {
+                        exited.View.Dispose();
+                        views.Remove(unit.UnitId);
+                    }
+                    continue;
+                }
                 if (!views.TryGetValue(unit.UnitId, out var record))
                 {
                     if (!sample.ShouldDisplay) continue;

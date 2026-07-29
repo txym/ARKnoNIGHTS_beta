@@ -53,7 +53,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "UNTARGETABLE_BY_MELEE"
                                               ]
                      },
                      {
@@ -95,7 +95,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "UNTARGETABLE_BY_MELEE"
                                               ]
                      }
                  ]

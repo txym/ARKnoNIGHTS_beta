@@ -441,6 +441,7 @@ namespace ArknoNights.Battle.Core
         public int CurrentHitPoints { get; internal set; }
         public FixedPosition Position { get; internal set; }
         public bool IsAlive { get; internal set; } = true;
+        public bool HasExitedBattle { get; internal set; }
         public string TargetUnitId { get; internal set; }
         // Retained for callers that only need the first stable relation. Use BlockedUnitIds for capacity-aware state.
         public string BlockedUnitId => blockedUnitIds.Count == 0 ? null : blockedUnitIds[0];
@@ -474,9 +475,14 @@ namespace ArknoNights.Battle.Core
             HasDeploymentApproach
             && !Position.Equals(
                 DeploymentApproachDestination.Value);
-        internal bool IsTargetable => abilityStates.All(item =>
-            item.Definition.UnitTraitEffect == null
-            || item.Definition.UnitTraitEffect.Kind != UnitTraitEffectKind.Untargetable);
+        internal bool IsTargetableBy(AttackMethod attackMethod) =>
+            abilityStates.All(item =>
+                item.Definition.UnitTraitEffect == null
+                || (item.Definition.UnitTraitEffect.Kind
+                        != UnitTraitEffectKind.Untargetable
+                    && (item.Definition.UnitTraitEffect.Kind
+                            != UnitTraitEffectKind.UntargetableByMelee
+                        || attackMethod != AttackMethod.Melee)));
         public int EffectiveBlockCapacity
         {
             get
@@ -941,6 +947,7 @@ namespace ArknoNights.Battle.Core
             Position = state.Position;
             HitPoints = state.CurrentHitPoints;
             IsAlive = state.IsAlive;
+            HasExitedBattle = state.HasExitedBattle;
         }
 
         public string UnitId { get; }
@@ -949,11 +956,12 @@ namespace ArknoNights.Battle.Core
         public FixedPosition Position { get; }
         public int HitPoints { get; }
         public bool IsAlive { get; }
+        public bool HasExitedBattle { get; }
     }
 
     public sealed class BattleRunResult
     {
-        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, string stableSummary)
+        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, string stableSummary, int homeLifeLoss = 0, int awayLifeLoss = 0)
             : this(
                 battleId,
                 homePlayerId,
@@ -968,11 +976,13 @@ namespace ArknoNights.Battle.Core
                 finalUnits,
                 new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
                     new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal)),
-                stableSummary)
+                stableSummary,
+                homeLifeLoss,
+                awayLifeLoss)
         {
         }
 
-        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> unitSnapshots, string stableSummary)
+        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> unitSnapshots, string stableSummary, int homeLifeLoss = 0, int awayLifeLoss = 0)
         {
             BattleId = battleId;
             HomePlayerId = homePlayerId;
@@ -987,6 +997,8 @@ namespace ArknoNights.Battle.Core
             FinalUnits = finalUnits;
             UnitSnapshots = unitSnapshots;
             StableSummary = stableSummary;
+            HomeLifeLoss = homeLifeLoss;
+            AwayLifeLoss = awayLifeLoss;
         }
 
         public int CompletedTicks { get; }
@@ -1003,6 +1015,8 @@ namespace ArknoNights.Battle.Core
         public IReadOnlyList<BattleUnitFinalState> FinalUnits { get; }
         public IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> UnitSnapshots { get; }
         public string StableSummary { get; }
+        public int HomeLifeLoss { get; }
+        public int AwayLifeLoss { get; }
 
         public bool TryGetUnitSnapshot(string unitId, out BattleUnitInstanceSnapshot snapshot)
         {
@@ -1014,6 +1028,8 @@ namespace ArknoNights.Battle.Core
     public sealed class BattleRunner
     {
         private const int AutomaticSkillPointGainIntervalTicks = BattleInput.TicksPerSecond / BattleInput.AutomaticSkillPointsPerSecond;
+        private const int OpposingGateHalfExtentUnits =
+            FixedPosition.UnitsPerMetre * 4 / 10;
         private readonly List<RuntimeUnitState> runtimeUnits;
         private readonly List<BattleStepTrace> trace = new List<BattleStepTrace>();
         private readonly List<BattleEvent> events = new List<BattleEvent>();
@@ -1029,6 +1045,8 @@ namespace ArknoNights.Battle.Core
         private readonly DynamicUnitIdAllocator dynamicUnitIdAllocator = new DynamicUnitIdAllocator();
         private int eventTick = int.MinValue;
         private int eventSequence;
+        private int homeGateLifeLoss;
+        private int awayGateLifeLoss;
 
         public BattleRunner(BattleInput input)
         {
@@ -1088,10 +1106,12 @@ namespace ArknoNights.Battle.Core
                     .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal));
             return new BattleRunResult(Input.BattleId, homePlayerId, awayPlayerId, Input.CanonicalSummary, knownUnitTypeIds,
                 CurrentTick, StopReason, Winner, immutableTrace, new ReadOnlyCollection<BattleEvent>(events.ToArray()), finalUnits,
-                immutableUnitSnapshots, BuildStableSummary());
+                immutableUnitSnapshots, BuildStableSummary(), HomeLifeLoss, AwayLifeLoss);
         }
 
         public BattleSide? Winner { get; private set; }
+        public int HomeLifeLoss { get; private set; }
+        public int AwayLifeLoss { get; private set; }
 
         private void RunAuthoritativeTick()
         {
@@ -1105,6 +1125,7 @@ namespace ArknoNights.Battle.Core
             RemoveInvalidPendingAttacks();
             AcquireTargets();
             ApplyMovement();
+            ResolveOpposingGateArrivals();
             RefreshAuraCombatModifiers();
             EvaluateBlocking();
             RefreshAuraCombatModifiers();
@@ -1128,8 +1149,10 @@ namespace ArknoNights.Battle.Core
 
         private void RemoveInvalidPendingAttacks()
         {
-            // A dead target cancels damage but not the already-started attack animation lock.
-            pendingAttacks.RemoveAll(item => !FindUnit(item.AttackerUnitId).IsAlive);
+            // A dead or exited target cancels damage at its due Tick, but the
+            // attacker's already-started animation lock remains intact.
+            pendingAttacks.RemoveAll(item =>
+                !IsInBattle(FindUnit(item.AttackerUnitId)));
         }
 
         private void AcquireTargets()
@@ -1143,7 +1166,11 @@ namespace ArknoNights.Battle.Core
                     continue;
                 }
                 if (HasLiveTarget(unit)) continue;
-                var selected = runtimeUnits.Where(candidate => IsActive(candidate) && candidate.IsTargetable && candidate.Side != unit.Side)
+                var selected = runtimeUnits.Where(candidate =>
+                        IsActive(candidate)
+                        && candidate.IsTargetableBy(
+                            unit.Definition.AttackMethod)
+                        && candidate.Side != unit.Side)
                     .OrderBy(candidate => DistanceSquared(unit.Position, candidate.Position))
                     .ThenBy(candidate => DistanceSquared(candidate.Position, GatePosition(unit.Side)))
                     .ThenBy(candidate => candidate.UnitId, StringComparer.Ordinal).FirstOrDefault();
@@ -1184,7 +1211,26 @@ namespace ArknoNights.Battle.Core
                     continue;
                 }
 
-                if (!HasLiveTarget(unit)) continue;
+                if (!HasLiveTarget(unit))
+                {
+                    if (runtimeUnits.Any(candidate =>
+                            IsActive(candidate)
+                            && candidate.Side != unit.Side))
+                    {
+                        var gate = OpposingGatePosition(unit.Side);
+                        var nextGatePosition = MoveTowards(
+                            unit,
+                            gate,
+                            0);
+                        if (!nextGatePosition.Equals(unit.Position))
+                            intents.Add(new MoveIntent(
+                                unit,
+                                unit.Position,
+                                nextGatePosition,
+                                null));
+                    }
+                    continue;
+                }
                 var target = FindUnit(unit.TargetUnitId);
                 if (IsInAttackRange(unit.Position, target.Position)) continue;
                 var next = MoveTowards(unit, target);
@@ -1197,6 +1243,62 @@ namespace ArknoNights.Battle.Core
             }
         }
 
+        private void ResolveOpposingGateArrivals()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(item =>
+                             IsActive(item)
+                             && IsInsideOpposingGateArea(item))
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                         .ToArray())
+            {
+                foreach (var otherId in unit.BlockedUnitIds.ToArray())
+                    EndBlock(unit, FindUnit(otherId));
+                foreach (var other in runtimeUnits
+                             .Where(item =>
+                                 IsActive(item)
+                                 && string.Equals(
+                                     item.TargetUnitId,
+                                     unit.UnitId,
+                                     StringComparison.Ordinal))
+                             .OrderBy(
+                                 item => item.UnitId,
+                                 StringComparer.Ordinal))
+                    SetTarget(other, null);
+                SetTarget(unit, null);
+                unit.HasExitedBattle = true;
+                pendingAttacks.RemoveAll(item =>
+                    string.Equals(
+                        item.AttackerUnitId,
+                        unit.UnitId,
+                        StringComparison.Ordinal));
+                if (unit.Side == BattleSide.Home)
+                    awayGateLifeLoss = SaturatingAdd(
+                        awayGateLifeLoss,
+                        unit.Definition.LifeDeduct);
+                else
+                    homeGateLifeLoss = SaturatingAdd(
+                        homeGateLifeLoss,
+                        unit.Definition.LifeDeduct);
+                Emit(
+                    BattleEventType.GateReached,
+                    unit.UnitId,
+                    null,
+                    null,
+                    null,
+                    unit.Position,
+                    null,
+                    unit.Definition.LifeDeduct,
+                    unit.CurrentHitPoints,
+                    unit.CurrentHitPoints,
+                    0,
+                    0,
+                    0,
+                    null,
+                    BattleStopReason.None);
+            }
+        }
+
         private void EvaluateBlocking()
         {
             foreach (var unit in runtimeUnits.Where(item => item.IsBlocked).OrderBy(item => item.UnitId, StringComparer.Ordinal).ToArray())
@@ -1204,7 +1306,7 @@ namespace ArknoNights.Battle.Core
                 foreach (var otherId in unit.BlockedUnitIds.ToArray())
                 {
                     var other = FindUnit(otherId);
-                    if (!unit.IsAlive || other == null || !other.IsAlive || DistanceSquared(unit.Position, other.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) EndBlock(unit, other);
+                    if (!IsInBattle(unit) || other == null || !IsInBattle(other) || DistanceSquared(unit.Position, other.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) EndBlock(unit, other);
                 }
             }
             ReleaseExcessBlockRelations();
@@ -1299,13 +1401,13 @@ namespace ArknoNights.Battle.Core
                          .OrderBy(item => item, StringComparer.Ordinal))
             {
                 var attacker = FindUnit(attackerId);
-                if (attacker != null && attacker.IsAlive)
+                if (attacker != null && IsInBattle(attacker))
                     attacker.CompleteAttack();
             }
             var valid = due
                 .Where(item =>
-                    FindUnit(item.AttackerUnitId).IsAlive
-                    && FindUnit(item.TargetUnitId).IsAlive)
+                    IsInBattle(FindUnit(item.AttackerUnitId))
+                    && IsInBattle(FindUnit(item.TargetUnitId)))
                 .SelectMany(ExpandAttackAreaDamage)
                 .ToArray();
             var reactions = new List<DamageReaction>();
@@ -1448,7 +1550,7 @@ namespace ArknoNights.Battle.Core
         {
             if (effect.MaxActiveSameType > 0
                 && runtimeUnits.Count(item =>
-                    item.IsAlive
+                    IsInBattle(item)
                     && item.Side == owner.Side
                     && string.Equals(
                         item.TypeId,
@@ -1634,9 +1736,10 @@ namespace ArknoNights.Battle.Core
             foreach (var unit in runtimeUnits.Where(item => !item.IsAlive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 foreach (var otherId in unit.BlockedUnitIds.ToArray()) EndBlock(unit, FindUnit(otherId));
-                foreach (var other in runtimeUnits.Where(item => item.IsAlive && item.TargetUnitId == unit.UnitId).OrderBy(item => item.UnitId, StringComparer.Ordinal)) SetTarget(other, null);
+                foreach (var other in runtimeUnits.Where(item => IsInBattle(item) && item.TargetUnitId == unit.UnitId).OrderBy(item => item.UnitId, StringComparer.Ordinal)) SetTarget(other, null);
             }
-            pendingAttacks.RemoveAll(item => !FindUnit(item.AttackerUnitId).IsAlive);
+            pendingAttacks.RemoveAll(item =>
+                !IsInBattle(FindUnit(item.AttackerUnitId)));
         }
 
         private void ResolveDueDeathSpawns()
@@ -1747,7 +1850,7 @@ namespace ArknoNights.Battle.Core
                              StringComparer.Ordinal))
             {
                 var target = FindUnit(group.Key);
-                if (target == null || !target.IsAlive)
+                if (target == null || !IsInBattle(target))
                     continue;
                 var resolved = group.ToArray();
                 var before = target.CurrentHitPoints;
@@ -2119,21 +2222,33 @@ namespace ArknoNights.Battle.Core
         private void EvaluateBattleEnd()
         {
             var homeAlive = runtimeUnits.Any(item =>
-                                item.IsAlive
+                                IsInBattle(item)
                                 && item.Side == BattleSide.Home)
                             || pendingDeathSpawns.Any(item =>
                                 item.Side == BattleSide.Home)
                             || pendingDeathAreaDamages.Any(item =>
                                 item.Side == BattleSide.Home);
             var awayAlive = runtimeUnits.Any(item =>
-                                item.IsAlive
+                                IsInBattle(item)
                                 && item.Side == BattleSide.Away)
                             || pendingDeathSpawns.Any(item =>
                                 item.Side == BattleSide.Away)
                             || pendingDeathAreaDamages.Any(item =>
                                 item.Side == BattleSide.Away);
-            if (homeAlive == awayAlive) { if (!homeAlive) EndBattle(BattleStopReason.MutualAnnihilation, null); return; }
-            EndBattle(BattleStopReason.Victory, homeAlive ? BattleSide.Home : BattleSide.Away);
+            if (homeAlive && awayAlive) return;
+
+            var homeLoss = CalculateLifeLoss(BattleSide.Home);
+            var awayLoss = CalculateLifeLoss(BattleSide.Away);
+            if (homeLoss == awayLoss)
+            {
+                EndBattle(BattleStopReason.MutualAnnihilation, null);
+                return;
+            }
+            EndBattle(
+                BattleStopReason.Victory,
+                homeLoss < awayLoss
+                    ? BattleSide.Home
+                    : BattleSide.Away);
         }
 
         private void RecoverAutomaticSkillPointsAndCast()
@@ -2335,10 +2450,39 @@ namespace ArknoNights.Battle.Core
         private void EndBattle(BattleStopReason reason, BattleSide? winner)
         {
             if (Status == BattleRunnerStatus.Stopped) return;
+            HomeLifeLoss = CalculateLifeLoss(BattleSide.Home);
+            AwayLifeLoss = CalculateLifeLoss(BattleSide.Away);
             Winner = winner;
             StopReason = reason;
             Status = BattleRunnerStatus.Stopped;
             Emit(BattleEventType.BattleEnded, null, null, null, null, null, null, 0, 0, 0, 0, 0, 0, winner, reason);
+        }
+
+        private int CalculateLifeLoss(BattleSide damagedSide)
+        {
+            var result = damagedSide == BattleSide.Home
+                ? homeGateLifeLoss
+                : awayGateLifeLoss;
+            var attackingSide = damagedSide == BattleSide.Home
+                ? BattleSide.Away
+                : BattleSide.Home;
+            foreach (var unit in runtimeUnits
+                         .Where(item =>
+                             IsInBattle(item)
+                             && item.Side == attackingSide)
+                         .OrderBy(item => item.UnitId, StringComparer.Ordinal))
+                result = SaturatingAdd(
+                    result,
+                    unit.Definition.LifeDeduct);
+            return result;
+        }
+
+        private static int SaturatingAdd(int first, int second)
+        {
+            var sum = (long)first + second;
+            return sum >= int.MaxValue
+                ? int.MaxValue
+                : (int)sum;
         }
 
         private void StartBlock(RuntimeUnitState actor, RuntimeUnitState target)
@@ -2371,8 +2515,16 @@ namespace ArknoNights.Battle.Core
             Emit(BattleEventType.TargetChanged, unit.UnitId, null, targetUnitId, null, null, null, 0, 0, 0, 0, 0, 0, null, BattleStopReason.None);
         }
 
-        private bool IsActive(RuntimeUnitState unit) => unit.IsAlive && unit.ActivationTick <= CurrentTick;
-        private bool HasLiveTarget(RuntimeUnitState unit) => unit.TargetUnitId != null && FindUnit(unit.TargetUnitId) != null && FindUnit(unit.TargetUnitId).IsAlive;
+        private static bool IsInBattle(RuntimeUnitState unit) =>
+            unit != null
+            && unit.IsAlive
+            && !unit.HasExitedBattle;
+        private bool IsActive(RuntimeUnitState unit) =>
+            IsInBattle(unit)
+            && unit.ActivationTick <= CurrentTick;
+        private bool HasLiveTarget(RuntimeUnitState unit) =>
+            unit.TargetUnitId != null
+            && IsActive(FindUnit(unit.TargetUnitId));
         private RuntimeUnitState GetAttackTarget(RuntimeUnitState unit)
         {
             var normalTarget = HasLiveTarget(unit) ? FindUnit(unit.TargetUnitId) : null;
@@ -2384,7 +2536,7 @@ namespace ArknoNights.Battle.Core
                 foreach (var blockedUnitId in unit.BlockedUnitIds)
                 {
                     var blocker = FindUnit(blockedUnitId);
-                    if (blocker != null && blocker.IsAlive) return blocker;
+                    if (IsActive(blocker)) return blocker;
                 }
             }
             return normalTarget;
@@ -2395,6 +2547,15 @@ namespace ArknoNights.Battle.Core
         private bool IsSkillAnimationLocked(RuntimeUnitState unit) => CurrentTick <= unit.SkillAnimationLockUntilTick;
         private static FixedPosition GatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.BlueGate : BattlefieldRules.RedGate);
         private static FixedPosition OpposingGatePosition(BattleSide side) => FixedPosition.FromCell(side == BattleSide.Home ? BattlefieldRules.RedGate : BattlefieldRules.BlueGate);
+        private static bool IsInsideOpposingGateArea(
+            RuntimeUnitState unit)
+        {
+            var gate = OpposingGatePosition(unit.Side);
+            return Math.Abs(unit.Position.XUnits - gate.XUnits)
+                       <= OpposingGateHalfExtentUnits
+                   && Math.Abs(unit.Position.YUnits - gate.YUnits)
+                       <= OpposingGateHalfExtentUnits;
+        }
         private static long DistanceSquared(FixedPosition first, FixedPosition second) { var x = (long)first.XUnits - second.XUnits; var y = (long)first.YUnits - second.YUnits; return x * x + y * y; }
         private static bool IsInAttackRange(FixedPosition first, FixedPosition second) => DistanceSquared(first, second) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre;
         private int CalculateDamage(PendingAttack attack, RuntimeUnitState target)
@@ -2646,16 +2807,24 @@ namespace ArknoNights.Battle.Core
                 definition.BlockCapacity,
                 definition.TauntLevel,
                 unit.Buffs,
-                unit.ActivationTick);
+                unit.ActivationTick,
+                definition.LifeDeduct);
         }
 
         private string BuildStableSummary()
         {
             var builder = new StringBuilder(Input.CanonicalSummary);
-            builder.Append("|runner:").Append(CurrentTick).Append(',').Append((int)Status).Append(',').Append((int)StopReason);
+            builder.Append("|runner:")
+                .Append(CurrentTick).Append(',')
+                .Append((int)Status).Append(',')
+                .Append((int)StopReason).Append(',')
+                .Append(HomeLifeLoss).Append(',')
+                .Append(AwayLifeLoss);
             foreach (var unit in runtimeUnits.OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 builder.Append("|R:").Append(unit.UnitId).Append(',').Append(unit.PlayerId).Append(',').Append((int)unit.Side).Append(',').Append(unit.TypeId).Append(',').Append(unit.CurrentHitPoints).Append(',').Append(unit.Position.XUnits).Append(',').Append(unit.Position.YUnits).Append(',').Append(unit.ActivationTick);
+                if (unit.HasExitedBattle)
+                    builder.Append(",exited");
                 if (unit.InstanceMoveSpeedMultiplierPermille
                     != DeathSpawnEffectDefinition
                         .NeutralMoveSpeedMultiplierPermille)

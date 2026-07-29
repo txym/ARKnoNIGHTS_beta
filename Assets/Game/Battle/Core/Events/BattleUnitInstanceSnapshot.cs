@@ -77,7 +77,8 @@ namespace ArknoNights.Battle.Core
             int blockCapacity,
             int tauntLevel,
             IEnumerable<BuffPlaceholder> buffs,
-            int activationTick)
+            int activationTick,
+            int lifeDeduct = 1)
         {
             UnitId = unitId;
             TypeId = typeId;
@@ -101,6 +102,7 @@ namespace ArknoNights.Battle.Core
             TauntLevel = tauntLevel;
             Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
             ActivationTick = activationTick;
+            LifeDeduct = lifeDeduct;
         }
 
         public string UnitId { get; }
@@ -125,5 +127,6 @@ namespace ArknoNights.Battle.Core
         public int TauntLevel { get; }
         public IReadOnlyList<BuffPlaceholder> Buffs { get; }
         public int ActivationTick { get; }
+        public int LifeDeduct { get; }
     }
 }

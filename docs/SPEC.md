@@ -407,6 +407,8 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 
 - 当前版本不存在远程单位，所有单位均按照近战单位规则行动和攻击；
 - 正常索敌只考虑敌方存活参战单位，依次按“到自身的欧氏距离平方”“到索敌方自己门格的欧氏距离平方”和稳定升序 unit ID 决胜；Home 门格为 `(5,1)`，Away 门格为 `(5,8)`；
+- BONDS 无人机携带“不可被近战索敌”特征。近战单位的正常索敌候选必须排除该特征单位；该限制不等同于全局不可选中，也不阻止未来远程攻击方式把它选为目标；
+- 可移动单位没有合法攻击目标、但敌方仍有参战实体时，改为朝对方门中心移动；不攻击单位不建立攻击目标，直接朝对方门中心移动。门区是以门中心为中心、边长 `0.8` 米的轴对齐正方形，边界计入门区；单位在移动阶段进入门区后立即退出本场战斗，不再移动、索敌、阻挡、攻击或成为待结算攻击的参与者，并按自身 `lifeDeduct` 计入对方玩家的本场生命损失；
 - 单位在逻辑帧中朝当前锁定目标的当前位置进行确定性定点直线移动，单 Tick 不得越过目标；
 - 攻击范围与阻挡范围均严格为 `< 0.25` 米。单位向当前目标移动时，不得在单 Tick 内跨越该范围并落到目标中心；移动终点至多推进到首个严格小于 `0.25` 米的可表示位置。该限制不依赖任一方是否仍有阻挡位；
 - 目标死亡后不在该 Tick 内立即重选，而在下一 Tick 的索敌阶段重选；
@@ -462,11 +464,12 @@ TASK-002 固化的第一阶段 fixture 使用 `battle-fixture-v1`，由 Player-s
 
 ### 7.5 单场战斗结果
 
-- 一方全部参战单位死亡且另一方仍有存活单位时，存活方是本场唯一胜方；
+- 单位进入对方门区退出时，其 `lifeDeduct` 立即计入对方玩家的本场生命损失。自然终局时，尚未死亡且仍在场内的敌方单位也按各自 `lifeDeduct` 计入对应玩家的生命损失；已经冲门退出的单位不得再次计数；
+- 当任一方已无存活在场实体且该方也没有待结算的死亡后继或死亡范围伤害时，本场自然终局。比较双方累计生命损失，损失较少的一方是本场唯一胜方；损失相同则返回无唯一胜方的 `MutualAnnihilation`；
 - 单场战斗结果属于战斗计算输出，不得由动画播放、Unity 碰撞或观察者视角决定；
 - 主场方和客场方观察的是同一份战斗结果，客场视角只对演示内容进行坐标和方向转换。
 
-双方同时失去全部单位、达到 `maxTicks` 和其他无法唯一判定的情况返回明确的 Unresolved 结果与原因，不伪造胜方。第一阶段输出只读且严格有序的 Spawn、Move、TargetChanged、BlockStarted、BlockEnded、Attack、Damage、Death 和 BattleEnded 事件；每条事件包含 Tick 与 Tick 内递增 sequence。
+达到 `maxTicks` 和其他无法唯一判定的情况返回明确的 Unresolved 结果与原因，不伪造胜方。第一阶段输出只读且严格有序的 Spawn、Move、TargetChanged、BlockStarted、BlockEnded、Attack、Damage、HealthChanged、Death、GateReached 和 BattleEnded 事件；`GateReached` 记录退出实体、位置与本次生命损失，每条事件包含 Tick 与 Tick 内递增 sequence。Core 在 `BattleRunResult.HomeLifeLoss/AwayLifeLoss` 输出本场结算值；把该值写回持久玩家生命属于完整回合结算，不由单场 Core 擅自执行。
 
 ### 7.6 单位世界空间血量与护盾状态条
 
@@ -630,7 +633,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - eliteLevel 仅作为实例表现元数据穿过 PlayerState、BattleInput 与 Presentation，不参与战斗数值或胜负。
 - UnitInformationPanel 只读取 UnitDetailSnapshot：名称未配置显示 `--`；未结算 Buff 的六项动态属性显示 `--`，不猜测 Buff 效果。
 
-- 已导入单位均配置简体中文显示名；显示名为空时仍不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`lifeDeduct` 是非负目标价值，仅提供数据和 UI 显示，不触发玩家生命结算。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
+- 已导入单位均配置简体中文显示名；显示名为空时仍不得用 `resourceKey` 冒充中文名，技能说明为空则是合法状态。`rarity` 必须为 `1..6`，`lifeDeduct` 是非负目标价值，并参与第 7.5 节的单场生命损失计算；单场 Core 只输出结算值，不直接修改持久玩家生命。旧 `UnitTemplate` 仅由 `UnitFactory` 的显式适配层继续服务旧入口，且其历史 `uintName` 仍接收 `resourceKey`。
 - `Assets/Resources/ProfilePicture` 下的单位头像统一按 Default Texture 导入。目录和 Player 校验使用 `Resources.Load<Texture2D>`；现有 uGUI `Image` 通过共享 `UnitPortraitLoader` 将整张 Texture2D 创建为 Sprite 并按资源路径缓存，不先尝试加载 Sprite。该约束只适用于单位头像，不改变 Spine 贴图或其他通用 UI 资源的加载策略。
 
 ## 15. `SUMMON_JELLY_MINIONS` 果冻召唤（2026-07-26）
