@@ -1,0 +1,17 @@
+{
+  "name": "ARKnoNIGHTS.Lobby.PlayModeTests",
+  "rootNamespace": "ArknoNights.Lobby.Tests",
+  "references": [
+    "ARKnoNIGHTS.Lobby"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}

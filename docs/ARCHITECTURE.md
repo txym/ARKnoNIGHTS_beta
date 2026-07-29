@@ -289,7 +289,6 @@ v2 是唯一人工维护的单位源，当前包含 BONDS 使用的 `99` 个 Typ
 - UI-INFO-002 将 `UnitInformationPanelLayout` 作为上半部统一缩放的几何来源；`FormalBattleHudController` 构建时缓存九个图标，并为默认导入的独立 PNG 一次性创建 Sprite。
 - `PreparationBattleLoopController` 是 `FormalBattleHudRoot` 的运行时幂等桥。它等待 UI-002/003 初始化，加载 Player-safe catalog 与固定 `task004a-real-1v1` 的 Away 快照，锁定输入并隐藏 `PreparationUnitViews` 后启动运行时战斗；Completed 时释放 `BattleDemoViews`、恢复准备投影/交互并重置时钟。场景重载通过 `SceneManager.sceneLoaded` 重新附加，且不会创建多个桥。
 - `BattleDemoCoordinator.StartRuntimeBattle` 是固定 Resources 入口之外的加法入口：它接收已验证 `BattleInput + UnitCatalog`，仍由局部 `BattleRunner` 先计算再复用原 Playback 生命周期。正式循环模式会阻止调试 Start/Recalculate 重载固定输入，但保留暂停、速度、观察视角和同一封存结果 Replay。Core 的 HP、死亡和 winner 未回写 PlayerState。
-
 ## 22. UI-009 四玩家双战斗场景接线（2026-07-26）
 
 - `LocalMatchState` 现在保留 fixture 中的玩家源顺序，并提供按玩家 ID 的只读查询。`PreparationBattleLoopController` 把正式 HUD 已创建的本地 `PlayerState` 作为本地覆盖项传给 `LocalMatchStateLoader`；因此没有为本地玩家创建第二份权威状态，其他三名玩家仍是 fixture 快照。
@@ -319,3 +318,9 @@ v2 是唯一人工维护的单位源，当前包含 BONDS 使用的 `99` 个 Typ
 - 全局自动恢复为 `2 SP/s`，在 20 TPS 下每 10 Tick 增加一点；每个 `RuntimeAbilityState` 私有保存 SP 和施放次数。`SUMMON_JELLY_MINIONS` 在 Tick 100/250 施放，每次在施法者中心 100cm × 100cm 方形中确定性生成三个 5504，并分配递减负数 ID。
 - Tick 在处理本 Tick 伤害、Death、阻挡解除和目标清理后判定终局；终局 Tick 不恢复 SP、不施放技能。非终局 Spawn 只创建无路径、无目标、无阻挡继承的新实例，`ActivationTick = SpawnTick + 1`，之后按普通单位规则重新索敌。
 - `BattleRunResult.UnitSnapshots` 是初始和动态实例的不可变索引。`BattlePresentationTrackCompiler` 从此索引建立动态 Track；Playback 在越过 Spawn Tick 时创建目录映射视图，Replay/Dispose 清理旧视图，并以相同实例 ID 重建，绝不重新运行 Core。
+
+## 25. LAN 房间展示与验收边界（2026-07-25）
+
+- 依赖方向严格为 `ARKnoNIGHTS.Lobby`（房间 DTO、发现、socket、uGUI View）→ `Assembly-CSharp/Initial` 的 `LanLobbyController`（主线程会话与本地准备阶段门控）→ 既有 UI-009 `PreparationBattleLoopController`。Lobby 不引用 `PlayerState`、Battle Core 或场景序列化对象；网络房间只同步成员、头像索引、准备、延迟与开始。大厅门控只冻结运行时准备倒计时；收到权威开始状态后解除门控，随后仍由 UI-009 的四玩家封存和多战斗演示流程推进。
+- `LanLobbyCaptureSuite` 位于 Initial 展示层，只在 Player 显式收到 `-lanLobbyCaptureSuite` 时启动。它以生产 `LanLobbyView` 产生五种固定证据状态，并将截图与 JSON 清单写入调用方指定的忽略目录；它不写入 `Assets`、不改场景、Prefab 或玩家战斗数据。
+- 清单中的 Sprite 来源由 capture suite 限制为已审批的 `UI/Lobby` 白名单，`ExportLanLobbyEvidence.ps1` 再逐项和 `docs/references/ui/lobby/ASSET_MAP.md` 对照。任何未知 Sprite、缺图、缺参考图或不完整清单都会令导出失败，而不会生成看似有效的证据。
