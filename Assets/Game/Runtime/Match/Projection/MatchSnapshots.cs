@@ -108,6 +108,22 @@ namespace ArknoNights.Match
             StateRevision = state.StateRevision;
             Phase = state.Phase;
             RoundNumber = state.RoundNumber;
+            PreparationRemainingMs = state.Phase == MatchPhase.Preparation
+                && state.Flow.HasPreparationClock
+                    ? Math.Max(
+                        0,
+                        state.Flow.PreparationDeadlineHostMonotonicMs
+                            - state.Flow.LastHostMonotonicMs)
+                    : 0;
+            Pairings = new ReadOnlyCollection<PublicMatchPairingSnapshot>(
+                (state.Flow.SealedRoundPlan == null
+                    ? Enumerable.Empty<MatchSealedPairing>()
+                    : state.Flow.SealedRoundPlan.Pairings)
+                    .Select(pairing => new PublicMatchPairingSnapshot(pairing))
+                    .ToArray());
+            EndReason = state.Flow.EndReason;
+            FinalStandings = new ReadOnlyCollection<MatchStanding>(
+                state.Flow.FinalStandings.ToArray());
             Seats = new ReadOnlyCollection<PublicMatchSeatSnapshot>(
                 state.Seats
                     .OrderBy(seat => seat.SeatIndex)
@@ -121,6 +137,16 @@ namespace ArknoNights.Match
             writer.Integer("revision", StateRevision);
             writer.EnumValue("phase", Phase);
             writer.Integer("round", RoundNumber);
+            writer.Integer("preparationRemainingMs", PreparationRemainingMs);
+            foreach (var pairing in Pairings)
+            {
+                writer.Summary("pairing", pairing.CanonicalSummary);
+            }
+            writer.EnumValue("endReason", EndReason);
+            foreach (var standing in FinalStandings)
+            {
+                writer.Summary("standing", standing.CanonicalSummary);
+            }
             foreach (var seat in Seats)
             {
                 writer.Summary("seat", seat.CanonicalSummary);
@@ -132,7 +158,40 @@ namespace ArknoNights.Match
         public long StateRevision { get; }
         public MatchPhase Phase { get; }
         public int RoundNumber { get; }
+        public long PreparationRemainingMs { get; }
+        public IReadOnlyList<PublicMatchPairingSnapshot> Pairings { get; }
+        public MatchEndReason EndReason { get; }
+        public IReadOnlyList<MatchStanding> FinalStandings { get; }
         public IReadOnlyList<PublicMatchSeatSnapshot> Seats { get; }
+        public string CanonicalSummary { get; }
+    }
+
+    public sealed class PublicMatchPairingSnapshot
+    {
+        internal PublicMatchPairingSnapshot(MatchSealedPairing pairing)
+        {
+            BattleId = pairing.BattleId;
+            BattleIndex = pairing.BattleIndex;
+            Kind = pairing.Kind;
+            HomePlayerId = pairing.HomePlayerId;
+            AwayPlayerId = pairing.AwayPlayerId;
+            ShadowOwnerPlayerId = pairing.ShadowOwnerPlayerId;
+            var writer = new CanonicalSummaryWriter(nameof(PublicMatchPairingSnapshot));
+            writer.String("battleId", BattleId);
+            writer.Integer("battleIndex", BattleIndex);
+            writer.EnumValue("kind", Kind);
+            writer.String("homePlayerId", HomePlayerId);
+            writer.String("awayPlayerId", AwayPlayerId);
+            writer.String("shadowOwnerPlayerId", ShadowOwnerPlayerId);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public string BattleId { get; }
+        public int BattleIndex { get; }
+        public MatchPairingKind Kind { get; }
+        public string HomePlayerId { get; }
+        public string AwayPlayerId { get; }
+        public string ShadowOwnerPlayerId { get; }
         public string CanonicalSummary { get; }
     }
 
@@ -150,6 +209,8 @@ namespace ArknoNights.Match
             PreparationBehavior = seat.PreparationBehavior;
             TotalDeploymentCost = seat.TotalDeploymentCost;
             AvailableDeploymentCost = seat.AvailableDeploymentCost;
+            StreakKind = seat.StreakKind;
+            StreakCount = seat.StreakCount;
             Units = new ReadOnlyCollection<MatchUnitState>(
                 seat.Units
                     .OrderBy(unit => unit.UnitId, StringComparer.Ordinal)
@@ -181,6 +242,8 @@ namespace ArknoNights.Match
             writer.Summary("preparationBehavior", PreparationBehavior.CanonicalSummary);
             writer.Integer("totalCost", TotalDeploymentCost);
             writer.Integer("availableCost", AvailableDeploymentCost);
+            writer.EnumValue("streakKind", StreakKind);
+            writer.Integer("streakCount", StreakCount);
             foreach (var unit in Units)
             {
                 writer.Summary("unit", unit.CanonicalSummary);
@@ -220,6 +283,8 @@ namespace ArknoNights.Match
         public MatchPreparationBehaviorState PreparationBehavior { get; }
         public int TotalDeploymentCost { get; }
         public int AvailableDeploymentCost { get; }
+        public MatchStreakKind StreakKind { get; }
+        public int StreakCount { get; }
         public IReadOnlyList<MatchUnitState> Units { get; }
         public IReadOnlyList<MatchShopOfferState> ShopOffers { get; }
         public IReadOnlyList<MatchUnitState> OverflowUnits { get; }
@@ -238,7 +303,7 @@ namespace ArknoNights.Match
             Owner = owner;
             var writer = new CanonicalSummaryWriter(nameof(PlayerMatchSnapshot));
             writer.Summary("public", Public.CanonicalSummary);
-            writer.Summary("owner", Owner.CanonicalSummary);
+            writer.Summary("owner", Owner == null ? string.Empty : Owner.CanonicalSummary);
             CanonicalSummary = writer.ToString();
         }
 
@@ -291,6 +356,7 @@ namespace ArknoNights.Match
             CompatibilityManifest = state.CompatibilityManifest;
             Pool = state.Pool;
             EndReason = state.EndReason;
+            Flow = state.Flow;
             Seats = new ReadOnlyCollection<MatchSeatState>(
                 state.Seats.OrderBy(seat => seat.SeatIndex).ToArray());
             CommandRecords = new ReadOnlyCollection<MatchCommandRecordSnapshot>(
@@ -318,6 +384,7 @@ namespace ArknoNights.Match
         public MatchCompatibilityManifest CompatibilityManifest { get; }
         public MatchPoolState Pool { get; }
         public string EndReason { get; }
+        public MatchFlowState Flow { get; }
         public IReadOnlyList<MatchSeatState> Seats { get; }
         public IReadOnlyList<MatchCommandRecordSnapshot> CommandRecords { get; }
         public string CanonicalSummary { get; }
@@ -346,14 +413,18 @@ namespace ArknoNights.Match
         {
             return new PlayerMatchSnapshot(
                 ProjectPublic(state),
-                new OwnerPrivateSnapshot(seat, state.Pool.Catalog));
+                seat.Eliminated
+                    ? null
+                    : new OwnerPrivateSnapshot(seat, state.Pool.Catalog));
         }
 
         internal static PublicConnectionState ToPublicConnectionState(MatchSeatState seat)
         {
             if (seat.Eliminated || seat.ConnectionState == MatchConnectionState.Eliminated)
             {
-                return PublicConnectionState.Eliminated;
+                return seat.ControllerKind == MatchControllerKind.Human
+                    ? PublicConnectionState.Spectating
+                    : PublicConnectionState.Eliminated;
             }
             if (seat.ControllerKind == MatchControllerKind.NativeBot
                 || seat.ControllerKind == MatchControllerKind.TakeoverBot)

@@ -1,6 +1,6 @@
 # 局域网同步对局实施计划
 
-> 状态：M1、M2 已形成基线；M3 已在 `codex/lan-match-fusion` 完成并等待主 Planner 集成，M4—M8 尚未执行。
+> 状态：M1–M3 已形成集成基线；M4 已在 `codex/lan-match-flow` 完成纯领域实现，M5—M8 尚未执行。
 >
 > 玩家可见规则见 [LAN-MATCH-DESIGN.md](LAN-MATCH-DESIGN.md)。战斗分块计算的独立 Agent 提示词见 [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md)；M1 暴露出的既有 Battle 基线漂移由 [TASK-BATTLE-BASELINE-CLEANUP.md](TASK-BATTLE-BASELINE-CLEANUP.md) 单独处理。
 
@@ -222,6 +222,8 @@ M1 暴露出的 Battle 基线漂移必须按 [`TASK-BATTLE-BASELINE-CLEANUP.md`]
 - 事务失败完全不改变状态。
 
 ### M4：配对、阶段、结算与淘汰
+
+状态（2026-07-30）：已在 `codex/lan-match-flow` 实现。实现继续扩展唯一的 `MatchAuthority`，保持 `ARKnoNIGHTS.Match` 为 `noEngineReferences=true`、零程序集引用的纯 C# 领域层；未接入 AI、Socket、Battle Core adapter、场景或 UI。
 
 实现：
 

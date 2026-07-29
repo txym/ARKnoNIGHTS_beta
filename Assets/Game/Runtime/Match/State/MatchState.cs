@@ -222,7 +222,9 @@ namespace ArknoNights.Match
             IEnumerable<MatchShopOfferState> shopOffers,
             IEnumerable<PlayerTargetedUnitBuffState> targetedUnitBuffs,
             IEnumerable<PlayerGlobalBuffState> globalBuffs,
-            IEnumerable<PlayerSourceEffectState> sourceEffects)
+            IEnumerable<PlayerSourceEffectState> sourceEffects,
+            MatchStreakKind streakKind = MatchStreakKind.None,
+            int streakCount = 0)
         {
             SeatIndex = seatIndex;
             PlayerId = playerId;
@@ -260,6 +262,8 @@ namespace ArknoNights.Match
                 (sourceEffects ?? Enumerable.Empty<PlayerSourceEffectState>())
                     .OrderBy(effect => effect == null ? string.Empty : effect.EffectInstanceId, StringComparer.Ordinal)
                     .ToArray());
+            StreakKind = streakKind;
+            StreakCount = streakCount;
             CanonicalSummary = BuildCanonicalSummary();
         }
 
@@ -286,9 +290,12 @@ namespace ArknoNights.Match
         public IReadOnlyList<PlayerTargetedUnitBuffState> TargetedUnitBuffs { get; }
         public IReadOnlyList<PlayerGlobalBuffState> GlobalBuffs { get; }
         public IReadOnlyList<PlayerSourceEffectState> SourceEffects { get; }
+        public MatchStreakKind StreakKind { get; }
+        public int StreakCount { get; }
         public string CanonicalSummary { get; }
 
         internal MatchSeatState With(
+            int? life = null,
             bool? ready = null,
             bool? eliminated = null,
             int? placement = null,
@@ -305,14 +312,16 @@ namespace ArknoNights.Match
             IEnumerable<MatchShopOfferState> shopOffers = null,
             IEnumerable<PlayerTargetedUnitBuffState> targetedUnitBuffs = null,
             IEnumerable<PlayerGlobalBuffState> globalBuffs = null,
-            IEnumerable<PlayerSourceEffectState> sourceEffects = null)
+            IEnumerable<PlayerSourceEffectState> sourceEffects = null,
+            MatchStreakKind? streakKind = null,
+            int? streakCount = null)
         {
             return new MatchSeatState(
                 SeatIndex,
                 PlayerId,
                 DisplayName,
                 AvatarId,
-                Life,
+                life ?? Life,
                 gold ?? Gold,
                 level ?? Level,
                 totalDeploymentCost ?? TotalDeploymentCost,
@@ -328,7 +337,9 @@ namespace ArknoNights.Match
                 shopOffers ?? ShopOffers,
                 targetedUnitBuffs ?? TargetedUnitBuffs,
                 globalBuffs ?? GlobalBuffs,
-                sourceEffects ?? SourceEffects);
+                sourceEffects ?? SourceEffects,
+                streakKind ?? StreakKind,
+                streakCount ?? StreakCount);
         }
 
         internal MatchSeatState WithElimination(int? placement)
@@ -354,7 +365,9 @@ namespace ArknoNights.Match
                 ShopOffers,
                 TargetedUnitBuffs,
                 GlobalBuffs,
-                SourceEffects);
+                SourceEffects,
+                StreakKind,
+                StreakCount);
         }
 
         private string BuildCanonicalSummary()
@@ -376,6 +389,8 @@ namespace ArknoNights.Match
             writer.NullableInteger("placement", Placement);
             writer.EnumValue("controller", ControllerKind);
             writer.EnumValue("connection", ConnectionState);
+            writer.EnumValue("streakKind", StreakKind);
+            writer.Integer("streakCount", StreakCount);
             foreach (var unit in Units)
             {
                 writer.Summary("unit", unit == null ? string.Empty : unit.CanonicalSummary);
@@ -412,7 +427,8 @@ namespace ArknoNights.Match
             MatchCompatibilityManifest compatibilityManifest,
             IEnumerable<MatchSeatState> seats,
             MatchPoolState pool,
-            string endReason)
+            string endReason,
+            MatchFlowState flow = null)
         {
             SessionId = sessionId;
             MatchSeed = matchSeed;
@@ -427,6 +443,7 @@ namespace ArknoNights.Match
                     .OrderBy(seat => seat == null ? int.MinValue : seat.SeatIndex)
                     .ToArray());
             EndReason = endReason ?? string.Empty;
+            Flow = flow ?? MatchFlowState.Empty;
             CanonicalSummary = BuildCanonicalSummary();
         }
 
@@ -440,6 +457,7 @@ namespace ArknoNights.Match
         internal MatchPoolState Pool { get; }
         public IReadOnlyList<MatchSeatState> Seats { get; }
         public string EndReason { get; }
+        public MatchFlowState Flow { get; }
         public string CanonicalSummary { get; }
 
         internal MatchSeatState FindSeat(string playerId)
@@ -462,7 +480,8 @@ namespace ArknoNights.Match
                 CompatibilityManifest,
                 seats,
                 Pool,
-                EndReason);
+                EndReason,
+                Flow);
         }
 
         internal MatchState WithSeatsAndPhase(
@@ -481,7 +500,8 @@ namespace ArknoNights.Match
                 CompatibilityManifest,
                 seats,
                 Pool,
-                endReason);
+                endReason,
+                Flow);
         }
 
         internal MatchState WithPhase(MatchPhase phase, string endReason = "")
@@ -496,7 +516,8 @@ namespace ArknoNights.Match
                 CompatibilityManifest,
                 Seats,
                 Pool,
-                endReason);
+                endReason,
+                Flow);
         }
 
         internal MatchState WithEconomy(
@@ -514,7 +535,43 @@ namespace ArknoNights.Match
                 CompatibilityManifest,
                 seats,
                 pool,
-                EndReason);
+                EndReason,
+                Flow);
+        }
+
+        internal MatchState Rebuild(
+            long stateRevision,
+            MatchPhase phase,
+            int roundNumber,
+            IEnumerable<MatchSeatState> seats,
+            MatchPoolState pool,
+            string endReason,
+            MatchFlowState flow)
+        {
+            return new MatchState(
+                SessionId,
+                MatchSeed,
+                stateRevision,
+                phase,
+                roundNumber,
+                HostPlayerId,
+                CompatibilityManifest,
+                seats,
+                pool,
+                endReason,
+                flow);
+        }
+
+        internal MatchState WithFlow(MatchFlowState flow, bool incrementRevision)
+        {
+            return Rebuild(
+                incrementRevision ? StateRevision + 1 : StateRevision,
+                Phase,
+                RoundNumber,
+                Seats,
+                Pool,
+                EndReason,
+                flow);
         }
 
         private string BuildCanonicalSummary()
@@ -531,6 +588,7 @@ namespace ArknoNights.Match
                 CompatibilityManifest == null ? string.Empty : CompatibilityManifest.CanonicalSummary);
             writer.Summary("pool", Pool == null ? string.Empty : Pool.CanonicalSummary);
             writer.String("endReason", EndReason);
+            writer.Summary("flow", Flow == null ? string.Empty : Flow.CanonicalSummary);
             foreach (var seat in Seats)
             {
                 writer.Summary("seat", seat == null ? string.Empty : seat.CanonicalSummary);
@@ -652,8 +710,7 @@ namespace ArknoNights.Match
                     diagnosticCode = "match.invariant.controllerOrConnection";
                     return false;
                 }
-                if (seat.Life < 0
-                    || seat.Gold < 0
+                if (seat.Gold < 0
                     || seat.Level < MatchEconomyRules.MinimumLevel
                     || seat.Level > MatchEconomyRules.MaximumLevel
                     || seat.TotalDeploymentCost < 0
@@ -661,6 +718,14 @@ namespace ArknoNights.Match
                     || seat.AvailableDeploymentCost > seat.TotalDeploymentCost)
                 {
                     diagnosticCode = "match.invariant.numeric";
+                    return false;
+                }
+                if (!Enum.IsDefined(typeof(MatchStreakKind), seat.StreakKind)
+                    || seat.StreakCount < 0
+                    || (seat.StreakKind == MatchStreakKind.None && seat.StreakCount != 0)
+                    || (seat.StreakKind != MatchStreakKind.None && seat.StreakCount == 0))
+                {
+                    diagnosticCode = "match.invariant.streak";
                     return false;
                 }
                 var maximumDiscount = seat.Level == MatchEconomyRules.MaximumLevel
@@ -997,6 +1062,22 @@ namespace ArknoNights.Match
             if (state.Phase == MatchPhase.Ended && string.IsNullOrWhiteSpace(state.EndReason))
             {
                 diagnosticCode = "match.invariant.endReason";
+                return false;
+            }
+            if (state.Flow == null
+                || state.Flow.PairingGeneration < 0
+                || state.Flow.PairingPopulation < 0
+                || state.Flow.PairingOffset < 0
+                || (state.Flow.HasPreparationClock
+                    && state.Flow.PreparationDeadlineHostMonotonicMs
+                        < state.Flow.PreparationStartedAtHostMonotonicMs)
+                || !Enum.IsDefined(typeof(MatchEndReason), state.Flow.EndReason))
+            {
+                diagnosticCode = "match.invariant.flow";
+                return false;
+            }
+            if (!MatchFlowInvariant.TryValidate(state, out diagnosticCode))
+            {
                 return false;
             }
 

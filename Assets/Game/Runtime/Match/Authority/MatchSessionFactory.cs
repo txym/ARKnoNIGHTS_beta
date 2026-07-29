@@ -15,6 +15,17 @@ namespace ArknoNights.Match
             MatchInitializationRequest request,
             IStagingSlotPolicy stagingSlotPolicy)
         {
+            return Create(
+                request,
+                stagingSlotPolicy,
+                new NoOpMatchPreparationEntryParticipant());
+        }
+
+        public static MatchInitializationResult Create(
+            MatchInitializationRequest request,
+            IStagingSlotPolicy stagingSlotPolicy,
+            IMatchPreparationEntryParticipant preparationEntryParticipant)
+        {
             if (request == null)
             {
                 return Rejected(MatchInitializationCode.InvalidRequest, "match.initialize.request.null");
@@ -24,6 +35,12 @@ namespace ArknoNights.Match
                 return Rejected(
                     MatchInitializationCode.InvalidRequest,
                     "match.initialize.stagingSlotPolicy.null");
+            }
+            if (preparationEntryParticipant == null)
+            {
+                return Rejected(
+                    MatchInitializationCode.InvalidRequest,
+                    "match.initialize.preparationEntryParticipant.null");
             }
             if (string.IsNullOrWhiteSpace(request.SessionId))
             {
@@ -152,7 +169,10 @@ namespace ArknoNights.Match
             return new MatchInitializationResult(
                 MatchInitializationCode.Accepted,
                 "match.initialize.accepted",
-                new MatchAuthority(state, stagingSlotPolicy),
+                new MatchAuthority(
+                    state,
+                    stagingSlotPolicy,
+                    preparationEntryParticipant),
                 initializedShop.PoolExhausted);
         }
 

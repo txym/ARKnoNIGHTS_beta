@@ -11,7 +11,7 @@
 - UI：uGUI、TextMesh Pro；角色表现使用仓库内的 Spine Unity 3.8 源码与资源。
 - 输入：Project Settings 使用旧 Input Manager；第一方交互主要读取 `UnityEngine.Input`。
 - 场景：Build Settings 只启用 `Assets/Scenes/SampleScene.unity`。
-- 当前产品形态：单场景本地四玩家自走棋 Demo、可用的 LAN 房间流程，以及尚未接入 Lobby/场景的纯领域 Match M1–M3 权威状态、经济、自动合成与 Overflow；正式同步对局尚未接入。
+- 当前产品形态：单场景本地四玩家自走棋 Demo、可用的 LAN 房间流程，以及尚未接入 Lobby/场景的纯领域 Match M1–M4 权威状态、经济、自动合成、Overflow、阶段、配对与结算；正式同步对局尚未接入。
 
 ## 2. 模块边界
 
@@ -24,11 +24,11 @@
 | `ARKnoNIGHTS.PlayerState` | 玩家单位、区域、阵型、等级、赤金、商店和本地四玩家快照 | 本地 Demo 的状态源，不是联网权威 Match 状态 |
 | `ARKnoNIGHTS.Round` | 准备阶段状态机、阵型封存、四玩家配对和战斗输入生成 | 连接 PlayerState 与 Battle Core，不负责网络同步 |
 | `ARKnoNIGHTS.Lobby` | UDP 房间发现、TCP 消息、房间状态、成员准备与开始 | 只同步 Lobby；不引用 PlayerState 或 Battle Core |
-| `ARKnoNIGHTS.Match` | 固定四席位的房主权威状态、共享实体牌库、六槽商店、确定性抽取、刷新/冻结/购买/升级、自动连锁合成、严格备战席栈、Overflow、命令幂等、连接状态、兼容清单与分权限快照 | `noEngineReferences=true` 且零程序集引用；M3 不含回合收入/结算、BattleInput、AI 决策、LAN Session 或 Socket |
+| `ARKnoNIGHTS.Match` | 固定四席位的房主权威状态、共享实体牌库、商店经济、合成/Overflow、权威阵型、30 秒准备时钟、2/3/4 人配对、封印计划、结果校验、结算/淘汰/排名、命令幂等与分权限快照 | `noEngineReferences=true` 且零程序集引用；M4 只定义纯领域战斗输入/结果契约，不含 Battle Tick、AI 决策、LAN Session 或 Socket |
 | `ARKnoNIGHTS.UI`、`ARKnoNIGHTS.Details` | 正式 HUD、商店/准备、玩家列表与单位详情投影 | 消费快照与事件，不保存第二份权威游戏状态 |
 | `Assembly-CSharp` 下的 `Runtime/Initial`、`Runtime/Deployment` | `SampleScene` 自动接线、场景生命周期和部署交互 | 是各隔离程序集与序列化场景之间的集成层 |
 
-第一方 EditMode 和 PlayMode 测试分别位于 `Assets/Game/Tests/EditMode` 与 `Assets/Game/Tests/PlayMode`，按 Battle/Lobby/Match 分程序集；Match M1–M3 当前只有独立 EditMode 测试程序集。
+第一方 EditMode 和 PlayMode 测试分别位于 `Assets/Game/Tests/EditMode` 与 `Assets/Game/Tests/PlayMode`，按 Battle/Lobby/Match 分程序集；Match M1–M4 当前只有独立 EditMode 测试程序集。
 
 ## 3. 主要数据流
 
@@ -77,7 +77,7 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
 
 `LanLobbyController` 自动创建场景级入口。现有开始流程会关闭 Lobby 服务并让每台设备各自进入本地四玩家 Demo；它没有持续的 Match Session、权威命令排序、状态同步或重连恢复。目标方案见 [`LAN-MATCH-DESIGN.md`](LAN-MATCH-DESIGN.md)。
 
-### 3.4 Match M1–M3 纯领域权威状态
+### 3.4 Match M1–M4 纯领域权威状态
 
 ```text
 四席位初始化 + 兼容清单 + 已验证商品目录
@@ -86,6 +86,9 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
         ↓
 MatchCommandEnvelope → MatchAuthority → MatchEconomyTransactionDraft → MatchState
         ↓ 获得具体 UnitId → 自动连锁合成 → Overflow 提升 → 单 revision
+准备入口/Ready/超时 → 同 revision 封印 → SealedRoundPlan
+BattleResolution → 完整结果 + 回放门控 → 同 revision Settlement
+        ↓ 生命/连续/收入/淘汰/排名/自然刷新 → 下一 Preparation 或 Ended
 PublicMatchSnapshot
 OwnerPrivateSnapshot
 HostMatchSnapshot
@@ -93,9 +96,11 @@ HostMatchSnapshot
 
 `ARKnoNIGHTS.Match` 不读取 Unity、Resources、系统时间或 Socket。M2 在 M1 的唯一 `MatchAuthority` 上增加不可变 `MatchShopCatalog`、共享具体实体池、`xoshiro256** v1` 随机状态和商店经济。M3 继续扩展同一个内部 `MatchEconomyTransactionDraft`：成功获得单位后，只扫描本次 TypeId 的合法候选区，按 `Deployed > Staging > Overflow > UnitId` 连锁合成，重映射玩家层定向 Buff，受检调整部署 Cost，永久退休被消费 UnitId，再按获取顺序逐个尝试提升 Overflow。任一步失败均丢弃草稿，不推进随机状态、ordinal、tombstone 或 revision。
 
-`MatchStagingProjection` 是 13 槽严格堆叠与规范排序的唯一权威实现；旧 `IStagingSlotPolicy` 构造边界仅为 M2 API 兼容保留，不能覆盖状态派生结果。封存组合可在同一 draft 中调用 Overflow 删除步骤；公开的 `TryDiscardRemainingOverflowAtSeal` 只为当前 Host 领域验证提交一次 revision，M4 仍应复用 draft 组合入口而不是拆成多个提交。
+`MatchStagingProjection` 是 13 槽严格堆叠与规范排序的唯一权威实现；旧 `IStagingSlotPolicy` 构造边界仅为 M2 API 兼容保留，不能覆盖状态派生结果。M4 的封存事务在同一 draft 中依次完成首回合安全购买、最终幸存单位安全部署、Overflow 永久退休、空阵安全部署、配对与战斗输入封印，不发布 `Sealing` 中间快照。
 
-权限投影保持三层：Public 不含商店、赤金、等级、Overflow、tombstone 或玩家层定向 Buff payload；OwnerPrivate 只含本人完整持有单位、严格备战席栈、Overflow、本人 Buff、六槽商店与经济；HostMatchSnapshot 包含完整池实体位置、退休 tombstone、全部玩家状态、剩余计数、公平刷新游标、已应用 round 和随机状态。Lobby、PlayerState、Round、Battle 与场景仍未消费该程序集。
+M4 由房主传入单调毫秒时钟，不读取墙上时间。`MatchFlowState` 保存准备期限、配对代次/偏移/历史、当前 `MatchSealedRoundPlan`、已接收结果、回放门控、包含刷新后 seat/pool 输出摘要的结算幂等记录、最终排名和持久外部效果 outbox。四人使用固定六轮双循环；三人每轮一场 Official 和一场 Shadow；两人主客交替。战斗适配层必须回传每场 `BattleId`、该场 `SealedInputHash`、双方非负生命伤害、终止原因和 Tick；Match 根据伤害复核 Outcome，并只按 `SettlementRecipients` 为每名存活玩家应用一个结果。旧 M1 的逐步 `TryAdvancePhase`、手工淘汰与任意字符串结束入口仅以 `internal` 保留给既有领域测试，正式调用方只能使用 M4 原子封印/结算和 `AbortMatchNoContest` 入口。
+
+权限投影保持三层：Public 增加权威剩余时间、公开配对、生命、淘汰、名次与安全终局信息，但不含商店、赤金、等级、Overflow、tombstone、封印 hash/seed 或玩家层定向 Buff payload；OwnerPrivate 只含仍存活的本人完整状态，淘汰旁观者只获得 Public；HostMatchSnapshot 额外包含完整 `MatchFlowState`、池、封印计划、结果、结算记录与诊断。Lobby、PlayerState、Round、Battle 与场景仍未消费该程序集。
 
 ## 4. 场景与启动入口
 
@@ -118,16 +123,16 @@ HostMatchSnapshot
 - PlayerState、准备倒计时、部署/换位/撤退、六槽商店、购买、刷新、冻结、等级与本地观察；
 - 固定四玩家本地配对、两场战斗共享时钟演示；
 - LAN 房间发现、创建、加入、准备、开始和房间 UI；
-- 纯 C# 房主权威 Match M1–M3 领域状态、共享牌库、确定性商店经济、自动合成、Overflow、兼容清单、命令幂等和分权限快照；
+- 纯 C# 房主权威 Match M1–M4 领域状态、共享牌库、确定性商店经济、自动合成、Overflow、权威阵型、准备/封印、2/3/4 人配对、战斗结果校验、结算/淘汰/排名、终局效果和分权限快照；
 - EditMode/PlayMode 自动测试、Windows x86_64 构建入口和多种截图证据入口。
 
 ## 6. 当前未实现或未闭环
 
-- Match M4—M8：回合/配对/结算收入、AI、会话协议、重连、战斗流式计算和最终集成；
-- M1–M3 的兼容清单、目录输入、命令与快照尚未接入 Lobby 握手、TCP 协议、场景或 UI；
+- Match M5—M8：AI、会话协议、重连、战斗流式计算和最终集成；
+- M1–M4 的兼容清单、目录输入、命令、封印计划与快照尚未接入 Lobby 握手、TCP 协议、场景、Battle adapter 或 UI；
 - 开局后保持连接、断线宽限、重连 token 恢复和 AI 接管；
-- 共享卡池和商店经济尚未接入联网传输；回合收入、连续奖励和完整跨回合结算仍未实现；
-- 正式玩家生命写回、淘汰、最终胜负和完整多人流程；
+- 共享卡池、商店经济、回合流程和结算快照尚未接入联网传输；
+- 正式 Battle Core adapter、流式计算/回放与 LAN 多端闭环；
 - 主机迁移、专用服务器与反房主作弊；
 - 目标平台发布配置以及全面的分辨率、设备和人工视觉验收。
 

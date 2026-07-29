@@ -78,6 +78,85 @@ namespace ArknoNights.Match
         public override string CanonicalSummary { get; }
     }
 
+    public sealed class DeployUnitCommand : MatchCommandPayload
+    {
+        public DeployUnitCommand(
+            string unitId,
+            MatchFormationPosition targetFormation,
+            int expectedAvailableCost)
+        {
+            UnitId = unitId;
+            TargetFormation = targetFormation;
+            ExpectedAvailableCost = expectedAvailableCost;
+            var writer = new CanonicalSummaryWriter(nameof(DeployUnitCommand));
+            writer.String("unitId", UnitId);
+            writer.Summary("target", TargetFormation.CanonicalSummary);
+            writer.Integer("expectedAvailableCost", ExpectedAvailableCost);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public string UnitId { get; }
+        public MatchFormationPosition TargetFormation { get; }
+        public int ExpectedAvailableCost { get; }
+        public override string CanonicalSummary { get; }
+    }
+
+    public sealed class ReplaceDeployedUnitCommand : MatchCommandPayload
+    {
+        public ReplaceDeployedUnitCommand(
+            string stagingUnitId,
+            string expectedDeployedUnitId,
+            MatchFormationPosition targetFormation)
+        {
+            StagingUnitId = stagingUnitId;
+            ExpectedDeployedUnitId = expectedDeployedUnitId;
+            TargetFormation = targetFormation;
+            var writer = new CanonicalSummaryWriter(nameof(ReplaceDeployedUnitCommand));
+            writer.String("stagingUnitId", StagingUnitId);
+            writer.String("expectedDeployedUnitId", ExpectedDeployedUnitId);
+            writer.Summary("target", TargetFormation.CanonicalSummary);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public string StagingUnitId { get; }
+        public string ExpectedDeployedUnitId { get; }
+        public MatchFormationPosition TargetFormation { get; }
+        public override string CanonicalSummary { get; }
+    }
+
+    public sealed class RelocateOrSwapUnitCommand : MatchCommandPayload
+    {
+        public RelocateOrSwapUnitCommand(
+            string unitId,
+            MatchFormationPosition targetFormation)
+        {
+            UnitId = unitId;
+            TargetFormation = targetFormation;
+            var writer = new CanonicalSummaryWriter(nameof(RelocateOrSwapUnitCommand));
+            writer.String("unitId", UnitId);
+            writer.Summary("target", TargetFormation.CanonicalSummary);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public string UnitId { get; }
+        public MatchFormationPosition TargetFormation { get; }
+        public override string CanonicalSummary { get; }
+    }
+
+    public sealed class RetreatUnitCommand : MatchCommandPayload
+    {
+        public RetreatUnitCommand(string unitId)
+        {
+            UnitId = unitId;
+            var writer = new CanonicalSummaryWriter(nameof(RetreatUnitCommand));
+            writer.String("unitId", UnitId);
+            CanonicalSummary = writer.ToString();
+        }
+
+        public string UnitId { get; }
+        public override string CanonicalSummary { get; }
+    }
+
     public sealed class MatchCommandEnvelope
     {
         public MatchCommandEnvelope(

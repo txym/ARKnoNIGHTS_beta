@@ -93,7 +93,23 @@ namespace ArknoNights.Match
         UpgradeLevelChanged = 20,
         UpgradePriceChanged = 21,
         PoolExhaustedDiagnostic = 22,
-        NaturalRefreshAlreadyApplied = 23
+        NaturalRefreshAlreadyApplied = 23,
+        FormationLocked = 24,
+        FormationPositionInvalid = 25,
+        FormationPositionOccupied = 26,
+        UnitUnknown = 27,
+        UnitZoneRejected = 28,
+        DeploymentCostChanged = 29,
+        InsufficientDeploymentCost = 30,
+        ClockRegressed = 31,
+        BattleIdUnexpected = 32,
+        SealedInputHashMismatch = 33,
+        BattleOutcomeMismatch = 34,
+        BattleResolutionConflict = 35,
+        BattleResultsIncomplete = 36,
+        BattlePlaybackIncomplete = 37,
+        SettlementAlreadyApplied = 38,
+        FatalMatchError = 39
     }
 
     public static class MatchInitialValues

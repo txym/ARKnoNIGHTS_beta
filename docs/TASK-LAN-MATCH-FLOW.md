@@ -1,6 +1,6 @@
 # M4：配对、阶段、结算与淘汰 Agent 提示词
 
-> 状态：待在独立 worktree 中实施。
+> 状态：已在 `codex/lan-match-flow` 独立 worktree 中完成纯领域实现，等待主 Planner 集成。
 > 本文件可直接作为实现 Agent 的任务提示词。本轮负责把 M1—M3 的领域能力编排成可运行的权威对局流程，但不接 Socket、AI 决策或 Battle Core 内部计算。
 
 ## 1. 任务角色与目标

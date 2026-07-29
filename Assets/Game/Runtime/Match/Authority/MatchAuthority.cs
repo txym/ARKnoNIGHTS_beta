@@ -4,20 +4,34 @@ using System.Linq;
 
 namespace ArknoNights.Match
 {
-    public sealed class MatchAuthority
+    public sealed partial class MatchAuthority
     {
         private readonly Dictionary<CommandKey, CommandRecord> commandRecords =
             new Dictionary<CommandKey, CommandRecord>();
         private readonly IStagingSlotPolicy stagingSlotPolicy;
+        private readonly IMatchPreparationEntryParticipant preparationEntryParticipant;
         private MatchState state;
 
         internal MatchAuthority(
             MatchState initialState,
             IStagingSlotPolicy stagingSlotPolicy)
+            : this(
+                initialState,
+                stagingSlotPolicy,
+                new NoOpMatchPreparationEntryParticipant())
+        {
+        }
+
+        internal MatchAuthority(
+            MatchState initialState,
+            IStagingSlotPolicy stagingSlotPolicy,
+            IMatchPreparationEntryParticipant preparationEntryParticipant)
         {
             state = initialState ?? throw new ArgumentNullException(nameof(initialState));
             this.stagingSlotPolicy = stagingSlotPolicy
                 ?? throw new ArgumentNullException(nameof(stagingSlotPolicy));
+            this.preparationEntryParticipant = preparationEntryParticipant
+                ?? throw new ArgumentNullException(nameof(preparationEntryParticipant));
         }
 
         public event Action<MatchChangedEvent> Changed;
@@ -28,9 +42,18 @@ namespace ArknoNights.Match
             get
             {
                 var required = state.Seats
-                    .Where(seat => !seat.Eliminated && seat.ControllerKind == MatchControllerKind.Human)
+                    .Where(seat =>
+                        !seat.Eliminated
+                        && seat.ControllerKind == MatchControllerKind.Human
+                        && seat.ConnectionState == MatchConnectionState.Connected)
                     .ToArray();
-                return required.Length > 0 && required.All(seat => seat.Ready);
+                var graceBlocks = state.Seats.Any(seat =>
+                    !seat.Eliminated
+                    && seat.ControllerKind == MatchControllerKind.Human
+                    && seat.ConnectionState == MatchConnectionState.DisconnectedGrace);
+                return required.Length > 0
+                    && !graceBlocks
+                    && required.All(seat => seat.Ready);
             }
         }
 
@@ -184,6 +207,13 @@ namespace ArknoNights.Match
             {
                 return ExecutePurchaseLevelUpgrade(key, envelope, seat, upgradeCommand);
             }
+            if (envelope.Payload is DeployUnitCommand
+                || envelope.Payload is ReplaceDeployedUnitCommand
+                || envelope.Payload is RelocateOrSwapUnitCommand
+                || envelope.Payload is RetreatUnitCommand)
+            {
+                return ExecuteFormationCommand(key, envelope);
+            }
             result = CommandResult(
                 envelope.CommandId,
                 MatchCommandCode.InvalidPayload,
@@ -222,31 +252,17 @@ namespace ArknoNights.Match
 
         public MatchTransactionResult TryEnterPreparation(int roundNumber)
         {
-            if (state.Phase == MatchPhase.Ended)
-            {
-                return TransactionRejected(
-                    MatchCommandCode.InvalidTransition,
-                    "match.phase.ended");
-            }
-            var expectedRound = state.RoundNumber + 1;
-            if ((state.Phase != MatchPhase.Initializing && state.Phase != MatchPhase.Settlement)
-                || roundNumber != expectedRound)
-            {
-                return TransactionRejected(
-                    MatchCommandCode.InvalidTransition,
-                    "match.phase.preparation.invalid");
-            }
-
-            var seats = state.Seats.Select(
-                seat => seat.ControllerKind == MatchControllerKind.Human && !seat.Eliminated
-                    ? seat.With(ready: false)
-                    : seat);
-            return CommitHost(
-                state.WithSeatsAndPhase(seats, MatchPhase.Preparation, roundNumber),
-                "match.phase.preparation.accepted");
+            return TryEnterPreparation(roundNumber, 0);
         }
 
-        public MatchTransactionResult TryAdvancePhase(MatchPhase targetPhase)
+        public MatchTransactionResult TryEnterPreparation(
+            int roundNumber,
+            long hostMonotonicNowMs)
+        {
+            return EnterPreparation(roundNumber, hostMonotonicNowMs);
+        }
+
+        internal MatchTransactionResult TryAdvancePhase(MatchPhase targetPhase)
         {
             if (state.Phase == MatchPhase.Ended)
             {
@@ -279,8 +295,20 @@ namespace ArknoNights.Match
                     MatchCommandCode.InvalidTransition,
                     "match.phase.advance.target.invalid");
             }
+            var nextState = state.WithPhase(targetPhase);
+            if (state.Phase == MatchPhase.Preparation)
+            {
+                nextState = nextState.Rebuild(
+                    nextState.StateRevision,
+                    nextState.Phase,
+                    nextState.RoundNumber,
+                    nextState.Seats,
+                    nextState.Pool,
+                    nextState.EndReason,
+                    nextState.Flow.With(hasPreparationClock: false));
+            }
             return CommitHost(
-                state.WithPhase(targetPhase),
+                nextState,
                 "match.phase.advance.accepted");
         }
 
@@ -405,7 +433,7 @@ namespace ArknoNights.Match
                 "match.controller.accepted");
         }
 
-        public MatchTransactionResult TryMarkEliminated(string playerId, int? placement)
+        internal MatchTransactionResult TryMarkEliminated(string playerId, int? placement)
         {
             if (state.Phase == MatchPhase.Ended)
             {
@@ -436,7 +464,7 @@ namespace ArknoNights.Match
                 "match.elimination.accepted");
         }
 
-        public MatchTransactionResult TryEndMatch(string reason)
+        internal MatchTransactionResult TryEndMatch(string reason)
         {
             if (state.Phase == MatchPhase.Ended)
             {
@@ -447,7 +475,16 @@ namespace ArknoNights.Match
                 return TransactionRejected(MatchCommandCode.InvalidPayload, "match.end.reason.invalid");
             }
 
-            return CommitHost(state.WithPhase(MatchPhase.Ended, reason), "match.end.accepted");
+            var nextState = state.WithPhase(MatchPhase.Ended, reason);
+            nextState = nextState.Rebuild(
+                nextState.StateRevision,
+                nextState.Phase,
+                nextState.RoundNumber,
+                nextState.Seats,
+                nextState.Pool,
+                nextState.EndReason,
+                nextState.Flow.With(hasPreparationClock: false));
+            return CommitHost(nextState, "match.end.accepted");
         }
 
         private MatchCommandResult ExecuteReady(
@@ -508,7 +545,31 @@ namespace ArknoNights.Match
                 return Cache(key, envelope, result);
             }
 
-            var nextState = state.WithSeat(seat.With(ready: command.DesiredReady));
+            if (!TryBuildReadyState(
+                seat,
+                command.DesiredReady,
+                out var nextState,
+                out var readyCode,
+                out var readyDiagnostic))
+            {
+                if (readyCode == MatchCommandCode.FatalMatchError
+                    && nextState != null)
+                {
+                    return CommitCommand(
+                        key,
+                        envelope,
+                        nextState,
+                        readyCode,
+                        readyDiagnostic);
+                }
+                result = CommandResult(
+                    envelope.CommandId,
+                    readyCode,
+                    false,
+                    null,
+                    readyDiagnostic);
+                return Cache(key, envelope, result);
+            }
             if (!MatchStateInvariant.TryValidate(nextState, stagingSlotPolicy, out var diagnosticCode))
             {
                 result = CommandResult(
@@ -526,7 +587,7 @@ namespace ArknoNights.Match
                 nextState.StateRevision,
                 nextState.StateRevision,
                 true,
-                "match.ready.accepted");
+                readyDiagnostic);
             state = nextState;
             Cache(key, envelope, result);
             PublishChanged();

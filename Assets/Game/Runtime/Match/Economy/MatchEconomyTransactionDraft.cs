@@ -90,7 +90,7 @@ namespace ArknoNights.Match
             }
 
             var eligibleSeats = RotatedSeats(nextNaturalRefreshStartSeat)
-                .Where(seat => !seat.Eliminated)
+                .Where(seat => !GetSeat(seat.PlayerId).Eliminated)
                 .ToArray();
             var targetSlotsByPlayer = eligibleSeats.ToDictionary(
                 seat => seat.PlayerId,
