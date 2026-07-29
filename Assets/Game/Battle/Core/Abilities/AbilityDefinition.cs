@@ -582,6 +582,29 @@ namespace ArknoNights.Battle.Core
         public int DefenseReductionPerStack { get; }
     }
 
+    public sealed class TimedTargetAreaDamageEffectDefinition
+    {
+        public TimedTargetAreaDamageEffectDefinition(
+            int targetRangeCentimetres,
+            int radiusCentimetres,
+            DamageType damageType,
+            int attackMultiplierPermille,
+            bool groundTargetsOnly)
+        {
+            TargetRangeCentimetres = targetRangeCentimetres;
+            RadiusCentimetres = radiusCentimetres;
+            DamageType = damageType;
+            AttackMultiplierPermille = attackMultiplierPermille;
+            GroundTargetsOnly = groundTargetsOnly;
+        }
+
+        public int TargetRangeCentimetres { get; }
+        public int RadiusCentimetres { get; }
+        public DamageType DamageType { get; }
+        public int AttackMultiplierPermille { get; }
+        public bool GroundTargetsOnly { get; }
+    }
+
     public sealed class UnblockedAttackChargeDefinition
     {
         public UnblockedAttackChargeDefinition(
@@ -813,27 +836,65 @@ namespace ArknoNights.Battle.Core
                 summonEffect,
                 unitTraitEffect,
                 null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
                 onHitDefenseDebuffEffect,
+                null,
                 animationKey,
                 skillAnimationOriginalDurationTicks)
+        {
+        }
+
+        public AbilityDefinition(
+            string abilityId,
+            string displayNameZhHans,
+            string descriptionZhHans,
+            AbilityActivationKind activationKind,
+            SilencePolicy silencePolicy,
+            int initialSkillPoints,
+            int requiredSkillPoints,
+            SkillPointGeneration skillPointGeneration,
+            SummonEffectDefinition summonEffect,
+            UnitTraitEffectDefinition unitTraitEffect,
+            PassiveCombatModifierDefinition passiveCombatModifier,
+            OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect,
+            TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect,
+            string animationKey,
+            int skillAnimationOriginalDurationTicks)
+            : this(
+                abilityId: abilityId,
+                displayNameZhHans: displayNameZhHans,
+                descriptionZhHans: descriptionZhHans,
+                activationKind: activationKind,
+                silencePolicy: silencePolicy,
+                initialSkillPoints: initialSkillPoints,
+                requiredSkillPoints: requiredSkillPoints,
+                skillPointGeneration: skillPointGeneration,
+                summonEffect: summonEffect,
+                unitTraitEffect: unitTraitEffect,
+                passiveCombatModifier: passiveCombatModifier,
+                passiveLifecycleEffect: null,
+                onDamageReactionEffect: null,
+                healthThresholdCombatModifier: null,
+                unblockedDamageTakenModifier: null,
+                attackSequenceModifier: null,
+                attackCountStateModifier: null,
+                deathSpawnEffect: null,
+                auraCombatModifier: null,
+                blockedCounterpartCombatModifier: null,
+                nearbySameTypeSelfModifier: null,
+                evasionModifier: null,
+                deathAreaDamageEffect: null,
+                attackAreaDamageModifier: null,
+                onHitDamageOverTimeEffect: null,
+                unblockedAttackCharge: null,
+                triggeredSpawnEffect: null,
+                healthThresholdAdjacentSpawnEffect: null,
+                healthThresholdFullHealEffect: null,
+                onHitDefenseDebuffEffect: onHitDefenseDebuffEffect,
+                animationKey: animationKey,
+                skillAnimationOriginalDurationTicks:
+                    skillAnimationOriginalDurationTicks,
+                timedTargetAreaDamageEffect:
+                    timedTargetAreaDamageEffect)
         {
         }
 
@@ -1342,7 +1403,7 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks)
+        public AbilityDefinition(string abilityId, string displayNameZhHans, string descriptionZhHans, AbilityActivationKind activationKind, SilencePolicy silencePolicy, int initialSkillPoints, int requiredSkillPoints, SkillPointGeneration skillPointGeneration, SummonEffectDefinition summonEffect, UnitTraitEffectDefinition unitTraitEffect, PassiveCombatModifierDefinition passiveCombatModifier, PassiveLifecycleEffectDefinition passiveLifecycleEffect, OnDamageReactionEffectDefinition onDamageReactionEffect, HealthThresholdCombatModifierDefinition healthThresholdCombatModifier, UnblockedDamageTakenModifierDefinition unblockedDamageTakenModifier, AttackSequenceModifierDefinition attackSequenceModifier, AttackCountStateModifierDefinition attackCountStateModifier, DeathSpawnEffectDefinition deathSpawnEffect, AuraCombatModifierDefinition auraCombatModifier, BlockedCounterpartCombatModifierDefinition blockedCounterpartCombatModifier, NearbySameTypeSelfModifierDefinition nearbySameTypeSelfModifier, EvasionModifierDefinition evasionModifier, DeathAreaDamageEffectDefinition deathAreaDamageEffect, AttackAreaDamageModifierDefinition attackAreaDamageModifier, OnHitDamageOverTimeEffectDefinition onHitDamageOverTimeEffect, UnblockedAttackChargeDefinition unblockedAttackCharge, TriggeredSpawnEffectDefinition triggeredSpawnEffect, HealthThresholdAdjacentSpawnEffectDefinition healthThresholdAdjacentSpawnEffect, HealthThresholdFullHealEffectDefinition healthThresholdFullHealEffect, OnHitDefenseDebuffEffectDefinition onHitDefenseDebuffEffect, string animationKey, int skillAnimationOriginalDurationTicks, TimedTargetAreaDamageEffectDefinition timedTargetAreaDamageEffect = null)
         {
             AbilityId = abilityId;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -1385,6 +1446,8 @@ namespace ArknoNights.Battle.Core
                 healthThresholdFullHealEffect;
             OnHitDefenseDebuffEffect =
                 onHitDefenseDebuffEffect;
+            TimedTargetAreaDamageEffect =
+                timedTargetAreaDamageEffect;
             AnimationKey = animationKey ?? string.Empty;
             SkillAnimationOriginalDurationTicks = skillAnimationOriginalDurationTicks;
         }
@@ -1436,6 +1499,8 @@ namespace ArknoNights.Battle.Core
             HealthThresholdFullHealEffect { get; }
         public OnHitDefenseDebuffEffectDefinition
             OnHitDefenseDebuffEffect { get; }
+        public TimedTargetAreaDamageEffectDefinition
+            TimedTargetAreaDamageEffect { get; }
         public string AnimationKey { get; }
         public int SkillAnimationOriginalDurationTicks { get; }
         public int SkillAnimationEffectiveDurationTicks =>

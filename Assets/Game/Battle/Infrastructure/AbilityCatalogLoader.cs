@@ -120,10 +120,30 @@ namespace ArknoNights.Battle.Infrastructure
                 string.IsNullOrWhiteSpace(source.unitTrait)
                     ? null
                     : new UnitTraitEffectDefinition(ParseEnum<UnitTraitEffectKind>(source.unitTrait)),
+                source.blockCapacityAdditive == 0
+                    && source.magicResistanceAdditive == 0
+                    && source.attackSpeedAdditive == 0
+                    && source.physicalDamageTakenPermille == 0
+                    && source.magicDamageTakenPermille == 0
+                        ? null
+                        : new PassiveCombatModifierDefinition(
+                            source.blockCapacityAdditive,
+                            source.magicResistanceAdditive,
+                            source.attackSpeedAdditive,
+                            source.physicalDamageTakenPermille,
+                            source.magicDamageTakenPermille),
                 source.onHitDefenseReductionPerStack == 0
                     ? null
                     : new OnHitDefenseDebuffEffectDefinition(
                         source.onHitDefenseReductionPerStack),
+                source.targetRangeCentimetres == 0
+                    ? null
+                    : new TimedTargetAreaDamageEffectDefinition(
+                        source.targetRangeCentimetres,
+                        source.areaRadiusCentimetres,
+                        ParseEnum<DamageType>(source.areaDamageType),
+                        source.areaAttackMultiplierPermille,
+                        source.groundTargetsOnly),
                 hasSkillAnimation
                     ? skillAnimation.AnimationKey
                     : string.Empty,
@@ -136,6 +156,6 @@ namespace ArknoNights.Battle.Infrastructure
         private static AbilityCatalogLoadResult Failure(string code, string message) => new AbilityCatalogLoadResult(null, new[] { new ValidationError(code, message) });
 
         [Serializable] private sealed class AbilityCatalogDto { public string schemaVersion; public string catalogId; public AbilityDto[] abilities; }
-        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; }
+        [Serializable] private sealed class AbilityDto { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; }
     }
 }

@@ -111,9 +111,18 @@ namespace ArknoNights.Battle.Tests
                 document.bindings.Select(item => item.abilityId),
                 Is.EqualTo(new[]
                 {
+                    "CHARGED_DRINK_AREA_ATTACK",
                     "SUMMON_JELLY_MINIONS",
                     "SUMMON_REPAIR_HELPER"
                 }));
+            var chargedBinding = document.bindings.Single(item =>
+                item.abilityId == "CHARGED_DRINK_AREA_ATTACK");
+            Assert.That(chargedBinding.typeId, Is.EqualTo("10039"));
+            Assert.That(chargedBinding.animationKey, Is.EqualTo("skill"));
+            Assert.That(chargedBinding.animationName, Is.EqualTo("Skill"));
+            Assert.That(
+                chargedBinding.originalAnimationTicks,
+                Is.EqualTo(57));
             var binding = document.bindings.Single(item =>
                 item.abilityId == "SUMMON_JELLY_MINIONS");
             Assert.That(binding.typeId, Is.EqualTo("5503"));
@@ -243,6 +252,45 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void AbilityCatalogGenerator_ProjectsCateringVehicleAbilities()
+        {
+            var output = NewIsolatedPath(
+                "ability-catering-vehicle-projection",
+                "ability-catalog-v1.json");
+
+            RunAbilityGenerator(
+                Path.Combine(
+                    Application.dataPath,
+                    "GameData/Abilities/Json"),
+                output);
+
+            var document = JsonUtility.FromJson<AbilityCatalogDocument>(
+                File.ReadAllText(output));
+            var fortified = document.abilities.Single(item =>
+                item.abilityId == "FORTIFIED_CATERING_VEHICLE");
+            Assert.That(fortified.activationKind, Is.EqualTo("Passive"));
+            Assert.That(fortified.blockCapacityAdditive, Is.EqualTo(2));
+            Assert.That(
+                fortified.physicalDamageTakenPermille,
+                Is.EqualTo(100));
+            Assert.That(
+                fortified.magicDamageTakenPermille,
+                Is.EqualTo(100));
+            var charged = document.abilities.Single(item =>
+                item.abilityId == "CHARGED_DRINK_AREA_ATTACK");
+            Assert.That(charged.activationKind, Is.EqualTo("Timed"));
+            Assert.That(charged.initialSkillPoints, Is.EqualTo(20));
+            Assert.That(charged.requiredSkillPoints, Is.EqualTo(30));
+            Assert.That(charged.targetRangeCentimetres, Is.EqualTo(220));
+            Assert.That(charged.areaRadiusCentimetres, Is.EqualTo(150));
+            Assert.That(charged.areaDamageType, Is.EqualTo("Physical"));
+            Assert.That(
+                charged.areaAttackMultiplierPermille,
+                Is.EqualTo(1000));
+            Assert.That(charged.groundTargetsOnly, Is.True);
+        }
+
+        [Test]
         public void UnitJsonBake_CollectsOnlyExplicitV2AbilityIds()
         {
             var ids = InvokeDeclaredAbilityCollector(
@@ -252,6 +300,8 @@ namespace ArknoNights.Battle.Tests
 
             Assert.That(ids, Is.EqualTo(new[]
             {
+                "CHARGED_DRINK_AREA_ATTACK",
+                "FORTIFIED_CATERING_VEHICLE",
                 "STACKING_DEFENSE_REDUCTION_ON_HIT",
                 "SUMMON_JELLY_MINIONS",
                 "SUMMON_REPAIR_HELPER",
@@ -585,6 +635,16 @@ namespace ArknoNights.Battle.Tests
             public bool inheritPathFromCaster;
             public string unitTrait;
             public int onHitDefenseReductionPerStack;
+            public int blockCapacityAdditive;
+            public int magicResistanceAdditive;
+            public int attackSpeedAdditive;
+            public int physicalDamageTakenPermille;
+            public int magicDamageTakenPermille;
+            public int targetRangeCentimetres;
+            public int areaRadiusCentimetres;
+            public string areaDamageType;
+            public int areaAttackMultiplierPermille;
+            public bool groundTargetsOnly;
         }
     }
 }

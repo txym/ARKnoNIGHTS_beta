@@ -354,6 +354,18 @@ namespace ArknoNights.Battle.Core
                     builder.Append("|W:")
                         .Append(ability.OnHitDefenseDebuffEffect
                             .DefenseReductionPerStack);
+                if (ability.TimedTargetAreaDamageEffect != null)
+                    builder.Append("|AA:")
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .TargetRangeCentimetres).Append(',')
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .RadiusCentimetres).Append(',')
+                        .Append((int)ability.TimedTargetAreaDamageEffect
+                            .DamageType).Append(',')
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .AttackMultiplierPermille).Append(',')
+                        .Append(ability.TimedTargetAreaDamageEffect
+                            .GroundTargetsOnly ? 1 : 0);
             }
             foreach (var player in Players.OrderBy(item => item.Side).ThenBy(item => item.PlayerId, StringComparer.Ordinal))
             {
@@ -442,13 +454,26 @@ namespace ArknoNights.Battle.Core
                     if (ability.OnHitDefenseDebuffEffect != null) validationErrors.Add(new ValidationError("ability.onHitDefenseDebuff.unexpected", "Timed ability cannot define an on-hit defense debuff: " + ability.AbilityId));
                     if (string.IsNullOrWhiteSpace(ability.AnimationKey)) validationErrors.Add(new ValidationError("ability.animationKey.invalid", "Timed ability requires an animation key: " + ability.AbilityId));
                     if (ability.SkillAnimationOriginalDurationTicks <= 0) validationErrors.Add(new ValidationError("ability.animationDuration.invalid", "Timed ability requires a positive source animation duration: " + ability.AbilityId));
-                    if (ability.SummonEffect == null) validationErrors.Add(new ValidationError("ability.summon.missing", "Summon effect is required: " + ability.AbilityId));
-                    else
+                    var timedEffectCount =
+                        (ability.SummonEffect == null ? 0 : 1)
+                        + (ability.TimedTargetAreaDamageEffect == null ? 0 : 1);
+                    if (timedEffectCount != 1)
+                        validationErrors.Add(new ValidationError("ability.timed.effect.invalid", "Timed ability requires exactly one supported effect: " + ability.AbilityId));
+                    if (ability.SummonEffect != null)
                     {
                         if (string.IsNullOrWhiteSpace(ability.SummonEffect.SummonTypeId) || !typeIds.Contains(ability.SummonEffect.SummonTypeId)) validationErrors.Add(new ValidationError("ability.summon.type.unknown", "Summon type is unknown: " + ability.SummonEffect.SummonTypeId));
                         if (ability.SummonEffect.Count <= 0) validationErrors.Add(new ValidationError("ability.summon.count.invalid", "Summon count must be positive: " + ability.AbilityId));
                         if (ability.SummonEffect.SideLengthCentimetres < 0) validationErrors.Add(new ValidationError("ability.summon.sideLength.invalid", "Summon side length must be non-negative: " + ability.AbilityId));
                     }
+                    if (ability.TimedTargetAreaDamageEffect != null
+                        && (ability.TimedTargetAreaDamageEffect.TargetRangeCentimetres <= 0
+                            || ability.TimedTargetAreaDamageEffect.RadiusCentimetres <= 0
+                            || ability.TimedTargetAreaDamageEffect.DamageType == DamageType.None
+                            || !Enum.IsDefined(
+                                typeof(DamageType),
+                                ability.TimedTargetAreaDamageEffect.DamageType)
+                            || ability.TimedTargetAreaDamageEffect.AttackMultiplierPermille <= 0))
+                        validationErrors.Add(new ValidationError("ability.timedTargetAreaDamage.invalid", "Timed target-area damage effect is invalid: " + ability.AbilityId));
                 }
                 else if (ability.ActivationKind == AbilityActivationKind.Passive)
                 {
@@ -458,6 +483,8 @@ namespace ArknoNights.Battle.Core
                         validationErrors.Add(new ValidationError("ability.passive.generation.invalid", "Passive ability must use None skill-point generation: " + ability.AbilityId));
                     if (ability.SummonEffect != null)
                         validationErrors.Add(new ValidationError("ability.passive.summon.unexpected", "Passive ability cannot define a summon effect: " + ability.AbilityId));
+                    if (ability.TimedTargetAreaDamageEffect != null)
+                        validationErrors.Add(new ValidationError("ability.passive.timedTargetAreaDamage.unexpected", "Passive ability cannot define a timed target-area damage effect: " + ability.AbilityId));
                     var passiveEffectCount =
                         (ability.UnitTraitEffect == null ? 0 : 1)
                         + (ability.PassiveCombatModifier == null ? 0 : 1)

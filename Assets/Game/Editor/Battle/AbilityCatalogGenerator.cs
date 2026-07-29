@@ -102,6 +102,68 @@ public static class AbilityCatalogGenerator
                 effect.defenseReductionPerStack;
             return entry;
         }
+        if (effect.kind == "PassiveCombatModifier")
+        {
+            if (activationKind != AbilityActivationKind.Passive
+                || effect.blockCapacityAdditive < 0
+                || effect.magicResistanceAdditive < -100
+                || effect.magicResistanceAdditive > 100
+                || effect.attackSpeedAdditive <= -100
+                || effect.attackSpeedAdditive > 10000
+                || effect.physicalDamageTakenPermille <= 0
+                || effect.physicalDamageTakenPermille > 10000
+                || effect.magicDamageTakenPermille <= 0
+                || effect.magicDamageTakenPermille > 10000
+                || (effect.blockCapacityAdditive == 0
+                    && effect.magicResistanceAdditive == 0
+                    && effect.attackSpeedAdditive == 0
+                    && effect.physicalDamageTakenPermille == 1000
+                    && effect.magicDamageTakenPermille == 1000))
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_PASSIVE_COMBAT_MODIFIER_INVALID path=" + sourcePath);
+            entry.blockCapacityAdditive =
+                effect.blockCapacityAdditive;
+            entry.magicResistanceAdditive =
+                effect.magicResistanceAdditive;
+            entry.attackSpeedAdditive =
+                effect.attackSpeedAdditive;
+            entry.physicalDamageTakenPermille =
+                effect.physicalDamageTakenPermille;
+            entry.magicDamageTakenPermille =
+                effect.magicDamageTakenPermille;
+            return entry;
+        }
+        if (effect.kind == "TimedTargetAreaDamage")
+        {
+            if (activationKind != AbilityActivationKind.Timed
+                || effect.targetRangeMetres <= 0f
+                || effect.radiusMetres <= 0f
+                || !Enum.TryParse(
+                    effect.damageType,
+                    true,
+                    out DamageType damageType)
+                || damageType == DamageType.None
+                || effect.attackMultiplierPermille <= 0)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TIMED_TARGET_AREA_DAMAGE_INVALID path=" + sourcePath);
+            var targetRangeCentimetres = Mathf.RoundToInt(
+                effect.targetRangeMetres * 100f);
+            var radiusCentimetres = Mathf.RoundToInt(
+                effect.radiusMetres * 100f);
+            if (Mathf.Abs(
+                    effect.targetRangeMetres * 100f
+                    - targetRangeCentimetres) > 0.0001f
+                || Mathf.Abs(
+                    effect.radiusMetres * 100f
+                    - radiusCentimetres) > 0.0001f)
+                throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_TIMED_TARGET_AREA_DAMAGE_NOT_EXACT path=" + sourcePath);
+            entry.targetRangeCentimetres =
+                targetRangeCentimetres;
+            entry.areaRadiusCentimetres = radiusCentimetres;
+            entry.areaDamageType = damageType.ToString();
+            entry.areaAttackMultiplierPermille =
+                effect.attackMultiplierPermille;
+            entry.groundTargetsOnly = effect.groundTargetsOnly;
+            return entry;
+        }
         if (effect.kind != "Summon"
             || activationKind != AbilityActivationKind.Timed
             || string.IsNullOrWhiteSpace(effect.summonTypeId)
@@ -137,9 +199,9 @@ public static class AbilityCatalogGenerator
     }
 
     [Serializable] private sealed class AbilityCatalogDocument { public string schemaVersion; public string catalogId; public AbilityCatalogEntry[] abilities; }
-    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; }
+    [Serializable] private sealed class AbilityCatalogEntry { public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public int initialSkillPoints; public int requiredSkillPoints; public string skillPointGeneration; public string summonTypeId; public int count; public int sideLengthCentimetres; public bool inheritPathFromCaster; public string unitTrait; public int onHitDefenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public int targetRangeCentimetres; public int areaRadiusCentimetres; public string areaDamageType; public int areaAttackMultiplierPermille; public bool groundTargetsOnly; }
     [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public AbilityEffect[] effects; }
     [Serializable] private sealed class SkillPoints { public int initial; public int required; public string generation; }
-    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; }
+    [Serializable] private sealed class AbilityEffect { public string kind; public string trait; public string summonTypeId; public int count; public SpawnArea spawnArea; public bool inheritPathFromCaster; public int defenseReductionPerStack; public int blockCapacityAdditive; public int magicResistanceAdditive; public int attackSpeedAdditive; public int physicalDamageTakenPermille; public int magicDamageTakenPermille; public float targetRangeMetres; public float radiusMetres; public string damageType; public int attackMultiplierPermille; public bool groundTargetsOnly; }
     [Serializable] private sealed class SpawnArea { public string shape; public string center; public float sideLengthMetres; }
 }

@@ -180,6 +180,154 @@ namespace ArknoNights.Battle.Tests
                 && item.Tick == 21));
         }
 
+        [Test]
+        public void ChargedDrink_WaitsForFullDoubleSpeedSkillThenDamagesGroundTargetsInRadius()
+        {
+            const string abilityId = "CHARGED_DRINK_AREA_ATTACK";
+            const string droneTraitId = "UNTARGETABLE_BY_MELEE";
+            var caster = new UnitDefinition(
+                "10039",
+                22000,
+                900,
+                900,
+                20,
+                0,
+                100,
+                30,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                1,
+                0,
+                true,
+                new[] { abilityId },
+                1);
+            var ground = new UnitDefinition(
+                "ground",
+                10000,
+                1,
+                0,
+                0,
+                0,
+                1000,
+                1,
+                DamageType.Physical,
+                AttackMethod.Melee,
+                1,
+                0,
+                true);
+            var drone = new UnitDefinition(
+                "drone",
+                10000,
+                1,
+                0,
+                0,
+                0,
+                1000,
+                1,
+                DamageType.Physical,
+                AttackMethod.Ranged,
+                0,
+                0,
+                true,
+                new[] { droneTraitId },
+                1);
+            var chargedArea = new AbilityDefinition(
+                abilityId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Timed,
+                SilencePolicy.Unaffected,
+                20,
+                30,
+                SkillPointGeneration.Automatic,
+                null,
+                null,
+                null,
+                null,
+                new TimedTargetAreaDamageEffectDefinition(
+                    220,
+                    150,
+                    DamageType.Physical,
+                    1000,
+                    true),
+                "skill",
+                57);
+            var droneTrait = new AbilityDefinition(
+                droneTraitId,
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Passive,
+                SilencePolicy.Unaffected,
+                0,
+                0,
+                SkillPointGeneration.None,
+                null,
+                new UnitTraitEffectDefinition(
+                    UnitTraitEffectKind.UntargetableByMelee));
+            var specification = new BattleInputSpecification(
+                BattleInput.SupportedSchemaVersion,
+                "charged-drink-area",
+                130,
+                new[] { caster, ground, drone },
+                new[] { chargedArea, droneTrait },
+                new[]
+                {
+                    new PlayerSnapshot(
+                        "home",
+                        BattleSide.Home,
+                        new[] { Unit("caster", "10039", 5, 4) }),
+                    new PlayerSnapshot(
+                        "away",
+                        BattleSide.Away,
+                        new[]
+                        {
+                            Unit("target", "ground", 5, 4),
+                            Unit("inside", "ground", 4, 4),
+                            Unit("outside", "ground", 3, 4),
+                            Unit("drone", "drone", 6, 4)
+                        })
+                });
+            Assert.That(
+                BattleInputFactory.TryCreate(
+                    specification,
+                    out var input,
+                    out var errors),
+                Is.True,
+                string.Join("; ", errors.Select(item => item.ToString())));
+
+            var result = new BattleRunner(input).RunToCompletion();
+
+            var skill = result.Events.Single(item =>
+                item.Type == BattleEventType.Skill
+                && item.UnitId == "caster");
+            Assert.That(skill.Tick, Is.EqualTo(100));
+            Assert.That(skill.RelatedUnitId, Is.EqualTo("target"));
+            Assert.That(skill.AnimationKey, Is.EqualTo("skill"));
+            Assert.That(skill.OriginalAnimationTicks, Is.EqualTo(57));
+            Assert.That(skill.EffectiveAnimationTicks, Is.EqualTo(29));
+            Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
+                item.Type == BattleEventType.Damage
+                && item.UnitId == "caster"
+                && item.Tick < 129));
+            var damage = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Damage
+                    && item.UnitId == "caster")
+                .ToArray();
+            Assert.That(
+                damage.Select(item => item.Tick),
+                Is.EqualTo(new[] { 129, 129 }));
+            Assert.That(
+                damage.Select(item => item.RelatedUnitId),
+                Is.EqualTo(new[] { "inside", "target" }));
+            Assert.That(
+                damage.Select(item => item.DamageAmount),
+                Is.EqualTo(new[] { 900, 900 }));
+            Assert.That(damage, Has.None.Matches<BattleEvent>(item =>
+                item.RelatedUnitId == "outside"
+                || item.RelatedUnitId == "drone"));
+        }
+
         private static UnitDefinition Caster(
             int attackIntervalTicks,
             int moveSpeed = 0)

@@ -1062,6 +1062,9 @@ namespace ArknoNights.Battle.Core
         private readonly List<PendingDeathAreaDamage>
             pendingDeathAreaDamages =
                 new List<PendingDeathAreaDamage>();
+        private readonly List<PendingTimedTargetAreaDamage>
+            pendingTimedTargetAreaDamages =
+                new List<PendingTimedTargetAreaDamage>();
         private readonly Dictionary<string, UnitDefinition> unitDefinitions;
         private readonly Dictionary<string, AbilityDefinition> abilityDefinitions;
         private readonly Dictionary<string, BattleUnitInstanceSnapshot> unitSnapshots = new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal);
@@ -1138,6 +1141,7 @@ namespace ArknoNights.Battle.Core
 
         private void RunAuthoritativeTick()
         {
+            ResolveDueTimedTargetAreaDamage();
             ResolveDueDeathSpawns();
             ResolveDueDeathAreaDamage();
             ResolveDueHealthThresholdFullHeals();
@@ -2310,6 +2314,15 @@ namespace ArknoNights.Battle.Core
                     || IsAttackAnimationLocked(caster)
                     || IsSkillAnimationLocked(caster))
                     continue;
+                var targetAreaEffect =
+                    abilityState.Definition.TimedTargetAreaDamageEffect;
+                var target = targetAreaEffect == null
+                    ? null
+                    : SelectTimedTargetAreaDamageTarget(
+                        caster,
+                        targetAreaEffect);
+                if (targetAreaEffect != null && target == null)
+                    continue;
                 var castOrdinal = abilityState.ConsumeCast();
                 caster.SkillAnimationLockUntilTick =
                     CurrentTick
@@ -2318,10 +2331,12 @@ namespace ArknoNights.Battle.Core
                     BattleEventType.Skill,
                     caster.UnitId,
                     null,
+                    target == null ? null : target.UnitId,
                     null,
                     null,
-                    null,
-                    null,
+                    targetAreaEffect == null
+                        ? (DamageType?)null
+                        : targetAreaEffect.DamageType,
                     0,
                     0,
                     0,
@@ -2331,8 +2346,165 @@ namespace ArknoNights.Battle.Core
                     null,
                     BattleStopReason.None,
                     abilityState.Definition.AnimationKey);
-                CastSummonAbility(caster, abilityState.Definition, castOrdinal);
+                if (abilityState.Definition.SummonEffect != null)
+                    CastSummonAbility(
+                        caster,
+                        abilityState.Definition,
+                        castOrdinal);
+                else
+                    pendingTimedTargetAreaDamages.Add(
+                        new PendingTimedTargetAreaDamage(
+                            CurrentTick
+                            + abilityState.Definition
+                                .SkillAnimationEffectiveDurationTicks,
+                            caster.UnitId,
+                            caster.Side,
+                            target.UnitId,
+                            caster.EffectiveAttack,
+                            abilityState.Definition.AbilityId,
+                            targetAreaEffect));
             }
+        }
+
+        private RuntimeUnitState SelectTimedTargetAreaDamageTarget(
+            RuntimeUnitState caster,
+            TimedTargetAreaDamageEffectDefinition effect)
+        {
+            var maximumDistanceSquared =
+                (long)effect.TargetRangeCentimetres
+                * effect.TargetRangeCentimetres;
+            return runtimeUnits
+                .Where(candidate =>
+                    IsActive(candidate)
+                    && candidate.Side != caster.Side
+                    && (!effect.GroundTargetsOnly
+                        || candidate.IsTargetableBy(
+                            AttackMethod.Melee))
+                    && DistanceSquared(
+                        caster.Position,
+                        candidate.Position)
+                    <= maximumDistanceSquared)
+                .OrderBy(candidate =>
+                    caster.HasBlockWith(candidate.UnitId)
+                        ? 0
+                        : 1)
+                .ThenBy(candidate =>
+                    DistanceSquared(
+                        caster.Position,
+                        candidate.Position))
+                .ThenBy(candidate =>
+                    DistanceSquared(
+                        candidate.Position,
+                        GatePosition(caster.Side)))
+                .ThenBy(
+                    candidate => candidate.UnitId,
+                    StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+
+        private void ResolveDueTimedTargetAreaDamage()
+        {
+            var due = pendingTimedTargetAreaDamages
+                .Where(item => item.DueTick <= CurrentTick)
+                .OrderBy(item => item.DueTick)
+                .ThenBy(
+                    item => item.OwnerUnitId,
+                    StringComparer.Ordinal)
+                .ThenBy(
+                    item => item.AbilityId,
+                    StringComparer.Ordinal)
+                .ToArray();
+            pendingTimedTargetAreaDamages.RemoveAll(item =>
+                item.DueTick <= CurrentTick);
+            var hits = due
+                .Where(pending =>
+                    IsInBattle(FindUnit(pending.OwnerUnitId))
+                    && IsActive(FindUnit(pending.TargetUnitId)))
+                .SelectMany(pending =>
+                {
+                    var centre =
+                        FindUnit(pending.TargetUnitId).Position;
+                    return runtimeUnits
+                        .Where(target =>
+                            IsActive(target)
+                            && target.Side != pending.Side
+                            && (!pending.Effect.GroundTargetsOnly
+                                || target.IsTargetableBy(
+                                    AttackMethod.Melee))
+                            && DistanceSquared(
+                                centre,
+                                target.Position)
+                            <= (long)pending.Effect
+                                   .RadiusCentimetres
+                               * pending.Effect
+                                   .RadiusCentimetres)
+                        .OrderBy(
+                            target => target.UnitId,
+                            StringComparer.Ordinal)
+                        .Select(target =>
+                            new TimedTargetAreaDamageHit(
+                                pending,
+                                target.UnitId,
+                                CalculateTimedTargetAreaDamage(
+                                    pending,
+                                    target)));
+                })
+                .ToArray();
+            foreach (var group in hits
+                         .GroupBy(
+                             item => item.TargetUnitId,
+                             StringComparer.Ordinal)
+                         .OrderBy(
+                             item => item.Key,
+                             StringComparer.Ordinal))
+            {
+                var target = FindUnit(group.Key);
+                if (target == null || !IsInBattle(target))
+                    continue;
+                var resolved = group.ToArray();
+                var before = target.CurrentHitPoints;
+                var total = resolved.Sum(item =>
+                    (long)item.Amount);
+                target.CurrentHitPoints = (int)Math.Max(
+                    0,
+                    before - Math.Min(int.MaxValue, total));
+                foreach (var hit in resolved)
+                    Emit(
+                        BattleEventType.Damage,
+                        hit.Pending.OwnerUnitId,
+                        null,
+                        hit.TargetUnitId,
+                        null,
+                        null,
+                        hit.Pending.Effect.DamageType,
+                        hit.Amount,
+                        before,
+                        target.CurrentHitPoints,
+                        0,
+                        0,
+                        0,
+                        null,
+                        BattleStopReason.None);
+            }
+        }
+
+        private static int CalculateTimedTargetAreaDamage(
+            PendingTimedTargetAreaDamage pending,
+            RuntimeUnitState target)
+        {
+            var scaledAttack = (int)Math.Min(
+                int.MaxValue,
+                (long)pending.Attack
+                * pending.Effect.AttackMultiplierPermille
+                / 1000);
+            var damage = DamageCalculator.Calculate(
+                pending.Effect.DamageType,
+                scaledAttack,
+                target.EffectiveDefense,
+                target.EffectiveMagicResistance);
+            return target.ApplyDamageTakenModifiers(
+                pending.Effect.DamageType,
+                damage);
         }
 
         private void CastSummonAbility(RuntimeUnitState caster, AbilityDefinition ability, int castOrdinal)
@@ -2730,6 +2902,8 @@ namespace ArknoNights.Battle.Core
         private readonly struct DamageReaction { public DamageReaction(string ownerUnitId, string targetUnitId, OnDamageReactionEffectDefinition effect) { OwnerUnitId = ownerUnitId; TargetUnitId = targetUnitId; Effect = effect; } public string OwnerUnitId { get; } public string TargetUnitId { get; } public OnDamageReactionEffectDefinition Effect { get; } }
         private readonly struct ResolvedDamageReaction { public ResolvedDamageReaction(DamageReaction reaction, int amount) { Reaction = reaction; Amount = amount; } public DamageReaction Reaction { get; } public int Amount { get; } }
         private readonly struct DeathAreaDamageHit { public DeathAreaDamageHit(PendingDeathAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingDeathAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
+        private readonly struct TimedTargetAreaDamageHit { public TimedTargetAreaDamageHit(PendingTimedTargetAreaDamage pending, string targetUnitId, int amount) { Pending = pending; TargetUnitId = targetUnitId; Amount = amount; } public PendingTimedTargetAreaDamage Pending { get; } public string TargetUnitId { get; } public int Amount { get; } }
+        private readonly struct PendingTimedTargetAreaDamage { public PendingTimedTargetAreaDamage(int dueTick, string ownerUnitId, BattleSide side, string targetUnitId, int attack, string abilityId, TimedTargetAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; TargetUnitId = targetUnitId; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public string TargetUnitId { get; } public int Attack { get; } public string AbilityId { get; } public TimedTargetAreaDamageEffectDefinition Effect { get; } }
         private readonly struct PendingDeathAreaDamage { public PendingDeathAreaDamage(int dueTick, string ownerUnitId, BattleSide side, FixedPosition position, int attack, string abilityId, DeathAreaDamageEffectDefinition effect) { DueTick = dueTick; OwnerUnitId = ownerUnitId; Side = side; Position = position; Attack = attack; AbilityId = abilityId; Effect = effect; } public int DueTick { get; } public string OwnerUnitId { get; } public BattleSide Side { get; } public FixedPosition Position { get; } public int Attack { get; } public string AbilityId { get; } public DeathAreaDamageEffectDefinition Effect { get; } }
         private readonly struct PendingDeathSpawn
         {
@@ -2898,6 +3072,19 @@ namespace ArknoNights.Battle.Core
                 builder.Append("|Z:")
                     .Append(pending.DueTick).Append(',')
                     .Append(pending.OwnerUnitId).Append(',')
+                    .Append(pending.AbilityId);
+            foreach (var pending in pendingTimedTargetAreaDamages
+                         .OrderBy(item => item.DueTick)
+                         .ThenBy(
+                             item => item.OwnerUnitId,
+                             StringComparer.Ordinal)
+                         .ThenBy(
+                             item => item.AbilityId,
+                             StringComparer.Ordinal))
+                builder.Append("|AA:")
+                    .Append(pending.DueTick).Append(',')
+                    .Append(pending.OwnerUnitId).Append(',')
+                    .Append(pending.TargetUnitId).Append(',')
                     .Append(pending.AbilityId);
             foreach (var item in trace) builder.Append("|S:").Append(item.Tick).Append(',').Append((int)item.Status).Append(',').Append((int)item.StopReason);
             return builder.ToString();

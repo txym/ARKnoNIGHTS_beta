@@ -63,7 +63,8 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FORTIFIED_CATERING_VEHICLE",
+                                                  "CHARGED_DRINK_AREA_ATTACK"
                                               ]
                      }
                  ]

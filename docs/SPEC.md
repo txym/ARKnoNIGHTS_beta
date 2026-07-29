@@ -675,6 +675,14 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - Debuff 属于受击目标实例状态，不跟随攻击者，也不因攻击者死亡、离场或切换目标而清除。当前没有沉默运行时；本能力也不新增施加沉默的能力或异常状态。
 - `1095` 的全部 v2 变体显式绑定该能力；能力源和生成器投影已经接入，但冻结 v1 目录不在本批次重新生成。
 
+## 18. 重型餐饮载具防御与 `10039` 蓄力范围攻击（2026-07-29）
+
+- `10038/10039` 的阻挡容量在基础值上增加 `2`；物理和法术承伤分别乘 `100/1000`，即降低 `90%`。真实伤害不受该被动影响。
+- `10039` 使用自动回复技能。根据允许用于补足原规范空白的 PRTS 资料，首次冷却为 `5s`、后续冷却为 `15s`、目标范围为 `2.2m`；在全局 `2 SP/s` 下编码为初始/需求 `20/30 SP`。没有合法地面目标时保持满 SP，不消费、不播放 Skill。
+- 施放时选定 `2.2m` 内合法地面敌方目标并封存当前有效攻击力；Skill 不打断已经开始的 Attack。v2 源动画 `Skill/2.833333s` 先向上取整为 `57 Tick`，再按二倍速向上取整为 `29 Tick`，在完整播放结束的到期 Tick 结算。
+- 到期时以原目标的当前位置为圆心，对其及 `150cm` 闭区间半径内仍在场的地面敌方单位各造成一次封存攻击力 `100%` 的物理伤害。目标已死亡或离场时本次技能不再结算；无人机等不可被近战索敌单位不作为主目标或范围目标。
+- 该技能伤害走普通物理防御和承伤倍率，但不属于普通攻击，不触发普通攻击专属的闪避、反伤、命中 Debuff 或攻击计数。冻结的 v1 目录仍不在本批次重新生成。
+
 ## LAN Home Create Open-Frame Rule (2026-07-27)
 
 In the LAN Home `创建同盟` region, the visible Create action bar is the region's lower boundary. The cyan `doc_frame_line` may form only the top, left, and right sides of the upper open frame; no cyan line or dark backing may continue beside or below visible bar pixels.

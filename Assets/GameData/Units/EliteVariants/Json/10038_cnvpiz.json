@@ -58,7 +58,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FORTIFIED_CATERING_VEHICLE"
                                               ]
                      },
                      {
@@ -105,7 +105,7 @@
                                                       ]
                                    },
                          "innateAbilityIds":  [
-
+                                                  "FORTIFIED_CATERING_VEHICLE"
                                               ]
                      }
                  ]

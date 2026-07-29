@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ability-source-v1",
+  "abilityId": "CHARGED_DRINK_AREA_ATTACK",
+  "displayNameZhHans": "",
+  "descriptionZhHans": "蓄力后，对目标及其半径1.5范围内的地面敌方单位造成攻击力100%的物理伤害。",
+  "activationKind": "Timed",
+  "silencePolicy": "Unaffected",
+  "skillPoints": {
+    "initial": 20,
+    "required": 30,
+    "generation": "Automatic"
+  },
+  "animationKey": "skill",
+  "effects": [
+    {
+      "kind": "TimedTargetAreaDamage",
+      "targetRangeMetres": 2.2,
+      "radiusMetres": 1.5,
+      "damageType": "Physical",
+      "attackMultiplierPermille": 1000,
+      "groundTargetsOnly": true
+    }
+  ]
+}
