@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1326,
+    "common":  {
+                   "rarity":  3,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1326_cbagen",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "特里蒙城防军",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5800,
+                                                      "attack":  400,
+                                                      "defense":  150,
+                                                      "magicResistance":  40
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  1.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cbagen",
+                                       "skeletonDataResourceName":  "enemy_1326_cbagen_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1326_cbagen",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.133333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1326_cbagen_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "特里蒙城防军队长",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7800,
+                                                      "attack":  500,
+                                                      "defense":  170,
+                                                      "magicResistance":  40
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  1.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cbagen_2",
+                                       "skeletonDataResourceName":  "enemy_1326_cbagen_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1326_cbagen_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.133333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

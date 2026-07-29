@@ -1,0 +1,122 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1254,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1254_lypa",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "实验用动力装甲",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  8000,
+                                                      "attack":  700,
+                                                      "defense":  700,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  1.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "lypa",
+                                       "skeletonDataResourceName":  "enemy_1254_lypa_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1254_lypa",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack_A",
+                                                              "durationSeconds":  0.666667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "attack.b",
+                                                              "name":  "Attack_B",
+                                                              "durationSeconds":  0.666667
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1254_lypa_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "测试用动力装甲",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  10000,
+                                                      "attack":  850,
+                                                      "defense":  800,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  1.3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "lypa_2",
+                                       "skeletonDataResourceName":  "enemy_1254_lypa_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1254_lypa_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack_A",
+                                                              "durationSeconds":  0.666667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "attack.b",
+                                                              "name":  "Attack_B",
+                                                              "durationSeconds":  0.666667
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

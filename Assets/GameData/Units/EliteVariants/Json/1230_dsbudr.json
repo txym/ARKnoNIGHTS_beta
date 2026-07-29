@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1230,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Magic"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1230_dsbudr",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "深溟奠基者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7000,
+                                                      "attack":  450,
+                                                      "defense":  200,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "dsbudr",
+                                       "skeletonDataResourceName":  "enemy_1230_dsbudr_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1230_dsbudr",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1230_dsbudr_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "富营养的奠基者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  9000,
+                                                      "attack":  600,
+                                                      "defense":  250,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "dsbudr_2",
+                                       "skeletonDataResourceName":  "enemy_1230_dsbudr_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1230_dsbudr_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

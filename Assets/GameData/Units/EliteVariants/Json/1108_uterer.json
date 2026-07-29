@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1108,
+    "common":  {
+                   "rarity":  2,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1108_uterer",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "乌萨斯裂兽",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  3500,
+                                                      "attack":  380,
+                                                      "defense":  100,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.7,
+                                                      "attackIntervalSeconds":  1.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "uterer",
+                                       "skeletonDataResourceName":  "enemy_1108_uterer_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1108_uterer",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1108_uterer_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "乌萨斯裂兽族母",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  4600,
+                                                      "attack":  450,
+                                                      "defense":  100,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.7,
+                                                      "attackIntervalSeconds":  1.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "uterer_2",
+                                       "skeletonDataResourceName":  "enemy_1108_uterer_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1108_uterer_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

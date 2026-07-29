@@ -59,7 +59,7 @@ TASK-006 已以 Unity `2022.3.62f1c1` 完成第一阶段复核：Editor 编译�
 旧单位初始化不是正式 Player 数据链，而是由初始化调试按钮触发的 legacy/debug 流程：
 
 1. `ButtonDebug.Debugbutton` 调用 `UnitFactory.SpawnAll`；
-2. `UnitFactory` 通过共享 `UnitEliteVariantResolver` 读取 `Application.dataPath/GameData/Units/EliteVariants/Json` 下的 v2 文档，当前只包含 `1000`、`5503`、`5504`；
+2. `UnitFactory` 通过共享 `UnitEliteVariantResolver` 读取 `Application.dataPath/GameData/Units/EliteVariants/Json` 下的 `100` 份 v2 文档（BONDS `99` 个 TypeId 加 legacy/demo `1000`）；
 3. 工厂在创建首个 `UnitTemplate` 或 GameObject 前完成全部 v2 源文档加载、精英 0 解析和必需 idle/move/attack 语义动画绑定校验；物理 `SkeletonDataAsset` 仍在对象创建后的第 7 步加载；
 4. 工厂把已解析的 v2 事实显式适配到内存 `UnitTemplate`，并按 `typeID` 写入静态字典；
 5. 工厂加载 `Resources/Prefabs/DefaultUnit` 并为每种类型实例化一个对象；
@@ -221,7 +221,9 @@ Core 不引用 `Assembly-CSharp`、Spine、UI、物理、场景、文件路径�
 
 `Assets/GameData/Units/EliteVariants/Json/*.json → UnitEliteVariantResolver(target elite 0) → UnitCatalogGenerator → frozen flat unit-catalog-v1 → existing Player loaders`
 
-v2 是唯一人工维护的单位源，首批只完成 `1000`、`5503`、`5504`，其余单位尚未导入。模型 `animations[]` 保存稳定 key、真实 Spine 名称和必需的源时长；`Default`、Hit、Skeleton 类型、动画行为和播放倍速不进入源契约。人工维护稀有度为 `1000=1`、`5503=6`、`5504=3`。现有 `unit-catalog-v1` 与 `ability-catalog-v1` 在首批迁移中保持字节冻结，因此 Player 仍暴露迁移前目录值；正式 Player 只读这些 Resources 目录，不读取 Editor 源或项目外 staging 数据。
+v2 是唯一人工维护的单位源，当前包含 BONDS 使用的 `99` 个 TypeId、`182` 个资源变体，以及保留的 legacy/demo `1000` 三个变体，合计 `100` 份文档和 `185` 个模型变体；`1021` 已退出当前范围。模型 `animations[]` 保存稳定 key、真实 Spine 名称和必需的源时长；`Default`、Hit、Skeleton 类型、动画行为和播放倍速不进入源契约。BONDS 稀有度来自 BONDS 规范，保留的 `1000=1`。现有 `unit-catalog-v1` 与 `ability-catalog-v1` 在本轮 authored 数据扩展中保持字节冻结，因此 Player 仍只暴露迁移前的 `1000/5503/5504`；正式 Player 只读这些 Resources 目录，不读取 Editor 源或项目外 staging 数据。
+
+全部导入文档的精英 0 部署费用当前统一为 `2`。`actionMethod` 的 authored 语义固定为：`1` 普通路线、`2` 部署位置到敌方门、`3` 己方门到部署位置、`4` 原地不动。源直读 `UnitFactory` 可以为全部 `100` 个 TypeId 建立 legacy/debug 精英 0 适配对象；该路径不改变正式 Player 的冻结目录边界。
 
 `UnitCatalogEntry` 明确分离 `ResourceKey`、可为空的 `DisplayNameZhHans`、可为空的 `SkillDescriptionZhHans` 与 `LifeDeduct`；`UnitCatalogLoader` 对冻结目录的 `rarity=1..6` 和非负 `lifeDeduct` 进行运行时校验。`PlayerState` 将目录 `Rarity` 原样投影至 `StagingStackSnapshot`，UI 不由精英化等级或源文件推断稀有度。v2 能合法表达不攻击且不阻挡的单位，但旧扁平目录无法表达该组合，生成器会显式拒绝投影而不是强制改写。
 

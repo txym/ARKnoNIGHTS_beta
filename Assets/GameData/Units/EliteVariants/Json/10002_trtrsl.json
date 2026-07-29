@@ -1,0 +1,142 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  10002,
+    "common":  {
+                   "rarity":  3,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  4,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "10002_trtrsl",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "浆果虫",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5400,
+                                                      "attack":  0,
+                                                      "defense":  0,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  0
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "trtrsl",
+                                       "skeletonDataResourceName":  "enemy_10002_trtrsl_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10002_trtrsl",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "start",
+                                                              "name":  "Start",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "skill.begin",
+                                                              "name":  "Skill_Begin",
+                                                              "durationSeconds":  0.5
+                                                          },
+                                                          {
+                                                              "key":  "skill.loop",
+                                                              "name":  "Skill_Loop",
+                                                              "durationSeconds":  0.933333
+                                                          },
+                                                          {
+                                                              "key":  "skill.end",
+                                                              "name":  "Skill_End",
+                                                              "durationSeconds":  1.1
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "10002_trtrsl_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "硕果虫",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7200,
+                                                      "attack":  0,
+                                                      "defense":  0,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  0
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "trtrsl_2",
+                                       "skeletonDataResourceName":  "enemy_10002_trtrsl_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10002_trtrsl_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "start",
+                                                              "name":  "Start",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "skill.begin",
+                                                              "name":  "Skill_Begin",
+                                                              "durationSeconds":  0.5
+                                                          },
+                                                          {
+                                                              "key":  "skill.loop",
+                                                              "name":  "Skill_Loop",
+                                                              "durationSeconds":  0.933333
+                                                          },
+                                                          {
+                                                              "key":  "skill.end",
+                                                              "name":  "Skill_End",
+                                                              "durationSeconds":  1.1
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  10038,
+    "common":  {
+                   "rarity":  6,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "10038_cnvpiz",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“方便快餐”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  15000,
+                                                      "attack":  650,
+                                                      "defense":  700,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.5,
+                                                      "attackIntervalSeconds":  5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cnvpiz",
+                                       "skeletonDataResourceName":  "enemy_10038_cnvpiz_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10038_cnvpiz",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "10038_cnvpiz_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“美食速递”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  17000,
+                                                      "attack":  750,
+                                                      "defense":  800,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.5,
+                                                      "attackIntervalSeconds":  5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cnvpiz_2",
+                                       "skeletonDataResourceName":  "enemy_10038_cnvpiz_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10038_cnvpiz_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

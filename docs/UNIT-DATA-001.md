@@ -1,6 +1,6 @@
 # UNIT-DATA-001：单位源 JSON 规范化与目录契约迁移
 
-## 当前状态（2026-07-28）
+## 当前状态（2026-07-29）
 
 本文件下方保留最初 `unit-source-v1` 规范化任务的历史需求；当前人工维护
 单位源契约已由
@@ -14,22 +14,24 @@ Assets/GameData/Units/EliteVariants/Json/*.json
     -> existing Player loaders
 ```
 
-- `unit-elite-variants-v2` 是唯一人工维护的单位源格式；首批只完成
-  `1000`、`5503`、`5504`，其余单位导入尚未开始。
+- `unit-elite-variants-v2` 是唯一人工维护的单位源格式；当前包含 BONDS
+  使用的 `99` 个 TypeId 和保留的 legacy/demo `1000`，共 `100` 份文档、
+  `185` 个模型变体；`1021` 不在当前范围。
 - 每个 TypeId 文档的精英 0 完整；高阶条目按最近较低条目继承省略的
   原子块，`sourceVariant` 是物理资源文件夹权威。
 - `animations[]` 保存稳定 key、真实 Spine 名称和必需的源时长；源数据
   不保存 `Default`、Hit、Skeleton 类型、动画行为或播放倍速。
-- 正式 Player 只读取生成的 Resources 目录。首批迁移不重新生成现有
-  `unit-catalog-v1` 或 `ability-catalog-v1`；人工维护 v2 稀有度
-  `1000=1`、`5503=6`、`5504=3` 与冻结目录中的迁移前值必须明确区分。
+- 正式 Player 只读取生成的 Resources 目录。本轮批量导入不重新生成现有
+  `unit-catalog-v1` 或 `ability-catalog-v1`；BONDS authored 稀有度来自
+  BONDS 规范，保留的 `1000=1`，并且必须与冻结目录中的迁移前值明确区分。
 - 旧目录投影为兼容表现接口映射 Skeleton Type 2 和空 Hit 名称；Type 2
   不是人工维护单位事实。合法但旧目录无法表达的不攻击/不阻挡 v2 源必须
   显式投影失败，不能被强制改写。
 - 源直读 `UnitFactory` 是 legacy/debug 适配器，正式运行时不依赖它，
   并在正式数据路径不再需要后销毁。旧 Hit/presentation 链在旧目录和
   播放接口退役后销毁，完整清单保留在 `docs/bonds/UnitAnimation.md`。
-- 精英 2/3 运行时选择、其余单位导入和独立动画层均尚未实施。
+- 精英 2/3 运行时选择和独立动画层仍未实施；authored 单位与模型变体导入
+  已覆盖上述当前范围。
 
 ## 角色
 

@@ -1,0 +1,102 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1355,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  2,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  false,
+                   "blockCapacity":  0,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1355_mrfly",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "护障",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6000,
+                                                      "attack":  0,
+                                                      "defense":  80,
+                                                      "magicResistance":  40
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "mrfly",
+                                       "skeletonDataResourceName":  "enemy_1355_mrfly_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1355_mrfly",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1355_mrfly_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "护障·P",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  10000,
+                                                      "attack":  0,
+                                                      "defense":  80,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "mrfly_2",
+                                       "skeletonDataResourceName":  "enemy_1355_mrfly_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1355_mrfly_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

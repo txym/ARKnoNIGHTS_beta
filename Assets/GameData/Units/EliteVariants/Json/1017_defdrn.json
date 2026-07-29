@@ -1,0 +1,60 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1017,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  2,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  false,
+                   "blockCapacity":  0,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1017_defdrn",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "御4",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  4000,
+                                                      "attack":  0,
+                                                      "defense":  150,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "defdrn",
+                                       "skeletonDataResourceName":  "enemy_1017_defdrn_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1017_defdrn",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

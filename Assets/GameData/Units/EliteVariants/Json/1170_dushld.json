@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1170,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1170_dushld",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "深池重甲卫士",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7000,
+                                                      "attack":  700,
+                                                      "defense":  750,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "dushld",
+                                       "skeletonDataResourceName":  "enemy_1170_dushld_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1170_dushld",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1170_dushld_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "深池重甲卫士队长",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  9000,
+                                                      "attack":  900,
+                                                      "defense":  1100,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "dushld_2",
+                                       "skeletonDataResourceName":  "enemy_1170_dushld_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1170_dushld_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

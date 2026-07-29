@@ -1,0 +1,70 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  2033,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "2033_syboys",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "塑路者分形",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  20000,
+                                                      "attack":  600,
+                                                      "defense":  100,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.4,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "syboys",
+                                       "skeletonDataResourceName":  "enemy_2033_syboys_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_2033_syboys",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "attack.skill",
+                                                              "name":  "Skill",
+                                                              "durationSeconds":  2
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

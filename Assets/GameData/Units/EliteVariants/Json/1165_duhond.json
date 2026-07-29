@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1165,
+    "common":  {
+                   "rarity":  2,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1165_duhond",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "深池侦察犬",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  2800,
+                                                      "attack":  300,
+                                                      "defense":  0,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.7,
+                                                      "attackIntervalSeconds":  1.4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "duhond",
+                                       "skeletonDataResourceName":  "enemy_1165_duhond_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1165_duhond",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Run_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1165_duhond_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "深池侦察犬pro",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  4000,
+                                                      "attack":  380,
+                                                      "defense":  0,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.7,
+                                                      "attackIntervalSeconds":  1.4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "duhond_2",
+                                       "skeletonDataResourceName":  "enemy_1165_duhond_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1165_duhond_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Run_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

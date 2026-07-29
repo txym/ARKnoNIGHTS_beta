@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1377,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1377_ltnclo",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "残党乐团大提琴家",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  15000,
+                                                      "attack":  600,
+                                                      "defense":  900,
+                                                      "magicResistance":  60
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "ltnclo",
+                                       "skeletonDataResourceName":  "enemy_1377_ltnclo_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1377_ltnclo",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1377_ltnclo_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "巫王乐团大提琴家",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  20000,
+                                                      "attack":  700,
+                                                      "defense":  1000,
+                                                      "magicResistance":  60
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "ltnclo_2",
+                                       "skeletonDataResourceName":  "enemy_1377_ltnclo_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1377_ltnclo_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.333333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

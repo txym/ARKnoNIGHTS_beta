@@ -1,0 +1,122 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1001,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1001_bigbo",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "大鲍勃",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  22000,
+                                                      "attack":  1900,
+                                                      "defense":  800,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.5,
+                                                      "attackIntervalSeconds":  6,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "bigbo",
+                                       "skeletonDataResourceName":  "enemy_1001_bigbo_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1001_bigbo",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "attack.2",
+                                                              "name":  "Attack2",
+                                                              "durationSeconds":  1.9
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1001_bigbo_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "大亚当",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  30000,
+                                                      "attack":  2700,
+                                                      "defense":  1000,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.5,
+                                                      "attackIntervalSeconds":  6,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "bigbo_2",
+                                       "skeletonDataResourceName":  "enemy_1001_bigbo_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1001_bigbo_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "attack.2",
+                                                              "name":  "Attack2",
+                                                              "durationSeconds":  1.9
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

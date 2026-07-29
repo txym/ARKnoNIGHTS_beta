@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1277,
+    "common":  {
+                   "rarity":  1,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1277_sgman",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "家族士兵",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  3500,
+                                                      "attack":  320,
+                                                      "defense":  120,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  1.8,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "sgman",
+                                       "skeletonDataResourceName":  "enemy_1277_sgman_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1277_sgman",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1277_sgman_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "家族精英士兵",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  4400,
+                                                      "attack":  375,
+                                                      "defense":  180,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  1.8,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "sgman_2",
+                                       "skeletonDataResourceName":  "enemy_1277_sgman_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1277_sgman_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

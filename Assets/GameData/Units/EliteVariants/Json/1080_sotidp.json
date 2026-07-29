@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1080,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1080_sotidp",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "游击队传令兵",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  7000,
+                                                      "attack":  300,
+                                                      "defense":  120,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  2.7,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "sotidp",
+                                       "skeletonDataResourceName":  "enemy_1080_sotidp_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1080_sotidp",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1080_sotidp_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "游击队传令兵组长",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  10000,
+                                                      "attack":  360,
+                                                      "defense":  120,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  2.5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "sotidp_2",
+                                       "skeletonDataResourceName":  "enemy_1080_sotidp_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1080_sotidp_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.1
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

@@ -1,0 +1,122 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  10006,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "10006_trsmgi",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "染秽魔像",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  30000,
+                                                      "attack":  1300,
+                                                      "defense":  50,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  6,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "trsmgi",
+                                       "skeletonDataResourceName":  "enemy_10006_trsmgi_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10006_trsmgi",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_1"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "move.2",
+                                                              "name":  "Move_2",
+                                                              "durationSeconds":  1.166667
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "10006_trsmgi_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "凶秽魔像",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  45000,
+                                                      "attack":  1500,
+                                                      "defense":  50,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.7,
+                                                      "attackIntervalSeconds":  6,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "trsmgi_2",
+                                       "skeletonDataResourceName":  "enemy_10006_trsmgi_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10006_trsmgi_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_1"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  2.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "move.2",
+                                                              "name":  "Move_2",
+                                                              "durationSeconds":  1.166667
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

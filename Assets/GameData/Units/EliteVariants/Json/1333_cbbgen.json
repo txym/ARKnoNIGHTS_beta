@@ -1,0 +1,102 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1333,
+    "common":  {
+                   "rarity":  3,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  false,
+                   "blockCapacity":  0,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1333_cbbgen",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“交通警察”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5500,
+                                                      "attack":  0,
+                                                      "defense":  300,
+                                                      "magicResistance":  40
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cbbgen",
+                                       "skeletonDataResourceName":  "enemy_1333_cbbgen_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1333_cbbgen",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1333_cbbgen_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“交通警长”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  8500,
+                                                      "attack":  0,
+                                                      "defense":  400,
+                                                      "magicResistance":  40
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cbbgen_2",
+                                       "skeletonDataResourceName":  "enemy_1333_cbbgen_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1333_cbbgen_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  7002,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Magic"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "7002_veingd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "矿脉守卫",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  25000,
+                                                      "attack":  400,
+                                                      "defense":  300,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "veingd",
+                                       "skeletonDataResourceName":  "enemy_7002_veingd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_7002_veingd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.666667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "7002_veingd_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "狂化矿脉守卫",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  40000,
+                                                      "attack":  500,
+                                                      "defense":  300,
+                                                      "magicResistance":  10
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  4,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "veingd_2",
+                                       "skeletonDataResourceName":  "enemy_7002_veingd_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_7002_veingd_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.666667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

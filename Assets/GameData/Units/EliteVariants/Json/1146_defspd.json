@@ -1,0 +1,102 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1146,
+    "common":  {
+                   "rarity":  6,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  3,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  false,
+                   "blockCapacity":  0,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1146_defspd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "铁砧",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  5000,
+                                                      "attack":  0,
+                                                      "defense":  80,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "defspd",
+                                       "skeletonDataResourceName":  "enemy_1146_defspd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1146_defspd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1146_defspd_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "铁砧B型",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  8000,
+                                                      "attack":  0,
+                                                      "defense":  80,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "defspd_2",
+                                       "skeletonDataResourceName":  "enemy_1146_defspd_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1146_defspd_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1319,
+    "common":  {
+                   "rarity":  3,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Magic"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1319_wdfmpm",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "叛乱煽动者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  10000,
+                                                      "attack":  250,
+                                                      "defense":  100,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdfmpm",
+                                       "skeletonDataResourceName":  "enemy_1319_wdfmpm_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1319_wdfmpm",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.166667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1319_wdfmpm_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "叛乱鼓动者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  12000,
+                                                      "attack":  300,
+                                                      "defense":  150,
+                                                      "magicResistance":  50
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.6,
+                                                      "attackIntervalSeconds":  5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "wdfmpm_2",
+                                       "skeletonDataResourceName":  "enemy_1319_wdfmpm_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1319_wdfmpm_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.166667
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

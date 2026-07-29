@@ -131,12 +131,14 @@
 
 完整对局不设置单名玩家同时存活战斗实体数的全局上限。召唤物生成后是普通战斗实体，使用自身单位类型数据正常参与索敌、移动、阻挡、攻击、受击、死亡、冲家和目标价值结算；不得因为其来源是召唤而跳过这些流程。除塑路者分形继续遵守其能力定义中的共享数量门槛外，其他召唤物当前不设置单种召唤物共享数量上限，因此允许持续召唤能力随战斗时长继续扩大实体数和潜在玩家生命伤害。正式战斗时长仍待确认。
 
-精英化单位源数据采用以下已确认并已为首批单位实施的存储与继承规则：
+精英化单位源数据采用以下已确认并已实施的存储与继承规则：
 
-- `Assets/GameData/Units/EliteVariants/Json/*.json` 的 `unit-elite-variants-v2` 是唯一人工维护的单位源；当前仅完成 `1000`、`5503`、`5504`，其余单位尚未导入；
+- `Assets/GameData/Units/EliteVariants/Json/*.json` 的 `unit-elite-variants-v2` 是唯一人工维护的单位源；当前包含 BONDS 使用的 `99` 个 TypeId 和保留的 legacy/demo `1000`，共 `100` 份文档、`185` 个模型变体；`1021` 不在当前范围；
 - 每个 TypeId 的 v2 文档包含公共规则和全部已导入变体；精英 0 必须完整，高阶条目缺失的名称、能力列表或原子块只继承最近的较低条目，显式空能力列表 `[]` 表示清空；
 - `stats.combat`、`stats.shared` 与 `model` 分别以完整块为继承单位；`sourceVariant` 是物理资源文件夹的权威名称，模型块一旦声明就必须完整；
 - `model.animations[]` 以稳定语义 key 保存真实 Spine 动画名，并为需要时长的实际使用动画保存正数源时长；源数据不保存 `Default`、Hit、Skeleton 类型、动画行为、状态机或播放倍速；
+- 当前导入单位的精英 0 基础部署费用统一为 `2`。`actionMethod=1` 表示普通路线，`2` 表示部署位置到敌方门，`3` 表示己方门到部署位置，`4` 表示原地不动；当前 `2` 用于 `1008/1017/1026/1042/1355`，`3` 用于 `1146`，`4` 用于 `10002`，其余单位使用 `1`；
+- 当前不攻击单位为 `1008/1017/1026/1042/1146/1333/1355/10002`，其 `attackMethod=0`、攻击力和攻击间隔为 `0`、伤害类型为 `None`，且不声明 attack 动画；`1008/1017/1026/1042/1146/1333/1355` 不可阻挡；
 - 当前 Editor 目录生成器只把精英 0 投影进扁平 `unit-catalog-v1`。精英 2/3 的运行时选择、合成系数和局内升阶仍未实现，因此现有“`eliteLevel` 不参与战斗数值或胜负”的规则继续成立；
 - v2 允许合法表达不攻击且不阻挡的单位；由于旧扁平目录不能表示该组合，投影时必须显式失败，不能强制改写为可攻击或可阻挡单位。
 
@@ -155,7 +157,7 @@
 3. 若不存在可合并堆叠且待部署区已经达到 `13` 个槽位，则新单位进入 `Overflow`。
 4. 每个购买得到的单位仍具有独立单位 ID；购买不会直接把单位部署到场上，也不会扣除部署费用。
 
-单位类型源 JSON 和 Player-safe catalog 均不保存独立的商店价格字段。商品价格直接等于运行时目录稀有度 `rarity`；领域层或 UI 只读快照可以暴露派生的 `Price` 便于显示，但该值必须每次由 `Rarity` 计算，不得保存第二份可能与稀有度漂移的配置。人工维护 v2 源的稀有度为 `1000=1`、`5503=6`、`5504=3`；首批迁移期间 Player-safe 目录保持冻结并继续暴露迁移前值（包括 `5503=4`），所以当前 Demo 中 `gopro` 商品价格为 `1`、`arcslma` 商品价格仍为 `4`。在后续目录迁移前，源稀有度不得被误述为当前玩家可见价格。
+单位类型源 JSON 和 Player-safe catalog 均不保存独立的商店价格字段。商品价格直接等于运行时目录稀有度 `rarity`；领域层或 UI 只读快照可以暴露派生的 `Price` 便于显示，但该值必须每次由 `Rarity` 计算，不得保存第二份可能与稀有度漂移的配置。人工维护 v2 源的 BONDS 单位稀有度来自 `docs/bonds/BONDS_SPEC.md`，保留的 `1000=1`；其中 `5503=6`、`5504=3`。Player-safe 目录在本轮批量导入期间保持冻结并继续暴露迁移前的三个类型和值（包括 `5503=4`），所以当前 Demo 中 `gopro` 商品价格为 `1`、`arcslma` 商品价格仍为 `4`。在后续目录迁移前，源稀有度不得被误述为当前玩家可见价格。
 
 完整对局的自然刷新规则已经确认：
 
@@ -601,7 +603,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 第一阶段在保留 `battle-fixture-v1` 作为合成算法回归数据的同时，新增两份 Player-safe 的 Resources 文本资源：
 
-- `BattleData/unit-catalog-v1`：正式 Player 当前读取的冻结扁平单位目录；`UnitCatalogGenerator` 的人工维护输入已经迁移为 `Assets/GameData/Units/EliteVariants/Json/*.json` 中的 v2 文档，解析目标固定为精英 0，但首批三单位迁移不重新生成现有目录。目录条目继续包含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
+- `BattleData/unit-catalog-v1`：正式 Player 当前读取的冻结扁平单位目录；`UnitCatalogGenerator` 的人工维护输入已经迁移为 `Assets/GameData/Units/EliteVariants/Json/*.json` 中的 v2 文档，解析目标固定为精英 0，但本轮扩展至 100 份 authored 文档时不重新生成现有目录。目录条目继续包含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
 - `BattleData/task004a-real-1v1`：`local-battle-v1` 对战快照，只含 `schemaVersion`、`battleId`、`maxTicks`、两个带 Home/Away 的玩家和各自单位实例（`unitId`、`typeId`、`zone`、`formationX`、`formationY`、`buffs`）；当前固定回归样本为 Home 3 对 Away 4，双方均混用 `gopro`（`1000`）与 `arcslma`（`5503`），采用打乱且互不重叠的部署坐标。不得重复类型数值或表现资源。
 
 `local-battle-v1` 通过 `typeId` 连接目录后才构造不可变 `BattleInput`；Core 仅接收 Core 值，不能接收 Resources、Spine 或表现对象。未知 schema、未知类型、重复或无效 ID、无效数值、空/不存在的表现资源路径均必须返回结构化诊断，其中包含 schema、battleId、playerId（如适用）和 typeId（如适用）。
@@ -617,9 +619,9 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 ## 13. UNIT-DATA-001 单位源数据契约（2026-07-23）
 
 - 当前权威链为 `Assets/GameData/Units/EliteVariants/Json/*.json → UnitEliteVariantResolver(target elite 0) → UnitCatalogGenerator → frozen flat unit-catalog-v1 → existing Player loaders`。正式 Player 只读生成的 Resources 目录，不能直接读取 Editor 源 JSON。
-- v2 是唯一人工维护的单位源；首批只实施 `1000`、`5503`、`5504`。每个文档的精英 0 完整，高阶条目按最近较低条目继承原子块，`sourceVariant` 决定物理资源文件夹。
+- v2 是唯一人工维护的单位源；当前 authored 范围为 BONDS 的 `99` 个 TypeId 加 legacy/demo `1000`，共 `100` 份文档和 `185` 个模型变体。每个文档的精英 0 完整，高阶条目按最近较低条目继承原子块，`sourceVariant` 决定物理资源文件夹。
 - `animations[]` 只保存稳定 key、真实 Spine 名称和必需的源时长；`Default`、Hit、Skeleton 类型、动画行为与播放倍速均不属于 v2 源契约。
-- 人工维护 v2 稀有度为 `1000=1`、`5503=6`、`5504=3`；冻结目录仍暴露迁移前值。合法但旧目录无法表达的不攻击/不阻挡 v2 单位必须投影失败。
+- BONDS 单位的 authored v2 稀有度来自 BONDS 规范，保留的 `1000=1`；冻结目录仍只暴露迁移前的 `1000/5503/5504`。合法但旧目录无法表达的不攻击/不阻挡 v2 单位必须投影失败。
 - 源直读 `UnitFactory` 是 legacy/debug 适配器，正式运行时不依赖它，并在后续正式数据路径不再需要时销毁。旧 Hit/presentation 链的完整销毁范围由 `docs/bonds/UnitAnimation.md` 维护。
 
 ## 14. UI-INFO-001 单位详情投影（2026-07-24）

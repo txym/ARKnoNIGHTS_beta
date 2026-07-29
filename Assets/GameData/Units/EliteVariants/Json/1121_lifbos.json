@@ -1,0 +1,192 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1121,
+    "common":  {
+                   "rarity":  5,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1121_lifbos",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "重犯",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  20000,
+                                                      "attack":  800,
+                                                      "defense":  400,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "lifbos",
+                                       "skeletonDataResourceName":  "enemy_1121_lifbos_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1121_lifbos",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_grey"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_grey"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack_grey",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_grey"
+                                                          },
+                                                          {
+                                                              "key":  "idle.orange",
+                                                              "name":  "Idle_orange",
+                                                              "durationSeconds":  1.666667
+                                                          },
+                                                          {
+                                                              "key":  "move.orange",
+                                                              "name":  "Move_orange",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.orange",
+                                                              "name":  "Attack_orange",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "death.orange",
+                                                              "name":  "Die_orange",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "idle.red",
+                                                              "name":  "Idle_red",
+                                                              "durationSeconds":  1.666667
+                                                          },
+                                                          {
+                                                              "key":  "move.red",
+                                                              "name":  "Move_red",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.red",
+                                                              "name":  "Attack_red",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "death.red",
+                                                              "name":  "Die_red",
+                                                              "durationSeconds":  1
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1121_lifbos_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "传奇重犯",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  25000,
+                                                      "attack":  1000,
+                                                      "defense":  500,
+                                                      "magicResistance":  0
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.8,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "lifbos_2",
+                                       "skeletonDataResourceName":  "enemy_1121_lifbos_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1121_lifbos_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle_grey"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_grey"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack_grey",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die_grey"
+                                                          },
+                                                          {
+                                                              "key":  "idle.orange",
+                                                              "name":  "Idle_orange",
+                                                              "durationSeconds":  1.666667
+                                                          },
+                                                          {
+                                                              "key":  "move.orange",
+                                                              "name":  "Move_orange",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.orange",
+                                                              "name":  "Attack_orange",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "death.orange",
+                                                              "name":  "Die_orange",
+                                                              "durationSeconds":  1
+                                                          },
+                                                          {
+                                                              "key":  "idle.red",
+                                                              "name":  "Idle_red",
+                                                              "durationSeconds":  1.666667
+                                                          },
+                                                          {
+                                                              "key":  "move.red",
+                                                              "name":  "Move_red",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "attack.red",
+                                                              "name":  "Attack_red",
+                                                              "durationSeconds":  2.333333
+                                                          },
+                                                          {
+                                                              "key":  "death.red",
+                                                              "name":  "Die_red",
+                                                              "durationSeconds":  1
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

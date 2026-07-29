@@ -13,19 +13,24 @@ playback behavior stays in the animation layer.
 The first implemented migration covers TypeIds `1000`, `5503`, and `5504`.
 Elite 0 is complete for those documents. Higher elite entries inherit omitted
 atomic blocks from the nearest lower entry, while `sourceVariant` remains the
-authority for the physical resource folder. Importing the remaining units and
-implementing the independent animation layer are later work.
+authority for the physical resource folder.
+
+The 2026-07-29 authored-data import extends this authority to the 99 current
+BONDS TypeIds while retaining legacy/demo TypeId `1000`: 100 documents and 185
+model variants in total. TypeId `1021` is outside the current scope. The
+independent animation layer and runtime elite 2/3 selection remain later work.
 
 ## Compatibility
 
-The existing Player catalogs are frozen during the first three-unit migration.
+The existing Player catalogs remain frozen during the subsequent bulk import.
 Formal Player runtime continues to read only the generated Resources catalogs;
 it never reads authored Editor sources. Legacy v1 projection uses mapped
 skeleton type 2 and an empty Hit name. Sources that v1 cannot represent, such
 as a valid v2 non-attacker/non-blocker, fail instead of being coerced.
 
-Authored v2 rarity is `1000=1`, `5503=6`, and `5504=3`; the frozen catalog
-continues to expose its pre-migration values until a later catalog migration.
+Authored BONDS rarity comes from `docs/bonds/BONDS_SPEC.md`, while retained
+legacy/demo TypeId `1000` uses rarity `1`; the frozen catalog continues to
+expose its pre-migration three-TypeId values until a later catalog migration.
 The generator's mapped Type 2 is temporary presentation transport and is not
 an authored unit fact.
 

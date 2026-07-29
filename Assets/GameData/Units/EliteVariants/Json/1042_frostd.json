@@ -1,0 +1,60 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1042,
+    "common":  {
+                   "rarity":  6,
+                   "deploymentCost":  2,
+                   "attackMethod":  0,
+                   "actionMethod":  2,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  false,
+                   "blockCapacity":  0,
+                   "tauntLevel":  0,
+                   "damageType":  "None"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1042_frostd",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "寒霜",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6500,
+                                                      "attack":  0,
+                                                      "defense":  600,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.9,
+                                                      "attackIntervalSeconds":  0,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "frostd",
+                                       "skeletonDataResourceName":  "enemy_1042_frostd_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1042_frostd",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move_Loop"
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

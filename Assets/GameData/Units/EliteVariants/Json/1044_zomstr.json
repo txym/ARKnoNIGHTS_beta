@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  1044,
+    "common":  {
+                   "rarity":  4,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "1044_zomstr",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "宿主拾荒者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  6000,
+                                                      "attack":  500,
+                                                      "defense":  130,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.65,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "zomstr",
+                                       "skeletonDataResourceName":  "enemy_1044_zomstr_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1044_zomstr",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.533333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     },
+                     {
+                         "minEliteLevel":  2,
+                         "sourceVariant":  "1044_zomstr_2",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "宿主流浪者",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  11000,
+                                                      "attack":  650,
+                                                      "defense":  200,
+                                                      "magicResistance":  30
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  0.65,
+                                                      "attackIntervalSeconds":  3,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "zomstr_2",
+                                       "skeletonDataResourceName":  "enemy_1044_zomstr_2_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_1044_zomstr_2",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.533333
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}

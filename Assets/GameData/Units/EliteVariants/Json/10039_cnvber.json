@@ -1,0 +1,70 @@
+{
+    "schemaVersion":  "unit-elite-variants-v2",
+    "typeId":  10039,
+    "common":  {
+                   "rarity":  6,
+                   "deploymentCost":  2,
+                   "attackMethod":  1,
+                   "actionMethod":  1,
+                   "attackRadiusMetres":  0,
+                   "blockRadiusMetres":  0,
+                   "canBlock":  true,
+                   "blockCapacity":  1,
+                   "tauntLevel":  0,
+                   "damageType":  "Physical"
+               },
+    "variants":  [
+                     {
+                         "minEliteLevel":  0,
+                         "sourceVariant":  "10039_cnvber",
+                         "statsLevel":  0,
+                         "displayNameZhHans":  "“开怀畅饮”",
+                         "skillDescriptionZhHans":  "",
+                         "stats":  {
+                                       "combat":  {
+                                                      "maxHitPoints":  22000,
+                                                      "attack":  900,
+                                                      "defense":  900,
+                                                      "magicResistance":  20
+                                                  },
+                                       "shared":  {
+                                                      "moveSpeedMetresPerSecond":  1.2,
+                                                      "attackIntervalSeconds":  5,
+                                                      "lifeDeduct":  1
+                                                  }
+                                   },
+                         "model":  {
+                                       "resourceKey":  "cnvber",
+                                       "skeletonDataResourceName":  "enemy_10039_cnvber_SkeletonData",
+                                       "profilePictureResourceName":  "UIImage_10039_cnvber",
+                                       "animations":  [
+                                                          {
+                                                              "key":  "idle",
+                                                              "name":  "Idle"
+                                                          },
+                                                          {
+                                                              "key":  "move",
+                                                              "name":  "Move"
+                                                          },
+                                                          {
+                                                              "key":  "attack",
+                                                              "name":  "Attack",
+                                                              "durationSeconds":  1.5
+                                                          },
+                                                          {
+                                                              "key":  "death",
+                                                              "name":  "Die"
+                                                          },
+                                                          {
+                                                              "key":  "skill",
+                                                              "name":  "Skill",
+                                                              "durationSeconds":  2.833333
+                                                          }
+                                                      ]
+                                   },
+                         "innateAbilityIds":  [
+
+                                              ]
+                     }
+                 ]
+}
