@@ -284,6 +284,34 @@ namespace ArknoNights.Match
                 "match.phase.advance.accepted");
         }
 
+        public MatchTransactionResult TryDiscardRemainingOverflowAtSeal()
+        {
+            if (state.Phase != MatchPhase.Sealing)
+            {
+                return TransactionRejected(
+                    MatchCommandCode.InvalidTransition,
+                    "match.overflow.discard.phase.invalid");
+            }
+
+            var draft = new MatchEconomyTransactionDraft(state);
+            if (!draft.TryDiscardRemainingOverflow(
+                out var retiredUnitIds,
+                out var code,
+                out var diagnosticCode))
+            {
+                return TransactionRejected(code, diagnosticCode);
+            }
+            if (code == MatchCommandCode.AcceptedNoChange)
+            {
+                return TransactionNoChange(diagnosticCode);
+            }
+            return CommitHost(
+                draft.BuildState(true),
+                diagnosticCode,
+                code,
+                retiredUnitIds);
+        }
+
         public MatchTransactionResult TrySetConnectionState(
             string playerId,
             MatchConnectionState connectionState)
@@ -593,6 +621,7 @@ namespace ArknoNights.Match
                 command.SlotIndex,
                 command.ExpectedUnitId,
                 stagingSlotPolicy,
+                out var acquisition,
                 out var code,
                 out var diagnosticCode))
             {
@@ -611,7 +640,8 @@ namespace ArknoNights.Match
                 envelope,
                 draft.BuildState(true),
                 MatchCommandCode.Accepted,
-                diagnosticCode);
+                diagnosticCode,
+                acquisition);
         }
 
         private MatchCommandResult ExecutePurchaseLevelUpgrade(
@@ -725,7 +755,8 @@ namespace ArknoNights.Match
             MatchCommandEnvelope envelope,
             MatchState nextState,
             MatchCommandCode code,
-            string diagnosticCode)
+            string diagnosticCode,
+            MatchAcquisitionResult acquisition = null)
         {
             if (!MatchStateInvariant.TryValidate(
                 nextState,
@@ -750,7 +781,8 @@ namespace ArknoNights.Match
                 state.StateRevision,
                 state.StateRevision,
                 true,
-                diagnosticCode);
+                diagnosticCode,
+                acquisition);
             Cache(key, envelope, result);
             PublishChanged();
             return result;
@@ -759,7 +791,8 @@ namespace ArknoNights.Match
         private MatchTransactionResult CommitHost(
             MatchState nextState,
             string diagnosticCode,
-            MatchCommandCode code = MatchCommandCode.Accepted)
+            MatchCommandCode code = MatchCommandCode.Accepted,
+            IEnumerable<string> retiredUnitIds = null)
         {
             if (!MatchStateInvariant.TryValidate(
                 nextState,
@@ -777,7 +810,8 @@ namespace ArknoNights.Match
                 state.StateRevision,
                 state.StateRevision,
                 true,
-                diagnosticCode);
+                diagnosticCode,
+                retiredUnitIds);
             PublishChanged();
             return result;
         }

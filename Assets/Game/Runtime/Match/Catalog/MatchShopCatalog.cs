@@ -59,7 +59,8 @@ namespace ArknoNights.Match
             && Rarity <= 6
             && MaxEliteLevel >= 0
             && MaxEliteLevel <= 3
-            && BaseDeploymentCost >= 0;
+            && BaseDeploymentCost >= 0
+            && MatchEliteRules.HasValidDeploymentCosts(this);
     }
 
     public sealed class MatchShopCatalog

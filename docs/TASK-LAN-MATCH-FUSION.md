@@ -1,6 +1,6 @@
 # M3：自动合成与 Overflow Agent 提示词
 
-> 状态：待在独立 worktree 中实施。
+> 状态：已在独立分支 `codex/lan-match-fusion` 实施并完成 focused 验证，尚未集成回主分支。
 > 本文件可直接作为实现 Agent 的任务提示词。本轮只覆盖 M3，并基于 M1、M2 的权威领域层继续工作。
 
 ## 1. 任务角色与目标

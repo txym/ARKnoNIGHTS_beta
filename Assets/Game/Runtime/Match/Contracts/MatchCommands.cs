@@ -123,7 +123,8 @@ namespace ArknoNights.Match
             long currentStateRevision,
             long? acceptedStateRevision,
             bool changedState,
-            string diagnosticCode)
+            string diagnosticCode,
+            MatchAcquisitionResult acquisition = null)
         {
             CommandId = commandId ?? string.Empty;
             Code = code;
@@ -131,6 +132,7 @@ namespace ArknoNights.Match
             AcceptedStateRevision = acceptedStateRevision;
             ChangedState = changedState;
             DiagnosticCode = diagnosticCode ?? string.Empty;
+            Acquisition = acquisition;
 
             var writer = new CanonicalSummaryWriter(nameof(MatchCommandResult));
             writer.String("commandId", CommandId);
@@ -141,6 +143,9 @@ namespace ArknoNights.Match
                 : "null");
             writer.Boolean("changed", ChangedState);
             writer.String("diagnostic", DiagnosticCode);
+            writer.Summary(
+                "acquisition",
+                Acquisition == null ? string.Empty : Acquisition.CanonicalSummary);
             CanonicalSummary = writer.ToString();
         }
 
@@ -154,6 +159,7 @@ namespace ArknoNights.Match
         public long? AcceptedStateRevision { get; }
         public bool ChangedState { get; }
         public string DiagnosticCode { get; }
+        public MatchAcquisitionResult Acquisition { get; }
         public string CanonicalSummary { get; }
     }
 }

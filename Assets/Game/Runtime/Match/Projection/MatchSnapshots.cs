@@ -14,6 +14,8 @@ namespace ArknoNights.Match
             Zone = state.Zone;
             EliteLevel = state.EliteLevel;
             Formation = state.Formation;
+            Buffs = new ReadOnlyCollection<MatchBuffState>(
+                state.Buffs.ToArray());
 
             var writer = new CanonicalSummaryWriter(nameof(PublicMatchUnitSnapshot));
             writer.String("unitId", UnitId);
@@ -21,6 +23,10 @@ namespace ArknoNights.Match
             writer.EnumValue("zone", Zone);
             writer.Integer("eliteLevel", EliteLevel);
             writer.String("formation", Formation.HasValue ? Formation.Value.CanonicalSummary : string.Empty);
+            foreach (var buff in Buffs)
+            {
+                writer.Summary("buff", buff.CanonicalSummary);
+            }
             CanonicalSummary = writer.ToString();
         }
 
@@ -29,6 +35,7 @@ namespace ArknoNights.Match
         public MatchUnitZone Zone { get; }
         public int EliteLevel { get; }
         public MatchFormationPosition? Formation { get; }
+        public IReadOnlyList<MatchBuffState> Buffs { get; }
         public string CanonicalSummary { get; }
     }
 
@@ -131,7 +138,9 @@ namespace ArknoNights.Match
 
     public sealed class OwnerPrivateSnapshot
     {
-        internal OwnerPrivateSnapshot(MatchSeatState seat)
+        internal OwnerPrivateSnapshot(
+            MatchSeatState seat,
+            MatchShopCatalog catalog)
         {
             PlayerId = seat.PlayerId;
             Gold = seat.Gold;
@@ -149,6 +158,19 @@ namespace ArknoNights.Match
                 seat.ShopOffers
                     .OrderBy(offer => offer.SlotIndex)
                     .ToArray());
+            OverflowUnits = new ReadOnlyCollection<MatchUnitState>(
+                seat.Units
+                    .Where(unit => unit.Zone == MatchUnitZone.Overflow)
+                    .OrderBy(unit => unit.AcquisitionOrdinal)
+                    .ThenBy(unit => unit.UnitId, StringComparer.Ordinal)
+                    .ToArray());
+            StagingStacks = MatchStagingProjection.Project(seat, catalog);
+            TargetedUnitBuffs = new ReadOnlyCollection<PlayerTargetedUnitBuffState>(
+                seat.TargetedUnitBuffs.ToArray());
+            GlobalBuffs = new ReadOnlyCollection<PlayerGlobalBuffState>(
+                seat.GlobalBuffs.ToArray());
+            SourceEffects = new ReadOnlyCollection<PlayerSourceEffectState>(
+                seat.SourceEffects.ToArray());
 
             var writer = new CanonicalSummaryWriter(nameof(OwnerPrivateSnapshot));
             writer.String("playerId", PlayerId);
@@ -167,6 +189,26 @@ namespace ArknoNights.Match
             {
                 writer.Summary("shop", offer.CanonicalSummary);
             }
+            foreach (var unit in OverflowUnits)
+            {
+                writer.Summary("overflowUnit", unit.CanonicalSummary);
+            }
+            foreach (var stack in StagingStacks)
+            {
+                writer.Summary("stagingStack", stack.CanonicalSummary);
+            }
+            foreach (var buff in TargetedUnitBuffs)
+            {
+                writer.Summary("targetedUnitBuff", buff.CanonicalSummary);
+            }
+            foreach (var buff in GlobalBuffs)
+            {
+                writer.Summary("globalBuff", buff.CanonicalSummary);
+            }
+            foreach (var effect in SourceEffects)
+            {
+                writer.Summary("sourceEffect", effect.CanonicalSummary);
+            }
             CanonicalSummary = writer.ToString();
         }
 
@@ -180,6 +222,11 @@ namespace ArknoNights.Match
         public int AvailableDeploymentCost { get; }
         public IReadOnlyList<MatchUnitState> Units { get; }
         public IReadOnlyList<MatchShopOfferState> ShopOffers { get; }
+        public IReadOnlyList<MatchUnitState> OverflowUnits { get; }
+        public IReadOnlyList<MatchStagingStackSnapshot> StagingStacks { get; }
+        public IReadOnlyList<PlayerTargetedUnitBuffState> TargetedUnitBuffs { get; }
+        public IReadOnlyList<PlayerGlobalBuffState> GlobalBuffs { get; }
+        public IReadOnlyList<PlayerSourceEffectState> SourceEffects { get; }
         public string CanonicalSummary { get; }
     }
 
@@ -299,7 +346,7 @@ namespace ArknoNights.Match
         {
             return new PlayerMatchSnapshot(
                 ProjectPublic(state),
-                new OwnerPrivateSnapshot(seat));
+                new OwnerPrivateSnapshot(seat, state.Pool.Catalog));
         }
 
         internal static PublicConnectionState ToPublicConnectionState(MatchSeatState seat)

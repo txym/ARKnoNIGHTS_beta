@@ -10,7 +10,9 @@ namespace ArknoNights.Match
     {
         AvailablePool = 0,
         ShopOffer = 1,
-        OwnedUnit = 2
+        OwnedUnit = 2,
+        ConsumedByFusion = 3,
+        OverflowDiscarded = 4
     }
 
     public sealed class MatchPoolEntityState
@@ -92,7 +94,8 @@ namespace ArknoNights.Match
             MatchRandomStateSnapshot randomState,
             int nextNaturalRefreshStartSeat,
             IEnumerable<int> appliedPostBattleRefreshRounds,
-            long nextAcquisitionOrdinal)
+            long nextAcquisitionOrdinal,
+            IEnumerable<MatchRetiredPersistentUnitState> retiredUnits = null)
         {
             Catalog = catalog;
             Entities = new ReadOnlyCollection<MatchPoolEntityState>(
@@ -108,6 +111,10 @@ namespace ArknoNights.Match
                     .OrderBy(round => round)
                     .ToArray());
             NextAcquisitionOrdinal = nextAcquisitionOrdinal;
+            RetiredUnits = new ReadOnlyCollection<MatchRetiredPersistentUnitState>(
+                (retiredUnits ?? Enumerable.Empty<MatchRetiredPersistentUnitState>())
+                    .OrderBy(retired => retired == null ? string.Empty : retired.UnitId, StringComparer.Ordinal)
+                    .ToArray());
             RemainingByType = new ReadOnlyCollection<MatchPoolRemainingCount>(
                 Catalog.Entries
                     .Where(entry => entry.IsShopEligible)
@@ -125,6 +132,10 @@ namespace ArknoNights.Match
             writer.Integer("nextNaturalRefreshStartSeat", NextNaturalRefreshStartSeat);
             writer.Integer("nextAcquisitionOrdinal", NextAcquisitionOrdinal);
             foreach (var round in AppliedPostBattleRefreshRounds) writer.Integer("appliedRound", round);
+            foreach (var retired in RetiredUnits)
+            {
+                writer.Summary("retired", retired == null ? string.Empty : retired.CanonicalSummary);
+            }
             foreach (var entity in Entities) writer.Summary("entity", entity.CanonicalSummary);
             CanonicalSummary = writer.ToString();
         }
@@ -137,6 +148,7 @@ namespace ArknoNights.Match
         public int NextNaturalRefreshStartSeat { get; }
         public IReadOnlyList<int> AppliedPostBattleRefreshRounds { get; }
         public long NextAcquisitionOrdinal { get; }
+        public IReadOnlyList<MatchRetiredPersistentUnitState> RetiredUnits { get; }
         public string CanonicalSummary { get; }
 
         internal static MatchPoolState CreateInitial(
@@ -166,7 +178,8 @@ namespace ArknoNights.Match
                 MatchDeterministicRandomV1.FromSeed(matchSeed, "match-shop-draw-v1").Snapshot,
                 1,
                 Array.Empty<int>(),
-                0);
+                0,
+                Array.Empty<MatchRetiredPersistentUnitState>());
         }
 
         internal MatchPoolState With(
@@ -174,7 +187,8 @@ namespace ArknoNights.Match
             MatchRandomStateSnapshot randomState,
             int? nextNaturalRefreshStartSeat = null,
             IEnumerable<int> appliedPostBattleRefreshRounds = null,
-            long? nextAcquisitionOrdinal = null)
+            long? nextAcquisitionOrdinal = null,
+            IEnumerable<MatchRetiredPersistentUnitState> retiredUnits = null)
         {
             return new MatchPoolState(
                 Catalog,
@@ -182,7 +196,8 @@ namespace ArknoNights.Match
                 randomState,
                 nextNaturalRefreshStartSeat ?? NextNaturalRefreshStartSeat,
                 appliedPostBattleRefreshRounds ?? AppliedPostBattleRefreshRounds,
-                nextAcquisitionOrdinal ?? NextAcquisitionOrdinal);
+                nextAcquisitionOrdinal ?? NextAcquisitionOrdinal,
+                retiredUnits ?? RetiredUnits);
         }
     }
 

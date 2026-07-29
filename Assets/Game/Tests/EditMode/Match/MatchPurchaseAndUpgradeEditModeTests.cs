@@ -74,28 +74,21 @@ namespace ArknoNights.Match.Tests
         }
 
         [Test]
-        public void Purchase_UsesReplaceablePrePurchaseStagingSlotPolicyAtTwelveAndThirteen()
+        public void Purchase_IgnoresLegacyInjectedPolicyAndUsesAuthoritativeProjection()
         {
-            var atTwelve = CreateAuthority(new FixedSlotPolicy(12));
-            atTwelve.TryEnterPreparation(1);
-            var twelveOffer = atTwelve.ProjectForPlayer("player-1").Owner.ShopOffers.First();
-            Assert.That(Execute(
-                atTwelve,
-                "player-1",
-                "at-12",
-                new PurchaseShopOfferCommand(twelveOffer.SlotIndex, twelveOffer.UnitId)).Code,
-                Is.EqualTo(MatchCommandCode.Accepted));
+            var authority = CreateAuthority(new FixedSlotPolicy(13));
+            authority.TryEnterPreparation(1);
+            var offer = authority.ProjectForPlayer("player-1").Owner.ShopOffers.First();
 
-            var atThirteen = CreateAuthority(new FixedSlotPolicy(13));
-            atThirteen.TryEnterPreparation(1);
-            var thirteenOffer = atThirteen.ProjectForPlayer("player-1").Owner.ShopOffers.First();
-            var before = atThirteen.ProjectForHostAuthority();
-            AssertRejectedWithoutStateChange(
-                atThirteen,
-                before,
-                "at-13",
-                new PurchaseShopOfferCommand(thirteenOffer.SlotIndex, thirteenOffer.UnitId),
-                MatchCommandCode.StagingFull);
+            var result = Execute(
+                authority,
+                "player-1",
+                "authoritative-projection",
+                new PurchaseShopOfferCommand(offer.SlotIndex, offer.UnitId));
+
+            Assert.That(result.Code, Is.EqualTo(MatchCommandCode.Accepted));
+            Assert.That(authority.ProjectForPlayer("player-1").Owner.StagingStacks,
+                Has.Count.EqualTo(1));
         }
 
         [Test]

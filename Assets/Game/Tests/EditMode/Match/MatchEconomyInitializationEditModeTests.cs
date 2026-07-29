@@ -25,6 +25,8 @@ namespace ArknoNights.Match.Tests
             AssertRejected(MatchTestData.Catalog(MatchTestData.Entry("1001", 1, maxEliteLevel: 4)));
             AssertRejected(MatchTestData.Catalog(MatchTestData.Entry("1001", 1, baseDeploymentCost: -1)));
             AssertRejected(MatchTestData.Catalog(
+                MatchTestData.Entry("1001", 1, maxEliteLevel: 3, baseDeploymentCost: int.MaxValue)));
+            AssertRejected(MatchTestData.Catalog(
                 MatchTestData.Entry("9001", 1, isShopEligible: false)));
         }
 

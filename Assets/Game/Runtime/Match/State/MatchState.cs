@@ -176,6 +176,53 @@ namespace ArknoNights.Match
             MatchConnectionState connectionState,
             IEnumerable<MatchUnitState> units,
             IEnumerable<MatchShopOfferState> shopOffers)
+            : this(
+                seatIndex,
+                playerId,
+                displayName,
+                avatarId,
+                life,
+                gold,
+                level,
+                totalDeploymentCost,
+                availableDeploymentCost,
+                upgradeDiscountCountAtThisLevel,
+                preparationBehavior,
+                ready,
+                eliminated,
+                placement,
+                controllerKind,
+                connectionState,
+                units,
+                shopOffers,
+                Array.Empty<PlayerTargetedUnitBuffState>(),
+                Array.Empty<PlayerGlobalBuffState>(),
+                Array.Empty<PlayerSourceEffectState>())
+        {
+        }
+
+        internal MatchSeatState(
+            int seatIndex,
+            string playerId,
+            string displayName,
+            string avatarId,
+            int life,
+            int gold,
+            int level,
+            int totalDeploymentCost,
+            int availableDeploymentCost,
+            int upgradeDiscountCountAtThisLevel,
+            MatchPreparationBehaviorState preparationBehavior,
+            bool ready,
+            bool eliminated,
+            int? placement,
+            MatchControllerKind controllerKind,
+            MatchConnectionState connectionState,
+            IEnumerable<MatchUnitState> units,
+            IEnumerable<MatchShopOfferState> shopOffers,
+            IEnumerable<PlayerTargetedUnitBuffState> targetedUnitBuffs,
+            IEnumerable<PlayerGlobalBuffState> globalBuffs,
+            IEnumerable<PlayerSourceEffectState> sourceEffects)
         {
             SeatIndex = seatIndex;
             PlayerId = playerId;
@@ -201,6 +248,18 @@ namespace ArknoNights.Match
                 (shopOffers ?? Enumerable.Empty<MatchShopOfferState>())
                     .OrderBy(offer => offer == null ? int.MinValue : offer.SlotIndex)
                     .ToArray());
+            TargetedUnitBuffs = new ReadOnlyCollection<PlayerTargetedUnitBuffState>(
+                (targetedUnitBuffs ?? Enumerable.Empty<PlayerTargetedUnitBuffState>())
+                    .OrderBy(buff => buff == null ? string.Empty : buff.BuffInstanceId, StringComparer.Ordinal)
+                    .ToArray());
+            GlobalBuffs = new ReadOnlyCollection<PlayerGlobalBuffState>(
+                (globalBuffs ?? Enumerable.Empty<PlayerGlobalBuffState>())
+                    .OrderBy(buff => buff == null ? string.Empty : buff.BuffInstanceId, StringComparer.Ordinal)
+                    .ToArray());
+            SourceEffects = new ReadOnlyCollection<PlayerSourceEffectState>(
+                (sourceEffects ?? Enumerable.Empty<PlayerSourceEffectState>())
+                    .OrderBy(effect => effect == null ? string.Empty : effect.EffectInstanceId, StringComparer.Ordinal)
+                    .ToArray());
             CanonicalSummary = BuildCanonicalSummary();
         }
 
@@ -224,6 +283,9 @@ namespace ArknoNights.Match
         public MatchConnectionState ConnectionState { get; }
         public IReadOnlyList<MatchUnitState> Units { get; }
         public IReadOnlyList<MatchShopOfferState> ShopOffers { get; }
+        public IReadOnlyList<PlayerTargetedUnitBuffState> TargetedUnitBuffs { get; }
+        public IReadOnlyList<PlayerGlobalBuffState> GlobalBuffs { get; }
+        public IReadOnlyList<PlayerSourceEffectState> SourceEffects { get; }
         public string CanonicalSummary { get; }
 
         internal MatchSeatState With(
@@ -235,10 +297,15 @@ namespace ArknoNights.Match
             MatchConnectionState? connectionState = null,
             int? gold = null,
             int? level = null,
+            int? totalDeploymentCost = null,
+            int? availableDeploymentCost = null,
             int? upgradeDiscountCountAtThisLevel = null,
             MatchPreparationBehaviorState preparationBehavior = null,
             IEnumerable<MatchUnitState> units = null,
-            IEnumerable<MatchShopOfferState> shopOffers = null)
+            IEnumerable<MatchShopOfferState> shopOffers = null,
+            IEnumerable<PlayerTargetedUnitBuffState> targetedUnitBuffs = null,
+            IEnumerable<PlayerGlobalBuffState> globalBuffs = null,
+            IEnumerable<PlayerSourceEffectState> sourceEffects = null)
         {
             return new MatchSeatState(
                 SeatIndex,
@@ -248,8 +315,8 @@ namespace ArknoNights.Match
                 Life,
                 gold ?? Gold,
                 level ?? Level,
-                TotalDeploymentCost,
-                AvailableDeploymentCost,
+                totalDeploymentCost ?? TotalDeploymentCost,
+                availableDeploymentCost ?? AvailableDeploymentCost,
                 upgradeDiscountCountAtThisLevel ?? UpgradeDiscountCountAtThisLevel,
                 preparationBehavior ?? PreparationBehavior,
                 ready ?? Ready,
@@ -258,7 +325,10 @@ namespace ArknoNights.Match
                 controllerKind ?? ControllerKind,
                 connectionState ?? ConnectionState,
                 units ?? Units,
-                shopOffers ?? ShopOffers);
+                shopOffers ?? ShopOffers,
+                targetedUnitBuffs ?? TargetedUnitBuffs,
+                globalBuffs ?? GlobalBuffs,
+                sourceEffects ?? SourceEffects);
         }
 
         internal MatchSeatState WithElimination(int? placement)
@@ -281,7 +351,10 @@ namespace ArknoNights.Match
                 ControllerKind,
                 MatchConnectionState.Eliminated,
                 Units,
-                ShopOffers);
+                ShopOffers,
+                TargetedUnitBuffs,
+                GlobalBuffs,
+                SourceEffects);
         }
 
         private string BuildCanonicalSummary()
@@ -310,6 +383,18 @@ namespace ArknoNights.Match
             foreach (var offer in ShopOffers)
             {
                 writer.Summary("shop", offer == null ? string.Empty : offer.CanonicalSummary);
+            }
+            foreach (var buff in TargetedUnitBuffs)
+            {
+                writer.Summary("targetedUnitBuff", buff == null ? string.Empty : buff.CanonicalSummary);
+            }
+            foreach (var buff in GlobalBuffs)
+            {
+                writer.Summary("globalBuff", buff == null ? string.Empty : buff.CanonicalSummary);
+            }
+            foreach (var effect in SourceEffects)
+            {
+                writer.Summary("sourceEffect", effect == null ? string.Empty : effect.CanonicalSummary);
             }
             return writer.ToString();
         }
@@ -530,6 +615,19 @@ namespace ArknoNights.Match
             var shopLocations = new Dictionary<string, string>(StringComparer.Ordinal);
             var shopTypeIds = new Dictionary<string, string>(StringComparer.Ordinal);
             var acquisitionOrdinals = new HashSet<long>();
+            var retiredById = new Dictionary<string, MatchRetirementReason>(StringComparer.Ordinal);
+            foreach (var retired in state.Pool.RetiredUnits)
+            {
+                if (retired == null
+                    || string.IsNullOrWhiteSpace(retired.UnitId)
+                    || !Enum.IsDefined(typeof(MatchRetirementReason), retired.Reason)
+                    || retiredById.ContainsKey(retired.UnitId))
+                {
+                    diagnosticCode = "match.invariant.retired";
+                    return false;
+                }
+                retiredById.Add(retired.UnitId, retired.Reason);
+            }
             MatchSeatState host = null;
             foreach (var seat in state.Seats)
             {
@@ -606,6 +704,7 @@ namespace ArknoNights.Match
                 }
 
                 var deployedPositions = new HashSet<MatchFormationPosition>();
+                var deployedCost = 0;
                 foreach (var unit in seat.Units)
                 {
                     if (unit == null
@@ -613,10 +712,14 @@ namespace ArknoNights.Match
                         || string.IsNullOrWhiteSpace(unit.TypeId)
                         || !Enum.IsDefined(typeof(MatchUnitZone), unit.Zone)
                         || unit.EliteLevel < 0
+                        || unit.EliteLevel > 3
                         || unit.AcquisitionOrdinal < 0
                         || !unitIds.Add(unit.UnitId)
                         || !acquisitionOrdinals.Add(unit.AcquisitionOrdinal)
-                        || unitOwners.ContainsKey(unit.UnitId))
+                        || unitOwners.ContainsKey(unit.UnitId)
+                        || retiredById.ContainsKey(unit.UnitId)
+                        || !state.Pool.Catalog.TryGet(unit.TypeId, out var unitCatalogEntry)
+                        || unit.EliteLevel > unitCatalogEntry.MaxEliteLevel)
                     {
                         diagnosticCode = "match.invariant.unit";
                         return false;
@@ -630,6 +733,19 @@ namespace ArknoNights.Match
                             || !deployedPositions.Add(unit.Formation.Value))
                         {
                             diagnosticCode = "match.invariant.deployedFormation";
+                            return false;
+                        }
+                        try
+                        {
+                            deployedCost = checked(
+                                deployedCost
+                                + MatchEliteRules.GetDeploymentCost(
+                                    unitCatalogEntry,
+                                    unit.EliteLevel));
+                        }
+                        catch (OverflowException)
+                        {
+                            diagnosticCode = "match.invariant.deployedCost.overflow";
                             return false;
                         }
                     }
@@ -647,13 +763,55 @@ namespace ArknoNights.Match
                         return false;
                     }
                 }
+                if (seat.AvailableDeploymentCost
+                    != seat.TotalDeploymentCost - deployedCost)
+                {
+                    diagnosticCode = "match.invariant.deploymentCost.balance";
+                    return false;
+                }
+
+                var ownedUnitIds = new HashSet<string>(
+                    seat.Units.Select(unit => unit.UnitId),
+                    StringComparer.Ordinal);
+                var targetedBuffIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var buff in seat.TargetedUnitBuffs)
+                {
+                    if (buff == null
+                        || !buff.IsValid
+                        || !targetedBuffIds.Add(buff.BuffInstanceId)
+                        || !ownedUnitIds.Contains(buff.TargetUnitId))
+                    {
+                        diagnosticCode = "match.invariant.targetedBuff";
+                        return false;
+                    }
+                }
+                var globalBuffIds = new HashSet<string>(StringComparer.Ordinal);
+                if (seat.GlobalBuffs.Any(buff =>
+                    buff == null
+                    || !buff.IsValid
+                    || !globalBuffIds.Add(buff.BuffInstanceId)))
+                {
+                    diagnosticCode = "match.invariant.globalBuff";
+                    return false;
+                }
+                var sourceEffectIds = new HashSet<string>(StringComparer.Ordinal);
+                if (seat.SourceEffects.Any(effect =>
+                    effect == null
+                    || !effect.IsValid
+                    || !sourceEffectIds.Add(effect.EffectInstanceId)))
+                {
+                    diagnosticCode = "match.invariant.sourceEffect";
+                    return false;
+                }
 
                 if (seat.ShopOffers.Count != MatchEconomyRules.ShopSlotCount)
                 {
                     diagnosticCode = "match.invariant.shop.count";
                     return false;
                 }
-                var stagingSlotUsage = stagingSlotPolicy.CountOccupiedSlots(seat.Units);
+                var stagingSlotUsage = MatchStagingProjection.CountOccupiedSlots(
+                    seat,
+                    state.Pool.Catalog);
                 if (stagingSlotUsage < 0
                     || stagingSlotUsage > MatchEconomyRules.StagingSlotCapacity)
                 {
@@ -718,6 +876,12 @@ namespace ArknoNights.Match
                 diagnosticCode = "match.invariant.shop.unitIdOwned";
                 return false;
             }
+            if (unitIds.Overlaps(retiredById.Keys)
+                || shopUnitIds.Overlaps(retiredById.Keys))
+            {
+                diagnosticCode = "match.invariant.retired.current";
+                return false;
+            }
             if (acquisitionOrdinals.Count > 0
                 && state.Pool.NextAcquisitionOrdinal <= acquisitionOrdinals.Max())
             {
@@ -747,7 +911,8 @@ namespace ArknoNights.Match
                         if (!string.IsNullOrEmpty(entity.PlayerId)
                             || entity.ShopSlotIndex.HasValue
                             || unitIds.Contains(entity.UnitId)
-                            || shopUnitIds.Contains(entity.UnitId))
+                            || shopUnitIds.Contains(entity.UnitId)
+                            || retiredById.ContainsKey(entity.UnitId))
                         {
                             diagnosticCode = "match.invariant.pool.availableLocation";
                             return false;
@@ -779,12 +944,41 @@ namespace ArknoNights.Match
                             return false;
                         }
                         break;
+                    case MatchPoolEntityLocation.ConsumedByFusion:
+                        if (!string.IsNullOrEmpty(entity.PlayerId)
+                            || entity.ShopSlotIndex.HasValue
+                            || unitIds.Contains(entity.UnitId)
+                            || shopUnitIds.Contains(entity.UnitId)
+                            || !retiredById.TryGetValue(
+                                entity.UnitId,
+                                out var fusionRetirementReason)
+                            || fusionRetirementReason != MatchRetirementReason.FusionConsumed)
+                        {
+                            diagnosticCode = "match.invariant.pool.fusionConsumedLocation";
+                            return false;
+                        }
+                        break;
+                    case MatchPoolEntityLocation.OverflowDiscarded:
+                        if (!string.IsNullOrEmpty(entity.PlayerId)
+                            || entity.ShopSlotIndex.HasValue
+                            || unitIds.Contains(entity.UnitId)
+                            || shopUnitIds.Contains(entity.UnitId)
+                            || !retiredById.TryGetValue(
+                                entity.UnitId,
+                                out var overflowRetirementReason)
+                            || overflowRetirementReason != MatchRetirementReason.OverflowDiscarded)
+                        {
+                            diagnosticCode = "match.invariant.pool.overflowDiscardedLocation";
+                            return false;
+                        }
+                        break;
                 }
             }
-            if (!poolIds.SetEquals(unitIds.Concat(shopUnitIds).Concat(
-                state.Pool.Entities
-                    .Where(entity => entity.Location == MatchPoolEntityLocation.AvailablePool)
-                    .Select(entity => entity.UnitId))))
+            if (!shopUnitIds.IsSubsetOf(poolIds)
+                || unitIds.Any(unitId =>
+                    MatchPoolUnitId.IsValid(unitId) && !poolIds.Contains(unitId))
+                || retiredById.Keys.Any(unitId =>
+                    MatchPoolUnitId.IsValid(unitId) && !poolIds.Contains(unitId)))
             {
                 diagnosticCode = "match.invariant.pool.conservation";
                 return false;

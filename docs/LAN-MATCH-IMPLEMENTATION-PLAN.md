@@ -1,6 +1,6 @@
 # 局域网同步对局实施计划
 
-> 状态：M1 已集成到 `txym`；M2 是下一可启动里程碑，M2—M8 尚未执行。
+> 状态：M1、M2 已形成基线；M3 已在 `codex/lan-match-fusion` 完成并等待主 Planner 集成，M4—M8 尚未执行。
 >
 > 玩家可见规则见 [LAN-MATCH-DESIGN.md](LAN-MATCH-DESIGN.md)。战斗分块计算的独立 Agent 提示词见 [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md)；M1 暴露出的既有 Battle 基线漂移由 [TASK-BATTLE-BASELINE-CLEANUP.md](TASK-BATTLE-BASELINE-CLEANUP.md) 单独处理。
 
@@ -169,6 +169,8 @@ M1 暴露出的 Battle 基线漂移必须按 [`TASK-BATTLE-BASELINE-CLEANUP.md`]
 
 ### M2：共享牌库、商店、UnitId 与经济
 
+状态（2026-07-30）：M2 基线提交为 `1d62ee713aa17ce24d2bc2098516d9c7eea55fed`，focused Match EditMode 为 `60/60`；M3 从该提交创建独立 worktree，未另建第二套权威状态。
+
 在 M1 基础上串行实现：
 
 - 根据实际运行时单位目录建立共享实体牌库；
@@ -193,6 +195,8 @@ M1 暴露出的 Battle 基线漂移必须按 [`TASK-BATTLE-BASELINE-CLEANUP.md`]
 - 共享牌库剩余实体只存在于 HostOnly 状态。
 
 ### M3：合成和 Overflow
+
+状态（2026-07-30）：已在 `codex/lan-match-fusion` 实现。当前 focused Match EditMode 为 `87/87`，包括 M1/M2 全部既有用例和 M3 自动合成、Buff、Cost、严格堆叠、Overflow、退休生命周期、投影与原子性用例；完整验证记录见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)。
 
 在 M2 之后实现为一个原子“获得单位事务”：
 

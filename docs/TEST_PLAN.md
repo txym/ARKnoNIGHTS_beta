@@ -78,7 +78,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - 玩家与回合：`LocalMatchStateEditModeTests`、`FourPlayerBattleRoundSealerEditModeTests`；
 - HUD：`ShopReadyHudStateEditModeTests`、`PlayerListObserverEditModeTests`；
 - Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试；
-- Match M1–M2 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、两级加权抽取、公平刷新、冻结、购买、升级、规范摘要和权限裁剪。
+- Match M1–M3 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、两级加权抽取、公平刷新、冻结、购买、升级、自动合成、Buff 重映射、部署 Cost、严格备战席栈、Overflow、永久退休、规范摘要和权限裁剪。
 
 规则或公共基础设施变化后再运行完整 EditMode。
 
@@ -148,10 +148,11 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 
 - 当前 Lobby 覆盖发现、创建、加入、准备、开始、离开和房主解散；
 - socket、消息长度、主线程派发和生命周期必须有结构化失败路径；
-- Match M1–M2 focused EditMode 必须验证固定四席位、初始化拒绝路径、单调 revision、重复 CommandId、稳定摘要、连接内部事务、共享实体唯一占位、失败事务不推进随机状态、自然刷新统一返池后按槽交错抽取，以及 Public/Owner/Host 权限隔离；
+- Match M1–M3 focused EditMode 必须验证固定四席位、初始化拒绝路径、单调 revision、重复 CommandId、稳定摘要、连接内部事务、共享实体唯一占位、失败事务不推进随机状态、自然刷新统一返池后按槽交错抽取，以及 Public/Owner/Host 权限隔离；
 - M2 还必须精确断言池副本数、具体 UnitId、概率/排序、刷新游标、槽位冻结、价格、余额、升级折扣、AcquisitionOrdinal 和结构化结果码，不能只断言非空或数量近似正确；
-- M1–M2 没有 PlayMode、Socket、场景或 UI 接入，不能用纯领域测试推断局域网流程可玩；
-- 后续 Match 里程碑必须逐步新增版本握手传输、命令排序、快照同步、自动合成、Overflow、重连、AI 接管、回合结算和跨端摘要一致性验证；
+- M3 还必须精确断言 `0..3` 精英上限与 `1/2/4/8` 副本等价、`1/2/3/5` 战斗实体派生、确定性幸存 ID、单 revision 合成诊断、tombstone/池守恒、Buff 引用、Cost 退场、严格堆叠排序、Overflow 非阻塞提升与封存删除；
+- M1–M3 没有 PlayMode、Socket、场景或 UI 接入，不能用纯领域测试推断局域网流程可玩；
+- 后续 Match 里程碑必须逐步新增版本握手传输、命令排序、快照同步、重连、AI 接管、回合结算、BattleInput 和跨端摘要一致性验证；
 - 不得把“收到 Lobby Start”记为正式联网对局通过。
 
 ## 6. 证据记录

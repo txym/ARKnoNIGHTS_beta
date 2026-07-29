@@ -10,6 +10,7 @@ namespace ArknoNights.Match
         private readonly Dictionary<string, MatchSeatState> seatsByPlayerId;
         private readonly Dictionary<string, MatchPoolEntityState> entitiesById;
         private readonly MatchDeterministicRandomV1 random;
+        private readonly Dictionary<string, MatchRetiredPersistentUnitState> retiredById;
         private int nextNaturalRefreshStartSeat;
         private readonly HashSet<int> appliedPostBattleRefreshRounds;
         private long nextAcquisitionOrdinal;
@@ -24,6 +25,9 @@ namespace ArknoNights.Match
                 entity => entity.UnitId,
                 StringComparer.Ordinal);
             random = MatchDeterministicRandomV1.FromState(source.Pool.RandomState);
+            retiredById = source.Pool.RetiredUnits.ToDictionary(
+                retired => retired.UnitId,
+                StringComparer.Ordinal);
             nextNaturalRefreshStartSeat = source.Pool.NextNaturalRefreshStartSeat;
             appliedPostBattleRefreshRounds =
                 new HashSet<int>(source.Pool.AppliedPostBattleRefreshRounds);
@@ -165,9 +169,11 @@ namespace ArknoNights.Match
             int shopSlotIndex,
             string expectedUnitId,
             IStagingSlotPolicy stagingSlotPolicy,
+            out MatchAcquisitionResult acquisition,
             out MatchCommandCode code,
             out string diagnosticCode)
         {
+            acquisition = null;
             var seat = GetSeat(playerId);
             if (stagingSlotPolicy == null)
             {
@@ -194,7 +200,9 @@ namespace ArknoNights.Match
                 diagnosticCode = "match.shop.purchase.offer.changed";
                 return false;
             }
-            var stagingSlotUsage = stagingSlotPolicy.CountOccupiedSlots(seat.Units);
+            var stagingSlotUsage = MatchStagingProjection.CountOccupiedSlots(
+                seat,
+                source.Pool.Catalog);
             if (stagingSlotUsage < 0)
             {
                 code = MatchCommandCode.InternalInvariantViolation;
@@ -214,9 +222,26 @@ namespace ArknoNights.Match
                 diagnosticCode = "match.shop.purchase.gold.insufficient";
                 return false;
             }
+            if (nextAcquisitionOrdinal == long.MaxValue)
+            {
+                code = MatchCommandCode.InternalInvariantViolation;
+                diagnosticCode = "match.acquisition.ordinal.exhausted";
+                return false;
+            }
 
             SpendGold(playerId, price);
-            AddOwnedUnitToStaging(playerId, shopSlotIndex);
+            var acquired = AddOwnedUnitToStaging(playerId, shopSlotIndex);
+            if (!TryResolveAcquisition(
+                playerId,
+                acquired.UnitId,
+                acquired.TypeId,
+                price,
+                out acquisition,
+                out code,
+                out diagnosticCode))
+            {
+                return false;
+            }
             code = MatchCommandCode.Accepted;
             diagnosticCode = "match.shop.purchase.accepted";
             return true;
@@ -250,6 +275,477 @@ namespace ArknoNights.Match
             return unit;
         }
 
+        internal bool TryAcquireAuthorizedPersistentUnit(
+            string playerId,
+            MatchAuthorizedPersistentUnit acquired,
+            out MatchAcquisitionResult acquisition,
+            out MatchCommandCode code,
+            out string diagnosticCode)
+        {
+            acquisition = null;
+            if (source.Phase != MatchPhase.Preparation
+                && source.Phase != MatchPhase.Battle)
+            {
+                code = MatchCommandCode.PhaseRejected;
+                diagnosticCode = "match.acquisition.phase.rejected";
+                return false;
+            }
+            if (acquired == null
+                || string.IsNullOrWhiteSpace(acquired.UnitId)
+                || string.IsNullOrWhiteSpace(acquired.TypeId)
+                || acquired.Buffs.Any(buff =>
+                    buff == null
+                    || string.IsNullOrWhiteSpace(buff.BuffId)
+                    || buff.CanonicalPayload == null))
+            {
+                code = MatchCommandCode.InvalidPayload;
+                diagnosticCode = "match.acquisition.unit.invalid";
+                return false;
+            }
+            if (!seatsByPlayerId.TryGetValue(playerId ?? string.Empty, out var seat))
+            {
+                code = MatchCommandCode.UnknownPlayer;
+                diagnosticCode = "match.acquisition.player.unknown";
+                return false;
+            }
+            if (seat.Eliminated)
+            {
+                code = MatchCommandCode.Eliminated;
+                diagnosticCode = "match.acquisition.player.eliminated";
+                return false;
+            }
+            if (!source.Pool.Catalog.TryGet(acquired.TypeId, out var entry)
+                || acquired.EliteLevel < 0
+                || acquired.EliteLevel > entry.MaxEliteLevel)
+            {
+                code = MatchCommandCode.InvalidPayload;
+                diagnosticCode = "match.acquisition.catalog.invalid";
+                return false;
+            }
+            if (nextAcquisitionOrdinal == long.MaxValue)
+            {
+                code = MatchCommandCode.InternalInvariantViolation;
+                diagnosticCode = "match.acquisition.ordinal.exhausted";
+                return false;
+            }
+            if (seatsByPlayerId.Values.SelectMany(item => item.Units).Any(
+                    unit => string.Equals(unit.UnitId, acquired.UnitId, StringComparison.Ordinal))
+                || entitiesById.ContainsKey(acquired.UnitId)
+                || retiredById.ContainsKey(acquired.UnitId))
+            {
+                code = MatchCommandCode.InvalidPayload;
+                diagnosticCode = "match.acquisition.unitId.duplicate";
+                return false;
+            }
+
+            var ordinal = nextAcquisitionOrdinal;
+            var unit = new MatchUnitState(
+                acquired.UnitId,
+                acquired.TypeId,
+                MatchUnitZone.Staging,
+                acquired.EliteLevel,
+                null,
+                ordinal,
+                acquired.Buffs);
+            var stagingSeat = seat.With(units: seat.Units.Concat(new[] { unit }));
+            if (MatchStagingProjection.CountOccupiedSlots(
+                stagingSeat,
+                source.Pool.Catalog) > MatchEconomyRules.StagingSlotCapacity)
+            {
+                unit = new MatchUnitState(
+                    unit.UnitId,
+                    unit.TypeId,
+                    MatchUnitZone.Overflow,
+                    unit.EliteLevel,
+                    null,
+                    unit.AcquisitionOrdinal,
+                    unit.Buffs);
+            }
+            nextAcquisitionOrdinal = checked(nextAcquisitionOrdinal + 1);
+            ReplaceSeat(seat.With(units: seat.Units.Concat(new[] { unit })));
+            return TryResolveAcquisition(
+                playerId,
+                unit.UnitId,
+                unit.TypeId,
+                0,
+                out acquisition,
+                out code,
+                out diagnosticCode);
+        }
+
+        internal bool TryDiscardRemainingOverflow(
+            out IReadOnlyList<string> retiredUnitIds,
+            out MatchCommandCode code,
+            out string diagnosticCode)
+        {
+            var ordered = seatsByPlayerId.Values
+                .OrderBy(seat => seat.SeatIndex)
+                .SelectMany(seat => seat.Units
+                    .Where(unit => unit.Zone == MatchUnitZone.Overflow)
+                    .OrderBy(unit => unit.AcquisitionOrdinal)
+                    .ThenBy(unit => unit.UnitId, StringComparer.Ordinal)
+                    .Select(unit => new OverflowDiscardCandidate(seat.PlayerId, unit)))
+                .ToArray();
+            if (ordered.Length == 0)
+            {
+                retiredUnitIds = Array.Empty<string>();
+                code = MatchCommandCode.AcceptedNoChange;
+                diagnosticCode = "match.overflow.discard.noChange";
+                return true;
+            }
+
+            foreach (var candidate in ordered)
+            {
+                var seat = GetSeat(candidate.PlayerId);
+                var targeted = seat.TargetedUnitBuffs.Where(buff =>
+                    string.Equals(
+                        buff.TargetUnitId,
+                        candidate.Unit.UnitId,
+                        StringComparison.Ordinal));
+                if (targeted.Any(buff =>
+                    buff.DiscardPolicy != MatchTargetedBuffDiscardPolicy.RemoveWithTarget))
+                {
+                    retiredUnitIds = Array.Empty<string>();
+                    code = MatchCommandCode.InvalidPayload;
+                    diagnosticCode = "match.overflow.discard.buffPolicy.missing";
+                    return false;
+                }
+            }
+
+            foreach (var group in ordered.GroupBy(
+                candidate => candidate.PlayerId,
+                StringComparer.Ordinal))
+            {
+                var seat = GetSeat(group.Key);
+                var discardedIds = new HashSet<string>(
+                    group.Select(candidate => candidate.Unit.UnitId),
+                    StringComparer.Ordinal);
+                ReplaceSeat(seat.With(
+                    units: seat.Units.Where(unit => !discardedIds.Contains(unit.UnitId)),
+                    targetedUnitBuffs: seat.TargetedUnitBuffs.Where(
+                        buff => !discardedIds.Contains(buff.TargetUnitId))));
+            }
+            foreach (var candidate in ordered)
+            {
+                if (!TryRetire(
+                    candidate.PlayerId,
+                    candidate.Unit.UnitId,
+                    MatchRetirementReason.OverflowDiscarded,
+                    out diagnosticCode))
+                {
+                    retiredUnitIds = Array.Empty<string>();
+                    code = MatchCommandCode.InternalInvariantViolation;
+                    return false;
+                }
+            }
+
+            retiredUnitIds = ordered.Select(candidate => candidate.Unit.UnitId).ToArray();
+            code = MatchCommandCode.Accepted;
+            diagnosticCode = "match.overflow.discard.accepted";
+            return true;
+        }
+
+        private bool TryResolveAcquisition(
+            string playerId,
+            string acquiredUnitId,
+            string acquiredTypeId,
+            int goldSpent,
+            out MatchAcquisitionResult acquisition,
+            out MatchCommandCode code,
+            out string diagnosticCode)
+        {
+            acquisition = null;
+            var steps = new List<MatchFusionStep>();
+            var retiredUnitIds = new List<string>();
+            var survivorByConsumedId = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!source.Pool.Catalog.TryGet(acquiredTypeId, out var catalogEntry))
+            {
+                code = MatchCommandCode.InternalInvariantViolation;
+                diagnosticCode = "match.fusion.catalog.missing";
+                return false;
+            }
+
+            while (true)
+            {
+                var seat = GetSeat(playerId);
+                var pair = seat.Units
+                    .Where(unit =>
+                        string.Equals(unit.TypeId, acquiredTypeId, StringComparison.Ordinal)
+                        && unit.EliteLevel < catalogEntry.MaxEliteLevel
+                        && IsFusionCandidateZone(seat, unit.Zone))
+                    .GroupBy(unit => unit.EliteLevel)
+                    .Where(group => group.Count() >= 2)
+                    .OrderBy(group => group.Key)
+                    .Select(group => group
+                        .OrderBy(unit => ZonePriority(unit.Zone))
+                        .ThenBy(unit => unit.UnitId, StringComparer.Ordinal)
+                        .Take(2)
+                        .ToArray())
+                    .FirstOrDefault();
+                if (pair == null)
+                {
+                    break;
+                }
+
+                var survivor = pair[0];
+                var consumed = pair[1];
+                if (consumed.Buffs.Count != 0)
+                {
+                    code = MatchCommandCode.InternalInvariantViolation;
+                    diagnosticCode = "match.fusion.consumed.inlineBuff.unsupported";
+                    return false;
+                }
+
+                var remappedTargetedBuffs = seat.TargetedUnitBuffs.Select(buff =>
+                    string.Equals(
+                        buff.TargetUnitId,
+                        consumed.UnitId,
+                        StringComparison.Ordinal)
+                        ? buff.WithTarget(survivor.UnitId)
+                        : buff).ToArray();
+                int availableCost;
+                MatchUnitState upgraded;
+                try
+                {
+                    availableCost = seat.AvailableDeploymentCost;
+                    if (consumed.Zone == MatchUnitZone.Deployed)
+                    {
+                        availableCost = checked(
+                            availableCost
+                            + MatchEliteRules.GetDeploymentCost(
+                                catalogEntry,
+                                consumed.EliteLevel));
+                    }
+
+                    upgraded = new MatchUnitState(
+                        survivor.UnitId,
+                        survivor.TypeId,
+                        survivor.Zone,
+                        checked(survivor.EliteLevel + 1),
+                        survivor.Formation,
+                        survivor.AcquisitionOrdinal,
+                        survivor.Buffs);
+                    if (survivor.Zone == MatchUnitZone.Deployed)
+                    {
+                        var oldCost = MatchEliteRules.GetDeploymentCost(
+                            catalogEntry,
+                            survivor.EliteLevel);
+                        var newCost = MatchEliteRules.GetDeploymentCost(
+                            catalogEntry,
+                            upgraded.EliteLevel);
+                        var delta = checked(newCost - oldCost);
+                        if (delta <= availableCost)
+                        {
+                            availableCost = checked(availableCost - delta);
+                        }
+                        else
+                        {
+                            availableCost = checked(availableCost + oldCost);
+                            var staging = new MatchUnitState(
+                                upgraded.UnitId,
+                                upgraded.TypeId,
+                                MatchUnitZone.Staging,
+                                upgraded.EliteLevel,
+                                null,
+                                upgraded.AcquisitionOrdinal,
+                                upgraded.Buffs);
+                            var stagingUnits = seat.Units
+                                .Where(unit =>
+                                    !string.Equals(unit.UnitId, survivor.UnitId, StringComparison.Ordinal)
+                                    && !string.Equals(unit.UnitId, consumed.UnitId, StringComparison.Ordinal))
+                                .Concat(new[] { staging })
+                                .ToArray();
+                            var stagingSeat = seat.With(
+                                availableDeploymentCost: availableCost,
+                                units: stagingUnits,
+                                targetedUnitBuffs: remappedTargetedBuffs);
+                            upgraded = MatchStagingProjection.CountOccupiedSlots(
+                                stagingSeat,
+                                source.Pool.Catalog)
+                                <= MatchEconomyRules.StagingSlotCapacity
+                                ? staging
+                                : new MatchUnitState(
+                                    staging.UnitId,
+                                    staging.TypeId,
+                                    MatchUnitZone.Overflow,
+                                    staging.EliteLevel,
+                                    null,
+                                    staging.AcquisitionOrdinal,
+                                    staging.Buffs);
+                        }
+                    }
+                }
+                catch (OverflowException)
+                {
+                    code = MatchCommandCode.InternalInvariantViolation;
+                    diagnosticCode = "match.fusion.cost.overflow";
+                    return false;
+                }
+
+                var changedUnits = seat.Units
+                    .Where(unit =>
+                        !string.Equals(unit.UnitId, survivor.UnitId, StringComparison.Ordinal)
+                        && !string.Equals(unit.UnitId, consumed.UnitId, StringComparison.Ordinal))
+                    .Concat(new[] { upgraded })
+                    .ToArray();
+                ReplaceSeat(seat.With(
+                    availableDeploymentCost: availableCost,
+                    units: changedUnits,
+                    targetedUnitBuffs: remappedTargetedBuffs));
+                if (!TryRetire(
+                    playerId,
+                    consumed.UnitId,
+                    MatchRetirementReason.FusionConsumed,
+                    out diagnosticCode))
+                {
+                    code = MatchCommandCode.InternalInvariantViolation;
+                    return false;
+                }
+
+                survivorByConsumedId[consumed.UnitId] = survivor.UnitId;
+                retiredUnitIds.Add(consumed.UnitId);
+                steps.Add(new MatchFusionStep(
+                    acquiredTypeId,
+                    survivor.EliteLevel,
+                    upgraded.EliteLevel,
+                    upgraded.UnitId,
+                    consumed.UnitId,
+                    upgraded.Zone));
+            }
+
+            PromoteEligibleOverflow(playerId);
+            var finalSurvivorUnitId = acquiredUnitId;
+            while (survivorByConsumedId.TryGetValue(
+                finalSurvivorUnitId,
+                out var mappedSurvivorUnitId))
+            {
+                finalSurvivorUnitId = mappedSurvivorUnitId;
+            }
+            var finalUnit = GetSeat(playerId).Units.SingleOrDefault(unit =>
+                string.Equals(
+                    unit.UnitId,
+                    finalSurvivorUnitId,
+                    StringComparison.Ordinal));
+            if (finalUnit == null)
+            {
+                code = MatchCommandCode.InternalInvariantViolation;
+                diagnosticCode = "match.fusion.finalSurvivor.missing";
+                return false;
+            }
+
+            acquisition = new MatchAcquisitionResult(
+                acquiredUnitId,
+                finalSurvivorUnitId,
+                steps,
+                retiredUnitIds,
+                finalUnit.Zone,
+                finalUnit.EliteLevel,
+                goldSpent);
+            code = MatchCommandCode.Accepted;
+            diagnosticCode = "match.acquisition.accepted";
+            return true;
+        }
+
+        private void PromoteEligibleOverflow(string playerId)
+        {
+            var orderedIds = GetSeat(playerId).Units
+                .Where(unit => unit.Zone == MatchUnitZone.Overflow)
+                .OrderBy(unit => unit.AcquisitionOrdinal)
+                .ThenBy(unit => unit.UnitId, StringComparer.Ordinal)
+                .Select(unit => unit.UnitId)
+                .ToArray();
+            foreach (var unitId in orderedIds)
+            {
+                var seat = GetSeat(playerId);
+                var unit = seat.Units.Single(candidate =>
+                    string.Equals(candidate.UnitId, unitId, StringComparison.Ordinal));
+                var staging = new MatchUnitState(
+                    unit.UnitId,
+                    unit.TypeId,
+                    MatchUnitZone.Staging,
+                    unit.EliteLevel,
+                    null,
+                    unit.AcquisitionOrdinal,
+                    unit.Buffs);
+                var units = seat.Units.Select(candidate =>
+                    string.Equals(candidate.UnitId, unitId, StringComparison.Ordinal)
+                        ? staging
+                        : candidate).ToArray();
+                var prospective = seat.With(units: units);
+                if (MatchStagingProjection.CountOccupiedSlots(
+                    prospective,
+                    source.Pool.Catalog) <= MatchEconomyRules.StagingSlotCapacity)
+                {
+                    ReplaceSeat(prospective);
+                }
+            }
+        }
+
+        private bool TryRetire(
+            string playerId,
+            string unitId,
+            MatchRetirementReason reason,
+            out string diagnosticCode)
+        {
+            if (retiredById.ContainsKey(unitId))
+            {
+                diagnosticCode = "match.retirement.duplicate";
+                return false;
+            }
+            if (entitiesById.TryGetValue(unitId, out var entity))
+            {
+                if (entity.Location != MatchPoolEntityLocation.OwnedUnit
+                    || !string.Equals(entity.PlayerId, playerId, StringComparison.Ordinal))
+                {
+                    diagnosticCode = "match.retirement.poolLocation.invalid";
+                    return false;
+                }
+                entitiesById[unitId] = entity.WithLocation(
+                    reason == MatchRetirementReason.FusionConsumed
+                        ? MatchPoolEntityLocation.ConsumedByFusion
+                        : MatchPoolEntityLocation.OverflowDiscarded);
+            }
+            retiredById.Add(
+                unitId,
+                new MatchRetiredPersistentUnitState(unitId, reason));
+            diagnosticCode = string.Empty;
+            return true;
+        }
+
+        private bool IsFusionCandidateZone(MatchSeatState seat, MatchUnitZone zone)
+        {
+            if (zone == MatchUnitZone.Staging || zone == MatchUnitZone.Overflow)
+            {
+                return true;
+            }
+            return zone == MatchUnitZone.Deployed
+                && source.Phase == MatchPhase.Preparation
+                && !seat.Ready;
+        }
+
+        private static int ZonePriority(MatchUnitZone zone)
+        {
+            switch (zone)
+            {
+                case MatchUnitZone.Deployed: return 0;
+                case MatchUnitZone.Staging: return 1;
+                case MatchUnitZone.Overflow: return 2;
+                default: return int.MaxValue;
+            }
+        }
+
+        private sealed class OverflowDiscardCandidate
+        {
+            internal OverflowDiscardCandidate(string playerId, MatchUnitState unit)
+            {
+                PlayerId = playerId;
+                Unit = unit;
+            }
+
+            internal string PlayerId { get; }
+            internal MatchUnitState Unit { get; }
+        }
+
         internal void PurchaseLevelUpgrade(string playerId)
         {
             var seat = GetSeat(playerId);
@@ -276,7 +772,8 @@ namespace ArknoNights.Match
                 random.Snapshot,
                 nextNaturalRefreshStartSeat,
                 appliedPostBattleRefreshRounds,
-                nextAcquisitionOrdinal);
+                nextAcquisitionOrdinal,
+                retiredUnits: retiredById.Values);
             return source.WithEconomy(
                 source.Seats.Select(seat => seatsByPlayerId[seat.PlayerId]),
                 pool,

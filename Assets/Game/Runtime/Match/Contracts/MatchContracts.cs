@@ -276,13 +276,16 @@ namespace ArknoNights.Match
             long currentStateRevision,
             long? acceptedStateRevision,
             bool changedState,
-            string diagnosticCode)
+            string diagnosticCode,
+            IEnumerable<string> retiredUnitIds = null)
         {
             Code = code;
             CurrentStateRevision = currentStateRevision;
             AcceptedStateRevision = acceptedStateRevision;
             ChangedState = changedState;
             DiagnosticCode = diagnosticCode ?? string.Empty;
+            RetiredUnitIds = new ReadOnlyCollection<string>(
+                (retiredUnitIds ?? Enumerable.Empty<string>()).ToArray());
 
             var writer = new CanonicalSummaryWriter(nameof(MatchTransactionResult));
             writer.EnumValue("code", Code);
@@ -292,6 +295,10 @@ namespace ArknoNights.Match
                 : "null");
             writer.Boolean("changed", ChangedState);
             writer.String("diagnostic", DiagnosticCode);
+            foreach (var retiredUnitId in RetiredUnitIds)
+            {
+                writer.String("retiredUnitId", retiredUnitId);
+            }
             CanonicalSummary = writer.ToString();
         }
 
@@ -304,6 +311,7 @@ namespace ArknoNights.Match
         public long? AcceptedStateRevision { get; }
         public bool ChangedState { get; }
         public string DiagnosticCode { get; }
+        public IReadOnlyList<string> RetiredUnitIds { get; }
         public string CanonicalSummary { get; }
     }
 }
