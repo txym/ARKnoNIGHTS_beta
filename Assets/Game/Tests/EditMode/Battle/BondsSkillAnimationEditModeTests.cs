@@ -43,11 +43,11 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void ReadySkill_WaitsForAlreadyStartedAttackToFinish()
+        public void ReadySkill_WaitsForAttackAndRestartsRecoveryAfterActualCast()
         {
             var input = CreateInput(
                 "skill-waits-for-attack",
-                130,
+                271,
                 Caster(92, 100),
                 Enemy(100),
                 Unit("caster", "caster", 5, 4),
@@ -64,10 +64,13 @@ namespace ArknoNights.Battle.Tests
                 item.Type == BattleEventType.Skill
                 && item.UnitId == "caster"
                 && item.Tick <= 120));
-            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
-                item.Type == BattleEventType.Skill
-                && item.UnitId == "caster"
-                && item.Tick == 121));
+            Assert.That(
+                result.Events
+                    .Where(item =>
+                        item.Type == BattleEventType.Skill
+                        && item.UnitId == "caster")
+                    .Select(item => item.Tick),
+                Is.EqualTo(new[] { 121, 270 }));
         }
 
         [Test]

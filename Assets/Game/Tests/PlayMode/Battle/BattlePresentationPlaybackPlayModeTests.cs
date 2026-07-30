@@ -71,13 +71,12 @@ namespace ArknoNights.Battle.Tests
         {
             var authoritative = RunSingleArcslmaSummonBattle();
             var result = WithoutDynamicEventSnapshots(authoritative);
-            var dynamicIds = result.Events
+            var dynamicSpawns = result.Events
                 .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504")
-                .Select(item => item.UnitId)
                 .ToArray();
+            var dynamicIds = dynamicSpawns.Select(item => item.UnitId).ToArray();
             Assert.That(dynamicIds, Is.EqualTo(new[] { "-1", "-2", "-3" }));
-            var dynamicSpawnTick = result.Events
-                .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504")
+            var dynamicSpawnTick = dynamicSpawns
                 .Select(item => item.Tick)
                 .Distinct()
                 .Single();
@@ -450,9 +449,12 @@ namespace ArknoNights.Battle.Tests
             var abilities = AbilityCatalogLoader.LoadFromResources("BattleData/ability-catalog-v1", catalog.Catalog);
             Assert.That(abilities.Success, Is.True, string.Join(";", abilities.Errors.Select(item => item.ToString())));
             var definitions = catalog.Catalog.Entries
-                .Select(item => item.Definition.TypeId == "1000"
-                    ? WithMaxHitPoints(item.Definition, 100000)
-                    : item.Definition)
+                .Select(item =>
+                    item.Definition.TypeId == "5503"
+                        ? WithoutNormalAttack(item.Definition)
+                        : item.Definition.TypeId == "1000"
+                            ? WithMaxHitPoints(item.Definition, 100000)
+                            : item.Definition)
                 .ToArray();
             var specification = new BattleInputSpecification(
                 BattleInput.SupportedSchemaVersion,
@@ -473,6 +475,27 @@ namespace ArknoNights.Battle.Tests
                 });
             Assert.That(BattleInputFactory.TryCreate(specification, out var input, out var errors), Is.True, string.Join(";", errors.Select(item => item.ToString())));
             return new BattleRunner(input).RunToCompletion();
+        }
+
+        private static UnitDefinition WithoutNormalAttack(UnitDefinition source)
+        {
+            return new UnitDefinition(
+                source.TypeId,
+                source.MaxHitPoints,
+                0,
+                source.Defense,
+                source.MagicResistance,
+                source.MoveSpeedCentimetresPerSecond,
+                0,
+                0,
+                DamageType.None,
+                AttackMethod.None,
+                source.BlockCapacity,
+                source.TauntLevel,
+                source.IsSyntheticFixtureData,
+                source.InnateAbilityIds,
+                source.ActionMethod,
+                source.LifeDeduct);
         }
 
         private static UnitDefinition WithMaxHitPoints(UnitDefinition source, int maxHitPoints)

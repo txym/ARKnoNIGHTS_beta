@@ -82,8 +82,26 @@ try
         {
             try
             {
-                [xml]$resultXml = Get-Content -LiteralPath $resultsPath -Raw -Encoding utf8
-                $testRun = $resultXml.'test-run'
+                $resultText = Get-Content -LiteralPath $resultsPath -Raw -Encoding utf8
+                if ([string]::IsNullOrWhiteSpace($resultText))
+                {
+                    throw [System.Xml.XmlException]::new('The test result XML is not populated yet.')
+                }
+                $resultXml = [System.Xml.XmlDocument]::new()
+                $resultXml.LoadXml($resultText)
+                if ($null -eq $resultXml.DocumentElement -or $resultXml.DocumentElement.Name -ne 'test-run')
+                {
+                    throw [System.Xml.XmlException]::new('The test result XML has no test-run root yet.')
+                }
+                $testRun = $resultXml.DocumentElement
+                foreach ($attributeName in @('result', 'total', 'failed', 'skipped', 'inconclusive'))
+                {
+                    if (-not $testRun.HasAttribute($attributeName))
+                    {
+                        throw [System.Xml.XmlException]::new(
+                            "The test result XML has no $attributeName attribute yet.")
+                    }
+                }
                 $total = [int]$testRun.total
                 $failed = [int]$testRun.failed
                 $skipped = [int]$testRun.skipped

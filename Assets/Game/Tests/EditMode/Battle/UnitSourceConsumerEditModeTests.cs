@@ -23,6 +23,20 @@ namespace ArknoNights.Battle.Tests
         };
 
         [Test]
+        public void NormalizedUtf8Hash_TreatsLfCrLfAndLoneCrAsSameContent()
+        {
+            const string lf = "alpha\n中文\nomega\n";
+            var expected = ComputeNormalizedUtf8Hash(lf);
+
+            Assert.That(
+                ComputeNormalizedUtf8Hash(lf.Replace("\n", "\r\n")),
+                Is.EqualTo(expected));
+            Assert.That(
+                ComputeNormalizedUtf8Hash(lf.Replace("\n", "\r")),
+                Is.EqualTo(expected));
+        }
+
+        [Test]
         public void Generate_ProjectsRepresentableLegacySourcesToIsolatedV1Catalog()
         {
             var outputPath = NewIsolatedPath("projection", "unit-catalog-v1.json");
@@ -1445,13 +1459,18 @@ namespace ArknoNights.Battle.Tests
             var path = Path.Combine(
                 Application.dataPath,
                 "Resources/BattleData/unit-catalog-v1.json");
-            var normalized = File.ReadAllText(path)
+            return ComputeNormalizedUtf8Hash(File.ReadAllText(path));
+        }
+
+        private static string ComputeNormalizedUtf8Hash(string text)
+        {
+            var normalized = text
                 .Replace("\r\n", "\n")
                 .Replace("\r", "\n");
-            var bytes = Encoding.UTF8.GetBytes(normalized);
             using (var sha256 = SHA256.Create())
             {
-                return BitConverter.ToString(sha256.ComputeHash(bytes))
+                return BitConverter.ToString(
+                        sha256.ComputeHash(Encoding.UTF8.GetBytes(normalized)))
                     .Replace("-", string.Empty);
             }
         }

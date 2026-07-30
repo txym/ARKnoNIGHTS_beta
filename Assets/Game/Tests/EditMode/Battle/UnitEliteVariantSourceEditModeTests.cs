@@ -480,6 +480,7 @@ namespace ArknoNights.Battle.Tests
                 EliteLevel = 0,
                 SourceVariant = "1000_gopro",
                 DisplayNameZhHans = "猎狗",
+                SkillDescriptionZhHans = string.Empty,
                 Rarity = 1,
                 MaxHitPoints = 820,
                 Attack = 190,
@@ -499,6 +500,7 @@ namespace ArknoNights.Battle.Tests
                 EliteLevel = 2,
                 SourceVariant = "1000_gopro_2",
                 DisplayNameZhHans = "猎狗pro",
+                SkillDescriptionZhHans = string.Empty,
                 Rarity = 1,
                 MaxHitPoints = 1700,
                 Attack = 260,
@@ -518,6 +520,7 @@ namespace ArknoNights.Battle.Tests
                 EliteLevel = 3,
                 SourceVariant = "1000_gopro_3",
                 DisplayNameZhHans = "狂暴的猎狗pro",
+                SkillDescriptionZhHans = string.Empty,
                 Rarity = 1,
                 MaxHitPoints = 3000,
                 Attack = 370,
@@ -537,6 +540,7 @@ namespace ArknoNights.Battle.Tests
                 EliteLevel = 0,
                 SourceVariant = "5503_arcslma",
                 DisplayNameZhHans = "果冻小子",
+                SkillDescriptionZhHans = "每隔一段时间，分裂出三个<果冻丁>。",
                 Rarity = 6,
                 MaxHitPoints = 18000,
                 Attack = 1100,
@@ -556,6 +560,7 @@ namespace ArknoNights.Battle.Tests
                 EliteLevel = 0,
                 SourceVariant = "5504_arcslmi",
                 DisplayNameZhHans = "果冻丁",
+                SkillDescriptionZhHans = string.Empty,
                 Rarity = 3,
                 MaxHitPoints = 2500,
                 Attack = 290,
@@ -593,7 +598,9 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 Field<string>(resolved, "displayNameZhHans"),
                 Is.EqualTo(expected.DisplayNameZhHans));
-            Assert.That(Field<string>(resolved, "skillDescriptionZhHans"), Is.Empty);
+            Assert.That(
+                Field<string>(resolved, "skillDescriptionZhHans"),
+                Is.EqualTo(expected.SkillDescriptionZhHans));
             Assert.That(Field<int>(resolved, "rarity"), Is.EqualTo(expected.Rarity));
             Assert.That(Field<int>(resolved, "deploymentCost"), Is.EqualTo(2));
             Assert.That(Field<int>(resolved, "attackMethod"), Is.EqualTo(1));
@@ -1075,6 +1082,7 @@ namespace ArknoNights.Battle.Tests
             internal int EliteLevel;
             internal string SourceVariant;
             internal string DisplayNameZhHans;
+            internal string SkillDescriptionZhHans;
             internal int Rarity;
             internal int MaxHitPoints;
             internal int Attack;
