@@ -166,7 +166,7 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 - 每个 scoped snapshot 只能包含 Public 与接收者本人的 OwnerPrivate；淘汰旁观者只能收到 Public，wire 不得出现 Pool、ControllerKind、token 或其他玩家 Gold/Shop/Overflow；
 - v3 客户端按 CommandId/SystemActionId、HostSequence、基础/目标 revision 和稳定对象身份幂等应用最终绝对值；重复、旧结果或非法顺序不得重复扣费、重复获得单位或破坏本地交互，revision 缺口只触发一次 RecoveryStateRequest；
 - reconnect token 必须是 32-byte CSPRNG 的 43 字符 base64url；房主只保留 verifier。EOF、timeout、端点不可达和 CompatibilityMismatch 保留 credential；ExplicitQuit、MatchEnded、SessionEnded、InvalidToken 等权威终止清除；
-- socket 回环必须覆盖原连接提升、OperationRequest/OperationResult、强制断线保留四席位、较高 generation 重连、当前 revision RecoveryState、MatchEnded 清理、客户端 Ping/房主 Pong 跨过漏回阈值仍连接，以及最终端口释放；
+- socket 回环必须覆盖原连接提升、OperationRequest/OperationResult、强制断线保留四席位、较高 generation 重连、当前 revision RecoveryState、MatchEnded 清理、客户端 Ping/房主 Pong 跨过漏回阈值仍连接、初始运行时加载超过三次心跳间隔但未超过 `30000ms` 时保持连接、首个有效 Pong 后连续三次漏回仍断线，以及最终端口释放；
 - Battle transport 测试验证 Session/Round/BattleSet/BattleId/input hash 路由、旧轮丢弃和重连时 `RecoveryState → SystemResult(BattleSeal) → SystemResult(PlaybackStart)` 顺序；M7 chunk/checkpoint/hash 由 Battle 程序集测试，正式集成再验证两者的生命周期。
 - M8 必须同时覆盖：Bot 正式调度、M4→M7 输入/结果映射、每端独立 producer、全部 Track 完成屏障、统一绝对开播时间、开播后零增量拼接、scoped HUD、直接回主界面和重连恢复；必须断言不以首个 5 秒块或固定超时开播，且块边界不会重启动作。不能把“收到 Lobby Start”或仅通过本地 Demo 记为通过。
 - 正式 HUD 回归必须加载真实 `SampleScene`，先等待离线 `BattleHudSceneCoordinator` 完成初始化，再启动 LAN runtime；断言复用同一个 `FormalBattleHudCanvas`、`ShopReadyHudController` 和 `PlayerListHudController`，运行期不存在 `LanMatchHudCanvas`，释放后原商店数据源与玩家列表选择回调恢复。`LanMatchBattleAdapterPlayModeTests` 覆盖场景生命周期，`ShopReadyHudStateEditModeTests` 覆盖外部投影仍使用旧控件的二次确认和回调门禁。
@@ -176,6 +176,7 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 - M9 结果应用必须按 UnitId/SlotId 原位更新表现；除新增、退休或恢复纠错确有差异的对象外，不得销毁重建单位/槽位。准备单位的连续 Idle/Move 动画不能因心跳、其他玩家操作或本人无关结果重启；
 - M9 Pending 测试必须覆盖按 UnitId/槽/按钮隔离锁定、购买拒绝保留二次确认、准备成功只清理阵型操作、Battle 开始清理全部准备交互、断线清理 Pending 且不自动重发未确认命令；
 - 自动化 loopback host+guest 证明真实 socket 与双运行时闭环；独立 Player 进程、跨物理设备、分辨率和人工视觉仍须分别记录，未执行时不得记为通过。
+- Android 发布检查必须断言 PlayerSettings 仅允许 Landscape Left/Right，且 Android 启动策略把 `Screen.sleepTimeout` 设置为 `SleepTimeout.NeverSleep`；构建 APK 后用 `aapt dump xmltree` 核对 `UnityPlayerActivity` 的 `screenOrientation` 为仅横屏模式，并在至少一台实体手机上验证启动、横向翻转与超过系统屏幕超时时间仍不休眠。
 
 ## 6. 证据记录
 

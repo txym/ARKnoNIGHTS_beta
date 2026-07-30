@@ -255,6 +255,68 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
+        public void MatchHeartbeat_InitialRuntimeLoadStallWaitsForFirstPongBeforeExpiry()
+        {
+            var configuration =
+                LanMatchSessionConfiguration.CreateForTests();
+            var host = Run(() => LanRoomHost.StartForTestsAsync(
+                Profile(HostMatchId),
+                0));
+            var client = Run(() => LanRoomClient.JoinAsync(
+                host.LoopbackEndpoint,
+                "000000",
+                Profile(GuestMatchId),
+                configuration,
+                new MemoryCredentialStore()));
+            try
+            {
+                Run(() => client.SetReadyAsync(true));
+                WaitUntil(() =>
+                {
+                    host.Tick();
+                    return host.Snapshot.Members.Single(
+                        member => member.PlayerId == GuestMatchId)
+                        .IsReady;
+                }, TimeSpan.FromSeconds(2));
+                Assert.That(
+                    host.TryStart(HostMatchId, out var failure),
+                    Is.True,
+                    failure.ToString());
+                Run(() => client.WaitForMatchInitializedAsync(
+                    TimeSpan.FromSeconds(2)));
+                client.Tick();
+
+                Thread.Sleep(4200);
+                client.Tick();
+                Assert.That(
+                    client.IsConnected,
+                    Is.True,
+                    "Initial host runtime loading must not consume the "
+                    + "steady-state three-Pong disconnect budget.");
+
+                WaitUntil(() =>
+                {
+                    host.Tick();
+                    client.Tick();
+                    return client.CurrentClock != null;
+                }, TimeSpan.FromSeconds(2));
+
+                Thread.Sleep(4200);
+                client.Tick();
+                Assert.That(
+                    client.IsConnected,
+                    Is.False,
+                    "After the first valid Match Pong, three consecutive "
+                    + "misses must still enter the disconnect flow.");
+            }
+            finally
+            {
+                Run(() => client.StopAsync());
+                Run(() => host.StopAsync());
+            }
+        }
+
+        [Test]
         public void HostOnlyStart_PublishesStartedSnapshotAndCompletesBroadcast()
         {
             var host = Run(() => LanRoomHost.StartAsync(Profile("host")));

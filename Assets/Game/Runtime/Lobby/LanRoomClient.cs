@@ -26,6 +26,8 @@ namespace ArknoNights.Lobby
     public sealed class LanRoomClient : IDisposable
     {
         private const int HeartbeatMilliseconds = 1000;
+        private const int MaximumMissedMatchPongs = 3;
+        private const int InitialMatchHeartbeatGraceMilliseconds = 30000;
         private readonly TcpClient tcpClient;
         private readonly NetworkStream stream;
         private readonly LobbyProfile profile;
@@ -65,7 +67,9 @@ namespace ArknoNights.Lobby
         private MatchPlaybackStartPayload currentPlaybackStart;
         private long latencyMilliseconds = -1;
         private long messageId;
+        private long matchHeartbeatGraceDeadlineUnixMilliseconds;
         private int missedMatchPongs;
+        private int matchHeartbeatEstablished;
         private bool recoveryRequested;
         private volatile bool matchMode;
         private volatile bool disconnected;
@@ -98,6 +102,7 @@ namespace ArknoNights.Lobby
             this.matchMode = matchMode;
             this.reconnectCredential = reconnectCredential;
             reconnectingConnection = matchMode;
+            if (matchMode) BeginInitialMatchHeartbeatGrace();
             readTask = Task.Run(ReadLoopAsync);
             heartbeatTask = Task.Run(HeartbeatLoopAsync);
         }
@@ -602,6 +607,7 @@ namespace ArknoNights.Lobby
                     if (kind == LobbyMessageKind.Start
                         || roomSnapshot.HasStarted)
                     {
+                        BeginInitialMatchHeartbeatGrace();
                         matchMode = true;
                         startCompletion.TrySetResult(true);
                     }
@@ -658,6 +664,7 @@ namespace ArknoNights.Lobby
                 }
                 SessionId = envelope.SessionId;
                 ConnectionGeneration = initialization.ConnectionGeneration;
+                BeginInitialMatchHeartbeatGrace();
                 receivedEvents.Enqueue(
                     ClientEvent.ForInitialization(initialization));
                 matchInitializationCompletion.TrySetResult(initialization);
@@ -705,6 +712,7 @@ namespace ArknoNights.Lobby
                     out MatchReconnectAcceptedPayload accepted))
             {
                 ConnectionGeneration = accepted.ConnectionGeneration;
+                BeginInitialMatchHeartbeatGrace();
                 receivedEvents.Enqueue(
                     ClientEvent.ForReconnectAccepted(accepted));
                 reconnectCompletion.TrySetResult(accepted);
@@ -730,6 +738,7 @@ namespace ArknoNights.Lobby
                 && pong.ConnectionGeneration == ConnectionGeneration)
             {
                 Interlocked.Exchange(ref missedMatchPongs, 0);
+                Interlocked.Exchange(ref matchHeartbeatEstablished, 1);
                 receivedEvents.Enqueue(ClientEvent.ForLatency(
                     Math.Max(
                         0,
@@ -771,9 +780,18 @@ namespace ArknoNights.Lobby
                     }
                     else if (ConnectionGeneration > 0 && !ended)
                     {
-                        if (Interlocked.Increment(
+                        var now = DateTimeOffset.UtcNow
+                            .ToUnixTimeMilliseconds();
+                        var graceDeadline = Interlocked.Read(
+                            ref matchHeartbeatGraceDeadlineUnixMilliseconds);
+                        var enforceMissedPongLimit =
+                            Volatile.Read(ref matchHeartbeatEstablished) != 0
+                            || graceDeadline <= 0
+                            || now >= graceDeadline;
+                        if (enforceMissedPongLimit
+                            && Interlocked.Increment(
                                 ref missedMatchPongs)
-                            >= 3)
+                            >= MaximumMissedMatchPongs)
                         {
                             disconnected = true;
                             try { tcpClient.Close(); }
@@ -792,6 +810,16 @@ namespace ArknoNights.Lobby
                 }
                 catch (Exception) { return; }
             }
+        }
+
+        private void BeginInitialMatchHeartbeatGrace()
+        {
+            Interlocked.Exchange(ref missedMatchPongs, 0);
+            Interlocked.Exchange(ref matchHeartbeatEstablished, 0);
+            Interlocked.Exchange(
+                ref matchHeartbeatGraceDeadlineUnixMilliseconds,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    + InitialMatchHeartbeatGraceMilliseconds);
         }
 
         private void ApplyRecovery(ScopedSnapshotPayload scoped)
