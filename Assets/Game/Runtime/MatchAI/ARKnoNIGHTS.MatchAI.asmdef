@@ -1,0 +1,16 @@
+{
+  "name": "ARKnoNIGHTS.MatchAI",
+  "rootNamespace": "ArknoNights.MatchAI",
+  "references": [
+    "ARKnoNIGHTS.Match"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

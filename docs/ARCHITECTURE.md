@@ -11,7 +11,7 @@
 - UI：uGUI、TextMesh Pro；角色表现使用仓库内的 Spine Unity 3.8 源码与资源。
 - 输入：Project Settings 使用旧 Input Manager；第一方交互主要读取 `UnityEngine.Input`。
 - 场景：Build Settings 只启用 `Assets/Scenes/SampleScene.unity`。
-- 当前产品形态：单场景本地四玩家自走棋 Demo、可用的 LAN 房间流程，以及尚未接入 Lobby/场景的纯领域 Match M1–M4 权威状态、经济、自动合成、Overflow、阶段、配对与结算；正式同步对局尚未接入。
+- 当前产品形态：单场景本地四玩家自走棋 Demo、可用的 LAN 房间流程，以及尚未接入 Lobby/场景的纯领域 Match M1–M5 权威状态、经济、自动合成、Overflow、阶段、配对、结算与确定性 AI；正式同步对局尚未接入。
 
 ## 2. 模块边界
 
@@ -25,10 +25,11 @@
 | `ARKnoNIGHTS.Round` | 准备阶段状态机、阵型封存、四玩家配对和战斗输入生成 | 连接 PlayerState 与 Battle Core，不负责网络同步 |
 | `ARKnoNIGHTS.Lobby` | UDP 房间发现、TCP 消息、房间状态、成员准备与开始 | 只同步 Lobby；不引用 PlayerState 或 Battle Core |
 | `ARKnoNIGHTS.Match` | 固定四席位的房主权威状态、共享实体牌库、商店经济、合成/Overflow、权威阵型、30 秒准备时钟、2/3/4 人配对、封印计划、结果校验、结算/淘汰/排名、命令幂等与分权限快照 | `noEngineReferences=true` 且零程序集引用；M4 只定义纯领域战斗输入/结果契约，不含 Battle Tick、AI 决策、LAN Session 或 Socket |
+| `ARKnoNIGHTS.MatchAI` | 权限裁剪的 BotObservation、纯决策表、权威操作适配、固定 Tick 调度与掉线/退出接管生命周期 | `noEngineReferences=true`，只引用 `ARKnoNIGHTS.Match`；不读取 Unity、墙上时间、随机数、Socket、UI 或 Battle Core |
 | `ARKnoNIGHTS.UI`、`ARKnoNIGHTS.Details` | 正式 HUD、商店/准备、玩家列表与单位详情投影 | 消费快照与事件，不保存第二份权威游戏状态 |
 | `Assembly-CSharp` 下的 `Runtime/Initial`、`Runtime/Deployment` | `SampleScene` 自动接线、场景生命周期和部署交互 | 是各隔离程序集与序列化场景之间的集成层 |
 
-第一方 EditMode 和 PlayMode 测试分别位于 `Assets/Game/Tests/EditMode` 与 `Assets/Game/Tests/PlayMode`，按 Battle/Lobby/Match 分程序集；Match M1–M4 当前只有独立 EditMode 测试程序集。
+第一方 EditMode 和 PlayMode 测试分别位于 `Assets/Game/Tests/EditMode` 与 `Assets/Game/Tests/PlayMode`，按 Battle/Lobby/Match 分程序集；Match M1–M5 当前只有独立 EditMode 测试程序集。
 
 ## 3. 主要数据流
 
@@ -77,7 +78,7 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
 
 `LanLobbyController` 自动创建场景级入口。现有开始流程会关闭 Lobby 服务并让每台设备各自进入本地四玩家 Demo；它没有持续的 Match Session、权威命令排序、状态同步或重连恢复。目标方案见 [`LAN-MATCH-DESIGN.md`](LAN-MATCH-DESIGN.md)。
 
-### 3.4 Match M1–M4 纯领域权威状态
+### 3.4 Match M1–M5 纯领域权威状态与 AI
 
 ```text
 四席位初始化 + 兼容清单 + 已验证商品目录
@@ -85,6 +86,7 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
 版本化 PRNG → 共享具体 UnitId 池 → 四份六槽初始商店
         ↓
 MatchCommandEnvelope → MatchAuthority → MatchEconomyTransactionDraft → MatchState
+MatchBotActionId → IMatchBotHost → 同一 Economy/Formation 权威核心
         ↓ 获得具体 UnitId → 自动连锁合成 → Overflow 提升 → 单 revision
 准备入口/Ready/超时 → 同 revision 封印 → SealedRoundPlan
 BattleResolution → 完整结果 + 回放门控 → 同 revision Settlement
@@ -101,6 +103,8 @@ HostMatchSnapshot
 M4 由房主传入单调毫秒时钟，不读取墙上时间。`MatchFlowState` 保存准备期限、配对代次/偏移/历史、当前 `MatchSealedRoundPlan`、已接收结果、回放门控、包含刷新后 seat/pool 输出摘要的结算幂等记录、最终排名和持久外部效果 outbox。四人使用固定六轮双循环；三人每轮一场 Official 和一场 Shadow；两人主客交替。战斗适配层必须回传每场 `BattleId`、该场 `SealedInputHash`、双方非负生命伤害、终止原因和 Tick；Match 根据伤害复核 Outcome，并只按 `SettlementRecipients` 为每名存活玩家应用一个结果。旧 M1 的逐步 `TryAdvancePhase`、手工淘汰与任意字符串结束入口仅以 `internal` 保留给既有领域测试，正式调用方只能使用 M4 原子封印/结算和 `AbortMatchNoContest` 入口。
 
 权限投影保持三层：Public 增加权威剩余时间、公开配对、生命、淘汰、名次与安全终局信息，但不含商店、赤金、等级、Overflow、tombstone、封印 hash/seed 或玩家层定向 Buff payload；OwnerPrivate 只含仍存活的本人完整状态，淘汰旁观者只获得 Public；HostMatchSnapshot 额外包含完整 `MatchFlowState`、池、封印计划、结果、结算记录与诊断。Lobby、PlayerState、Round、Battle 与场景仍未消费该程序集。
+
+M5 新增单向依赖的 `ARKnoNIGHTS.MatchAI`。`MatchAuthority` 只通过 `IMatchBotHost` 提供本席位 Owner 数据、公开真人 Ready 和目录派生部署 Cost；该接口不暴露 `MatchState`、对手私有经济、共享池、seed、token 或随机状态。`BotDecisionMachine` 对相同观察始终产生相同的 Wait/Buy/Refresh/Upgrade 意图；`BotOperationAdapter` 用 `MatchBotActionId` 调用既有经济与阵型核心，购买成功后只对 `FinalSurvivorUnitId` 尝试一次中心向外部署。`BotController` 在准备入口执行 0ms 周期，随后补处理 1000–29000ms 固定周期，30000ms 由 M4 先封存。NativeBot 与 TakeoverBot 使用递增 controller generation；普通掉线、主动退出和恢复真人控制由 Host 内部入口驱动，状态不回滚。Public/Owner 快照仍不暴露 Bot 身份或策略运行时。M6 只需在已验证连接事件上调用 Controller 的 disconnect/quit/restore 入口，并把时钟推进放入同一房主串行队列。
 
 ## 4. 场景与启动入口
 
@@ -123,14 +127,14 @@ M4 由房主传入单调毫秒时钟，不读取墙上时间。`MatchFlowState` 
 - PlayerState、准备倒计时、部署/换位/撤退、六槽商店、购买、刷新、冻结、等级与本地观察；
 - 固定四玩家本地配对、两场战斗共享时钟演示；
 - LAN 房间发现、创建、加入、准备、开始和房间 UI；
-- 纯 C# 房主权威 Match M1–M4 领域状态、共享牌库、确定性商店经济、自动合成、Overflow、权威阵型、准备/封印、2/3/4 人配对、战斗结果校验、结算/淘汰/排名、终局效果和分权限快照；
+- 纯 C# 房主权威 Match M1–M5 领域状态、共享牌库、确定性商店经济、自动合成、Overflow、权威阵型、准备/封印、2/3/4 人配对、战斗结果校验、结算/淘汰/排名、终局效果、分权限快照和确定性 Bot/接管调度；
 - EditMode/PlayMode 自动测试、Windows x86_64 构建入口和多种截图证据入口。
 
 ## 6. 当前未实现或未闭环
 
-- Match M5—M8：AI、会话协议、重连、战斗流式计算和最终集成；
+- Match M6—M8：会话协议与 token 验证、跨端重连接线、战斗流式计算和最终集成；
 - M1–M4 的兼容清单、目录输入、命令、封印计划与快照尚未接入 Lobby 握手、TCP 协议、场景、Battle adapter 或 UI；
-- 开局后保持连接、断线宽限、重连 token 恢复和 AI 接管；
+- 开局后保持连接、断线事件传递与重连 token 验证尚未接线；M5 只提供 Host 内部 AI 接管/归还控制入口；
 - 共享卡池、商店经济、回合流程和结算快照尚未接入联网传输；
 - 正式 Battle Core adapter、流式计算/回放与 LAN 多端闭环；
 - 主机迁移、专用服务器与反房主作弊；

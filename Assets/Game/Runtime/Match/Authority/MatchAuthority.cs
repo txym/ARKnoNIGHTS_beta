@@ -4,10 +4,12 @@ using System.Linq;
 
 namespace ArknoNights.Match
 {
-    public sealed partial class MatchAuthority
+    public sealed partial class MatchAuthority : IMatchBotHost
     {
         private readonly Dictionary<CommandKey, CommandRecord> commandRecords =
             new Dictionary<CommandKey, CommandRecord>();
+        private readonly Dictionary<string, BotActionRecord> botActionRecords =
+            new Dictionary<string, BotActionRecord>(StringComparer.Ordinal);
         private readonly IStagingSlotPolicy stagingSlotPolicy;
         private readonly IMatchPreparationEntryParticipant preparationEntryParticipant;
         private MatchState state;
@@ -427,7 +429,12 @@ namespace ArknoNights.Match
 
             var nextSeat = seat.With(
                 ready: controllerKind == MatchControllerKind.Human ? (bool?)null : false,
-                controllerKind: controllerKind);
+                controllerKind: controllerKind,
+                controllerGeneration:
+                    controllerKind == MatchControllerKind.NativeBot
+                    || controllerKind == MatchControllerKind.TakeoverBot
+                        ? checked(seat.ControllerGeneration + 1)
+                        : seat.ControllerGeneration);
             return CommitHost(
                 state.WithSeat(nextSeat),
                 "match.controller.accepted");

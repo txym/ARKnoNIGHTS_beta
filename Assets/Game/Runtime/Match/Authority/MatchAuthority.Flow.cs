@@ -46,6 +46,25 @@ namespace ArknoNights.Match
                 return TransactionNoChange("match.clock.noChange");
             }
 
+            var botHost = CreateLiveBotHost();
+            if (!preparationEntryParticipant.TryAdvance(
+                botHost,
+                hostMonotonicNowMs,
+                out var botDiagnosticCode))
+            {
+                return TransactionRejected(
+                    MatchCommandCode.InternalInvariantViolation,
+                    string.IsNullOrWhiteSpace(botDiagnosticCode)
+                        ? "match.ai.advance.invalid"
+                        : botDiagnosticCode);
+            }
+            if (state.Phase != MatchPhase.Preparation
+                || !state.Flow.HasPreparationClock)
+            {
+                return TransactionRejected(
+                    MatchCommandCode.InvalidTransition,
+                    "match.clock.phase.changedDuringBotAdvance");
+            }
             var next = state.WithFlow(
                 state.Flow.With(lastHostMonotonicMs: hostMonotonicNowMs),
                 true);
@@ -297,14 +316,14 @@ namespace ArknoNights.Match
                         MatchCommandCode.InternalInvariantViolation,
                         diagnosticCode);
                 }
+                var botHost = CreatePreparationEntryBotHost(next);
                 if (!preparationEntryParticipant.TryRun(
-                    next,
-                    out var participantState,
+                    botHost,
                     out diagnosticCode)
-                    || participantState == null
-                    || participantState.StateRevision != targetRevision
-                    || participantState.Phase != MatchPhase.Preparation
-                    || participantState.RoundNumber != next.RoundNumber)
+                    || botHost.Current == null
+                    || botHost.Current.StateRevision != targetRevision
+                    || botHost.Current.Phase != MatchPhase.Preparation
+                    || botHost.Current.RoundNumber != next.RoundNumber)
                 {
                     return TransactionRejected(
                         MatchCommandCode.InternalInvariantViolation,
@@ -312,7 +331,7 @@ namespace ArknoNights.Match
                             ? "match.preparation.participant.invalid"
                             : diagnosticCode);
                 }
-                next = participantState;
+                next = botHost.Current;
                 if (!HasAnyRequiredHuman(next))
                 {
                     if (!TryBuildSealedState(
@@ -414,14 +433,14 @@ namespace ArknoNights.Match
                     MatchCommandCode.InternalInvariantViolation,
                     diagnosticCode);
             }
+            var botHost = CreatePreparationEntryBotHost(prepared);
             if (!preparationEntryParticipant.TryRun(
-                prepared,
-                out var participantState,
+                botHost,
                 out diagnosticCode)
-                || participantState == null
-                || participantState.StateRevision != prepared.StateRevision
-                || participantState.Phase != MatchPhase.Preparation
-                || participantState.RoundNumber != prepared.RoundNumber)
+                || botHost.Current == null
+                || botHost.Current.StateRevision != prepared.StateRevision
+                || botHost.Current.Phase != MatchPhase.Preparation
+                || botHost.Current.RoundNumber != prepared.RoundNumber)
             {
                 return TransactionRejected(
                     MatchCommandCode.InternalInvariantViolation,
@@ -429,7 +448,7 @@ namespace ArknoNights.Match
                         ? "match.preparation.participant.invalid"
                         : diagnosticCode);
             }
-            prepared = participantState;
+            prepared = botHost.Current;
             if (!HasAnyRequiredHuman(prepared))
             {
                 if (!TryBuildSealedState(

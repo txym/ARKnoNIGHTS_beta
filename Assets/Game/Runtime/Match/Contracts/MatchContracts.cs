@@ -109,7 +109,8 @@ namespace ArknoNights.Match
         BattleResultsIncomplete = 36,
         BattlePlaybackIncomplete = 37,
         SettlementAlreadyApplied = 38,
-        FatalMatchError = 39
+        FatalMatchError = 39,
+        ControllerGenerationChanged = 40
     }
 
     public static class MatchInitialValues

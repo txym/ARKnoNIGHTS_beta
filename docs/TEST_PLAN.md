@@ -37,6 +37,7 @@
   - `ARKnoNIGHTS.Lobby.EditModeTests`
   - `ARKnoNIGHTS.Lobby.PlayModeTests`
   - `ARKnoNIGHTS.Match.EditModeTests`
+  - `ARKnoNIGHTS.MatchAI.EditModeTests`
 - 项目测试启动器：`scripts/Invoke-UnityTests.ps1`。
 - 默认结果目录：`Temp/UnityTests/<UTC 时间戳>/`，包含 NUnit XML、Unity 日志和 `summary.txt`。
 - 每次运行必须使用新的结果目录。若脚本在 Unity 完成写入前读到不完整 XML，该次结果记为未验证；确认无 Unity 进程占用后，换新目录完整重跑，不覆盖或复用旧 XML。
@@ -78,7 +79,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - 玩家与回合：`LocalMatchStateEditModeTests`、`FourPlayerBattleRoundSealerEditModeTests`；
 - HUD：`ShopReadyHudStateEditModeTests`、`PlayerListObserverEditModeTests`；
 - Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试；
-- Match M1–M4 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、商店经济、自动合成、Buff 重映射、部署 Cost、严格备战席栈、Overflow、准备时钟、阵型命令、封印安全规则、2/3/4 人配对、结果校验、影子映射、结算收入/连续、淘汰/排名、终局和权限裁剪；只需聚焦 M4 时可使用 `ArknoNights.Match.Tests.MatchFlowEditModeTests`。
+- Match M1–M4 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、商店经济、自动合成、Buff 重映射、部署 Cost、严格备战席栈、Overflow、准备时钟、阵型命令、封印安全规则、2/3/4 人配对、结果校验、影子映射、结算收入/连续、淘汰/排名、终局和权限裁剪；只需聚焦 M4 时可使用 `ArknoNights.Match.Tests.MatchFlowEditModeTests`；
+- Match M5 AI：`ArknoNights.MatchAI.Tests`，覆盖观察权限、确定性决策表、ActionId 幂等、购买后 FinalSurvivor 单次部署、0–29000ms 固定 Tick、时间跳跃、立即封存、掉线/退出接管与恢复控制。
 
 规则或公共基础设施变化后再运行完整 EditMode。
 
@@ -152,8 +154,9 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 - M2 还必须精确断言池副本数、具体 UnitId、概率/排序、刷新游标、槽位冻结、价格、余额、升级折扣、AcquisitionOrdinal 和结构化结果码，不能只断言非空或数量近似正确；
 - M3 还必须精确断言 `0..3` 精英上限与 `1/2/4/8` 副本等价、`1/2/3/5` 战斗实体派生、确定性幸存 ID、单 revision 合成诊断、tombstone/池守恒、Buff 引用、Cost 退场、严格堆叠排序、Overflow 非阻塞提升与封存删除；
 - M4 还必须精确断言 `30000ms` 时钟边界、最后 Ready 原子封印、Ready 阵型锁、首回合安全购买/部署、Overflow 删除顺序、四/三/两人黄金表、人数切换确定性、每名存活玩家恰好一个 AppliedResult、影子 owner 忽略规则、结果 hash/Outcome 复核、回放门控、六档收入/连续奖励、负生命/共享名次、结算幂等、NoContest 与外部效果 outbox；
-- M1–M4 没有 PlayMode、Socket、场景、Battle adapter 或 UI 接入，不能用纯领域测试推断局域网流程可玩；
-- 后续 Match 里程碑必须逐步新增版本握手传输、命令排序、快照同步、重连、AI 接管、BattleInput adapter、流式回放和跨端摘要一致性验证；
+- M5 必须精确断言 AI 观察不含对手 Gold/Shop/Cost、池/seed/token，Cost 可部署候选与最右槽排序，`G=U+P+1/+2` 边界，满 13 槽仍可升级，部署坐标 35 格顺序，ActionId 重放/冲突/generation，0/1000…29000/30000 边界，跳帧补处理，真人全 Ready 后无末次动作，以及 Preparation/Battle 掉线宽限、主动退出与重连不回滚；
+- M1–M5 没有 PlayMode、Socket、场景、Battle adapter 或 UI 接入，不能用纯领域测试推断局域网流程可玩；
+- 后续 Match 里程碑必须逐步新增版本握手传输、命令排序、快照同步、token 身份验证、BattleInput adapter、流式回放和跨端摘要一致性验证；
 - 不得把“收到 Lobby Start”记为正式联网对局通过。
 
 ## 6. 证据记录

@@ -299,14 +299,26 @@ namespace ArknoNights.Match
 
     public interface IMatchPreparationEntryParticipant
     {
-        bool TryRun(MatchState state, out MatchState preparedState, out string diagnosticCode);
+        bool TryRun(IMatchBotHost host, out string diagnosticCode);
+        bool TryAdvance(
+            IMatchBotHost host,
+            long hostMonotonicNowMs,
+            out string diagnosticCode);
     }
 
     internal sealed class NoOpMatchPreparationEntryParticipant : IMatchPreparationEntryParticipant
     {
-        public bool TryRun(MatchState state, out MatchState preparedState, out string diagnosticCode)
+        public bool TryRun(IMatchBotHost host, out string diagnosticCode)
         {
-            preparedState = state;
+            diagnosticCode = string.Empty;
+            return true;
+        }
+
+        public bool TryAdvance(
+            IMatchBotHost host,
+            long hostMonotonicNowMs,
+            out string diagnosticCode)
+        {
             diagnosticCode = string.Empty;
             return true;
         }

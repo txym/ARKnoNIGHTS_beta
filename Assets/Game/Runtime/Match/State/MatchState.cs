@@ -175,7 +175,8 @@ namespace ArknoNights.Match
             MatchControllerKind controllerKind,
             MatchConnectionState connectionState,
             IEnumerable<MatchUnitState> units,
-            IEnumerable<MatchShopOfferState> shopOffers)
+            IEnumerable<MatchShopOfferState> shopOffers,
+            long controllerGeneration = 0)
             : this(
                 seatIndex,
                 playerId,
@@ -197,7 +198,8 @@ namespace ArknoNights.Match
                 shopOffers,
                 Array.Empty<PlayerTargetedUnitBuffState>(),
                 Array.Empty<PlayerGlobalBuffState>(),
-                Array.Empty<PlayerSourceEffectState>())
+                Array.Empty<PlayerSourceEffectState>(),
+                controllerGeneration: controllerGeneration)
         {
         }
 
@@ -224,7 +226,8 @@ namespace ArknoNights.Match
             IEnumerable<PlayerGlobalBuffState> globalBuffs,
             IEnumerable<PlayerSourceEffectState> sourceEffects,
             MatchStreakKind streakKind = MatchStreakKind.None,
-            int streakCount = 0)
+            int streakCount = 0,
+            long controllerGeneration = 0)
         {
             SeatIndex = seatIndex;
             PlayerId = playerId;
@@ -264,6 +267,7 @@ namespace ArknoNights.Match
                     .ToArray());
             StreakKind = streakKind;
             StreakCount = streakCount;
+            ControllerGeneration = controllerGeneration;
             CanonicalSummary = BuildCanonicalSummary();
         }
 
@@ -292,6 +296,7 @@ namespace ArknoNights.Match
         public IReadOnlyList<PlayerSourceEffectState> SourceEffects { get; }
         public MatchStreakKind StreakKind { get; }
         public int StreakCount { get; }
+        internal long ControllerGeneration { get; }
         public string CanonicalSummary { get; }
 
         internal MatchSeatState With(
@@ -314,7 +319,8 @@ namespace ArknoNights.Match
             IEnumerable<PlayerGlobalBuffState> globalBuffs = null,
             IEnumerable<PlayerSourceEffectState> sourceEffects = null,
             MatchStreakKind? streakKind = null,
-            int? streakCount = null)
+            int? streakCount = null,
+            long? controllerGeneration = null)
         {
             return new MatchSeatState(
                 SeatIndex,
@@ -339,7 +345,8 @@ namespace ArknoNights.Match
                 globalBuffs ?? GlobalBuffs,
                 sourceEffects ?? SourceEffects,
                 streakKind ?? StreakKind,
-                streakCount ?? StreakCount);
+                streakCount ?? StreakCount,
+                controllerGeneration ?? ControllerGeneration);
         }
 
         internal MatchSeatState WithElimination(int? placement)
@@ -367,7 +374,8 @@ namespace ArknoNights.Match
                 GlobalBuffs,
                 SourceEffects,
                 StreakKind,
-                StreakCount);
+                StreakCount,
+                ControllerGeneration);
         }
 
         private string BuildCanonicalSummary()
@@ -388,6 +396,7 @@ namespace ArknoNights.Match
             writer.Boolean("eliminated", Eliminated);
             writer.NullableInteger("placement", Placement);
             writer.EnumValue("controller", ControllerKind);
+            writer.Integer("controllerGeneration", ControllerGeneration);
             writer.EnumValue("connection", ConnectionState);
             writer.EnumValue("streakKind", StreakKind);
             writer.Integer("streakCount", StreakCount);
@@ -705,7 +714,11 @@ namespace ArknoNights.Match
                     return false;
                 }
                 if (!Enum.IsDefined(typeof(MatchControllerKind), seat.ControllerKind)
-                    || !Enum.IsDefined(typeof(MatchConnectionState), seat.ConnectionState))
+                    || !Enum.IsDefined(typeof(MatchConnectionState), seat.ConnectionState)
+                    || seat.ControllerGeneration < 0
+                    || ((seat.ControllerKind == MatchControllerKind.NativeBot
+                            || seat.ControllerKind == MatchControllerKind.TakeoverBot)
+                        && seat.ControllerGeneration < 1))
                 {
                     diagnosticCode = "match.invariant.controllerOrConnection";
                     return false;

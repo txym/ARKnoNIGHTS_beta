@@ -204,7 +204,8 @@ namespace ArknoNights.Match
                         string.Empty,
                         string.Empty,
                         null,
-                        false)));
+                        false)),
+                initialization.InitialControllerKind == MatchControllerKind.NativeBot ? 1 : 0);
         }
 
         private static MatchInitializationResult Rejected(
