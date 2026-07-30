@@ -37,14 +37,15 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void Seal_RemovesOverflow_AutoDeploysUniqueHighestAffordableUnit_AndBuildsValidatedInput()
         {
-            var fixedBattle = LoadFixed();
-            var player = LoadPlayer();
+            var catalog = LoadUniqueAutoDeployCatalog();
+            var fixedBattle = LoadFixed(catalog);
+            var player = LoadPlayer(catalog);
             Assert.IsTrue(PreparationBattleSealer.TrySeal(player, fixedBattle.Catalog, Away(fixedBattle), "test-round-1", fixedBattle.Input.MaxTicks, out var seal, out var error), error);
 
             CollectionAssert.AreEqual(new[] { "local-1000-overflow" }, seal.OverflowRemovedUnitIds);
             Assert.AreEqual("local-5503-alpha", seal.AutoDeployedUnitId);
             Assert.AreEqual(99, seal.Before.DeploymentCost);
-            Assert.AreEqual(87, seal.After.DeploymentCost);
+            Assert.AreEqual(78, seal.After.DeploymentCost);
             var home = seal.Input.Players.Single(item => item.Side == BattleSide.Home);
             var deployed = home.Units.Single(item => item.Zone == UnitZone.Deployed);
             Assert.AreEqual("local-5503-alpha", deployed.UnitId);
@@ -85,7 +86,8 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void Seal_WhenHighestCostIsNotAffordable_DeploysNextAffordableUnit()
         {
-            var fixedBattle = LoadFixed();
+            var catalog = LoadUniqueAutoDeployCatalog();
+            var fixedBattle = LoadFixed(catalog);
             const string playerJson = "{\"schemaVersion\":\"local-player-state-v1\",\"playerId\":\"limited-home\",\"deploymentCost\":2,\"units\":[{\"unitId\":\"costly\",\"typeId\":\"5503\",\"zone\":\"Staging\",\"eliteLevel\":0,\"buffs\":[],\"formationX\":0,\"formationY\":0},{\"unitId\":\"affordable\",\"typeId\":\"1000\",\"zone\":\"Staging\",\"eliteLevel\":0,\"buffs\":[],\"formationX\":0,\"formationY\":0}]}";
             var playerLoad = LocalPlayerStateLoader.LoadFromJson(fixedBattle.Catalog, playerJson);
             Assert.IsTrue(playerLoad.Success);
@@ -123,11 +125,37 @@ namespace ArknoNights.Battle.Tests
             return result;
         }
 
+        private static LocalBattleLoadResult LoadFixed(UnitCatalog catalog)
+        {
+            var asset = Resources.Load<TextAsset>(FixedBattlePath);
+            Assert.NotNull(asset);
+            var result = LocalBattleLoader.LoadFromJson(catalog, asset.text);
+            Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
+            return result;
+        }
+
         private static PlayerState LoadPlayer()
         {
             var result = LocalPlayerStateLoader.LoadFromResources(CatalogPath, PlayerPath);
             Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
             return result.State;
+        }
+
+        private static PlayerState LoadPlayer(UnitCatalog catalog)
+        {
+            var asset = Resources.Load<TextAsset>(PlayerPath);
+            Assert.NotNull(asset);
+            var result = LocalPlayerStateLoader.LoadFromJson(catalog, asset.text);
+            Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
+            return result.State;
+        }
+
+        private static UnitCatalog LoadUniqueAutoDeployCatalog()
+        {
+            var result =
+                UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
+            return result.Catalog;
         }
 
         private static PlayerState LoadOpponent()

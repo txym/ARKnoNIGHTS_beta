@@ -46,6 +46,7 @@ namespace ArknoNights.Match
                 return TransactionNoChange("match.clock.noChange");
             }
 
+            var revisionBeforeAdvance = state.StateRevision;
             var botHost = CreateLiveBotHost();
             if (!preparationEntryParticipant.TryAdvance(
                 botHost,
@@ -65,10 +66,20 @@ namespace ArknoNights.Match
                     MatchCommandCode.InvalidTransition,
                     "match.clock.phase.changedDuringBotAdvance");
             }
-            var next = state.WithFlow(
+            state = state.WithFlow(
                 state.Flow.With(lastHostMonotonicMs: hostMonotonicNowMs),
-                true);
-            return CommitHost(next, "match.clock.advanced");
+                false);
+            if (state.StateRevision == revisionBeforeAdvance)
+            {
+                return TransactionNoChange(
+                    "match.clock.advanced.noStateChange");
+            }
+            return new MatchTransactionResult(
+                MatchCommandCode.Accepted,
+                state.StateRevision,
+                state.StateRevision,
+                true,
+                "match.ai.advance.accepted");
         }
 
         public MatchTransactionResult TryExecuteBotFormation(
@@ -514,6 +525,16 @@ namespace ArknoNights.Match
                 source.Pool,
                 string.Empty,
                 flow);
+            var economyDraft =
+                new MatchEconomyTransactionDraft(prepared);
+            if (!economyDraft.TryResolvePreparationEntryFusions(
+                out _,
+                out diagnosticCode))
+            {
+                prepared = null;
+                return false;
+            }
+            prepared = economyDraft.BuildState(false);
             diagnosticCode = string.Empty;
             return true;
         }

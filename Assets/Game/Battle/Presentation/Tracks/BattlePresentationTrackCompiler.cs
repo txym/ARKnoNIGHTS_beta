@@ -23,6 +23,9 @@ namespace ArknoNights.Battle.Presentation
             public readonly List<UnitPresentationTrack.Attack> Attacks = new List<UnitPresentationTrack.Attack>();
             public readonly List<UnitPresentationTrack.Skill> Skills = new List<UnitPresentationTrack.Skill>();
             public readonly List<UnitPresentationTrack.State> States = new List<UnitPresentationTrack.State>();
+            public readonly List<UnitPresentationTrack.AttributeKey>
+                Attributes =
+                    new List<UnitPresentationTrack.AttributeKey>();
         }
 
         public bool TryCompile(BattleRunResult result, out BattlePresentationTrack track, out IReadOnlyList<BattlePresentationDiagnostic> diagnostics)
@@ -140,6 +143,19 @@ namespace ArknoNights.Battle.Presentation
                                 item.AnimationKey));
                         break;
 
+                    case BattleEventType.AttributesChanged:
+                        if (item.AttributesSnapshot == null)
+                        {
+                            AddError(errors, "track.attributes.missing", "Attribute change requires a snapshot.", result.BattleId, item.UnitId, item.Tick, item.Sequence);
+                            break;
+                        }
+                        actor.Attributes.Add(
+                            new UnitPresentationTrack.AttributeKey(
+                                item.Tick,
+                                item.Sequence,
+                                item.AttributesSnapshot));
+                        break;
+
                     case BattleEventType.Damage:
                         if (string.IsNullOrEmpty(item.RelatedUnitId) || !builders.TryGetValue(item.RelatedUnitId, out var target) || item.HitPointsAfter < 0 || item.HitPointsAfter > target.Snapshot.MaxHitPoints)
                         {
@@ -207,7 +223,7 @@ namespace ArknoNights.Battle.Presentation
                 .OrderBy(item => item.SpawnTick)
                 .ThenBy(item => item.SpawnSequence)
                 .ThenBy(item => item.Snapshot.UnitId, StringComparer.Ordinal)
-                .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, item.ExitTick, compressedPositions[item.Snapshot.UnitId], item.HitPoints, item.Attacks, item.Skills, item.States))
+                .Select(item => new UnitPresentationTrack(item.Snapshot, item.SpawnTick, result.CompletedTicks, item.DeathTick, item.ExitTick, compressedPositions[item.Snapshot.UnitId], item.HitPoints, item.Attacks, item.Skills, item.States, item.Attributes))
                 .ToArray();
             track = new BattlePresentationTrack(result, units, CreateEventDigest(events, result.UnitSnapshots), metrics);
             diagnostics = ReadOnly(errors);
@@ -581,6 +597,14 @@ namespace ArknoNights.Battle.Presentation
             foreach (var item in events)
             {
                 builder.Append((int)item.Type).Append('|').Append(item.Tick).Append('|').Append(item.Sequence).Append('|').Append(item.UnitId).Append('|').Append(item.UnitTypeId).Append('|').Append(item.UnitSide).Append('|').Append(item.RelatedUnitId).Append('|').Append(item.FromPosition).Append('|').Append(item.ToPosition).Append('|').Append(item.DamageType).Append('|').Append(item.DamageAmount).Append('|').Append(item.HitPointsBefore).Append('|').Append(item.HitPointsAfter).Append('|').Append(item.PlannedDamageTick).Append('|').Append(item.OriginalAnimationTicks).Append('|').Append(item.EffectiveAnimationTicks).Append('|').Append(item.AnimationKey).Append('|').Append(item.Winner).Append('|').Append(item.Reason);
+                if (item.AttributesSnapshot != null)
+                    builder.Append("|attributes:")
+                        .Append(item.AttributesSnapshot.Attack).Append('|')
+                        .Append(item.AttributesSnapshot.Defense).Append('|')
+                        .Append(item.AttributesSnapshot.MagicResistance).Append('|')
+                        .Append(item.AttributesSnapshot.MoveSpeedCentimetresPerSecond).Append('|')
+                        .Append(item.AttributesSnapshot.AttackIntervalTicks).Append('|')
+                        .Append(item.AttributesSnapshot.BlockCapacity);
                 if (item.Type == BattleEventType.Spawn && TryResolveSpawnSnapshot(item, snapshots, out var snapshot))
                     AppendSnapshot(builder, snapshot);
             }

@@ -129,7 +129,7 @@ namespace ArknoNights.Round
                 BattleInput.LocalBattleSchemaVersion,
                 battleId,
                 maxTicks,
-                catalog.Entries.Select(entry => entry.Definition),
+                catalog.AllDefinitions,
                 abilityCatalog.Abilities,
                 new[] { ToPlayerSnapshot(home, BattleSide.Home), ToPlayerSnapshot(away, BattleSide.Away) });
             return BattleInputFactory.TryCreate(specification, out input, out errors);
@@ -161,7 +161,7 @@ namespace ArknoNights.Round
                 BattleInput.LocalBattleSchemaVersion,
                 battleId,
                 maxTicks,
-                catalog.Entries.Select(entry => entry.Definition),
+                catalog.AllDefinitions,
                 abilityCatalog.Abilities,
                 new[] { new PlayerSnapshot(player.PlayerId, BattleSide.Home, homeUnits), fixedAway });
             return BattleInputFactory.TryCreate(specification, out input, out errors);

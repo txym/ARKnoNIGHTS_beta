@@ -32,7 +32,7 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void Commands_AreSerializedByHostAcceptSequenceAndSnapshotsStayScoped()
+        public void Commands_AreSerializedAsRecipientScopedOperationResults()
         {
             var actor = StartConnectedActor(out _, out _);
             var revision = actor.StateRevision;
@@ -53,13 +53,18 @@ namespace ArknoNights.Lobby.Tests
 
             var dispatches = actor.Tick(100);
             var acknowledgements = dispatches
-                .Where(item => item.Kind == MatchWireKind.CommandAck)
-                .Select(item => (MatchCommandAckPayload)item.Payload)
+                .Where(item => item.Kind == MatchWireKind.OperationResult)
+                .Where(item => item.ConnectionId == "guest-connection")
+                .Select(item => (MatchOperationResultPayload)item.Payload)
                 .ToArray();
 
             Assert.That(acknowledgements.Select(item => item.HostAcceptSequence),
                 Is.EqualTo(new long[] { 1, 2 }));
             Assert.That(acknowledgements.All(item => item.DidChangeState), Is.True);
+            Assert.That(
+                dispatches.Any(item =>
+                    item.Kind == MatchWireKind.RecoveryState),
+                Is.False);
             var hostSnapshot = actor.ProjectScoped(HostId);
             var guestSnapshot = actor.ProjectScoped(GuestId);
             Assert.That(hostSnapshot.OwnerPrivateState.PlayerId, Is.EqualTo(HostId));
@@ -67,7 +72,7 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(hostSnapshot.OwnerPrivateState.PlayerId, Is.Not.EqualTo(GuestId));
 
             var frame = MatchProtocol.Encode(
-                MatchWireKind.ScopedSnapshot,
+                MatchWireKind.RecoveryState,
                 actor.SessionId,
                 "privacy",
                 guestSnapshot,
@@ -132,8 +137,7 @@ namespace ArknoNights.Lobby.Tests
                 Is.EqualTo(new[]
                 {
                     MatchWireKind.ReconnectAccepted,
-                    MatchWireKind.ScopedSnapshot,
-                    MatchWireKind.ClockSync
+                    MatchWireKind.RecoveryState
                 }));
             var reconnected = actor.ProjectHostState().Seats
                 .Single(seat => seat.PlayerId == GuestId);
@@ -193,9 +197,9 @@ namespace ArknoNights.Lobby.Tests
                     revision)));
 
             var forgedAcknowledgement = actor.Tick(10)
-                .Single(item => item.Kind == MatchWireKind.CommandAck);
+                .Single(item => item.Kind == MatchWireKind.OperationResult);
             Assert.That(
-                ((MatchCommandAckPayload)forgedAcknowledgement.Payload).ResultCode,
+                ((MatchOperationResultPayload)forgedAcknowledgement.Payload).ResultCode,
                 Is.EqualTo(MatchCommandCode.ConnectionRejected.ToString()));
             Assert.That(
                 actor.BindFrozenConnection(GuestId, "replacement-connection", 2),
@@ -212,16 +216,16 @@ namespace ArknoNights.Lobby.Tests
                     revision)));
 
             var oldGenerationAcknowledgement = actor.Tick(20)
-                .Single(item => item.Kind == MatchWireKind.CommandAck);
+                .Single(item => item.Kind == MatchWireKind.OperationResult);
 
             Assert.That(
-                ((MatchCommandAckPayload)oldGenerationAcknowledgement.Payload).ResultCode,
+                ((MatchOperationResultPayload)oldGenerationAcknowledgement.Payload).ResultCode,
                 Is.EqualTo(MatchCommandCode.ConnectionRejected.ToString()));
             Assert.That(actor.StateRevision, Is.EqualTo(revision));
         }
 
         [Test]
-        public void CommandAck_PrecedesSnapshotAndDuplicateCommandIsIdempotent()
+        public void OperationResult_CarriesDeltaAndDuplicateCommandIsIdempotent()
         {
             var actor = StartConnectedActor(out _, out _);
             var command = Command(
@@ -239,18 +243,15 @@ namespace ArknoNights.Lobby.Tests
                 .Where(item =>
                     item.ConnectionId == "guest-connection")
                 .ToArray();
-            var firstAck = (MatchCommandAckPayload)first
-                .First(item => item.Kind == MatchWireKind.CommandAck)
+            var firstAck = (MatchOperationResultPayload)first
+                .Single(item => item.Kind == MatchWireKind.OperationResult)
                 .Payload;
 
             Assert.That(
-                first.Select(item => item.Kind).Take(2),
-                Is.EqualTo(new[]
-                {
-                    MatchWireKind.CommandAck,
-                    MatchWireKind.ScopedSnapshot
-                }));
+                first.Select(item => item.Kind),
+                Is.EqualTo(new[] { MatchWireKind.OperationResult }));
             Assert.That(firstAck.DidChangeState, Is.True);
+            Assert.That(firstAck.Delta, Is.Not.Null);
             var revision = actor.StateRevision;
 
             actor.EnqueueRemote(
@@ -258,8 +259,8 @@ namespace ArknoNights.Lobby.Tests
                 1,
                 GuestId,
                 Envelope(actor.SessionId, command));
-            var repeatedAck = (MatchCommandAckPayload)actor.Tick(20)
-                .Single(item => item.Kind == MatchWireKind.CommandAck)
+            var repeatedAck = (MatchOperationResultPayload)actor.Tick(20)
+                .Single(item => item.Kind == MatchWireKind.OperationResult)
                 .Payload;
 
             Assert.That(repeatedAck.ResultCode, Is.EqualTo(firstAck.ResultCode));
@@ -270,7 +271,56 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void SnapshotRequest_ReturnsCurrentRecipientScopedFullSnapshot()
+        public void PurchaseResult_HidesOwnerShopSlotFromOtherRecipients()
+        {
+            var actor = StartConnectedActor(out _, out _);
+            var guest = actor.ProjectScoped(GuestId);
+            var offer = guest.OwnerPrivateState.ShopOffers
+                .First(item =>
+                    !string.IsNullOrEmpty(item.UnitId));
+            actor.EnqueueRemote(
+                "guest-connection",
+                1,
+                GuestId,
+                Envelope(
+                    actor.SessionId,
+                    new MatchCommandWirePayload
+                    {
+                        PlayerId = GuestId,
+                        ConnectionGeneration = 1,
+                        CommandId = "guest-purchase",
+                        KnownStateRevision =
+                            guest.StateRevision,
+                        CommandKind = MatchCommandKind
+                            .PurchaseShopOffer.ToString(),
+                        SlotIndex = offer.SlotIndex,
+                        ExpectedUnitId = offer.UnitId
+                    }));
+
+            var results = actor.Tick(10)
+                .Where(item =>
+                    item.Kind
+                        == MatchWireKind.OperationResult)
+                .ToDictionary(
+                    item => item.ConnectionId,
+                    item => (MatchOperationResultPayload)
+                        item.Payload,
+                    StringComparer.Ordinal);
+
+            Assert.That(
+                results["guest-connection"].ShopSlotIndex,
+                Is.EqualTo(offer.SlotIndex));
+            Assert.That(
+                results["host-local"].ShopSlotIndex,
+                Is.Zero);
+            Assert.That(
+                results["host-local"].Delta
+                    .HasOwnerPrivateState,
+                Is.False);
+        }
+
+        [Test]
+        public void RecoveryStateRequest_ReturnsCurrentRecipientScopedFullState()
         {
             var actor = StartConnectedActor(out _, out _);
             actor.EnqueueRemote(
@@ -283,11 +333,11 @@ namespace ArknoNights.Lobby.Tests
                     {
                         ClientLastAppliedRevision = 0
                     },
-                    MatchWireKind.SnapshotRequest));
+                    MatchWireKind.RecoveryStateRequest));
 
             var snapshot = (ScopedSnapshotPayload)actor.Tick(10)
                 .Single(item =>
-                    item.Kind == MatchWireKind.ScopedSnapshot
+                    item.Kind == MatchWireKind.RecoveryState
                     && item.ConnectionId == "guest-connection")
                 .Payload;
 
@@ -431,7 +481,11 @@ namespace ArknoNights.Lobby.Tests
             var ended = actor.AbortByHost("match.test.abort");
             Assert.That(
                 ended.Any(item =>
-                    item.Kind == MatchWireKind.MatchEnded),
+                    item.Kind == MatchWireKind.SystemResult
+                    && ((MatchSystemResultPayload)item.Payload)
+                        .SystemKind
+                        == MatchSystemResultKind.HostAborted
+                            .ToString()),
                 Is.True);
             Assert.That(actor.Lifecycle, Is.EqualTo(MatchSessionLifecycle.Ended));
             Assert.That(
@@ -469,16 +523,6 @@ namespace ArknoNights.Lobby.Tests
                     HostMonotonicStartMs = 1000,
                     StartTick = 0
                 }), Is.Not.Empty);
-            Assert.That(actor.PublishPlaybackClock(
-                new MatchPlaybackClockPayload
-                {
-                    RoundNumber = plan.RoundNumber,
-                    BattleSetId = battleSetId,
-                    CanonicalInputHash = plan.CanonicalInputHash,
-                    HostMonotonicNowMs = 7000,
-                    CurrentTick = 120
-                }), Is.Not.Empty);
-
             var accepted = new List<MatchBattleTransportEvent>();
             actor.BattleTransportAccepted += accepted.Add;
             actor.EnqueueRemote(
@@ -562,20 +606,18 @@ namespace ArknoNights.Lobby.Tests
                 Is.EqualTo(new[]
                 {
                     MatchWireKind.ReconnectAccepted,
-                    MatchWireKind.ScopedSnapshot,
-                    MatchWireKind.ClockSync,
-                    MatchWireKind.BattleSeal,
-                    MatchWireKind.PlaybackStart,
-                    MatchWireKind.PlaybackClock
+                    MatchWireKind.RecoveryState,
+                    MatchWireKind.SystemResult,
+                    MatchWireKind.SystemResult
                 }));
             Assert.That(
-                ((MatchBattleSealPayload)recovery[3].Payload)
-                    .SealedPayload,
+                ((MatchSystemResultPayload)recovery[2].Payload)
+                    .BattleSeal.SealedPayload,
                 Is.EqualTo("m7-contract-payload"));
             Assert.That(
-                ((MatchPlaybackClockPayload)recovery[5].Payload)
-                    .CurrentTick,
-                Is.EqualTo(120));
+                ((MatchSystemResultPayload)recovery[3].Payload)
+                    .PlaybackStart.StartTick,
+                Is.EqualTo(0));
         }
 
         private static MatchSessionStartResult CreateSession()
@@ -720,7 +762,7 @@ namespace ArknoNights.Lobby.Tests
             return Envelope(
                 sessionId,
                 command,
-                MatchWireKind.Command);
+                MatchWireKind.OperationRequest);
         }
 
         private static MatchWireEnvelope Envelope(

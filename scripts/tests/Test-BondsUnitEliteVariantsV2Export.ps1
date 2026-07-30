@@ -10,6 +10,7 @@ $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $generator = Join-Path $repositoryRoot 'scripts\Export-BondsUnitEliteVariantsV2.ps1'
 $sourceDirectory = Join-Path $repositoryRoot 'Assets\GameData\Units\EliteVariants\Json'
+$bondSpecPath = Join-Path $repositoryRoot 'docs\bonds\BONDS_SPEC.md'
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repositoryRoot 'Artifacts\UnitDataImport20260729\GeneratorTestOutput'
 }
@@ -61,6 +62,26 @@ $documents = @(
             [System.IO.File]::ReadAllText($_.FullName, $strictUtf8) | ConvertFrom-Json
         }
 )
+$bondSpec = [System.IO.File]::ReadAllText(
+    $bondSpecPath,
+    $strictUtf8)
+$costTableMatch = [regex]::Match(
+    $bondSpec,
+    '(?ms)<!-- UNIT-COST-TABLE:START -->(?<table>.*?)<!-- UNIT-COST-TABLE:END -->')
+if (-not $costTableMatch.Success) {
+    throw 'BONDS unit cost table markers are missing.'
+}
+$expectedDeploymentCostByTypeId = @{}
+foreach ($match in [regex]::Matches(
+    $costTableMatch.Groups['table'].Value,
+    '(?m)^\|\s*(?<id>\d+)\s*\|\s*[^|]+?\s*\|\s*[1-6]\s*\|\s*(?<deploymentCost>\d+)\s*\|')) {
+    $expectedDeploymentCostByTypeId[
+        [int]$match.Groups['id'].Value
+    ] = [int]$match.Groups['deploymentCost'].Value
+}
+if ($expectedDeploymentCostByTypeId.Count -ne 94) {
+    throw "Expected 94 deployment costs, actual=$($expectedDeploymentCostByTypeId.Count)"
+}
 $variantCount = ($documents | ForEach-Object { @($_.variants).Count } | Measure-Object -Sum).Sum
 if ($documents.Count -ne 97 -or $variantCount -ne 180) {
     throw "Generated scope mismatch: documents=$($documents.Count) variants=$variantCount"
@@ -118,7 +139,13 @@ foreach ($file in $secondFiles) {
             throw "Forbidden field or animation entered source: file=$($file.Name) token=$forbidden"
         }
     }
-    if ([int]$document.common.deploymentCost -ne 2 `
+    $expectedDeploymentCost =
+        if ($expectedDeploymentCostByTypeId.ContainsKey($typeId)) {
+            $expectedDeploymentCostByTypeId[$typeId]
+        } else {
+            2
+        }
+    if ([int]$document.common.deploymentCost -ne $expectedDeploymentCost `
         -or [double]$document.common.attackRadiusMetres -ne 0 `
         -or [double]$document.common.blockRadiusMetres -ne 0 `
         -or [int]$document.common.tauntLevel -ne 0) {

@@ -77,9 +77,10 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod, int lifeDeduct = 1)
+        public UnitDefinition(string typeId, int maxHitPoints, int attack, int defense, int magicResistance, int moveSpeedCentimetresPerSecond, int attackIntervalTicks, int attackAnimationDurationTicks, DamageType damageType, AttackMethod attackMethod, int blockCapacity, int tauntLevel, bool isSyntheticFixtureData, IEnumerable<string> innateAbilityIds, int actionMethod, int lifeDeduct = 1, int eliteLevel = 0)
         {
             TypeId = typeId;
+            EliteLevel = eliteLevel;
             MaxHitPoints = maxHitPoints;
             Attack = attack;
             Defense = defense;
@@ -98,6 +99,7 @@ namespace ArknoNights.Battle.Core
         }
 
         public string TypeId { get; }
+        public int EliteLevel { get; }
         public int MaxHitPoints { get; }
         public int Attack { get; }
         public int Defense { get; }
@@ -129,11 +131,37 @@ namespace ArknoNights.Battle.Core
     public sealed class UnitSnapshot
     {
         public UnitSnapshot(string unitId, string typeId, UnitZone zone, FormationCoordinate? formation, IEnumerable<BuffPlaceholder> buffs)
-            : this(unitId, typeId, zone, formation, buffs, 0)
+            : this(
+                unitId,
+                typeId,
+                zone,
+                formation,
+                buffs,
+                0,
+                default(FormationOffset))
         {
         }
 
         public UnitSnapshot(string unitId, string typeId, UnitZone zone, FormationCoordinate? formation, IEnumerable<BuffPlaceholder> buffs, int eliteLevel)
+            : this(
+                unitId,
+                typeId,
+                zone,
+                formation,
+                buffs,
+                eliteLevel,
+                default(FormationOffset))
+        {
+        }
+
+        public UnitSnapshot(
+            string unitId,
+            string typeId,
+            UnitZone zone,
+            FormationCoordinate? formation,
+            IEnumerable<BuffPlaceholder> buffs,
+            int eliteLevel,
+            FormationOffset formationOffset)
         {
             UnitId = unitId;
             TypeId = typeId;
@@ -141,6 +169,7 @@ namespace ArknoNights.Battle.Core
             Formation = formation;
             Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
             EliteLevel = eliteLevel;
+            FormationOffset = formationOffset;
         }
 
         public string UnitId { get; }
@@ -149,6 +178,7 @@ namespace ArknoNights.Battle.Core
         public FormationCoordinate? Formation { get; }
         public IReadOnlyList<BuffPlaceholder> Buffs { get; }
         public int EliteLevel { get; }
+        public FormationOffset FormationOffset { get; }
     }
 
     public sealed class PlayerSnapshot
@@ -194,9 +224,11 @@ namespace ArknoNights.Battle.Core
         {
             var builder = new StringBuilder();
             builder.Append(SchemaVersion).Append('|').Append(BattleId).Append('|').Append(MaxTicks);
-            foreach (var definition in UnitDefinitions.OrderBy(item => item.TypeId, StringComparer.Ordinal))
+            foreach (var definition in UnitDefinitions
+                         .OrderBy(item => item.TypeId, StringComparer.Ordinal)
+                         .ThenBy(item => item.EliteLevel))
             {
-                builder.Append("|T:").Append(definition.TypeId).Append(',').Append(definition.MaxHitPoints).Append(',').Append(definition.Attack).Append(',').Append(definition.Defense).Append(',').Append(definition.MagicResistance).Append(',').Append(definition.MoveSpeedCentimetresPerSecond).Append(',').Append(definition.AttackIntervalTicks).Append(',').Append(definition.AttackAnimationDurationTicks).Append(',').Append((int)definition.DamageType).Append(',').Append((int)definition.AttackMethod).Append(',').Append(definition.BlockCapacity).Append(',').Append(definition.TauntLevel).Append(',').Append(definition.IsSyntheticFixtureData ? 1 : 0);
+                builder.Append("|T:").Append(definition.TypeId).Append(',').Append(definition.EliteLevel).Append(',').Append(definition.MaxHitPoints).Append(',').Append(definition.Attack).Append(',').Append(definition.Defense).Append(',').Append(definition.MagicResistance).Append(',').Append(definition.MoveSpeedCentimetresPerSecond).Append(',').Append(definition.AttackIntervalTicks).Append(',').Append(definition.AttackAnimationDurationTicks).Append(',').Append((int)definition.DamageType).Append(',').Append((int)definition.AttackMethod).Append(',').Append(definition.BlockCapacity).Append(',').Append(definition.TauntLevel).Append(',').Append(definition.IsSyntheticFixtureData ? 1 : 0);
                 if (definition.ActionMethod != 1)
                     builder.Append("|M:").Append(definition.ActionMethod);
                 if (definition.LifeDeduct != 1)
@@ -235,6 +267,7 @@ namespace ArknoNights.Battle.Core
                         .Append(ability.HealthThresholdCombatModifier.AttackSpeedAdditive).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.MoveSpeedMultiplierPermille).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.MakesUnblockable ? 1 : 0).Append(',')
+                        .Append(ability.HealthThresholdCombatModifier.RushesOpposingGate ? 1 : 0).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.TransitionAnimationKey).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.TransitionAnimationOriginalDurationTicks).Append(',')
                         .Append(ability.HealthThresholdCombatModifier.CompletedPresentationStateTag);
@@ -418,6 +451,8 @@ namespace ArknoNights.Battle.Core
                 {
                     builder.Append("|U:").Append(unit.UnitId).Append(',').Append(unit.TypeId).Append(',').Append((int)unit.Zone).Append(',').Append(unit.EliteLevel).Append(',');
                     if (unit.Formation.HasValue) builder.Append(unit.Formation.Value.X).Append(',').Append(unit.Formation.Value.Y);
+                    if (!unit.FormationOffset.IsZero)
+                        builder.Append("|O:").Append(unit.FormationOffset.XUnits).Append(',').Append(unit.FormationOffset.YUnits);
                     foreach (var buff in unit.Buffs.OrderBy(item => item.Id, StringComparer.Ordinal).ThenBy(item => item.RawPayload, StringComparer.Ordinal)) builder.Append("|B:").Append(buff.Id).Append(',').Append(buff.RawPayload);
                 }
             }
@@ -444,11 +479,25 @@ namespace ArknoNights.Battle.Core
             if (specification.MaxTicks <= 0) validationErrors.Add(new ValidationError("maxTicks.invalid", "maxTicks must be positive."));
 
             var typeIds = new HashSet<string>(StringComparer.Ordinal);
+            var typeEliteKeys =
+                new HashSet<string>(StringComparer.Ordinal);
             foreach (var definition in specification.UnitDefinitions)
             {
                 if (definition == null) { validationErrors.Add(new ValidationError("type.missing", "Unit definition is missing.")); continue; }
                 if (string.IsNullOrWhiteSpace(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.invalid", "Type ID is required."));
-                else if (!typeIds.Add(definition.TypeId)) validationErrors.Add(new ValidationError("typeId.duplicate", "Duplicate type ID: " + definition.TypeId));
+                else
+                {
+                    typeIds.Add(definition.TypeId);
+                    var typeEliteKey = definition.TypeId
+                        + "\u001f"
+                        + definition.EliteLevel.ToString(
+                            CultureInfo.InvariantCulture);
+                    if (!typeEliteKeys.Add(typeEliteKey))
+                        validationErrors.Add(new ValidationError("typeElite.duplicate", "Duplicate type and elite level: " + definition.TypeId + "/" + definition.EliteLevel));
+                }
+                if (definition.EliteLevel < 0
+                    || definition.EliteLevel > 3)
+                    validationErrors.Add(new ValidationError("type.elite.invalid", "Unit definition elite level must be within 0..3: " + (definition.TypeId ?? "<missing>")));
                 if (definition.MaxHitPoints <= 0 || definition.Attack < 0 || definition.Defense < 0 || definition.MagicResistance < 0 || definition.MagicResistance > 100 || definition.MoveSpeedCentimetresPerSecond < 0 || definition.BlockCapacity < 0 || definition.TauntLevel < 0 || definition.ActionMethod < 1 || definition.ActionMethod > 4 || definition.LifeDeduct < 0)
                     validationErrors.Add(new ValidationError("type.values.invalid", "Unit definition has invalid numeric values: " + (definition.TypeId ?? "<missing>")));
                 if (!Enum.IsDefined(typeof(DamageType), definition.DamageType) || !Enum.IsDefined(typeof(AttackMethod), definition.AttackMethod)) validationErrors.Add(new ValidationError("type.enum.invalid", "Unit definition has invalid enum values: " + (definition.TypeId ?? "<missing>")));
@@ -843,8 +892,16 @@ namespace ArknoNights.Battle.Core
                     else if (IsReservedDynamicUnitId(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.reserved.dynamic", "Initial unit ID is reserved for dynamic units: " + unit.UnitId));
                     else if (!unitIds.Add(unit.UnitId)) validationErrors.Add(new ValidationError("unitId.duplicate", "Duplicate unit ID: " + unit.UnitId));
                     if (unit.EliteLevel < 0 || unit.EliteLevel > 3) validationErrors.Add(new ValidationError("unit.elite.invalid", "Unit elite level must be within 0..3: " + unit.UnitId));
-                    if (string.IsNullOrWhiteSpace(unit.TypeId) || !typeIds.Contains(unit.TypeId)) validationErrors.Add(new ValidationError("unit.type.unknown", "Unit has an unknown type ID: " + (unit.TypeId ?? "<missing>")));
+                    var unitTypeEliteKey =
+                        (unit.TypeId ?? string.Empty)
+                        + "\u001f"
+                        + unit.EliteLevel.ToString(
+                            CultureInfo.InvariantCulture);
+                    if (string.IsNullOrWhiteSpace(unit.TypeId)
+                        || !typeEliteKeys.Contains(unitTypeEliteKey))
+                        validationErrors.Add(new ValidationError("unit.typeElite.unknown", "Unit has an unknown type and elite level: " + (unit.TypeId ?? "<missing>") + "/" + unit.EliteLevel));
                     if (!Enum.IsDefined(typeof(UnitZone), unit.Zone)) validationErrors.Add(new ValidationError("unit.zone.invalid", "Unit zone is invalid: " + unit.UnitId));
+                    if (!unit.FormationOffset.IsValid) validationErrors.Add(new ValidationError("unit.formationOffset.invalid", "Unit has an invalid formation offset: " + unit.UnitId));
                     if (unit.Zone == UnitZone.Deployed)
                     {
                         if (!unit.Formation.HasValue) validationErrors.Add(new ValidationError("unit.formation.missing", "Deployed unit requires a formation coordinate: " + unit.UnitId));
@@ -855,7 +912,11 @@ namespace ArknoNights.Battle.Core
                             if (!BattlefieldRules.IsDeployable(battlefield)) validationErrors.Add(new ValidationError("unit.formation.notDeployable", "Unit maps to a non-deployable battlefield coordinate: " + unit.UnitId));
                         }
                     }
-                    else if (unit.Formation.HasValue) validationErrors.Add(new ValidationError("unit.formation.unexpected", "Only deployed units may have a formation coordinate: " + unit.UnitId));
+                    else
+                    {
+                        if (unit.Formation.HasValue) validationErrors.Add(new ValidationError("unit.formation.unexpected", "Only deployed units may have a formation coordinate: " + unit.UnitId));
+                        if (!unit.FormationOffset.IsZero) validationErrors.Add(new ValidationError("unit.formationOffset.unexpected", "Only deployed units may have a formation offset: " + unit.UnitId));
+                    }
                 }
             }
 

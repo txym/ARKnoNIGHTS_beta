@@ -132,7 +132,7 @@ function Read-BondsUnitFacts {
     }
     foreach ($match in [regex]::Matches(
         $tableMatch.Groups['table'].Value,
-        '(?m)^\|\s*(?<id>\d+)\s*\|\s*(?<name>[^|]+?)\s*\|\s*(?<rarity>[1-6])\s*\|')) {
+        '(?m)^\|\s*(?<id>\d+)\s*\|\s*(?<name>[^|]+?)\s*\|\s*(?<rarity>[1-6])\s*\|\s*(?<deploymentCost>\d+)\s*\|')) {
         $typeId = [int]$match.Groups['id'].Value
         if ($facts.ContainsKey($typeId)) {
             throw "Duplicate BONDS unit table TypeId=$typeId"
@@ -140,6 +140,8 @@ function Read-BondsUnitFacts {
         $facts[$typeId] = [pscustomobject]@{
             DisplayNameZhHans = $match.Groups['name'].Value.Trim()
             Rarity = [int]$match.Groups['rarity'].Value
+            DeploymentCost =
+                [int]$match.Groups['deploymentCost'].Value
         }
     }
     if ($facts.Count -ne 94) {
@@ -161,6 +163,7 @@ function Read-BondsUnitFacts {
         $facts[$typeId] = [pscustomobject]@{
             DisplayNameZhHans = $names[0]
             Rarity = $rarities[0]
+            DeploymentCost = 2
         }
     }
 
@@ -371,8 +374,14 @@ function Get-AnimationPlan {
         { $_ -in @(2031, 2033) } {
             $additional += New-AnimationSpec -Key 'attack.skill' -Name 'Skill'
         }
-        { $_ -in @(10126, 10127) } {
+        10126 {
             $idle = 'A_Idle'
+            $move = 'A_Move'
+            $attack = 'A_Attack'
+            $death = 'A_Die'
+        }
+        10127 {
+            $idle = 'A_Default'
             $move = 'A_Move'
             $attack = 'A_Attack'
             $death = 'A_Die'
@@ -666,7 +675,8 @@ foreach ($typeId in $typeIds) {
         typeId = $typeId
         common = [ordered]@{
             rarity = [int]$unitFacts[$typeId].Rarity
-            deploymentCost = 2
+            deploymentCost =
+                [int]$unitFacts[$typeId].DeploymentCost
             attackMethod = $attackMethod
             actionMethod = $actionMethod
             attackRadiusMetres = 0

@@ -75,7 +75,7 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
                                            ↓
                          StartCommitted：冻结 1..4 席位
                                            ↓
-        同一 TCP 连接 → MatchInitialized → Command/Ack → ScopedSnapshot
+        同一 TCP 连接 → MatchInitialized → OperationResult/SystemResult
                                            ↓
       ConnectionLost → DisconnectedGrace → ReconnectRequest/恢复包
                                            ↓
@@ -84,15 +84,28 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
 
 `LanLobbyController` 自动创建场景级入口。开始时只停止 UDP 发现并隐藏 Lobby View，不再关闭 TCP 或解除本地 `LocalMatchState` Demo 门控。`LanRoomHost` 保留 listener 与既有 guest socket，把连接原位提升为 Match；普通 Join 从此被拒绝，listener 仅服务当前 Session 的重连。
 
-`MatchSessionHostActor` 是 `MatchAuthority` 的唯一可变调用方。远端命令、房主本地命令、连接事件、时钟和 Battle transport 事件进入同一队列并获得全局 `HostAcceptSequence`；后台读循环只做有界帧读取、严格解码和连接元数据绑定。每个连接由一个容量为 64 的串行 writer 写 `NetworkStream`，只允许在不跨越 Ack/控制消息时原位替换尚未发送的同接收者完整快照。
+`MatchSessionHostActor` 是 `MatchAuthority` 的唯一可变调用方。远端命令、房主本地命令、连接事件、时钟和 Battle transport 事件进入同一队列并获得全局 `HostAcceptSequence`；后台读循环只做有界帧读取、严格解码和连接元数据绑定。每个连接由一个容量为 64 的串行 writer 写 `NetworkStream`；普通运行期只排队结果和控制消息，不再生成可合并的周期完整快照。
 
-Match wire 使用独立 `MatchWireEnvelope` 和 4 字节大端长度前缀：绝对上限 4 MiB，控制消息 64 KiB，完整 scoped snapshot 1 MiB，BattleSeal 为 4 MiB 减前缀。正式 M8 运行时清单使用 `lan-match-v2`，因为 BattleSeal 的每场 M7 输入 hash 和公开战斗 Buff 投影是继续对局所必需，旧客户端必须在占席前被兼容检查拒绝。协议使用严格 UTF-8、显式 DTO/方向/范围校验，不依赖运行时类型名。每次权威事务先向发送者排队 `CommandAck`，再为各在线 Human 独立投影并序列化 Public + 本人 OwnerPrivate 完整快照；客户端只原子接受更高 `StateRevision`。
+Match wire 使用独立 `MatchWireEnvelope` 和 4 字节大端长度前缀：绝对上限 4 MiB，控制消息 64 KiB，完整恢复状态 1 MiB，包含 BattleSeal 的 SystemResult 为 4 MiB 减前缀。正式运行时清单使用 `lan-match-v3`，旧 v2 客户端必须在占席前被兼容检查拒绝。协议使用严格 UTF-8、显式 DTO/方向/范围校验，不依赖运行时类型名。玩家事务发布按接收者权限裁剪的 `OperationResult`，阶段、AI、连接、战斗与结算发布 `SystemResult`；结果包含基础/目标 revision 与最终绝对状态，客户端检测到 revision 缺口时只请求一次 `RecoveryState`。
+
+#### 3.3.1 已实现的结果流
+
+项目负责人于 2026-07-30 确认并实现把稳定运行期同步改为房主权威的
+OperationResult/SystemResult 流。该实现保留同一 TCP、actor、权限隔离、
+CommandId 幂等、重连 token 和恢复状态，但取消日常
+`CommandAck + ScopedSnapshot`、纯时钟 revision/完整快照和独立每秒
+PlaybackClock。完整恢复状态只用于初始、重连和显式纠错。
+
+UI 的点击、选中、商店确认、拖动、选择菱形、撤退 UI、Pending 与动画状态全部
+留在本地；网络结果只按稳定 UnitId/SlotId 更新客户端权威镜像。实现与约束详见
+[`LAN-MATCH-DESIGN.md`](LAN-MATCH-DESIGN.md) 第 12 节及
+[`2026-07-30-operation-result-driven-lan-sync.md`](decisions/2026-07-30-operation-result-driven-lan-sync.md)。
 
 安装级 `PlayerId` 为 `lan-` 加 32 位小写 hex，并通过 `ILocalProfileIdentityStore` 持久化。每个 Human 席位使用 32-byte CSPRNG base64url reconnect token；客户端原子保存单记录 credential，房主只保留 SHA-256 verifier，终局/显式退出时擦除。普通 EOF、超时和端点不可达保留 credential；自动重试为 `0/500/1000/2000/5000ms...`，兼容性不匹配停止本轮重试但保留 token。
 
 运行时兼容清单由真实 Unit/Ability 目录加载结果生成。目录 SHA 基于 Battle Core 的规范化模拟定义，按稳定键排序，排除本地化名称和美术路径；加入、开局和重连均逐字段核对 Protocol、MatchRules、BattleCore、UnitCatalog 与 AbilityCatalog。
 
-M6 提供 BattleSeal、FirstChunkReady、PlaybackStart、PlaybackClock、FinalSecondHash 和 ClientBattleFailure 的严格 transport/恢复顺序。M8 的正式组合根把已验证的连接丢失、恢复 Human 和显式退出 sink 绑定到 M5 `BotController`；Bot 仍只通过 `IMatchBotHost` 调用权威核心。
+Match transport 提供嵌入 SystemResult 的 BattleSeal/PlaybackStart，以及 FirstChunkReady、FinalSecondHash 和 ClientBattleFailure；不再发送独立 PlaybackClock。正式组合根把已验证的连接丢失、恢复 Human 和显式退出 sink 绑定到 M5 `BotController`；Bot 仍只通过 `IMatchBotHost` 调用权威核心。
 
 ### 3.4 正式 LAN 运行时与本地 Battle
 
@@ -102,23 +115,23 @@ LanLobbyController
 LanMatchRuntimeController
         ├─ Host：LanRoomHost → MatchSessionHostActor → MatchAuthority
         │                 └─ BotController（唯一房主调度）
-        ├─ Guest：LanRoomClient → ScopedSnapshot（无可写 Authority）
+        ├─ Guest：LanRoomClient → 结果镜像/RecoveryState（无可写 Authority）
         ├─ 每台机器：LanMatchBattleAdapter → M7 Producers
         │                              → MultiBattlePresentationCoordinator
-        └─ LanMatchHudController（只读本机 scoped snapshot/本地表现）
+        └─ LanMatchHudController（只读结果镜像/本地交互表现）
 ```
 
-`LanMatchRuntimeController` 是正式 LAN 路径的唯一场景组合根。Host 自身也只把按 Host 玩家裁剪的 `ScopedSnapshotPayload` 交给 HUD；房主本地命令与 guest 命令都进入 M6 actor 队列。Guest 从不创建可写 `MatchAuthority`。旧 `PreparationBattleLoopController` 与固定四玩家 Demo 继续用于离线测试，但 LAN handoff 会显式冻结这些入口。
+`LanMatchRuntimeController` 是正式 LAN 路径的唯一场景组合根。Host 与 Guest 都通过同一 actor 结果流更新按本人权限裁剪的客户端镜像；房主本地命令与 guest 命令进入同一队列。Guest 从不创建可写 `MatchAuthority`。旧 `PreparationBattleLoopController` 与固定四玩家 Demo 继续用于离线测试，但 LAN handoff 会显式冻结这些入口。
 
 `LanMatchHudController` 是正式 HUD 的 LAN 适配层，不是第二套 View。它查找并保持既有 `FormalBattleHudCanvas` 激活，把 Public/Owner scoped snapshot 投影为 `StagingHudController`、`ShopReadyHudController`、`PlayerListHudController` 和 `FormalBattleHudController` 已有的只读模型，并把旧控件的交互回调路由到 `LanMatchRuntimeController`。LAN 接管期间，离线场景协调器只暂停数据和输入驱动，不销毁或隐藏既有视觉层级；释放后恢复离线订阅、选择回调和部署门禁。禁止再创建平行的 `LanMatchHudCanvas`、停用正式画布或复制商店/玩家列表几何。
 
-运行时目录配置从真实 Unit/Ability Resources 加载器创建，并对模拟字段生成规范 SHA-256。`LanMatchBattleAdapter` 把 M4 的公开封存阵型、公开 Buff/SourceEffect 与每场 `SealedInputHash` 转换为 M7 `BattleInput`；精英 0/1/2/3 分别派生 1/2/3/5 个局部战斗实体，持久 UnitId 只用于稳定派生 EntityId 和结果映射。M4 的规范 hash 使用小写 hex，M7 输入验证对 SHA-256 hex 大小写等价，以避免跨模块格式差异改变语义。
+运行时目录配置从真实 Unit/Ability Resources 加载器创建，并对模拟字段生成规范 SHA-256。`LanMatchBattleAdapter` 把 M4 的公开封存阵型、公开 Buff/SourceEffect 与每场 `SealedInputHash` 转换为 M7 `BattleInput`；精英 0/1/2/3 分别派生 1/2/3/5 个局部战斗实体，持久 UnitId 只用于稳定派生 EntityId 和结果映射。展开本体保持在阵型格中心，其余实体按右下、左下、左上、右上的顺时针顺序使用 `±25cm` 格内偏移；偏移在 M4→M7 适配时生成并进入 M7 规范摘要，Battle Core 在客场 `180°` 旋转之前应用。M4 的规范 hash 使用小写 hex，M7 输入验证对 SHA-256 hex 大小写等价，以避免跨模块格式差异改变语义。
 
 BattleSeal 携带本轮 M4 规范摘要和每场 M7 输入 hash。每台在线机器独立、轮转地计算全部 Official/Shadow 战斗，不接收房主 BattleChunk。全体本地首块完成后发送 FirstChunkReady；房主冻结当时在线 Human 集合，等待全部就绪或 10 秒，且绝不绕过房主本地首块，然后广播未来 1000ms 的统一播放起点。表现 Tick 只由估算的房主单调时钟按 20 TPS 推导；本地计算不足只暂停本机画面，不暂停权威时钟。
 
 房主播放到所有本地战斗的最大 EndTick 后，把自己的 M7 `BattleResolution` 集合映射为 M4 结果并原子提交 `PlaybackCompleted + Settlement`。Guest 上报 Input/FinalSecond hash 仅用于诊断；不一致不会覆盖结算、踢人或改变对局。新 Preparation 快照会释放旧 producers/views；Ended/NoContest 释放运行时和 Session 后直接回主界面，不创建结算页或重赛房间。
 
-重连恢复包保留当前 scoped snapshot、ClockSync、BattleSeal、PlaybackStart 与 PlaybackClock。Preparation 重连以房主 deadline 恢复只读画面并由权威清除 Ready；Battle 重连从 Tick 0 无表现加速重建到当前房主 Tick，再转入正常 one-chunk-ahead 播放。接管 generation 与重连归还均不回滚已接受状态。
+重连先发送当前权限裁剪 `RecoveryState`，如处于战斗再补发嵌入 SystemResult 的 BattleSeal/PlaybackStart。Preparation 重连以 Pong 中的房主 deadline 恢复倒计时并由权威清除 Ready；Battle 重连从 Tick 0 无表现加速重建到按房主绝对时间推导的当前 Tick，再转入正常 one-chunk-ahead 播放。接管 generation 与重连归还均不回滚已接受状态。
 
 ### 3.5 Match M1–M5 纯领域权威状态与 AI
 
@@ -190,6 +203,6 @@ M5 新增单向依赖的 `ARKnoNIGHTS.MatchAI`。`MatchAuthority` 只通过 `IMa
 - 改战斗规则：优先进入 `Battle.Core` 并用确定性 EditMode 测试覆盖；Unity 表现只消费事件。
 - 改单位或能力：修改 v2 源和生成器，验证目录投影；不要直接把生成目录当人工事实源。
 - 改本地回合：保持 `PlayerState → Round seal → BattleInput` 单向流。
-- 改联网：遵守 `Lobby I/O → MatchSessionHostActor → ARKnoNIGHTS.Match → scoped snapshot → Initial 集成` 的单向依赖；后续里程碑继续扩展既有唯一权威状态，不让后台 I/O、View 或 Battle 表现直接调用 `MatchAuthority`。
-- 改 UI：读取快照和事件；不要让 View 保存或推断权威规则。
+- 改联网：遵守 `Lobby I/O → actor → Match → scoped result/recovery state → client mirror → Initial`，不得让后台 I/O、View 或 Battle 表现直接调用 `MatchAuthority`。
+- 改 UI：权威数据只读客户端结果镜像；点击、确认、选中、拖动、遮罩、撤退 UI、Pending 和动画等交互表现由 View 本地拥有，不能写入权威镜像或被无关结果清理。
 - 改场景、Prefab 或序列化字段：检查 `.meta`、引用和序列化 diff，并执行相应 PlayMode/Player 验证。

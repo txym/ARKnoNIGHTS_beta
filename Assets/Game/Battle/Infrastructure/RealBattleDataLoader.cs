@@ -10,9 +10,12 @@ namespace ArknoNights.Battle.Infrastructure
 {
     public sealed class UnitCatalogEntry
     {
-        internal UnitCatalogEntry(UnitDefinition definition, int legacyUnitTypeId, string resourceKey, string displayNameZhHans, string skillDescriptionZhHans, string sourceFile, int deploymentCost, string portraitResourcePath, int rarity, int initialEliteLevel, int lifeDeduct, string prefabResourcePath, string skeletonDataResourcePath, int unitSkelType, string moveAnimation, string attackAnimation, string hitAnimation, string deathAnimation)
+        internal UnitCatalogEntry(UnitDefinition definition, int legacyUnitTypeId, string resourceKey, string displayNameZhHans, string skillDescriptionZhHans, string sourceFile, int deploymentCost, string portraitResourcePath, int rarity, int initialEliteLevel, int lifeDeduct, string prefabResourcePath, string skeletonDataResourcePath, int unitSkelType, string idleAnimation, string moveAnimation, string attackAnimation, string hitAnimation, string deathAnimation)
         {
             Definition = definition;
+            EliteLevel = definition == null
+                ? initialEliteLevel
+                : definition.EliteLevel;
             LegacyUnitTypeId = legacyUnitTypeId;
             ResourceKey = resourceKey;
             DisplayNameZhHans = displayNameZhHans ?? string.Empty;
@@ -26,6 +29,7 @@ namespace ArknoNights.Battle.Infrastructure
             PrefabResourcePath = prefabResourcePath;
             SkeletonDataResourcePath = skeletonDataResourcePath;
             UnitSkelType = unitSkelType;
+            IdleAnimation = idleAnimation;
             MoveAnimation = moveAnimation;
             AttackAnimation = attackAnimation;
             HitAnimation = hitAnimation;
@@ -33,6 +37,7 @@ namespace ArknoNights.Battle.Infrastructure
         }
 
         public UnitDefinition Definition { get; }
+        public int EliteLevel { get; }
         public int LegacyUnitTypeId { get; }
         /// <summary>Stable technical Resources/object lookup key; never a player-visible name.</summary>
         public string ResourceKey { get; }
@@ -49,6 +54,7 @@ namespace ArknoNights.Battle.Infrastructure
         public string PrefabResourcePath { get; }
         public string SkeletonDataResourcePath { get; }
         public int UnitSkelType { get; }
+        public string IdleAnimation { get; }
         public string MoveAnimation { get; }
         public string AttackAnimation { get; }
         public string HitAnimation { get; }
@@ -58,21 +64,53 @@ namespace ArknoNights.Battle.Infrastructure
     public sealed class UnitCatalog
     {
         private readonly Dictionary<string, UnitCatalogEntry> entriesByTypeId;
+        private readonly Dictionary<string, UnitCatalogEntry>
+            entriesByTypeAndElite;
 
         internal UnitCatalog(string schemaVersion, string catalogId, IEnumerable<UnitCatalogEntry> entries)
         {
             SchemaVersion = schemaVersion;
             CatalogId = catalogId;
-            Entries = new ReadOnlyCollection<UnitCatalogEntry>((entries ?? Enumerable.Empty<UnitCatalogEntry>()).OrderBy(entry => entry.Definition.TypeId, StringComparer.Ordinal).ToArray());
+            EliteVariants = new ReadOnlyCollection<UnitCatalogEntry>(
+                (entries ?? Enumerable.Empty<UnitCatalogEntry>())
+                .OrderBy(entry => entry.Definition.TypeId, StringComparer.Ordinal)
+                .ThenBy(entry => entry.EliteLevel)
+                .ToArray());
+            Entries = new ReadOnlyCollection<UnitCatalogEntry>(
+                EliteVariants
+                    .Where(entry => entry.EliteLevel == 0)
+                    .ToArray());
             entriesByTypeId = Entries.ToDictionary(entry => entry.Definition.TypeId, StringComparer.Ordinal);
-            CanonicalSummary = string.Join("|", Entries.Select(entry => entry.Definition.TypeId + "," + entry.LegacyUnitTypeId + "," + entry.SkeletonDataResourcePath + "," + entry.Definition.AttackAnimationDurationTicks));
+            entriesByTypeAndElite = EliteVariants.ToDictionary(
+                entry => VariantKey(
+                    entry.Definition.TypeId,
+                    entry.EliteLevel),
+                StringComparer.Ordinal);
+            CanonicalSummary = string.Join("|", EliteVariants.Select(entry => entry.Definition.TypeId + "," + entry.EliteLevel + "," + entry.LegacyUnitTypeId + "," + entry.SkeletonDataResourcePath + "," + entry.Definition.AttackAnimationDurationTicks));
         }
 
         public string SchemaVersion { get; }
         public string CatalogId { get; }
         public IReadOnlyList<UnitCatalogEntry> Entries { get; }
+        public IReadOnlyList<UnitCatalogEntry> EliteVariants { get; }
+        public IEnumerable<UnitDefinition> AllDefinitions =>
+            EliteVariants.Select(entry => entry.Definition);
         public string CanonicalSummary { get; }
         public bool TryGet(string typeId, out UnitCatalogEntry entry) => entriesByTypeId.TryGetValue(typeId ?? string.Empty, out entry);
+        public bool TryGet(
+            string typeId,
+            int eliteLevel,
+            out UnitCatalogEntry entry) =>
+            entriesByTypeAndElite.TryGetValue(
+                VariantKey(typeId, eliteLevel),
+                out entry);
+
+        private static string VariantKey(
+            string typeId,
+            int eliteLevel) =>
+            (typeId ?? string.Empty)
+            + "\u001f"
+            + eliteLevel.ToString(CultureInfo.InvariantCulture);
     }
 
     public sealed class UnitCatalogLoadResult
@@ -123,8 +161,37 @@ namespace ArknoNights.Battle.Infrastructure
             {
                 var entry = ConvertEntry(item, dto.schemaVersion, dto.catalogId, errors);
                 if (entry == null) continue;
-                if (!seen.Add(entry.Definition.TypeId)) errors.Add(Error("catalog.typeId.duplicate", dto.schemaVersion, dto.catalogId, null, entry.Definition.TypeId));
-                else entries.Add(entry);
+                if (entry.EliteLevel != 0)
+                {
+                    errors.Add(Error("catalog.base.elite.invalid", dto.schemaVersion, dto.catalogId, null, entry.Definition.TypeId));
+                    continue;
+                }
+                AddEntry(entry, dto, seen, entries, errors);
+                foreach (var variantDto in item.eliteVariants
+                             ?? Array.Empty<UnitCatalogEntryDto>())
+                {
+                    var variant = ConvertEntry(
+                        variantDto,
+                        dto.schemaVersion,
+                        dto.catalogId,
+                        errors);
+                    if (variant == null) continue;
+                    if (!string.Equals(
+                            variant.Definition.TypeId,
+                            entry.Definition.TypeId,
+                            StringComparison.Ordinal)
+                        || variant.EliteLevel == 0)
+                    {
+                        errors.Add(Error("catalog.variant.identity.invalid", dto.schemaVersion, dto.catalogId, null, variant.Definition.TypeId));
+                        continue;
+                    }
+                    AddEntry(
+                        variant,
+                        dto,
+                        seen,
+                        entries,
+                        errors);
+                }
             }
 
             if (entries.Count == 0) errors.Add(Error("catalog.units.empty", dto.schemaVersion, dto.catalogId, null, null));
@@ -132,6 +199,30 @@ namespace ArknoNights.Battle.Infrastructure
             return errors.Count == 0
                 ? new UnitCatalogLoadResult(new UnitCatalog(dto.schemaVersion, dto.catalogId, entries), readOnlyErrors)
                 : new UnitCatalogLoadResult(null, readOnlyErrors);
+        }
+
+        private static void AddEntry(
+            UnitCatalogEntry entry,
+            UnitCatalogDto document,
+            ISet<string> seen,
+            ICollection<UnitCatalogEntry> entries,
+            ICollection<ValidationError> errors)
+        {
+            var key = entry.Definition.TypeId
+                      + "\u001f"
+                      + entry.EliteLevel.ToString(
+                          CultureInfo.InvariantCulture);
+            if (!seen.Add(key))
+            {
+                errors.Add(Error(
+                    "catalog.typeElite.duplicate",
+                    document.schemaVersion,
+                    document.catalogId,
+                    null,
+                    entry.Definition.TypeId));
+                return;
+            }
+            entries.Add(entry);
         }
 
         private static UnitCatalogEntry ConvertEntry(UnitCatalogEntryDto dto, string schemaVersion, string catalogId, ICollection<ValidationError> errors)
@@ -170,7 +261,8 @@ namespace ArknoNights.Battle.Infrastructure
                 valid = false;
             }
             if (dto.isSyntheticFixtureData) { errors.Add(Error("catalog.synthetic.notAllowed", schemaVersion, catalogId, null, dto.typeId)); valid = false; }
-            if (dto.deploymentCost < 0 || dto.rarity < 1 || dto.rarity > 6 || dto.initialEliteLevel < 0 || dto.initialEliteLevel > 3 || dto.lifeDeduct < 0)
+            var eliteLevel = dto.eliteLevel;
+            if (dto.deploymentCost < 0 || dto.rarity < 1 || dto.rarity > 6 || dto.initialEliteLevel < 0 || dto.initialEliteLevel > 3 || eliteLevel < 0 || eliteLevel > 3 || dto.lifeDeduct < 0)
             {
                 errors.Add(Error("catalog.ui.values.invalid", schemaVersion, catalogId, null, dto.typeId));
                 valid = false;
@@ -192,7 +284,8 @@ namespace ArknoNights.Battle.Infrastructure
                 if (Resources.Load<UnityEngine.Object>(dto.skeletonDataResourcePath) == null) { errors.Add(Error("catalog.skeleton.resource.missing", schemaVersion, catalogId, null, dto.typeId)); valid = false; }
             }
             if (dto.unitSkelType != 1 && dto.unitSkelType != 2) { errors.Add(Error("catalog.skeletonType.invalid", schemaVersion, catalogId, null, dto.typeId)); valid = false; }
-            if (string.IsNullOrWhiteSpace(dto.moveAnimation)
+            if (string.IsNullOrWhiteSpace(dto.idleAnimation)
+                || string.IsNullOrWhiteSpace(dto.moveAnimation)
                 || string.IsNullOrWhiteSpace(dto.deathAnimation)
                 || attackMethod != AttackMethod.None
                 && string.IsNullOrWhiteSpace(dto.attackAnimation))
@@ -209,8 +302,8 @@ namespace ArknoNights.Battle.Infrastructure
             if (!valid) return null;
 
             return new UnitCatalogEntry(
-                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>(), actionMethod, dto.lifeDeduct),
-                dto.legacyUnitTypeId, dto.resourceKey, dto.displayNameZhHans, dto.skillDescriptionZhHans, dto.sourceFile, dto.deploymentCost, dto.portraitResourcePath, dto.rarity, dto.initialEliteLevel, dto.lifeDeduct, dto.prefabResourcePath, dto.skeletonDataResourcePath, dto.unitSkelType, dto.moveAnimation, dto.attackAnimation, dto.hitAnimation ?? string.Empty, dto.deathAnimation);
+                new UnitDefinition(dto.typeId, dto.maxHitPoints, dto.attack, dto.defense, dto.magicResistance, dto.moveSpeedCentimetresPerSecond, dto.attackIntervalTicks, dto.attackAnimationDurationTicks, damageType, attackMethod, dto.blockCapacity, dto.tauntLevel, false, dto.innateAbilityIds ?? Array.Empty<string>(), actionMethod, dto.lifeDeduct, eliteLevel),
+                dto.legacyUnitTypeId, dto.resourceKey, dto.displayNameZhHans, dto.skillDescriptionZhHans, dto.sourceFile, dto.deploymentCost, dto.portraitResourcePath, dto.rarity, dto.initialEliteLevel, dto.lifeDeduct, dto.prefabResourcePath, dto.skeletonDataResourcePath, dto.unitSkelType, dto.idleAnimation, dto.moveAnimation, dto.attackAnimation, dto.hitAnimation ?? string.Empty, dto.deathAnimation);
         }
 
         private static bool TryParseEnum<T>(string value, out T parsed) where T : struct => Enum.TryParse(value, true, out parsed) && Enum.IsDefined(typeof(T), parsed);
@@ -218,7 +311,7 @@ namespace ArknoNights.Battle.Infrastructure
         internal static ValidationError Error(string code, string schema, string battleOrCatalogId, string playerId, string typeId) => new ValidationError(code, "schema=" + (schema ?? "<missing>") + "; battleId=" + (battleOrCatalogId ?? "<missing>") + "; playerId=" + (playerId ?? "<none>") + "; typeId=" + (typeId ?? "<none>"));
 
         [Serializable] private sealed class UnitCatalogDto { public string schemaVersion; public string catalogId; public UnitCatalogEntryDto[] units; }
-        [Serializable] private sealed class UnitCatalogEntryDto { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int actionMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string[] innateAbilityIds; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; }
+        [Serializable] private sealed class UnitCatalogEntryDto { public string typeId; public int legacyUnitTypeId; public string resourceKey; public string displayNameZhHans; public string skillDescriptionZhHans; public string sourceFile; public int deploymentCost; public string portraitResourcePath; public int rarity; public int initialEliteLevel; public int eliteLevel; public int maxHitPoints; public int attack; public int defense; public int magicResistance; public int moveSpeedCentimetresPerSecond; public int attackIntervalTicks; public int attackAnimationDurationTicks; public string damageType; public string attackMethod; public int actionMethod; public int blockCapacity; public int tauntLevel; public int lifeDeduct; public bool isSyntheticFixtureData; public string[] innateAbilityIds; public string prefabResourcePath; public string skeletonDataResourcePath; public int unitSkelType; public string idleAnimation; public string moveAnimation; public string attackAnimation; public string hitAnimation; public string deathAnimation; public UnitCatalogEntryDto[] eliteVariants; }
     }
 
     /// <summary>Joins a local-battle-v1 player snapshot to a Player-safe unit catalog without exposing presentation data to Core.</summary>
@@ -260,7 +353,7 @@ namespace ArknoNights.Battle.Infrastructure
             var players = (dto.players ?? Array.Empty<PlayerDto>()).Select(player => ConvertPlayer(player, dto, catalog, errors)).ToArray();
             if (errors.Count > 0) return new LocalBattleLoadResult(null, catalog, new ReadOnlyCollection<ValidationError>(errors));
 
-            var specification = new BattleInputSpecification(BattleInput.LocalBattleSchemaVersion, dto.battleId, dto.maxTicks, catalog.Entries.Select(entry => entry.Definition), abilityCatalog.Abilities, players);
+            var specification = new BattleInputSpecification(BattleInput.LocalBattleSchemaVersion, dto.battleId, dto.maxTicks, catalog.AllDefinitions, abilityCatalog.Abilities, players);
             if (!BattleInputFactory.TryCreate(specification, out var input, out var inputErrors)) return new LocalBattleLoadResult(null, catalog, inputErrors);
             return new LocalBattleLoadResult(input, catalog, Array.Empty<ValidationError>());
         }

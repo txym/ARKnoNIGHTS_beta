@@ -114,6 +114,15 @@ namespace ArknoNights.Battle.Core
             MaxHitPoints = snapshot.MaxHitPoints;
             CurrentHitPoints = state.CurrentHitPoints;
             CurrentShield = snapshot.CurrentShield;
+            Attack = state.EffectiveAttack;
+            Defense = state.EffectiveDefense;
+            MagicResistance =
+                state.EffectiveMagicResistance;
+            MoveSpeedCentimetresPerSecond =
+                state.EffectiveMoveSpeedCentimetresPerSecond;
+            AttackIntervalTicks =
+                state.EffectiveAttackIntervalTicks;
+            BlockCapacity = state.EffectiveBlockCapacity;
             TargetUnitId = state.TargetUnitId;
             BlockedUnitIds = new ReadOnlyCollection<string>(
                 state.BlockedUnitIds
@@ -172,6 +181,12 @@ namespace ArknoNights.Battle.Core
         public int MaxHitPoints { get; }
         public int CurrentHitPoints { get; }
         public int CurrentShield { get; }
+        public int Attack { get; }
+        public int Defense { get; }
+        public int MagicResistance { get; }
+        public int MoveSpeedCentimetresPerSecond { get; }
+        public int AttackIntervalTicks { get; }
+        public int BlockCapacity { get; }
         public string TargetUnitId { get; }
         public IReadOnlyList<string> BlockedUnitIds { get; }
         public BattleCheckpointAction Action { get; }
@@ -661,6 +676,25 @@ namespace ArknoNights.Battle.Core
                     : null);
             writer.WriteInt32((int)item.Reason);
             WriteSpawn(writer, item.SpawnSnapshot);
+            WriteAttributes(
+                writer,
+                item.AttributesSnapshot);
+        }
+
+        private static void WriteAttributes(
+            CanonicalWriter writer,
+            BattleUnitAttributesSnapshot item)
+        {
+            writer.WriteBoolean(item != null);
+            if (item == null)
+                return;
+            writer.WriteInt32(item.Attack);
+            writer.WriteInt32(item.Defense);
+            writer.WriteInt32(item.MagicResistance);
+            writer.WriteInt32(
+                item.MoveSpeedCentimetresPerSecond);
+            writer.WriteInt32(item.AttackIntervalTicks);
+            writer.WriteInt32(item.BlockCapacity);
         }
 
         private static void WriteSpawn(
@@ -680,6 +714,13 @@ namespace ArknoNights.Battle.Core
             writer.WriteInt32(item.MaxHitPoints);
             writer.WriteInt32(item.CurrentHitPoints);
             writer.WriteInt32(item.CurrentShield);
+            writer.WriteInt32(item.Attack);
+            writer.WriteInt32(item.Defense);
+            writer.WriteInt32(item.MagicResistance);
+            writer.WriteInt32(
+                item.MoveSpeedCentimetresPerSecond);
+            writer.WriteInt32(item.AttackIntervalTicks);
+            writer.WriteInt32(item.BlockCapacity);
             writer.WriteInt32(item.Attack);
             writer.WriteInt32(item.Defense);
             writer.WriteInt32(item.MagicResistance);

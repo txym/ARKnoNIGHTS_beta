@@ -335,6 +335,52 @@ namespace ArknoNights.Match.Tests
         }
 
         [Test]
+        public void EnterPreparation_ResolvesBattleDeferredDeployedAndStagingFusion()
+        {
+            var catalog = MatchFusionTestData.CatalogWithFillers(
+                baseDeploymentCost: 2);
+            var authority = MatchFusionTestData.CreateAuthority(catalog);
+            authority = MatchFusionTestData.WithPlayerOneState(
+                authority,
+                new[]
+                {
+                    MatchFusionTestData.Unit(
+                        "deferred-deployed",
+                        "1001",
+                        MatchUnitZone.Deployed,
+                        0,
+                        0,
+                        new MatchFormationPosition(4, 2)),
+                    MatchFusionTestData.Unit(
+                        "deferred-staging",
+                        "1001",
+                        MatchUnitZone.Staging,
+                        0,
+                        1)
+                });
+
+            var entered = authority.TryEnterPreparation(1, 1000);
+
+            Assert.That(entered.Accepted, Is.True,
+                entered.DiagnosticCode);
+            var owner = authority.ProjectForPlayer("player-1").Owner;
+            var survivor = owner.Units.Single(unit =>
+                unit.TypeId == "1001");
+            Assert.That(survivor.UnitId,
+                Is.EqualTo("deferred-deployed"));
+            Assert.That(survivor.EliteLevel, Is.EqualTo(1));
+            Assert.That(survivor.Zone,
+                Is.EqualTo(MatchUnitZone.Deployed));
+            Assert.That(survivor.Formation,
+                Is.EqualTo(new MatchFormationPosition(4, 2)));
+            Assert.That(owner.AvailableDeploymentCost, Is.EqualTo(12));
+            Assert.That(authority.ProjectForHostAuthority().Pool.RetiredUnits
+                .Single(retired =>
+                    retired.UnitId == "deferred-staging").Reason,
+                Is.EqualTo(MatchRetirementReason.FusionConsumed));
+        }
+
+        [Test]
         public void ConsumedPoolUnitNeverReturnsAndCannotBeAuthorizedAgain()
         {
             var catalog = MatchTestData.Catalog(MatchTestData.Entry("1001", 1));

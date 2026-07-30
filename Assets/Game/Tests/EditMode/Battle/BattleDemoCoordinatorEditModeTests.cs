@@ -97,7 +97,7 @@ namespace ArknoNights.Battle.Tests
                 skills
                     .Where(item => item.UnitId == "home-5503-alpha")
                     .Select(item => item.Tick),
-                Is.EqualTo(new[] { 100, 279 }));
+                Is.EqualTo(new[] { 100, 277 }));
 
             var dynamicJellySpawns = result.Events
                 .Where(item =>
@@ -112,12 +112,12 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(new[] { 9, 6, 3, 6 }));
             Assert.That(
                 dynamicJellySpawns.Select(item => item.Tick).Distinct(),
-                Is.EqualTo(new[] { 100, 250, 279, 400 }));
+                Is.EqualTo(new[] { 100, 250, 277, 400 }));
 
             var homeDeath = result.Events.Single(item =>
                 item.Type == BattleEventType.Death
                 && item.UnitId == "home-5503-alpha");
-            Assert.That(homeDeath.Tick, Is.EqualTo(390));
+            Assert.That(homeDeath.Tick, Is.EqualTo(388));
             Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.Skill
                 && item.UnitId == "home-5503-alpha"

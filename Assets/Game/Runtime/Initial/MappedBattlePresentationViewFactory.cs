@@ -10,7 +10,7 @@ using UnityEngine;
 /// Scene-configurable, explicit Core type to existing Unity resource bridge. TASK-005 can attach it to a
 /// controller; TASK-004 intentionally creates no mapping asset or scene wiring.
 /// </summary>
-public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattlePresentationViewFactory
+public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IEliteBattlePresentationViewFactory
 {
     private const string DefaultUnitPrefabResourcePath = "Prefabs/DefaultUnit";
     private const string DefaultCatalogResourcePath = "BattleData/unit-catalog-v1";
@@ -28,6 +28,12 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
     [SerializeField] private Transform unitParent;
     [SerializeField] private Binding[] bindings = Array.Empty<Binding>();
     [SerializeField] private TextAsset unitCatalogAsset;
+    private UnitCatalogLoadResult cachedCatalog;
+    private SkillAnimationCatalogLoadResult cachedSkillAnimations;
+    private readonly Dictionary<string, GameObject> cachedPrefabs =
+        new Dictionary<string, GameObject>(StringComparer.Ordinal);
+    private readonly Dictionary<string, SkeletonDataAsset> cachedSkeletonData =
+        new Dictionary<string, SkeletonDataAsset>(StringComparer.Ordinal);
 
     /// <summary>
     /// Optional Player-safe catalog asset override. When unset, the generated Resources catalog is loaded.
@@ -37,20 +43,49 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
     public TextAsset UnitCatalogAsset
     {
         get => unitCatalogAsset;
-        set => unitCatalogAsset = value;
+        set
+        {
+            if (unitCatalogAsset == value) return;
+            unitCatalogAsset = value;
+            cachedCatalog = null;
+            cachedPrefabs.Clear();
+            cachedSkeletonData.Clear();
+        }
     }
 
     public bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic)
+    {
+        return TryCreate(
+            unitId,
+            typeId,
+            0,
+            out view,
+            out diagnostic);
+    }
+
+    public bool TryCreate(
+        string unitId,
+        string typeId,
+        int eliteLevel,
+        out IBattlePresentationView view,
+        out BattlePresentationDiagnostic diagnostic)
     {
         view = null;
         diagnostic = null;
         var binding = Array.Find(bindings, item => item != null && string.Equals(item.coreTypeId, typeId, StringComparison.Ordinal));
         UnitCatalogEntry catalogEntry = null;
-        var catalogResult = unitCatalogAsset
-            ? UnitCatalogLoader.LoadFromJson(unitCatalogAsset.text)
-            : UnitCatalogLoader.LoadFromResources(DefaultCatalogResourcePath);
-        if (catalogResult.Success) catalogResult.Catalog.TryGet(typeId, out catalogEntry);
-        var skillAnimations = SkillAnimationCatalogLoader.LoadFromResources();
+        var catalogResult = cachedCatalog
+            ?? (cachedCatalog = unitCatalogAsset
+                ? UnitCatalogLoader.LoadFromJson(unitCatalogAsset.text)
+                : UnitCatalogLoader.LoadFromResources(DefaultCatalogResourcePath));
+        if (catalogResult.Success)
+            catalogResult.Catalog.TryGet(
+                typeId,
+                eliteLevel,
+                out catalogEntry);
+        var skillAnimations = cachedSkillAnimations
+            ?? (cachedSkillAnimations =
+                SkillAnimationCatalogLoader.LoadFromResources());
         if (!skillAnimations.Success)
         {
             diagnostic = new BattlePresentationDiagnostic(
@@ -67,7 +102,16 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
         }
 
         var prefabResourcePath = catalogEntry != null ? catalogEntry.PrefabResourcePath : DefaultUnitPrefabResourcePath;
-        var prefab = binding != null && binding.prefabOverride ? binding.prefabOverride : Resources.Load<GameObject>(prefabResourcePath);
+        GameObject prefab;
+        if (binding != null && binding.prefabOverride)
+        {
+            prefab = binding.prefabOverride;
+        }
+        else if (!cachedPrefabs.TryGetValue(prefabResourcePath, out prefab))
+        {
+            prefab = Resources.Load<GameObject>(prefabResourcePath);
+            if (prefab) cachedPrefabs.Add(prefabResourcePath, prefab);
+        }
         if (!prefab)
         {
             diagnostic = new BattlePresentationDiagnostic("resource.prefab.missing", "DefaultUnit prefab is unavailable for Core type " + typeId + ".");
@@ -83,7 +127,26 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
             return false;
         }
 
-        var skeletonData = binding != null && binding.skeletonData ? binding.skeletonData : catalogEntry != null ? Resources.Load<SkeletonDataAsset>(catalogEntry.SkeletonDataResourcePath) : skeleton.skeletonDataAsset;
+        SkeletonDataAsset skeletonData;
+        if (binding != null && binding.skeletonData)
+        {
+            skeletonData = binding.skeletonData;
+        }
+        else if (catalogEntry == null)
+        {
+            skeletonData = skeleton.skeletonDataAsset;
+        }
+        else if (!cachedSkeletonData.TryGetValue(
+                     catalogEntry.SkeletonDataResourcePath,
+                     out skeletonData))
+        {
+            skeletonData = Resources.Load<SkeletonDataAsset>(
+                catalogEntry.SkeletonDataResourcePath);
+            if (skeletonData)
+                cachedSkeletonData.Add(
+                    catalogEntry.SkeletonDataResourcePath,
+                    skeletonData);
+        }
         if (!skeletonData)
         {
             Destroy(instance);
@@ -126,7 +189,13 @@ public sealed class MappedBattlePresentationViewFactory : MonoBehaviour, IBattle
         }
 
         if (catalogEntry != null)
+        {
             unitSkel.ConfigureCatalogPresentationData(identity, catalogEntry.Definition.MoveSpeedCentimetresPerSecond / 100f, catalogEntry.Definition.AttackIntervalTicks / (float)ArknoNights.Battle.Core.BattleInput.TicksPerSecond);
+            unitSkel.ConfigureLegacySourceAnimations(
+                catalogEntry.IdleAnimation,
+                catalogEntry.MoveAnimation,
+                catalogEntry.AttackAnimation);
+        }
         else
             unitSkel.unitIdentity = identity;
 

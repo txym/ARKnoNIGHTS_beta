@@ -19,7 +19,7 @@ public sealed class UnitInformationCaptureRunner : MonoBehaviour
     private readonly List<CaptureRecord> captures = new List<CaptureRecord>();
     private static readonly string[] InformationElementPaths =
     {
-        "UnitName", "CombatSummary", "Portrait", "TargetValue", "TargetValue/Background", "TargetValue/Icon", "TargetValue/Value", "HealthBackground", "HealthValue",
+        "UnitName", "CombatSummary", "Portrait", "TargetValue", "TargetValue/Background", "TargetValue/Icon", "TargetValue/Value", "HealthBackground", "HealthValue", "Tab_技能",
         "Stat_maxHp", "Stat_maxHp/Background", "Stat_maxHp/Icon", "Stat_maxHp/Label", "Stat_maxHp/Value",
         "Stat_moveSpeed", "Stat_moveSpeed/Background", "Stat_moveSpeed/Icon", "Stat_moveSpeed/Label", "Stat_moveSpeed/Value",
         "Stat_attack", "Stat_attack/Background", "Stat_attack/Icon", "Stat_attack/Label", "Stat_attack/Value",

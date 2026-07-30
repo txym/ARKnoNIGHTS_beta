@@ -180,23 +180,4 @@ namespace ArknoNights.Lobby
         }
     }
 
-    public sealed class ScopedSnapshotClientState
-    {
-        public event Action<ScopedSnapshotPayload> Changed;
-
-        public ScopedSnapshotPayload Current { get; private set; }
-
-        public bool TryApply(ScopedSnapshotPayload snapshot)
-        {
-            if (snapshot == null
-                || snapshot.StateRevision < 0
-                || (Current != null && snapshot.StateRevision <= Current.StateRevision))
-            {
-                return false;
-            }
-            Current = snapshot;
-            Changed?.Invoke(snapshot);
-            return true;
-        }
-    }
 }

@@ -25,6 +25,17 @@ namespace ArknoNights.Battle.Presentation
         bool TryCreate(string unitId, string typeId, out IBattlePresentationView view, out BattlePresentationDiagnostic diagnostic);
     }
 
+    public interface IEliteBattlePresentationViewFactory
+        : IBattlePresentationViewFactory
+    {
+        bool TryCreate(
+            string unitId,
+            string typeId,
+            int eliteLevel,
+            out IBattlePresentationView view,
+            out BattlePresentationDiagnostic diagnostic);
+    }
+
     /// <summary>Optional capability for views backed by catalog-named Skill clips.</summary>
     public interface IBattleSkillPresentationView
     {
@@ -64,7 +75,7 @@ namespace ArknoNights.Battle.Presentation
         {
         }
 
-        internal BattlePresentationViewState(string unitId, string typeId, BattleSide side, FixedPosition position, PresentationPosition continuousPosition, int maxHitPoints, int hitPoints, int currentShield, bool hasSpawned, bool isAlive, UnitPresentationAction action, int eliteLevel)
+        internal BattlePresentationViewState(string unitId, string typeId, BattleSide side, FixedPosition position, PresentationPosition continuousPosition, int maxHitPoints, int hitPoints, int currentShield, bool hasSpawned, bool isAlive, UnitPresentationAction action, int eliteLevel, BattleUnitAttributesSnapshot attributes = null)
         {
             UnitId = unitId;
             TypeId = typeId;
@@ -78,6 +89,17 @@ namespace ArknoNights.Battle.Presentation
             IsAlive = isAlive;
             Action = action;
             EliteLevel = eliteLevel;
+            AttributesAvailable = attributes != null;
+            Attack = attributes?.Attack ?? 0;
+            Defense = attributes?.Defense ?? 0;
+            MagicResistance =
+                attributes?.MagicResistance ?? 0;
+            MoveSpeedCentimetresPerSecond =
+                attributes?.MoveSpeedCentimetresPerSecond ?? 0;
+            AttackIntervalTicks =
+                attributes?.AttackIntervalTicks ?? 0;
+            BlockCapacity =
+                attributes?.BlockCapacity ?? 0;
         }
 
         public string UnitId { get; }
@@ -92,5 +114,12 @@ namespace ArknoNights.Battle.Presentation
         public bool IsAlive { get; }
         public UnitPresentationAction Action { get; }
         public int EliteLevel { get; }
+        public bool AttributesAvailable { get; }
+        public int Attack { get; }
+        public int Defense { get; }
+        public int MagicResistance { get; }
+        public int MoveSpeedCentimetresPerSecond { get; }
+        public int AttackIntervalTicks { get; }
+        public int BlockCapacity { get; }
     }
 }

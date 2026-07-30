@@ -19,17 +19,35 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     {
         public ShopReadyConfirmation Kind { get; private set; }
         public int ShopSlotId { get; private set; } = -1;
+        public string ShopUnitId { get; private set; } = string.Empty;
+        public bool Submitted { get; private set; }
 
         public bool RequestPurchase(int shopSlotId)
         {
-            if (Kind == ShopReadyConfirmation.Purchase && ShopSlotId == shopSlotId)
+            return RequestPurchase(shopSlotId, string.Empty);
+        }
+
+        public bool RequestPurchase(
+            int shopSlotId,
+            string shopUnitId)
+        {
+            shopUnitId = shopUnitId ?? string.Empty;
+            if (Kind == ShopReadyConfirmation.Purchase
+                && ShopSlotId == shopSlotId
+                && string.Equals(
+                    ShopUnitId,
+                    shopUnitId,
+                    StringComparison.Ordinal))
             {
-                Clear();
+                if (Submitted) return false;
+                Submitted = true;
                 return true;
             }
 
             Kind = ShopReadyConfirmation.Purchase;
             ShopSlotId = shopSlotId;
+            ShopUnitId = shopUnitId;
+            Submitted = false;
             return false;
         }
 
@@ -39,19 +57,52 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 throw new ArgumentOutOfRangeException(nameof(requested));
             if (Kind == requested)
             {
-                Clear();
+                if (Submitted) return false;
+                Submitted = true;
                 return true;
             }
 
             Kind = requested;
             ShopSlotId = -1;
+            ShopUnitId = string.Empty;
+            Submitted = false;
             return false;
+        }
+
+        public void Resolve(bool accepted)
+        {
+            if (accepted)
+            {
+                Clear();
+                return;
+            }
+            Submitted = false;
+        }
+
+        public void Reconcile(
+            IEnumerable<ShopReadySlotViewState> slots)
+        {
+            if (Kind != ShopReadyConfirmation.Purchase) return;
+            var current = (slots
+                    ?? Enumerable.Empty<ShopReadySlotViewState>())
+                .FirstOrDefault(item =>
+                    item.ShopSlotId == ShopSlotId);
+            if (current == null
+                || !string.Equals(
+                    current.UnitId,
+                    ShopUnitId,
+                    StringComparison.Ordinal))
+            {
+                Clear();
+            }
         }
 
         public void Clear()
         {
             Kind = ShopReadyConfirmation.None;
             ShopSlotId = -1;
+            ShopUnitId = string.Empty;
+            Submitted = false;
         }
     }
 
@@ -131,6 +182,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             : this(
                 source.ShopSlotId,
                 source.UnitTypeId,
+                source.UnitTypeId,
                 source.Price,
                 source.DeploymentCost,
                 source.Rarity,
@@ -146,6 +198,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private ShopReadySlotViewState(
             int shopSlotId,
             string unitTypeId,
+            string unitId,
             int price,
             int deploymentCost,
             int rarity,
@@ -158,6 +211,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         {
             ShopSlotId = shopSlotId;
             UnitTypeId = unitTypeId ?? string.Empty;
+            UnitId = unitId ?? string.Empty;
             Price = price;
             DeploymentCost = deploymentCost;
             Rarity = rarity;
@@ -171,6 +225,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         public int ShopSlotId { get; }
         public string UnitTypeId { get; }
+        public string UnitId { get; }
         public int Price { get; }
         public int DeploymentCost { get; }
         public int Rarity { get; }
@@ -194,9 +249,39 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             bool canPurchase,
             bool canToggleFrozen)
         {
+            return CreateProjection(
+                shopSlotId,
+                unitTypeId,
+                unitTypeId,
+                price,
+                deploymentCost,
+                rarity,
+                displayName,
+                portraitResourcePath,
+                isEmpty,
+                isFrozen,
+                canPurchase,
+                canToggleFrozen);
+        }
+
+        public static ShopReadySlotViewState CreateProjection(
+            int shopSlotId,
+            string unitTypeId,
+            string unitId,
+            int price,
+            int deploymentCost,
+            int rarity,
+            string displayName,
+            string portraitResourcePath,
+            bool isEmpty,
+            bool isFrozen,
+            bool canPurchase,
+            bool canToggleFrozen)
+        {
             return new ShopReadySlotViewState(
                 shopSlotId,
                 unitTypeId,
+                unitId,
                 price,
                 deploymentCost,
                 rarity,

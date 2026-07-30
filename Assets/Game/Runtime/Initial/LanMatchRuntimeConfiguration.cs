@@ -14,9 +14,9 @@ using UnityEngine;
 
 internal static class LanMatchRuntimeConfiguration
 {
-    internal const string ProtocolVersion = "lan-match-v2";
+    internal const string ProtocolVersion = "lan-match-v3";
     internal const string MatchRulesVersion = "match-rules-v1";
-    internal const string BattleCoreVersion = "battle-core-v1";
+    internal const string BattleCoreVersion = "battle-core-v2";
     private const string UnitCatalogResource = "BattleData/unit-catalog-v1";
     private const string AbilityCatalogResource = "BattleData/ability-catalog-v1";
     private static readonly HashSet<string> ShopExcludedTypeIds =

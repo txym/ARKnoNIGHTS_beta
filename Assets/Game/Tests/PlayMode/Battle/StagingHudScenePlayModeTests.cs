@@ -79,7 +79,14 @@ namespace ArknoNights.Battle.Tests
             Assert.That(firstStat.anchoredPosition.y, Is.EqualTo(secondStat.anchoredPosition.y).Within(0.01f));
             Assert.That(canvas.Find("FormalHud/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color, Is.EqualTo(new Color(1f, .47058824f, .47058824f)));
             Assert.That(information.Find("TargetValue/Value").GetComponent<Text>().color, Is.EqualTo(canvas.Find("FormalHud/BattleStatusPanel/PlayerHealth").GetComponent<Text>().color), "Target value must use the same color as the battle status player health.");
-            Assert.IsTrue(information.Find("Tab_技能").GetComponent<Text>().text.Contains("未接入"));
+            var abilityDescription = information.Find("Tab_技能").GetComponent<Text>();
+            Assert.AreEqual(string.Empty, abilityDescription.text);
+            Assert.AreEqual(TextAnchor.UpperLeft, abilityDescription.alignment);
+            Assert.AreEqual(
+                HorizontalWrapMode.Wrap,
+                abilityDescription.horizontalOverflow);
+            Assert.IsFalse(
+                abilityDescription.text.Contains("技能"));
         }
 
         private static void AssertUnitInformationEntry(Transform entry, string expectedSpriteName, bool requiresLabel)
@@ -125,6 +132,9 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("--", information.Find("UnitName").GetComponent<Text>().text);
             Assert.AreEqual("18000", information.Find("Stat_maxHp/Value").GetComponent<Text>().text);
             Assert.AreEqual(20, information.Find("HealthValue/Text").GetComponent<Text>().fontSize);
+            Assert.AreEqual(
+                "视觉验证能力描述。",
+                information.Find("Tab_技能").GetComponent<Text>().text);
 
             showFixture.Invoke(formalHud, new object[] { "medium-name" });
             yield return null;
@@ -346,6 +356,60 @@ namespace ArknoNights.Battle.Tests
         }
 
         [UnityTest]
+        public IEnumerator SampleScene_StagingDragOntoDeployedUnitAtomicallyReplacesIt()
+        {
+            SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+            for (var frame = 0; frame < 3; frame++) yield return null;
+
+            var hud = Object.FindObjectOfType<StagingHudController>();
+            var controller = hud.GetComponent(
+                "ArknoNights.Deployment.StateDrivenDeploymentController");
+            var type = controller.GetType();
+            Assert.IsTrue(
+                hud.PlayerState.TryDeploy(
+                    "local-1000-alpha",
+                    5,
+                    2).Success);
+            yield return null;
+            var jellySlot = hud.Snapshot.StagingSlots.Single(slot =>
+                slot.TypeId == "5503");
+            var jellySlotId =
+                StagingHudController.BuildSlotId(jellySlot);
+
+            Assert.IsTrue((bool)type.GetMethod("BeginDragFromSlot")
+                .Invoke(controller, new object[] { jellySlotId }));
+            type.GetMethod("SetDragWorldPositionForTests").Invoke(
+                controller,
+                new object[] { new Vector3(500f, 0f, 200f) });
+            var result = (ArknoNights.Player.PlayerOperationResult)type
+                .GetMethod("CommitCurrentDragForTests")
+                .Invoke(controller, null);
+            yield return null;
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(78, hud.PlayerState.DeploymentCost);
+            Assert.AreEqual(
+                "local-5503-alpha",
+                hud.PlayerState
+                    .GetUnits(
+                        ArknoNights.Player.PlayerUnitZone.Deployed)
+                    .Single().UnitId);
+            Assert.AreEqual(
+                ArknoNights.Player.PlayerUnitZone.Staging,
+                hud.Snapshot.Units.Single(unit =>
+                    unit.UnitId == "local-1000-alpha").Zone);
+            var views = GameObject.Find("PreparationUnitViews").transform;
+            Assert.IsNull(
+                views.Find("PreparationView_local-1000-alpha"));
+            Assert.NotNull(
+                views.Find("PreparationView_local-5503-alpha"));
+            Assert.AreEqual(
+                1,
+                (int)type.GetProperty("PreparationViewCount")
+                    .GetValue(controller));
+        }
+
+        [UnityTest]
         public IEnumerator SampleScene_DragPreviewFailureAndInteractionLockLeavePlayerStateUntouched()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
@@ -380,7 +444,7 @@ namespace ArknoNights.Battle.Tests
         }
 
         [UnityTest]
-        public IEnumerator SampleScene_SelectedDeployedRelocationSwapsViewsAndKeepsOriginalSelection()
+        public IEnumerator SampleScene_DirectDeployedRelocationSwapsViewsAndKeepsOriginalSelection()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
             for (var frame = 0; frame < 3; frame++) yield return null;
@@ -392,14 +456,21 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(hud.PlayerState.TryDeploy("local-1000-bravo", 6, 2).Success);
             yield return null;
 
-            Assert.IsFalse((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }), "An unselected deployed unit must not start relocation.");
-            Assert.IsTrue((bool)type.GetMethod("SelectDeployedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
-            var indicator = GameObject.Find("DeployedUnitSelectionIndicator");
-            Assert.NotNull(indicator);
-            Assert.IsTrue(indicator.activeSelf);
+            Assert.IsTrue(
+                (bool)type.GetMethod(
+                        "BeginRelocateSelectedForTests")
+                    .Invoke(
+                        controller,
+                        new object[] { "local-1000-alpha" }),
+                "A deployed unit must enter relocation directly without first opening its panel.");
+            var indicatorTransform = controller.transform.Find(
+                "DeployedUnitSelectionIndicator");
+            Assert.NotNull(indicatorTransform);
+            var indicator = indicatorTransform.gameObject;
+            Assert.IsFalse(
+                indicator.activeSelf,
+                "The selected-unit frame must be hidden while relocation is dragging.");
             var beforeCost = hud.PlayerState.DeploymentCost;
-            Assert.IsTrue((bool)type.GetMethod("BeginRelocateSelectedForTests").Invoke(controller, new object[] { "local-1000-alpha" }));
-            Assert.IsFalse(indicator.activeSelf, "The selected-unit frame must be hidden while relocation is dragging.");
             type.GetMethod("SetDragWorldPositionForTests").Invoke(controller, new object[] { new Vector3(600f, 0f, 200f) });
             var result = (ArknoNights.Player.PlayerOperationResult)type.GetMethod("CommitCurrentDragForTests").Invoke(controller, null);
             yield return null;
@@ -514,7 +585,7 @@ namespace ArknoNights.Battle.Tests
             var retreatCollider = GameObject.Find("DeployedUnitSelectionIndicator").transform.Find("ReturnToStaging").GetComponent<BoxCollider>();
             var screenPosition = Camera.main.WorldToScreenPoint(retreatCollider.bounds.center);
 
-            Assert.IsNull(type.GetMethod("FindSelectedViewAtScreen", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(controller, new object[] { screenPosition }));
+            Assert.IsNull(type.GetMethod("FindDeployedViewAtScreen", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(controller, new object[] { screenPosition }));
             Assert.AreEqual("SelectedDeployed", type.GetProperty("State").GetValue(controller).ToString());
         }
     }

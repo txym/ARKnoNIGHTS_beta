@@ -160,6 +160,111 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void PrepareCompletedPlayback_BindsTheImmutableTrackOnlyAfterAllComputationFinishes()
+        {
+            var loaded = BattleFixtureLoader.LoadFromResources(
+                "BattleFixtures/task003-minimal-v1");
+            Assert.That(loaded.Success, Is.True,
+                string.Join(";", loaded.Errors));
+            var players = loaded.Input.Players.ToArray();
+            using (var coordinator =
+                   new MultiBattlePresentationCoordinator())
+            {
+                Assert.That(coordinator.Prepare(
+                    new[]
+                    {
+                        new BattleMatchRequest("single", loaded.Input)
+                    },
+                    new[]
+                    {
+                        new PlayerBattleObservation(
+                            players[0].PlayerId,
+                            "single",
+                            BattleObserverView.Home),
+                        new PlayerBattleObservation(
+                            players[1].PlayerId,
+                            "single",
+                            BattleObserverView.Away)
+                    },
+                    new Factory(),
+                    players[0].PlayerId), Is.True,
+                    coordinator.LastError);
+
+                var guard = 0;
+                while (!coordinator.AllTracksReady && guard++ < 1000)
+                    Assert.That(
+                        coordinator.PumpComputation(200),
+                        Is.True,
+                        coordinator.LastError);
+
+                Assert.That(coordinator.AllTracksReady, Is.True);
+                Assert.That(
+                    coordinator.Matches,
+                    Has.All.Matches<BattleMatchPresentation>(
+                        match => match.Track != null));
+                Assert.That(
+                    coordinator.PrepareCompletedPlayback(),
+                    Is.True);
+                Assert.That(
+                    coordinator.State,
+                    Is.EqualTo(MultiBattlePresentationState.Ready));
+                Assert.That(coordinator.PresentationTick, Is.Zero);
+
+                Assert.That(
+                    coordinator.AdvanceToAuthoritativeTick(
+                        coordinator.GlobalRoundEndTick,
+                        0),
+                    Is.True,
+                    coordinator.LastError);
+                Assert.That(
+                    coordinator.PresentationTick,
+                    Is.EqualTo(coordinator.GlobalRoundEndTick));
+                Assert.That(coordinator.AllTracksReady, Is.True);
+            }
+        }
+
+        [Test]
+        public void SelectObservedPlayer_UnknownPlayerIsRejectedWithoutPoisoningPlayback()
+        {
+            var loaded = BattleFixtureLoader.LoadFromResources(
+                "BattleFixtures/task003-minimal-v1");
+            Assert.That(loaded.Success, Is.True,
+                string.Join(";", loaded.Errors));
+            var players = loaded.Input.Players.ToArray();
+            using (var coordinator =
+                   new MultiBattlePresentationCoordinator())
+            {
+                Assert.That(coordinator.Prepare(
+                    new[]
+                    {
+                        new BattleMatchRequest("single", loaded.Input)
+                    },
+                    new[]
+                    {
+                        new PlayerBattleObservation(
+                            players[0].PlayerId,
+                            "single",
+                            BattleObserverView.Home),
+                        new PlayerBattleObservation(
+                            players[1].PlayerId,
+                            "single",
+                            BattleObserverView.Away)
+                    },
+                    new Factory(),
+                    players[0].PlayerId), Is.True,
+                    coordinator.LastError);
+
+                Assert.That(coordinator.SelectObservedPlayer(
+                    "eliminated-or-unpaired-player"), Is.False);
+                Assert.That(coordinator.State,
+                    Is.Not.EqualTo(MultiBattlePresentationState.Error));
+                Assert.That(coordinator.LastError, Is.Empty);
+                Assert.That(coordinator.PumpComputation(2), Is.True,
+                    coordinator.LastError);
+            }
+        }
+
+        [Test]
         public void PumpComputation_DoesNotPublishAnEarlyTerminalBeforeEveryFirstChunkExists()
         {
             var shortSource = LocalBattleLoader.LoadFromResources(

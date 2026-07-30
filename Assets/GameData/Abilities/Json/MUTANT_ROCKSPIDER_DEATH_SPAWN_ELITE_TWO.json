@@ -2,7 +2,7 @@
   "schemaVersion": "ability-source-v1",
   "abilityId": "MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO",
   "displayNameZhHans": "",
-  "descriptionZhHans": "死亡时分裂两个<畸变恶性瘤>。",
+  "descriptionZhHans": "死亡时分裂三个<畸变恶性瘤>。",
   "activationKind": "Passive",
   "silencePolicy": "Unaffected",
   "skillPoints": { "initial": 0, "required": 0, "generation": "None" },
@@ -10,7 +10,7 @@
     {
       "kind": "DeathSpawn",
       "options": [ { "summonTypeId": "1138", "weight": 1 } ],
-      "count": 2,
+      "count": 3,
       "delayTicks": 2,
       "spawnArea": { "shape": "Square", "center": "NearestPassableCell", "sideLengthMetres": 0.4 },
       "snapToNearestPassableCell": true,

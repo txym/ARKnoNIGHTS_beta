@@ -12,9 +12,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class LanMatchRuntimeController : MonoBehaviour
 {
-    public const long FirstChunkWaitMilliseconds = 10000;
     public const long PlaybackStartLeadMilliseconds = 1000;
-    private const int ComputationBudgetPerFrame = 600;
+    private const int ComputationBudgetPerFrame = 40;
 
     private readonly HashSet<string> readyPlayers =
         new HashSet<string>(StringComparer.Ordinal);
@@ -23,6 +22,8 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
     private readonly Dictionary<string, MatchFinalSecondHashPayload> remoteHashes =
         new Dictionary<string, MatchFinalSecondHashPayload>(StringComparer.Ordinal);
     private readonly HostClockEstimator clockEstimator = new HostClockEstimator();
+    private readonly MatchResultClientState projectedState =
+        new MatchResultClientState();
     private readonly Stopwatch localClock = Stopwatch.StartNew();
 
     private LanRoomHost host;
@@ -33,13 +34,10 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
     private MatchClockSyncPayload clock;
     private MatchBattleSealPayload seal;
     private MatchPlaybackStartPayload playbackStart;
-    private MatchPlaybackClockPayload playbackClock;
     private MultiBattlePresentationCoordinator battles;
     private LanMatchBattleSet battleSet;
     private LanMatchHudController hud;
     private HashSet<string> barrierPlayers;
-    private long firstChunkDeadlineMs;
-    private long lastPlaybackClockBroadcastMs;
     private int activeBattleRound;
     private bool localReadySent;
     private bool settlementSubmitted;
@@ -61,6 +59,31 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         battles == null ? MultiBattlePresentationState.Idle : battles.State;
     public int PresentationTick =>
         battles == null ? 0 : Mathf.FloorToInt((float)battles.PresentationTick);
+    public int BattleRemainingSeconds
+    {
+        get
+        {
+            if (snapshot?.PublicState == null
+                || !string.Equals(
+                    snapshot.PublicState.Phase,
+                    MatchPhase.Battle.ToString(),
+                    StringComparison.Ordinal))
+            {
+                return 0;
+            }
+            var maximumTicks = battles != null
+                && battles.AllBattlesTerminal
+                    ? battles.GlobalRoundEndTick
+                    : CurrentBattleInput?.MaxTicks
+                      ?? LanMatchBattleAdapter.MaximumBattleTicks;
+            var currentTick = playbackStart == null
+                ? 0
+                : EstimateAuthoritativeTick();
+            var remainingTicks = Math.Max(0, maximumTicks - currentTick);
+            return (remainingTicks + BattleInput.TicksPerSecond - 1)
+                / BattleInput.TicksPerSecond;
+        }
+    }
     public IReadOnlyList<BattlePresentationViewState> CurrentBattleViewStates =>
         battles == null
             ? Array.Empty<BattlePresentationViewState>()
@@ -91,7 +114,12 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
             {
                 return 0;
             }
-            if (clock == null)
+            if (clock == null
+                || clock.RoundNumber != snapshot.PublicState.RoundNumber
+                || !string.Equals(
+                    clock.Phase,
+                    MatchPhase.Preparation.ToString(),
+                    StringComparison.Ordinal))
                 return snapshot.PublicState.PreparationRemainingMs;
             var hostNow = host != null
                 ? LanRoomHost.HostMonotonicNowMs
@@ -154,8 +182,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
             ReceiveBattleSeal(client.CurrentBattleSeal);
         if (client.CurrentPlaybackStart != null)
             ReceivePlaybackStart(client.CurrentPlaybackStart);
-        if (client.CurrentPlaybackClock != null)
-            ReceivePlaybackClock(client.CurrentPlaybackClock);
         InitializeHud();
         diagnosticCode = string.Empty;
         return true;
@@ -181,8 +207,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
             ReceiveBattleSeal(client.CurrentBattleSeal);
         if (client.CurrentPlaybackStart != null)
             ReceivePlaybackStart(client.CurrentPlaybackStart);
-        if (client.CurrentPlaybackClock != null)
-            ReceivePlaybackClock(client.CurrentPlaybackClock);
         hud?.Refresh();
         diagnosticCode = string.Empty;
         return true;
@@ -196,11 +220,15 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
 
     public bool TryObservePlayer(string playerId)
     {
-        var changed = battles != null
-            && battles.SelectObservedPlayer(playerId);
-        if (hud != null)
-            changed |= hud.TryObservePlayer(playerId);
-        return changed;
+        var battleChanged = false;
+        if (battles != null)
+        {
+            if (!battles.SelectObservedPlayer(playerId))
+                return false;
+            battleChanged = true;
+        }
+        var hudChanged = hud != null && hud.TryObservePlayer(playerId);
+        return battleChanged || hudChanged;
     }
 
     public bool CanSendCommands
@@ -264,15 +292,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         if (assets == null || snapshot?.PublicState == null)
             return;
 
-        if (host != null
-            && host.SessionActor != null
-            && host.Lifecycle != MatchSessionLifecycle.Ended)
-        {
-            var projected = host.SessionActor.ProjectScoped(LocalPlayerId);
-            if (projected.StateRevision > snapshot.StateRevision)
-                ApplySnapshot(projected);
-        }
-
         if (string.Equals(
                 snapshot.PublicState.Phase,
                 MatchPhase.Battle.ToString(),
@@ -330,8 +349,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
                 }).ToArray()
         };
         activeBattleRound = plan.RoundNumber;
-        firstChunkDeadlineMs =
-            LanRoomHost.HostMonotonicNowMs + FirstChunkWaitMilliseconds;
         barrierPlayers = new HashSet<string>(
             host.SessionActor.Participants
                 .Where(item =>
@@ -429,7 +446,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         remoteHashes.Clear();
         readyPlayers.Clear();
         playbackStart = null;
-        playbackClock = null;
         hud?.Refresh();
         diagnosticCode = string.Empty;
         return true;
@@ -440,36 +456,24 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         if (battles == null || seal == null) return;
         if (playbackStart == null)
         {
-            if (!battles.PumpComputation(ComputationBudgetPerFrame))
+            if (!battles.AllTracksReady
+                && !battles.PumpComputation(ComputationBudgetPerFrame))
             {
                 ReportLocalBattleFailure(
                     seal,
                     battles.LastError);
                 return;
             }
-            ReportFirstChunkReadyIfNeeded();
+            ReportPlaybackReadyIfNeeded();
             if (host != null)
                 TryStartHostPlayback();
             return;
         }
 
         var targetTick = EstimateAuthoritativeTick();
-        for (var pass = 0;
-             pass < 4
-             && !battles.AllBattlesTerminal
-             && battles.CommonAvailableThroughTick
-                < targetTick + BattleSimulationProducer.AuthoritativeTicksPerFullChunk;
-             pass++)
-        {
-            if (!battles.PumpComputation(ComputationBudgetPerFrame))
-            {
-                ReportLocalBattleFailure(seal, battles.LastError);
-                return;
-            }
-        }
         if (!battles.AdvanceToAuthoritativeTick(
                 targetTick,
-                ComputationBudgetPerFrame))
+                0))
         {
             ReportLocalBattleFailure(seal, battles.LastError);
             return;
@@ -477,14 +481,20 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         ReportFinalHashes();
         if (host != null)
         {
-            PublishPlaybackClock(targetTick);
             TryCommitHostSettlement();
         }
     }
 
-    private void ReportFirstChunkReadyIfNeeded()
+    private void ReportPlaybackReadyIfNeeded()
     {
-        if (localReadySent || !battles.AllFirstChunksReady) return;
+        if (localReadySent || !battles.AllTracksReady) return;
+        if (!battles.PrepareCompletedPlayback())
+        {
+            ReportLocalBattleFailure(
+                seal,
+                "match.runtime.playback.prepareFailed");
+            return;
+        }
         localReadySent = true;
         var payload = new MatchFirstChunkReadyPayload
         {
@@ -521,9 +531,9 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         });
         var hostReady = readyPlayers.Contains(LocalPlayerId);
         var allReady = barrierPlayers.All(item => readyPlayers.Contains(item));
-        var now = LanRoomHost.HostMonotonicNowMs;
-        if (!hostReady || !allReady && now < firstChunkDeadlineMs)
+        if (!hostReady || !allReady)
             return;
+        var now = LanRoomHost.HostMonotonicNowMs;
         var start = new MatchPlaybackStartPayload
         {
             RoundNumber = seal.RoundNumber,
@@ -553,21 +563,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
             ? battles.GlobalRoundEndTick
             : LanMatchBattleAdapter.MaximumBattleTicks;
         return Math.Max(0, Math.Min(tick, maximum));
-    }
-
-    private void PublishPlaybackClock(int tick)
-    {
-        var now = LanRoomHost.HostMonotonicNowMs;
-        if (now - lastPlaybackClockBroadcastMs < 1000) return;
-        lastPlaybackClockBroadcastMs = now;
-        host.PublishPlaybackClock(new MatchPlaybackClockPayload
-        {
-            RoundNumber = seal.RoundNumber,
-            BattleSetId = seal.BattleSetId,
-            CanonicalInputHash = seal.CanonicalInputHash,
-            HostMonotonicNowMs = now,
-            CurrentTick = tick
-        });
     }
 
     private void ReportFinalHashes()
@@ -666,23 +661,16 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         if (dispatch == null) return;
         switch (dispatch.Kind)
         {
-            case MatchWireKind.ScopedSnapshot:
+            case MatchWireKind.RecoveryState:
                 ApplySnapshot(dispatch.Payload as ScopedSnapshotPayload);
                 break;
-            case MatchWireKind.ClockSync:
-                ApplyClock(dispatch.Payload as MatchClockSyncPayload);
+            case MatchWireKind.OperationResult:
+                ReceiveOperationResult(
+                    dispatch.Payload as MatchOperationResultPayload);
                 break;
-            case MatchWireKind.BattleSeal:
-                ReceiveBattleSeal(dispatch.Payload as MatchBattleSealPayload);
-                break;
-            case MatchWireKind.PlaybackStart:
-                ReceivePlaybackStart(dispatch.Payload as MatchPlaybackStartPayload);
-                break;
-            case MatchWireKind.PlaybackClock:
-                ReceivePlaybackClock(dispatch.Payload as MatchPlaybackClockPayload);
-                break;
-            case MatchWireKind.MatchEnded:
-                RaiseExit("Match ended.");
+            case MatchWireKind.SystemResult:
+                ReceiveSystemResult(
+                    dispatch.Payload as MatchSystemResultPayload);
                 break;
         }
     }
@@ -756,24 +744,26 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
     private void SubscribeClient(LanRoomClient value)
     {
         value.MatchSnapshotChanged += ApplySnapshot;
+        value.RecoveryStateApplied += OnRecoveryStateApplied;
         value.ClockSynchronized += ApplyClock;
         value.BattleSealReceived += ReceiveBattleSeal;
         value.PlaybackStarted += ReceivePlaybackStart;
-        value.PlaybackClockReceived += ReceivePlaybackClock;
         value.MatchEnded += OnClientEnded;
-        value.CommandAcknowledged += OnCommandAcknowledged;
+        value.OperationResultReceived += ReceiveOperationResult;
+        value.SystemResultReceived += ReceiveSystemResult;
         value.Reconnecting += OnClientReconnecting;
     }
 
     private void UnsubscribeClient(LanRoomClient value)
     {
         value.MatchSnapshotChanged -= ApplySnapshot;
+        value.RecoveryStateApplied -= OnRecoveryStateApplied;
         value.ClockSynchronized -= ApplyClock;
         value.BattleSealReceived -= ReceiveBattleSeal;
         value.PlaybackStarted -= ReceivePlaybackStart;
-        value.PlaybackClockReceived -= ReceivePlaybackClock;
         value.MatchEnded -= OnClientEnded;
-        value.CommandAcknowledged -= OnCommandAcknowledged;
+        value.OperationResultReceived -= ReceiveOperationResult;
+        value.SystemResultReceived -= ReceiveSystemResult;
         value.Reconnecting -= OnClientReconnecting;
     }
 
@@ -786,7 +776,54 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         {
             return;
         }
+        if (!projectedState.TryApplyRecovery(value))
+            return;
+        var previous = snapshot;
         snapshot = value;
+        SynchronizePreparationClockOnTransition(previous, value);
+        reconnecting = false;
+        if (string.Equals(
+                value.PublicState.Phase,
+                MatchPhase.Ended.ToString(),
+                StringComparison.Ordinal))
+        {
+            RaiseExit("Match ended.");
+        }
+        hud?.Refresh();
+    }
+
+    private void ReceiveOperationResult(
+        MatchOperationResultPayload result)
+    {
+        if (result == null) return;
+        ApplyDelta(result.Delta);
+        hud?.ShowCommandResult(result);
+    }
+
+    private void ReceiveSystemResult(
+        MatchSystemResultPayload result)
+    {
+        if (result == null) return;
+        ApplyDelta(result.Delta);
+        if (host == null) return;
+        if (result.BattleSeal != null)
+            ReceiveBattleSeal(result.BattleSeal);
+        if (result.PlaybackStart != null)
+            ReceivePlaybackStart(result.PlaybackStart);
+        if (result.MatchEnded != null)
+            OnClientEnded(result.MatchEnded);
+    }
+
+    private void ApplyDelta(MatchStateDeltaWire delta)
+    {
+        if (delta == null) return;
+        var previous = snapshot;
+        var status = projectedState.TryApply(delta);
+        if (status != MatchDeltaApplyStatus.Applied)
+            return;
+        var value = projectedState.Current;
+        snapshot = value;
+        SynchronizePreparationClockOnTransition(previous, value);
         reconnecting = false;
         if (string.Equals(
                 value.PublicState.Phase,
@@ -812,6 +849,52 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         hud?.Refresh();
     }
 
+    private void SynchronizePreparationClockOnTransition(
+        ScopedSnapshotPayload previous,
+        ScopedSnapshotPayload current)
+    {
+        var alreadyTrackingCurrentPreparation =
+            previous?.PublicState != null
+            && string.Equals(
+                previous.PublicState.Phase,
+                MatchPhase.Preparation.ToString(),
+                StringComparison.Ordinal)
+            && previous.PublicState.RoundNumber
+                == current?.PublicState?.RoundNumber
+            && clock != null
+            && clock.RoundNumber == current.PublicState.RoundNumber
+            && string.Equals(
+                clock.Phase,
+                MatchPhase.Preparation.ToString(),
+                StringComparison.Ordinal);
+        if (current?.PublicState == null
+            || !string.Equals(
+                current.PublicState.Phase,
+                MatchPhase.Preparation.ToString(),
+                StringComparison.Ordinal)
+            || alreadyTrackingCurrentPreparation)
+        {
+            return;
+        }
+
+        var hostNow = host != null
+            ? LanRoomHost.HostMonotonicNowMs
+            : clockEstimator.EstimateHostNow(localClock.ElapsedMilliseconds);
+        var remaining = Math.Max(
+            0,
+            current.PublicState.PreparationRemainingMs);
+        var deadline = hostNow > long.MaxValue - remaining
+            ? long.MaxValue
+            : hostNow + remaining;
+        clock = new MatchClockSyncPayload
+        {
+            RoundNumber = current.PublicState.RoundNumber,
+            Phase = MatchPhase.Preparation.ToString(),
+            HostMonotonicNowMs = hostNow,
+            PreparationDeadlineHostMonotonicMs = deadline
+        };
+    }
+
     private void ReceivePlaybackStart(MatchPlaybackStartPayload value)
     {
         if (!MatchesSeal(value)) return;
@@ -820,25 +903,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         {
             clockEstimator.AddSample(
                 value.HostMonotonicStartMs - PlaybackStartLeadMilliseconds,
-                localClock.ElapsedMilliseconds,
-                client == null ? 0 : client.LatencyMilliseconds);
-        }
-    }
-
-    private void ReceivePlaybackClock(MatchPlaybackClockPayload value)
-    {
-        if (value == null
-            || seal == null
-            || value.RoundNumber != seal.RoundNumber
-            || !string.Equals(value.BattleSetId, seal.BattleSetId, StringComparison.Ordinal))
-        {
-            return;
-        }
-        playbackClock = value;
-        if (host == null)
-        {
-            clockEstimator.AddSample(
-                value.HostMonotonicNowMs,
                 localClock.ElapsedMilliseconds,
                 client == null ? 0 : client.LatencyMilliseconds);
         }
@@ -861,14 +925,14 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         RaiseExit("Match ended.");
     }
 
-    private void OnCommandAcknowledged(MatchCommandAckPayload ack)
-    {
-        hud?.ShowCommandResult(ack);
-    }
-
     private void OnClientReconnecting()
     {
         SetReconnecting(true);
+    }
+
+    private void OnRecoveryStateApplied()
+    {
+        hud?.ResetLocalInteractionState();
     }
 
     private void ReportLocalBattleFailure(
@@ -942,7 +1006,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         battleSet = null;
         seal = null;
         playbackStart = null;
-        playbackClock = null;
         barrierPlayers = null;
         activeBattleRound = 0;
         localReadySent = false;
@@ -969,6 +1032,13 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
                 host.SessionActor.BattleTransportAccepted -= OnBattleTransportAccepted;
         }
         if (client != null) UnsubscribeClient(client);
+        if (hud != null)
+        {
+            var activeHud = hud;
+            hud = null;
+            activeHud.DisposeHud();
+            Destroy(activeHud.gameObject);
+        }
         ClearBattleRound();
         host = null;
         client = null;
@@ -978,12 +1048,6 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         clock = null;
         reconnecting = false;
         exitRaised = false;
-        if (hud != null)
-        {
-            hud.DisposeHud();
-            Destroy(hud.gameObject);
-            hud = null;
-        }
     }
 
     private void OnDestroy()

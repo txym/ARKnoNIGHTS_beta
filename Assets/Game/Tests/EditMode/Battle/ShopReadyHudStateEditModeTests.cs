@@ -62,16 +62,40 @@ namespace ArknoNights.Battle.Tests
 
 
         [Test]
-        public void PendingCommand_RequiresTheSamePurchasableSlotTwiceAndClearsOnInvalidation()
+        public void PendingCommand_BindsSlotAndUnitUntilAcceptedOrIdentityChanges()
         {
             var pending = new ShopReadyPendingCommand();
 
-            Assert.IsFalse(pending.RequestPurchase(2));
+            Assert.IsFalse(pending.RequestPurchase(2, "unit-a"));
             Assert.AreEqual(ShopReadyConfirmation.Purchase, pending.Kind);
             Assert.AreEqual(2, pending.ShopSlotId);
-            Assert.IsFalse(pending.RequestPurchase(3));
+            Assert.IsFalse(pending.RequestPurchase(3, "unit-b"));
             Assert.AreEqual(3, pending.ShopSlotId);
-            Assert.IsTrue(pending.RequestPurchase(3));
+            Assert.IsTrue(pending.RequestPurchase(3, "unit-b"));
+            Assert.AreEqual(ShopReadyConfirmation.Purchase, pending.Kind);
+            Assert.That(pending.Submitted, Is.True);
+
+            pending.Resolve(false);
+            Assert.AreEqual(ShopReadyConfirmation.Purchase, pending.Kind);
+            Assert.That(pending.Submitted, Is.False);
+            Assert.IsTrue(pending.RequestPurchase(3, "unit-b"));
+
+            pending.Reconcile(new[]
+            {
+                ShopReadySlotViewState.CreateProjection(
+                    3,
+                    "1000",
+                    "unit-c",
+                    1,
+                    2,
+                    1,
+                    "Test",
+                    string.Empty,
+                    false,
+                    false,
+                    true,
+                    true)
+            });
             Assert.AreEqual(ShopReadyConfirmation.None, pending.Kind);
 
             Assert.IsFalse(pending.RequestFixed(ShopReadyConfirmation.Upgrade));

@@ -60,7 +60,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(ArknoNights.Battle.Presentation.BattleObserverView.Away, multi.GetType().GetProperty("Observer").GetValue(multi));
             Assert.AreEqual(sharedTick, (double)multi.GetType().GetProperty("PresentationTick").GetValue(multi));
             CollectionAssert.AreEqual(results, matches.Cast<object>().Select(item => item.GetType().GetProperty("Result").GetValue(item)).ToArray());
-            Assert.AreEqual(87, hud.PlayerState.DeploymentCost);
+            Assert.AreEqual(78, hud.PlayerState.DeploymentCost);
             Assert.IsFalse(hud.PlayerState.Snapshot.Units.Any(unit => unit.UnitId == "local-1000-overflow"));
 
             var shopsBeforeTerminalPresentation = match.Snapshot.Players.ToDictionary(
@@ -86,7 +86,7 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("Preparation", loopType.GetProperty("Phase").GetValue(loop).ToString());
             Assert.That((float)loopType.GetProperty("RemainingPreparationSeconds").GetValue(loop), Is.InRange(29f, 30f));
             Assert.AreEqual(BattleDemoState.Idle, demo.State);
-            Assert.AreEqual(87, hud.PlayerState.DeploymentCost, "Combat death/HP/winner must not write back to persistent player state.");
+            Assert.AreEqual(78, hud.PlayerState.DeploymentCost, "Combat death/HP/winner must not write back to persistent player state.");
             Assert.AreEqual(1, hud.PlayerState.GetUnits(PlayerUnitZone.Deployed).Count);
             Assert.NotNull(GameObject.Find("PreparationUnitViews"));
 

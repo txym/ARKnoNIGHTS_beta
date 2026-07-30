@@ -345,3 +345,11 @@ v2 是唯一人工维护的单位源，当前包含 BONDS 使用的 `99` 个 Typ
 - 清单中的 Sprite 来源由 capture suite 限制为已审批的 `UI/Lobby` 白名单，`ExportLanLobbyEvidence.ps1` 再逐项和 `docs/references/ui/lobby/ASSET_MAP.md` 对照。任何未知 Sprite、缺图、缺参考图或不完整清单都会令导出失败，而不会生成看似有效的证据。
 
 2026-07-29 的主界面/房间 UI 优化保持上述模块边界不变：`LanLobbyController` 只持久化四选一头像索引，并用 `LobbyProfile.DisplayNameForAvatar` 派生本地游戏名；`LobbyProfile` 构造边界也会把旧客户端或网络提交的自由名字规范化为对应头像名，同时保留既有字段长度校验，因此房间权威状态不会携带头像与游戏名不一致的资料。`LanLobbyView` 继续只读 `LobbyRoomSnapshot`，把成员 `AvatarIndex` 与 `DisplayName` 投影到对应 `RoomCard/LowerDecoration`，座位号来自当前成员索引 `+1`。该投影不写回房间状态，也不向 `PlayerState` 或 Battle Core 注入资料。`LanLobbyCaptureSuite` 同步导出活动头像、扩展名字和更新后的节点清单。
+
+## 26. LAN 操作结果同步（2026-07-30，已实现）
+
+- 已确认把准备阶段稳态同步从“命令后回执加范围快照、周期时钟消息”改为“客户端提交已完成的游戏操作，房主广播该操作的权威结果”。刷新、购买、部署、移动、撤退、准备等操作以 `OperationResult` 返回接受或拒绝、稳定原因码以及受影响实体的最终绝对值；阶段切换、AI 操作、掉线接管、回合收入、自然刷新、战斗封存与结算等无客户端命令来源的变化使用 `SystemResult`。
+- 选择、悬停、商店二次确认、拖拽、拖影、部署菱形遮罩、撤退按钮、按实体划分的 Pending 和动画生命周期均属于客户端本地表现状态，不进入房主权威状态。拖拽期间本地立即表现，松手后才提交目标；等待结果时只锁定对应 `UnitId`，接受后保留预览位置，拒绝后回滚该单位，不阻塞其他单位或商店交互。
+- 全量 `MatchSnapshot` 仅用于首次进入对局、重连恢复和检测到序列缺口或不变量失败后的显式恢复。恢复投影按 `PlayerId`、`UnitId`、商店 `SlotId + UnitId` 等稳定身份对账，禁止通过清空并重建整个 HUD 制造动画抽搐或取消仍有效的本地交互。
+- 保活收敛为客户端每秒一次 `Ping` 与房主 `Pong`；`Pong` 携带房主时间、阶段和截止时间，连续三次缺失即判定掉线。稳态不再周期发送全量快照或独立 `PlaybackClock`。协议升级为新版本并拒绝旧客户端，不维护双协议兼容。
+- 正式代码已升级为 `lan-match-v3`：普通运行只使用 OperationResult/SystemResult，完整 RecoveryState 限于初始化、重连和 revision 缺口恢复；旧 v2 稳态消息种类已从协议枚举删除。

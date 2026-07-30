@@ -7,6 +7,36 @@ using System.Runtime.Serialization;
 namespace ArknoNights.Battle.Core
 {
     [DataContract]
+    public sealed class BattleUnitAttributesPayload
+    {
+        internal BattleUnitAttributesPayload(
+            BattleUnitAttributesSnapshot source)
+        {
+            Attack = source.Attack;
+            Defense = source.Defense;
+            MagicResistance = source.MagicResistance;
+            MoveSpeedCentimetresPerSecond =
+                source.MoveSpeedCentimetresPerSecond;
+            AttackIntervalTicks =
+                source.AttackIntervalTicks;
+            BlockCapacity = source.BlockCapacity;
+        }
+
+        [DataMember(Name = "attack", Order = 1)]
+        public int Attack { get; private set; }
+        [DataMember(Name = "defense", Order = 2)]
+        public int Defense { get; private set; }
+        [DataMember(Name = "magicResistance", Order = 3)]
+        public int MagicResistance { get; private set; }
+        [DataMember(Name = "moveSpeedCentimetresPerSecond", Order = 4)]
+        public int MoveSpeedCentimetresPerSecond { get; private set; }
+        [DataMember(Name = "attackIntervalTicks", Order = 5)]
+        public int AttackIntervalTicks { get; private set; }
+        [DataMember(Name = "blockCapacity", Order = 6)]
+        public int BlockCapacity { get; private set; }
+    }
+
+    [DataContract]
     public sealed class BattleBuffPayload
     {
         internal BattleBuffPayload(BuffPlaceholder source)
@@ -150,6 +180,10 @@ namespace ArknoNights.Battle.Core
                 ? null
                 : new BattleSpawnSnapshotPayload(
                     source.SpawnSnapshot);
+            Attributes = source.AttributesSnapshot == null
+                ? null
+                : new BattleUnitAttributesPayload(
+                    source.AttributesSnapshot);
         }
 
         [DataMember(Name = "type", Order = 1)]
@@ -200,6 +234,12 @@ namespace ArknoNights.Battle.Core
             get;
             private set;
         }
+        [DataMember(Name = "attributes", Order = 23)]
+        public BattleUnitAttributesPayload Attributes
+        {
+            get;
+            private set;
+        }
     }
 
     [DataContract]
@@ -223,6 +263,14 @@ namespace ArknoNights.Battle.Core
             MaxHitPoints = source.MaxHitPoints;
             CurrentHitPoints = source.CurrentHitPoints;
             CurrentShield = source.CurrentShield;
+            Attack = source.Attack;
+            Defense = source.Defense;
+            MagicResistance = source.MagicResistance;
+            MoveSpeedCentimetresPerSecond =
+                source.MoveSpeedCentimetresPerSecond;
+            AttackIntervalTicks =
+                source.AttackIntervalTicks;
+            BlockCapacity = source.BlockCapacity;
             TargetUnitId = source.TargetUnitId;
             Action = source.Action;
             ActionStartTick = source.ActionStartTick;
@@ -309,6 +357,18 @@ namespace ArknoNights.Battle.Core
             new ReadOnlyCollection<string>(
                 serializedExecutionStateFields
                 ?? Array.Empty<string>());
+        [DataMember(Name = "attack", Order = 28)]
+        public int Attack { get; private set; }
+        [DataMember(Name = "defense", Order = 29)]
+        public int Defense { get; private set; }
+        [DataMember(Name = "magicResistance", Order = 30)]
+        public int MagicResistance { get; private set; }
+        [DataMember(Name = "moveSpeedCentimetresPerSecond", Order = 31)]
+        public int MoveSpeedCentimetresPerSecond { get; private set; }
+        [DataMember(Name = "attackIntervalTicks", Order = 32)]
+        public int AttackIntervalTicks { get; private set; }
+        [DataMember(Name = "blockCapacity", Order = 33)]
+        public int BlockCapacity { get; private set; }
     }
 
     [DataContract]

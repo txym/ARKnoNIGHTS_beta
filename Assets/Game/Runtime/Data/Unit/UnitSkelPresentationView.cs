@@ -133,7 +133,12 @@ public sealed class UnitSkelPresentationView : MonoBehaviour, IBattlePresentatio
     {
         // World X is horizontal; world Z is vertical map movement and must not change left/right facing.
         if (Mathf.Approximately(direction.x, 0f)) return;
-        transform.rotation = direction.x > 0f ? RightFacing : LeftFacing;
+        var targetRotation =
+            direction.x > 0f ? RightFacing : LeftFacing;
+        if (Mathf.Abs(
+            Quaternion.Dot(transform.rotation, targetRotation)) > .999999f)
+            return;
+        transform.rotation = targetRotation;
         if (!statusBar) statusBar = GetComponent<UnitWorldStatusBar>();
         if (statusBar) statusBar.RefreshForFacing();
     }

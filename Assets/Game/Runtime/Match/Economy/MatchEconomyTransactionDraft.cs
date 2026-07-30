@@ -445,6 +445,58 @@ namespace ArknoNights.Match
             return true;
         }
 
+        internal bool TryResolvePreparationEntryFusions(
+            out MatchCommandCode code,
+            out string diagnosticCode)
+        {
+            var changed = false;
+            foreach (var originalSeat in seatsByPlayerId.Values
+                         .Where(seat => !seat.Eliminated)
+                         .OrderBy(seat => seat.SeatIndex))
+            {
+                var typeIds = originalSeat.Units
+                    .Select(unit => unit.TypeId)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(typeId => typeId, StringComparer.Ordinal)
+                    .ToArray();
+                foreach (var typeId in typeIds)
+                {
+                    var anchor = GetSeat(originalSeat.PlayerId).Units
+                        .Where(unit => string.Equals(
+                            unit.TypeId,
+                            typeId,
+                            StringComparison.Ordinal))
+                        .OrderBy(unit => ZonePriority(unit.Zone))
+                        .ThenBy(unit => unit.UnitId, StringComparer.Ordinal)
+                        .FirstOrDefault();
+                    if (anchor == null)
+                    {
+                        continue;
+                    }
+                    if (!TryResolveAcquisition(
+                        originalSeat.PlayerId,
+                        anchor.UnitId,
+                        typeId,
+                        0,
+                        out var acquisition,
+                        out code,
+                        out diagnosticCode))
+                    {
+                        return false;
+                    }
+                    changed |= acquisition.FusionSteps.Count != 0;
+                }
+            }
+
+            code = changed
+                ? MatchCommandCode.Accepted
+                : MatchCommandCode.AcceptedNoChange;
+            diagnosticCode = changed
+                ? "match.fusion.preparationEntry.accepted"
+                : "match.fusion.preparationEntry.noChange";
+            return true;
+        }
+
         private bool TryResolveAcquisition(
             string playerId,
             string acquiredUnitId,

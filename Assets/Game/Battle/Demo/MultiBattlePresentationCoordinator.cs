@@ -252,6 +252,9 @@ namespace ArknoNights.Battle.Demo
         public bool AllBattlesTerminal =>
             matches.Count != 0
             && matches.All(item => item.IsTerminal);
+        public bool AllTracksReady =>
+            AllBattlesTerminal
+            && matches.All(item => item.Track != null);
         public int CommonAvailableThroughTick
         {
             get
@@ -539,6 +542,21 @@ namespace ArknoNights.Battle.Demo
             return true;
         }
 
+        public bool PrepareCompletedPlayback()
+        {
+            if (!AllTracksReady
+                || string.IsNullOrEmpty(SelectedPlayerId))
+                return false;
+            presentationTick = 0d;
+            if (!SelectObservedPlayer(
+                    SelectedPlayerId,
+                    true))
+                return false;
+            State = MultiBattlePresentationState.Ready;
+            playback.SetPlaybackSpeed(0f);
+            return true;
+        }
+
         public bool Pause()
         {
             if (State != MultiBattlePresentationState.Playing
@@ -580,7 +598,14 @@ namespace ArknoNights.Battle.Demo
 
         public bool SelectObservedPlayer(string playerId)
         {
+            if (!CanObservePlayer(playerId))
+                return false;
             return SelectObservedPlayer(playerId, false);
+        }
+
+        public bool CanObservePlayer(string playerId)
+        {
+            return observations.ContainsKey(playerId ?? string.Empty);
         }
 
         public void Advance(float unscaledDeltaSeconds)
@@ -783,12 +808,22 @@ namespace ArknoNights.Battle.Demo
                     SelectedPlayerId);
             var match = matches.Single(item =>
                 item.MatchId == observation.MatchId);
-            if (!playback.Bind(
+            IReadOnlyList<BattlePresentationDiagnostic>
+                diagnostics;
+            var bound = match.Track != null
+                ? playback.Bind(
+                    match.Track,
+                    factory,
+                    observation.Observer,
+                    presentationTick,
+                    out diagnostics)
+                : playback.Bind(
                     match.Stream,
                     factory,
                     observation.Observer,
                     presentationTick,
-                    out var diagnostics))
+                    out diagnostics);
+            if (!bound)
                 return Fail(
                     "multi.playback.bind.failed",
                     match.MatchId

@@ -42,6 +42,48 @@ namespace ArknoNights.Battle.Core
         public override string ToString() => X + "," + Y;
     }
 
+    /// <summary>
+    /// Deterministic centimetre offset from the centre of a local formation cell.
+    /// The offset is applied before an away formation is rotated into battlefield space.
+    /// </summary>
+    public readonly struct FormationOffset : IEquatable<FormationOffset>
+    {
+        public const int MaximumAbsoluteUnits = FixedPosition.UnitsPerMetre / 2;
+
+        public FormationOffset(int xUnits, int yUnits)
+        {
+            if (!IsWithinCell(xUnits, yUnits))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(xUnits),
+                    "Formation offsets must remain within the source cell.");
+            }
+
+            XUnits = xUnits;
+            YUnits = yUnits;
+        }
+
+        public int XUnits { get; }
+        public int YUnits { get; }
+        public bool IsValid => IsWithinCell(XUnits, YUnits);
+        public bool IsZero => XUnits == 0 && YUnits == 0;
+
+        public static bool IsWithinCell(int xUnits, int yUnits) =>
+            xUnits >= -MaximumAbsoluteUnits
+            && xUnits <= MaximumAbsoluteUnits
+            && yUnits >= -MaximumAbsoluteUnits
+            && yUnits <= MaximumAbsoluteUnits;
+
+        public bool Equals(FormationOffset other) =>
+            XUnits == other.XUnits && YUnits == other.YUnits;
+
+        public override bool Equals(object obj) =>
+            obj is FormationOffset other && Equals(other);
+
+        public override int GetHashCode() => (XUnits * 397) ^ YUnits;
+        public override string ToString() => XUnits + "," + YUnits;
+    }
+
     /// <summary>One-based coordinate in the authoritative 9 by 8 battlefield.</summary>
     public readonly struct BattlefieldCoordinate : IEquatable<BattlefieldCoordinate>
     {
@@ -84,6 +126,7 @@ namespace ArknoNights.Battle.Core
 
     public static class BattlefieldRules
     {
+        public const int CombatContactRangeUnits = 40;
         public static readonly BattlefieldCoordinate BlueGate = new BattlefieldCoordinate(5, 1);
         public static readonly BattlefieldCoordinate RedGate = new BattlefieldCoordinate(5, 8);
 
@@ -92,6 +135,27 @@ namespace ArknoNights.Battle.Core
         public static BattlefieldCoordinate Rotate180(BattlefieldCoordinate coordinate) => new BattlefieldCoordinate(10 - coordinate.X, 9 - coordinate.Y);
         public static BattlefieldCoordinate MapHome(FormationCoordinate coordinate) => new BattlefieldCoordinate(coordinate.X, coordinate.Y);
         public static BattlefieldCoordinate MapAway(FormationCoordinate coordinate) => Rotate180(MapHome(coordinate));
+        public static FixedPosition MapHomePosition(
+            FormationCoordinate coordinate,
+            FormationOffset offset)
+        {
+            var centre = FixedPosition.FromCell(MapHome(coordinate));
+            return new FixedPosition(
+                centre.XUnits + offset.XUnits,
+                centre.YUnits + offset.YUnits);
+        }
+
+        public static FixedPosition MapAwayPosition(
+            FormationCoordinate coordinate,
+            FormationOffset offset) =>
+            Rotate180(MapHomePosition(coordinate, offset));
+
+        public static FixedPosition Rotate180(FixedPosition position) =>
+            new FixedPosition(
+                (BattlefieldCoordinate.Width + 1) * FixedPosition.UnitsPerMetre
+                    - position.XUnits,
+                (BattlefieldCoordinate.Height + 1) * FixedPosition.UnitsPerMetre
+                    - position.YUnits);
     }
 
     /// <summary>Deterministic logic position. One metre is 100 fixed units (one centimetre).</summary>

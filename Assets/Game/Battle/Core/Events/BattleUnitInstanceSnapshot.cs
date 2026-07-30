@@ -5,6 +5,64 @@ using System.Linq;
 
 namespace ArknoNights.Battle.Core
 {
+    public sealed class BattleUnitAttributesSnapshot
+        : IEquatable<BattleUnitAttributesSnapshot>
+    {
+        public BattleUnitAttributesSnapshot(
+            int attack,
+            int defense,
+            int magicResistance,
+            int moveSpeedCentimetresPerSecond,
+            int attackIntervalTicks,
+            int blockCapacity)
+        {
+            Attack = attack;
+            Defense = defense;
+            MagicResistance = magicResistance;
+            MoveSpeedCentimetresPerSecond =
+                moveSpeedCentimetresPerSecond;
+            AttackIntervalTicks = attackIntervalTicks;
+            BlockCapacity = blockCapacity;
+        }
+
+        public int Attack { get; }
+        public int Defense { get; }
+        public int MagicResistance { get; }
+        public int MoveSpeedCentimetresPerSecond { get; }
+        public int AttackIntervalTicks { get; }
+        public int BlockCapacity { get; }
+
+        public bool Equals(BattleUnitAttributesSnapshot other)
+        {
+            return other != null
+                && Attack == other.Attack
+                && Defense == other.Defense
+                && MagicResistance == other.MagicResistance
+                && MoveSpeedCentimetresPerSecond
+                    == other.MoveSpeedCentimetresPerSecond
+                && AttackIntervalTicks
+                    == other.AttackIntervalTicks
+                && BlockCapacity == other.BlockCapacity;
+        }
+
+        public override bool Equals(object obj) =>
+            Equals(obj as BattleUnitAttributesSnapshot);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hash = Attack;
+                hash = hash * 397 ^ Defense;
+                hash = hash * 397 ^ MagicResistance;
+                hash = hash * 397
+                    ^ MoveSpeedCentimetresPerSecond;
+                hash = hash * 397 ^ AttackIntervalTicks;
+                return hash * 397 ^ BlockCapacity;
+            }
+        }
+    }
+
     public sealed class BattleUnitInstanceSnapshot
     {
         public BattleUnitInstanceSnapshot(
@@ -103,6 +161,13 @@ namespace ArknoNights.Battle.Core
             Buffs = new ReadOnlyCollection<BuffPlaceholder>((buffs ?? Enumerable.Empty<BuffPlaceholder>()).ToArray());
             ActivationTick = activationTick;
             LifeDeduct = lifeDeduct;
+            Attributes = new BattleUnitAttributesSnapshot(
+                attack,
+                defense,
+                magicResistance,
+                moveSpeedCentimetresPerSecond,
+                attackIntervalTicks,
+                blockCapacity);
         }
 
         public string UnitId { get; }
@@ -128,5 +193,6 @@ namespace ArknoNights.Battle.Core
         public IReadOnlyList<BuffPlaceholder> Buffs { get; }
         public int ActivationTick { get; }
         public int LifeDeduct { get; }
+        public BattleUnitAttributesSnapshot Attributes { get; }
     }
 }

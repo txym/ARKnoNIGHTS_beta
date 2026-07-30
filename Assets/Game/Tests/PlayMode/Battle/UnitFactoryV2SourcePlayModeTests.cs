@@ -77,7 +77,7 @@ namespace ArknoNights.Battle.Tests
                     Is.EqualTo(expectedTypeIds));
 
                 AssertTemplate(templates[1000], 1000, "gopro", 820, 190, 1, 2, 1.9f, 0.7f);
-                AssertTemplate(templates[5503], 5503, "arcslma", 18000, 1100, 6, 2, 0.2f, 2.0f);
+                AssertTemplate(templates[5503], 5503, "arcslma", 18000, 1100, 6, 21, 0.2f, 2.0f);
                 AssertTemplate(templates[5504], 5504, "arcslmi", 2500, 290, 3, 2, 1.9f, 0.75f);
 
                 var type2 = Type.GetType("UnitSkelType2, Assembly-CSharp");

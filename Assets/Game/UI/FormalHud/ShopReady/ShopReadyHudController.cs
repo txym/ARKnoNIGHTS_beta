@@ -162,9 +162,41 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                     "External state requires external HUD mode.");
             if (projection == null)
                 throw new ArgumentNullException(nameof(projection));
-            if (resetPendingConfirmation) pendingCommand.Clear();
+            pendingCommand.Reconcile(projection.Slots);
             state = projection.WithShopVisible(shopVisible);
             RenderState();
+        }
+
+        public void ResolveExternalPurchase(
+            int shopSlotId,
+            string shopUnitId,
+            bool accepted)
+        {
+            if (!externalMode || state == null) return;
+            if (pendingCommand.Kind
+                != ShopReadyConfirmation.Purchase
+                || pendingCommand.ShopSlotId != shopSlotId
+                || !string.Equals(
+                    pendingCommand.ShopUnitId,
+                    shopUnitId ?? string.Empty,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+            pendingCommand.Resolve(accepted);
+            RenderState();
+        }
+
+        public void ResolveExternalUpgrade(bool accepted)
+        {
+            if (externalMode
+                && state != null
+                && pendingCommand.Kind
+                    == ShopReadyConfirmation.Upgrade)
+            {
+                pendingCommand.Resolve(accepted);
+                RenderState();
+            }
         }
 
         public void ClearExternalMode()
@@ -183,6 +215,13 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 match.Changed += OnMatchChanged;
                 Refresh(match.Snapshot);
             }
+        }
+
+        public void ClearExternalPendingConfirmation()
+        {
+            if (!externalMode) return;
+            pendingCommand.Clear();
+            if (state != null) RenderState();
         }
 
         public void SetShopVisible(bool visible)
@@ -266,7 +305,9 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             if (state == null || !state.ShopCommandsEnabled) return;
             var slot = state.Slots.FirstOrDefault(item => item.ShopSlotId == shopSlotId);
             if (slot == null || !slot.CanPurchase) return;
-            if (!pendingCommand.RequestPurchase(shopSlotId))
+            if (!pendingCommand.RequestPurchase(
+                    shopSlotId,
+                    slot.UnitId))
             {
                 RenderCurrent();
                 return;
@@ -510,7 +551,12 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             slotWidgets.Clear();
             foreach (var slot in state.Slots)
             {
-                var rootRect = ButtonRoot("ShopSlot_" + slot.ShopSlotId, shopPanel, () => Purchase(slot.ShopSlotId), out var button);
+                var capturedSlotId = slot.ShopSlotId;
+                var rootRect = ButtonRoot(
+                    "ShopSlot_" + capturedSlotId,
+                    shopPanel,
+                    () => Purchase(capturedSlotId),
+                    out var button);
                 var background = Image("Background", rootRect, "UI/Texture/shop/bg_black");
                 var portraitClip = Rect("PortraitClip", rootRect);
                 portraitClip.gameObject.AddComponent<RectMask2D>();

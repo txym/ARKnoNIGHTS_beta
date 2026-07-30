@@ -16,13 +16,14 @@ namespace ArknoNights.Battle.Core
         Skill,
         HealthChanged,
         GateReached,
-        PresentationStateChanged
+        PresentationStateChanged,
+        AttributesChanged
     }
 
     /// <summary>Immutable presentation-neutral record emitted by the authoritative tick runner.</summary>
     public sealed class BattleEvent
     {
-        internal BattleEvent(BattleEventType type, int tick, int sequence, string unitId, string unitTypeId, BattleSide? unitSide, string relatedUnitId, FixedPosition? fromPosition, FixedPosition? toPosition, DamageType? damageType, int damageAmount, int hitPointsBefore, int hitPointsAfter, int plannedDamageTick, int originalAnimationTicks, int effectiveAnimationTicks, BattleSide? winner, BattleStopReason reason, BattleUnitInstanceSnapshot spawnSnapshot, string animationKey = null)
+        internal BattleEvent(BattleEventType type, int tick, int sequence, string unitId, string unitTypeId, BattleSide? unitSide, string relatedUnitId, FixedPosition? fromPosition, FixedPosition? toPosition, DamageType? damageType, int damageAmount, int hitPointsBefore, int hitPointsAfter, int plannedDamageTick, int originalAnimationTicks, int effectiveAnimationTicks, BattleSide? winner, BattleStopReason reason, BattleUnitInstanceSnapshot spawnSnapshot, string animationKey = null, BattleUnitAttributesSnapshot attributesSnapshot = null)
         {
             Type = type;
             Tick = tick;
@@ -44,6 +45,7 @@ namespace ArknoNights.Battle.Core
             Reason = reason;
             SpawnSnapshot = spawnSnapshot;
             AnimationKey = animationKey ?? string.Empty;
+            AttributesSnapshot = attributesSnapshot;
         }
 
         public BattleEventType Type { get; }
@@ -68,5 +70,6 @@ namespace ArknoNights.Battle.Core
         public BattleStopReason Reason { get; }
         public BattleUnitInstanceSnapshot SpawnSnapshot { get; }
         public string AnimationKey { get; }
+        public BattleUnitAttributesSnapshot AttributesSnapshot { get; }
     }
 }

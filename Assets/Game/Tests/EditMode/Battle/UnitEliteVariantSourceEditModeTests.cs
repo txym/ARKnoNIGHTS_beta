@@ -230,7 +230,7 @@ namespace ArknoNights.Battle.Tests
 }";
 
         [TestCase(0, "猎狗", 820, 190, "gopro")]
-        [TestCase(1, "猎狗", 820, 190, "gopro")]
+        [TestCase(1, "猎狗", 1091, 238, "gopro")]
         [TestCase(2, "猎狗pro", 1700, 260, "gopro_2")]
         [TestCase(3, "狂暴的猎狗pro", 3000, 370, "gopro_3")]
         public void Resolve_AppliesNearestLowerAtomicInheritance(
@@ -282,6 +282,51 @@ namespace ArknoNights.Battle.Tests
 
             var eliteThree = Resolve(InheritanceFixture, 3, "9000_fixture.json");
             Assert.That(Field<IList>(eliteThree, "innateAbilityIds"), Is.Empty);
+        }
+
+        [Test]
+        public void Resolve_GrowsEveryMissingCombatLevelFromPreviousRoundedValues()
+        {
+            var eliteOne = Resolve(
+                InheritanceFixture,
+                1,
+                "9000_fixture.json");
+            var eliteTwo = Resolve(
+                InheritanceFixture,
+                2,
+                "9000_fixture.json");
+            var eliteThree = Resolve(
+                InheritanceFixture,
+                3,
+                "9000_fixture.json");
+
+            Assert.That(
+                new[]
+                {
+                    Field<int>(eliteOne, "maxHitPoints"),
+                    Field<int>(eliteOne, "attack"),
+                    Field<int>(eliteOne, "defense")
+                },
+                Is.EqualTo(new[] { 133, 13, 0 }));
+            Assert.That(
+                new[]
+                {
+                    Field<int>(eliteTwo, "maxHitPoints"),
+                    Field<int>(eliteTwo, "attack"),
+                    Field<int>(eliteTwo, "defense")
+                },
+                Is.EqualTo(new[] { 177, 16, 0 }));
+            Assert.That(
+                new[]
+                {
+                    Field<int>(eliteThree, "maxHitPoints"),
+                    Field<int>(eliteThree, "attack"),
+                    Field<int>(eliteThree, "defense")
+                },
+                Is.EqualTo(new[] { 235, 20, 0 }));
+            Assert.That(
+                Field<int>(eliteThree, "magicResistance"),
+                Is.Zero);
         }
 
         [TestCase("unit-elite-variants-v1", "UNIT_ELITE_VARIANT_SCHEMA_INVALID")]
@@ -482,6 +527,7 @@ namespace ArknoNights.Battle.Tests
                 DisplayNameZhHans = "猎狗",
                 SkillDescriptionZhHans = string.Empty,
                 Rarity = 1,
+                DeploymentCost = 2,
                 MaxHitPoints = 820,
                 Attack = 190,
                 Defense = 0,
@@ -502,6 +548,7 @@ namespace ArknoNights.Battle.Tests
                 DisplayNameZhHans = "猎狗pro",
                 SkillDescriptionZhHans = string.Empty,
                 Rarity = 1,
+                DeploymentCost = 2,
                 MaxHitPoints = 1700,
                 Attack = 260,
                 Defense = 0,
@@ -522,6 +569,7 @@ namespace ArknoNights.Battle.Tests
                 DisplayNameZhHans = "狂暴的猎狗pro",
                 SkillDescriptionZhHans = string.Empty,
                 Rarity = 1,
+                DeploymentCost = 2,
                 MaxHitPoints = 3000,
                 Attack = 370,
                 Defense = 0,
@@ -542,6 +590,7 @@ namespace ArknoNights.Battle.Tests
                 DisplayNameZhHans = "果冻小子",
                 SkillDescriptionZhHans = "每隔一段时间，分裂出三个<果冻丁>。",
                 Rarity = 6,
+                DeploymentCost = 21,
                 MaxHitPoints = 18000,
                 Attack = 1100,
                 Defense = 0,
@@ -562,6 +611,7 @@ namespace ArknoNights.Battle.Tests
                 DisplayNameZhHans = "果冻丁",
                 SkillDescriptionZhHans = string.Empty,
                 Rarity = 3,
+                DeploymentCost = 2,
                 MaxHitPoints = 2500,
                 Attack = 290,
                 Defense = 100,
@@ -602,7 +652,9 @@ namespace ArknoNights.Battle.Tests
                 Field<string>(resolved, "skillDescriptionZhHans"),
                 Is.EqualTo(expected.SkillDescriptionZhHans));
             Assert.That(Field<int>(resolved, "rarity"), Is.EqualTo(expected.Rarity));
-            Assert.That(Field<int>(resolved, "deploymentCost"), Is.EqualTo(2));
+            Assert.That(
+                Field<int>(resolved, "deploymentCost"),
+                Is.EqualTo(expected.DeploymentCost));
             Assert.That(Field<int>(resolved, "attackMethod"), Is.EqualTo(1));
             Assert.That(Field<int>(resolved, "actionMethod"), Is.EqualTo(1));
             Assert.That(Field<float>(resolved, "attackRadiusMetres"), Is.Zero);
@@ -1084,6 +1136,7 @@ namespace ArknoNights.Battle.Tests
             internal string DisplayNameZhHans;
             internal string SkillDescriptionZhHans;
             internal int Rarity;
+            internal int DeploymentCost;
             internal int MaxHitPoints;
             internal int Attack;
             internal int Defense;

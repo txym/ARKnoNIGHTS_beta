@@ -16,9 +16,14 @@ namespace ArknoNights.Match.Tests
 
             Assert.That(entered.Code, Is.EqualTo(MatchCommandCode.Accepted));
             Assert.That(authority.ProjectPublic().PreparationRemainingMs, Is.EqualTo(30000));
+            var revisionBeforeClockOnlyAdvance = authority.StateRevision;
             Assert.That(authority.AdvancePreparationClock(30999).Accepted, Is.True);
             Assert.That(authority.ProjectPublic().Phase, Is.EqualTo(MatchPhase.Preparation));
             Assert.That(authority.ProjectPublic().PreparationRemainingMs, Is.EqualTo(1));
+            Assert.That(
+                authority.StateRevision,
+                Is.EqualTo(revisionBeforeClockOnlyAdvance),
+                "Clock-only observation must not create a gameplay revision.");
 
             var sealedResult = authority.AdvancePreparationClock(31000);
 

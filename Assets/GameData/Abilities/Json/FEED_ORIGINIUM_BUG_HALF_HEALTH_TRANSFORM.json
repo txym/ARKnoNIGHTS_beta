@@ -20,7 +20,8 @@
       "blockCapacityAdditive": 0,
       "attackSpeedAdditive": 0,
       "moveSpeedMultiplierPermille": 2500,
-      "makesUnblockable": true
+      "makesUnblockable": true,
+      "rushesOpposingGate": true
     }
   ]
 }

@@ -3,7 +3,7 @@
     "typeId":  1132,
     "common":  {
                    "rarity":  3,
-                   "deploymentCost":  2,
+                   "deploymentCost":  9,
                    "attackMethod":  1,
                    "actionMethod":  1,
                    "attackRadiusMetres":  0,
@@ -66,7 +66,7 @@
                          "sourceVariant":  "1132_sarchn_2",
                          "statsLevel":  0,
                          "displayNameZhHans":  "变异岩蛛α",
-                         "skillDescriptionZhHans":  "死亡时分裂两个\u003c畸变恶性瘤\u003e。",
+                         "skillDescriptionZhHans":  "死亡时分裂三个\u003c畸变恶性瘤\u003e。",
                          "stats":  {
                                        "combat":  {
                                                       "maxHitPoints":  3500,

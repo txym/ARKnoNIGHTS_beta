@@ -241,7 +241,16 @@ namespace ArknoNights.UI
                 return;
             }
 
-            ClearStagingSelection();
+            if (displayedReadOnly
+                || !string.IsNullOrEmpty(selectedSlotId)
+                && !source.StagingSlots.Any(stack =>
+                    string.Equals(
+                        BuildSlotId(stack),
+                        selectedSlotId,
+                        StringComparison.Ordinal)))
+            {
+                ClearStagingSelection();
+            }
             RebuildSlots();
             if (costText) costText.text = source.DeploymentCost.ToString();
         }

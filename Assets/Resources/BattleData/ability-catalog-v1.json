@@ -112,6 +112,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -226,6 +227,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -340,6 +342,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -454,6 +457,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 1000,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -568,6 +572,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -682,6 +687,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -796,6 +802,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -910,6 +917,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1024,6 +1032,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1138,6 +1147,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1261,6 +1271,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1375,6 +1386,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 500,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": "10002"
@@ -1489,6 +1501,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 2500,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1603,6 +1616,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1717,6 +1731,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1831,6 +1846,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -1945,6 +1961,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2064,6 +2081,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2178,6 +2196,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 2500,
             "healthThresholdCombatMakesUnblockable": true,
+            "healthThresholdCombatRushesOpposingGate": true,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2292,6 +2311,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2406,6 +2426,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2520,6 +2541,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2634,6 +2656,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2748,6 +2771,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2862,6 +2886,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -2976,6 +3001,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3090,6 +3116,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3204,6 +3231,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3318,6 +3346,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3432,6 +3461,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3546,6 +3576,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3660,6 +3691,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3774,6 +3806,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -3888,6 +3921,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4007,6 +4041,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4014,7 +4049,7 @@
         {
             "abilityId": "MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO",
             "displayNameZhHans": "",
-            "descriptionZhHans": "死亡时分裂两个<畸变恶性瘤>。",
+            "descriptionZhHans": "死亡时分裂三个<畸变恶性瘤>。",
             "activationKind": "Passive",
             "silencePolicy": "Unaffected",
             "initialSkillPoints": 0,
@@ -4055,7 +4090,7 @@
                     "weight": 1
                 }
             ],
-            "deathSpawnCount": 2,
+            "deathSpawnCount": 3,
             "deathSpawnDelayTicks": 2,
             "deathSpawnSideLengthCentimetres": 40,
             "deathSpawnSnapToNearestPassableCell": true,
@@ -4126,6 +4161,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4245,6 +4281,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4364,6 +4401,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4478,6 +4516,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4592,6 +4631,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4706,6 +4746,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4820,6 +4861,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -4934,6 +4976,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5048,6 +5091,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5162,6 +5206,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5276,6 +5321,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 1000,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5390,6 +5436,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5504,6 +5551,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5618,6 +5666,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5732,6 +5781,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 100,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 2000,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5846,6 +5896,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 150,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 2500,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -5960,6 +6011,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6074,6 +6126,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6188,6 +6241,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 100,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 2000,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6302,6 +6356,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6416,6 +6471,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6530,6 +6586,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6644,6 +6701,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6758,6 +6816,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6872,6 +6931,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 1000,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -6986,6 +7046,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -7100,6 +7161,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -7214,6 +7276,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -7328,6 +7391,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -7442,6 +7506,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -7556,6 +7621,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""
@@ -7670,6 +7736,7 @@
             "healthThresholdCombatAttackSpeedAdditive": 0,
             "healthThresholdCombatMoveSpeedMultiplierPermille": 0,
             "healthThresholdCombatMakesUnblockable": false,
+            "healthThresholdCombatRushesOpposingGate": false,
             "healthThresholdAdjacentSpawnHitPointsPermille": 0,
             "healthThresholdAdjacentSpawnInclusive": false,
             "healthThresholdAdjacentSpawnTypeId": ""

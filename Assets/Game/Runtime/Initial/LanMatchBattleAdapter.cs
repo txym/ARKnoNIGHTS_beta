@@ -36,6 +36,22 @@ public sealed class LanMatchBattleSet
 public static class LanMatchBattleAdapter
 {
     public const int MaximumBattleTicks = 1800;
+    private static readonly FormationOffset[] EliteEntityFormationOffsets =
+    {
+        default(FormationOffset),
+        new FormationOffset(
+            FixedPosition.QuarterMetre,
+            -FixedPosition.QuarterMetre),
+        new FormationOffset(
+            -FixedPosition.QuarterMetre,
+            -FixedPosition.QuarterMetre),
+        new FormationOffset(
+            -FixedPosition.QuarterMetre,
+            FixedPosition.QuarterMetre),
+        new FormationOffset(
+            FixedPosition.QuarterMetre,
+            FixedPosition.QuarterMetre)
+    };
 
     public static bool TryCreate(
         ScopedSnapshotPayload snapshot,
@@ -109,7 +125,7 @@ public static class LanMatchBattleAdapter
                         BattleInput.LocalBattleSchemaVersion,
                         pairing.BattleId,
                         MaximumBattleTicks,
-                        unitCatalog.Entries.Select(item => item.Definition),
+                        unitCatalog.AllDefinitions,
                         abilityCatalog.Abilities,
                         players),
                     out var input,
@@ -219,7 +235,8 @@ public static class LanMatchBattleAdapter
                     UnitZone.Deployed,
                     new FormationCoordinate(unit.FormationX, unit.FormationY),
                     buffs,
-                    unit.EliteLevel));
+                    unit.EliteLevel,
+                    EliteEntityFormationOffsets[ordinal]));
             }
         }
         return new PlayerSnapshot(seat.PlayerId, side, units);

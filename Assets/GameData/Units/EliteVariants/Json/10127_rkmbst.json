@@ -3,7 +3,7 @@
     "typeId":  10127,
     "common":  {
                    "rarity":  5,
-                   "deploymentCost":  2,
+                   "deploymentCost":  23,
                    "attackMethod":  1,
                    "actionMethod":  1,
                    "attackRadiusMetres":  0,
@@ -40,7 +40,7 @@
                                        "animations":  [
                                                           {
                                                               "key":  "idle",
-                                                              "name":  "A_Idle"
+                                                              "name":  "A_Default"
                                                           },
                                                           {
                                                               "key":  "move",
@@ -87,7 +87,7 @@
                                        "animations":  [
                                                           {
                                                               "key":  "idle",
-                                                              "name":  "A_Idle"
+                                                              "name":  "A_Default"
                                                           },
                                                           {
                                                               "key":  "move",

@@ -68,7 +68,7 @@ foreach ($file in Get-ChildItem `
 
 $variantOverrides = @{
     '1131:2' = '死亡时分裂两个<畸变恶性瘤>。'
-    '1132:2' = '死亡时分裂两个<畸变恶性瘤>。'
+    '1132:2' = '死亡时分裂三个<畸变恶性瘤>。'
 }
 $changedFiles = 0
 $changedVariants = 0

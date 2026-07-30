@@ -14,7 +14,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class UnitSourceConsumerEditModeTests
     {
         private const string ExpectedRuntimeCatalogHash =
-            "C9BD2C82100AA8905A48D3C1B3A9E67E8562AE83EFCFFB613160E24DADA8FB14";
+            "4F13613FAC99F9C0EAAEC742224F004EDC817773E2DB35C59CC79CE11A0E1375";
         private static readonly string[] LegacyProjectionFileNames =
         {
             "1000_gopro.json",
@@ -75,7 +75,7 @@ namespace ArknoNights.Battle.Tests
                 Is.EqualTo(20));
             Assert.That(
                 document.units.Single(unit => unit.typeId == "5503").deploymentCost,
-                Is.EqualTo(2));
+                Is.EqualTo(21));
             Assert.That(
                 document.units.Single(unit => unit.typeId == "5503").rarity,
                 Is.EqualTo(6));
@@ -90,6 +90,24 @@ namespace ArknoNights.Battle.Tests
                 document.units.Single(unit => unit.typeId == "5504")
                     .attackAnimationDurationTicks,
                 Is.EqualTo(24));
+            var gopro = document.units.Single(unit =>
+                unit.typeId == "1000");
+            Assert.That(
+                gopro.eliteVariants.Select(item =>
+                    item.eliteLevel),
+                Is.EqualTo(new[] { 1, 2, 3 }));
+            Assert.That(
+                gopro.eliteVariants.Single(item =>
+                    item.eliteLevel == 1).maxHitPoints,
+                Is.EqualTo(1091));
+            Assert.That(
+                gopro.eliteVariants.Single(item =>
+                    item.eliteLevel == 2).maxHitPoints,
+                Is.EqualTo(1700));
+            Assert.That(
+                gopro.eliteVariants.Single(item =>
+                    item.eliteLevel == 3).maxHitPoints,
+                Is.EqualTo(3000));
         }
 
         [Test]
@@ -996,6 +1014,13 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 deathSpawn.deathSpawnSummonedMoveSpeedMultiplierPermille,
                 Is.EqualTo(3000));
+            var eliteTwoRockSpider = document.abilities.Single(item =>
+                item.abilityId == "MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO");
+            Assert.That(eliteTwoRockSpider.deathSpawnOptions, Has.Length.EqualTo(1));
+            Assert.That(
+                eliteTwoRockSpider.deathSpawnOptions[0].summonTypeId,
+                Is.EqualTo("1138"));
+            Assert.That(eliteTwoRockSpider.deathSpawnCount, Is.EqualTo(3));
             var prisoner = document.abilities.Single(item =>
                 item.abilityId == "PRISONER_RELEASE_LEADER");
             Assert.That(
@@ -1030,6 +1055,9 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 feeder.persistentPresentationStateTag,
                 Is.EqualTo("b"));
+            Assert.That(
+                feeder.healthThresholdCombatRushesOpposingGate,
+                Is.True);
             var anvilAura = document.abilities.Single(item =>
                 item.abilityId == "ANVIL_SUPPORT_AURA");
             Assert.That(anvilAura.auraTargetSide, Is.EqualTo("Allies"));
@@ -1510,6 +1538,8 @@ namespace ArknoNights.Battle.Tests
             public string typeId;
             public int deploymentCost;
             public int rarity;
+            public int eliteLevel;
+            public int maxHitPoints;
             public int attackAnimationDurationTicks;
             public string damageType;
             public string attackMethod;
@@ -1518,6 +1548,7 @@ namespace ArknoNights.Battle.Tests
             public string moveAnimation;
             public string attackAnimation;
             public string hitAnimation;
+            public CatalogProjectionEntry[] eliteVariants;
         }
 
         [Serializable]
@@ -1621,6 +1652,7 @@ namespace ArknoNights.Battle.Tests
             public int healthThresholdCombatAttackSpeedAdditive;
             public int healthThresholdCombatMoveSpeedMultiplierPermille;
             public bool healthThresholdCombatMakesUnblockable;
+            public bool healthThresholdCombatRushesOpposingGate;
             public int healthThresholdAdjacentSpawnHitPointsPermille;
             public bool healthThresholdAdjacentSpawnInclusive;
             public string healthThresholdAdjacentSpawnTypeId;

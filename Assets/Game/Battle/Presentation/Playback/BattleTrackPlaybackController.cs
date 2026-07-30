@@ -114,7 +114,22 @@ namespace ArknoNights.Battle.Presentation
                 if (!views.TryGetValue(unit.UnitId, out var record))
                 {
                     if (!sample.ShouldDisplay) continue;
-                    if (!factory.TryCreate(unit.UnitId, unit.TypeId, out var view, out var diagnostic) || view == null)
+                    IBattlePresentationView view;
+                    BattlePresentationDiagnostic diagnostic;
+                    var created = factory
+                        is IEliteBattlePresentationViewFactory eliteFactory
+                            ? eliteFactory.TryCreate(
+                                unit.UnitId,
+                                unit.TypeId,
+                                unit.EliteLevel,
+                                out view,
+                                out diagnostic)
+                            : factory.TryCreate(
+                                unit.UnitId,
+                                unit.TypeId,
+                                out view,
+                                out diagnostic);
+                    if (!created || view == null)
                     {
                         AddDiagnostic(diagnostic ?? new BattlePresentationDiagnostic("view.create.failed", "A view could not be created.", Timeline.BattleId, unit.UnitId));
                         renderDiagnostics = Diagnostics;
@@ -217,7 +232,7 @@ namespace ArknoNights.Battle.Presentation
             {
                 var sample = Unit.Sample(presentationTick);
                 var position = new FixedPosition((int)Math.Round(sample.Position.XUnits * FixedPosition.UnitsPerMetre), (int)Math.Round(sample.Position.YUnits * FixedPosition.UnitsPerMetre));
-                return new BattlePresentationViewState(Unit.UnitId, Unit.TypeId, Unit.Side, position, sample.Position, sample.MaxHitPoints, sample.CurrentHitPoints, sample.CurrentShield, sample.HasSpawned, sample.IsAlive, sample.Action, Unit.EliteLevel);
+                return new BattlePresentationViewState(Unit.UnitId, Unit.TypeId, Unit.Side, position, sample.Position, sample.MaxHitPoints, sample.CurrentHitPoints, sample.CurrentShield, sample.HasSpawned, sample.IsAlive, sample.Action, Unit.EliteLevel, sample.Attributes);
             }
         }
     }

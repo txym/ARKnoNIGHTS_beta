@@ -14,22 +14,18 @@ namespace ArknoNights.Lobby
         HandshakeAccepted,
         Reject,
         MatchInitialized,
-        Command,
-        CommandAck,
-        ScopedSnapshot,
-        SnapshotRequest,
-        ClockSync,
-        BattleSeal,
+        OperationRequest,
+        OperationResult,
+        SystemResult,
+        RecoveryState,
+        RecoveryStateRequest,
         FirstChunkReady,
-        PlaybackStart,
-        PlaybackClock,
         FinalSecondHash,
         ClientBattleFailure,
         ReconnectRequest,
         ReconnectAccepted,
         ReconnectRejected,
         ExplicitQuit,
-        MatchEnded,
         Ping,
         Pong
     }
@@ -272,19 +268,6 @@ namespace ArknoNights.Lobby
     }
 
     [DataContract]
-    public sealed class MatchCommandAckPayload
-    {
-        [DataMember(Name = "commandId")] public string CommandId;
-        [DataMember(Name = "resultCode")] public string ResultCode;
-        [DataMember(Name = "currentStateRevision")] public long CurrentStateRevision;
-        [DataMember(Name = "acceptedStateRevision")] public long AcceptedStateRevision;
-        [DataMember(Name = "hasAcceptedStateRevision")] public bool HasAcceptedStateRevision;
-        [DataMember(Name = "didChangeState")] public bool DidChangeState;
-        [DataMember(Name = "stableDetailCode")] public string StableDetailCode;
-        [DataMember(Name = "hostAcceptSequence")] public long HostAcceptSequence;
-    }
-
-    [DataContract]
     public sealed class MatchSnapshotRequestPayload
     {
         [DataMember(Name = "clientLastAppliedRevision")] public long ClientLastAppliedRevision;
@@ -334,16 +317,6 @@ namespace ArknoNights.Lobby
         [DataMember(Name = "canonicalInputHash")] public string CanonicalInputHash;
         [DataMember(Name = "hostMonotonicStartMs")] public long HostMonotonicStartMs;
         [DataMember(Name = "startTick")] public int StartTick;
-    }
-
-    [DataContract]
-    public sealed class MatchPlaybackClockPayload
-    {
-        [DataMember(Name = "roundNumber")] public int RoundNumber;
-        [DataMember(Name = "battleSetId")] public string BattleSetId;
-        [DataMember(Name = "canonicalInputHash")] public string CanonicalInputHash;
-        [DataMember(Name = "hostMonotonicNowMs")] public long HostMonotonicNowMs;
-        [DataMember(Name = "currentTick")] public int CurrentTick;
     }
 
     [DataContract]
@@ -410,6 +383,11 @@ namespace ArknoNights.Lobby
     {
         [DataMember(Name = "connectionGeneration")] public long ConnectionGeneration;
         [DataMember(Name = "sentUnixMilliseconds")] public long SentUnixMilliseconds;
+        [DataMember(Name = "hostMonotonicNowMs")] public long HostMonotonicNowMs;
+        [DataMember(Name = "roundNumber")] public int RoundNumber;
+        [DataMember(Name = "phase")] public string Phase;
+        [DataMember(Name = "phaseDeadlineHostMonotonicMs")]
+        public long PhaseDeadlineHostMonotonicMs;
     }
 
     [DataContract]
@@ -569,8 +547,8 @@ namespace ArknoNights.Lobby
 
     public static class MatchProtocol
     {
-        public const int ProtocolVersion = 1;
-        public const int SchemaVersion = 1;
+        public const int ProtocolVersion = 2;
+        public const int SchemaVersion = 2;
         public const int AbsoluteMaximumFrameBytes = 4 * 1024 * 1024;
         public const int ControlPayloadMaximum = 64 * 1024;
         public const int ScopedSnapshotPayloadMaximum = 1024 * 1024;
@@ -582,30 +560,25 @@ namespace ArknoNights.Lobby
             switch (kind)
             {
                 case MatchWireKind.Handshake:
-                case MatchWireKind.Command:
-                case MatchWireKind.SnapshotRequest:
+                case MatchWireKind.OperationRequest:
+                case MatchWireKind.RecoveryStateRequest:
                 case MatchWireKind.FirstChunkReady:
                 case MatchWireKind.FinalSecondHash:
                 case MatchWireKind.ClientBattleFailure:
                 case MatchWireKind.ReconnectRequest:
                 case MatchWireKind.ExplicitQuit:
+                case MatchWireKind.Ping:
                     return MatchWireDirection.ClientToHost;
                 case MatchWireKind.HandshakeAccepted:
                 case MatchWireKind.Reject:
                 case MatchWireKind.MatchInitialized:
-                case MatchWireKind.CommandAck:
-                case MatchWireKind.ScopedSnapshot:
-                case MatchWireKind.ClockSync:
-                case MatchWireKind.BattleSeal:
-                case MatchWireKind.PlaybackStart:
-                case MatchWireKind.PlaybackClock:
+                case MatchWireKind.OperationResult:
+                case MatchWireKind.SystemResult:
+                case MatchWireKind.RecoveryState:
                 case MatchWireKind.ReconnectAccepted:
                 case MatchWireKind.ReconnectRejected:
-                case MatchWireKind.MatchEnded:
-                    return MatchWireDirection.HostToClient;
-                case MatchWireKind.Ping:
                 case MatchWireKind.Pong:
-                    return MatchWireDirection.Bidirectional;
+                    return MatchWireDirection.HostToClient;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind));
             }
@@ -818,22 +791,22 @@ namespace ArknoNights.Lobby
                             value.Snapshot.SessionId,
                             StringComparison.Ordinal)
                         && ValidateClock(value.Clock));
-                case MatchWireKind.Command:
+                case MatchWireKind.OperationRequest:
                     return DeserializeAnd(json, (MatchCommandWirePayload value) =>
                         ValidPlayerId(value.PlayerId)
                         && value.ConnectionGeneration > 0
                         && ValidToken(value.CommandId, 128)
                         && value.KnownStateRevision >= 0
                         && ValidateCommand(value));
-                case MatchWireKind.CommandAck:
-                    return DeserializeAnd(json, (MatchCommandAckPayload value) =>
-                        ValidToken(value.CommandId, 128)
-                        && EnumToken<MatchCommandCode>(value.ResultCode)
-                        && value.CurrentStateRevision >= 0
-                        && (!value.HasAcceptedStateRevision || value.AcceptedStateRevision >= 0)
-                        && ValidDetail(value.StableDetailCode)
-                        && value.HostAcceptSequence > 0);
-                case MatchWireKind.ScopedSnapshot:
+                case MatchWireKind.OperationResult:
+                    return DeserializeAnd<MatchOperationResultPayload>(
+                        json,
+                        ValidateOperationResult);
+                case MatchWireKind.SystemResult:
+                    return DeserializeAnd<MatchSystemResultPayload>(
+                        json,
+                        ValidateSystemResult);
+                case MatchWireKind.RecoveryState:
                     return DeserializeAnd<ScopedSnapshotPayload>(
                         json,
                         value => ValidateSnapshot(value)
@@ -841,48 +814,15 @@ namespace ArknoNights.Lobby
                                 sessionId,
                                 value.SessionId,
                                 StringComparison.Ordinal));
-                case MatchWireKind.SnapshotRequest:
+                case MatchWireKind.RecoveryStateRequest:
                     return DeserializeAnd(json, (MatchSnapshotRequestPayload value) =>
                         value.ClientLastAppliedRevision >= 0);
-                case MatchWireKind.ClockSync:
-                    return DeserializeAnd<MatchClockSyncPayload>(json, ValidateClock);
-                case MatchWireKind.BattleSeal:
-                    return DeserializeAnd(json, (MatchBattleSealPayload value) =>
-                        value.RoundNumber > 0
-                        && ValidToken(value.BattleSetId, 128)
-                        && IsSha256(value.CanonicalInputHash)
-                        && value.SealedPayload != null
-                        && (value.BattleInputs == null
-                            || value.BattleInputs.Length <= 2
-                            && value.BattleInputs.All(item =>
-                                item != null
-                                && ValidToken(item.BattleId, 128)
-                                && IsSha256(item.InputSha256)
-                                && (string.IsNullOrEmpty(item.SealedInputHash)
-                                    || IsSha256(item.SealedInputHash)))
-                            && value.BattleInputs
-                                .GroupBy(item => item.BattleId, StringComparer.Ordinal)
-                                .All(group => group.Count() == 1)));
                 case MatchWireKind.FirstChunkReady:
                     return DeserializeAnd(json, (MatchFirstChunkReadyPayload value) =>
                         value.RoundNumber > 0
                         && ValidToken(value.BattleSetId, 128)
                         && IsSha256(value.CanonicalInputHash)
                         && value.ReadyRevision >= 0);
-                case MatchWireKind.PlaybackStart:
-                    return DeserializeAnd(json, (MatchPlaybackStartPayload value) =>
-                        value.RoundNumber > 0
-                        && ValidToken(value.BattleSetId, 128)
-                        && IsSha256(value.CanonicalInputHash)
-                        && value.HostMonotonicStartMs >= 0
-                        && value.StartTick >= 0);
-                case MatchWireKind.PlaybackClock:
-                    return DeserializeAnd(json, (MatchPlaybackClockPayload value) =>
-                        value.RoundNumber > 0
-                        && ValidToken(value.BattleSetId, 128)
-                        && IsSha256(value.CanonicalInputHash)
-                        && value.HostMonotonicNowMs >= 0
-                        && value.CurrentTick >= 0);
                 case MatchWireKind.FinalSecondHash:
                     return DeserializeAnd(json, (MatchFinalSecondHashPayload value) =>
                         value.RoundNumber > 0
@@ -919,18 +859,18 @@ namespace ArknoNights.Lobby
                 case MatchWireKind.ExplicitQuit:
                     return DeserializeAnd(json, (MatchExplicitQuitPayload value) =>
                         ValidPlayerId(value.PlayerId) && value.ConnectionGeneration > 0);
-                case MatchWireKind.MatchEnded:
-                    return DeserializeAnd(json, (MatchEndedPayload value) =>
-                        EnumToken<MatchEndReason>(value.EndReason)
-                        && value.EndReason != MatchEndReason.None.ToString()
-                        && value.FinalRevision >= 0
-                        && value.FinalStandings != null
-                        && value.FinalStandings.Length <= 4
-                        && value.FinalStandings.All(ValidateStanding));
                 case MatchWireKind.Ping:
-                case MatchWireKind.Pong:
                     return DeserializeAnd(json, (MatchHeartbeatPayload value) =>
                         value.ConnectionGeneration > 0 && value.SentUnixMilliseconds >= 0);
+                case MatchWireKind.Pong:
+                    return DeserializeAnd(json, (MatchHeartbeatPayload value) =>
+                        value.ConnectionGeneration > 0
+                        && value.SentUnixMilliseconds >= 0
+                        && value.HostMonotonicNowMs >= 0
+                        && value.RoundNumber >= 0
+                        && EnumToken<MatchPhase>(value.Phase)
+                        && value.PhaseDeadlineHostMonotonicMs
+                            >= value.HostMonotonicNowMs);
                 default:
                     return false;
             }
@@ -1039,6 +979,212 @@ namespace ArknoNights.Lobby
                 && EnumToken<MatchPhase>(value.Phase)
                 && value.HostMonotonicNowMs >= 0
                 && value.PreparationDeadlineHostMonotonicMs >= 0;
+        }
+
+        private static bool ValidateOperationResult(
+            MatchOperationResultPayload value)
+        {
+            return value != null
+                && ValidToken(value.CommandId, 128)
+                && ValidPlayerId(value.OriginPlayerId)
+                && EnumToken<MatchCommandKind>(value.CommandKind)
+                && (string.IsNullOrEmpty(value.PrimaryUnitId)
+                    || ValidToken(value.PrimaryUnitId, 128))
+                && value.ShopSlotIndex >= 0
+                && value.ShopSlotIndex <= MatchEconomyRules.ShopSlotCount
+                && EnumToken<MatchCommandCode>(value.ResultCode)
+                && value.CurrentStateRevision >= 0
+                && (!value.HasAcceptedStateRevision
+                    || value.AcceptedStateRevision >= 0)
+                && ValidDetail(value.StableDetailCode)
+                && value.HostAcceptSequence > 0
+                && (value.DidChangeState
+                    ? value.Delta != null
+                        && ValidateDelta(value.Delta)
+                        && value.Delta.StateRevision
+                            == value.CurrentStateRevision
+                    : value.Delta == null);
+        }
+
+        private static bool ValidateSystemResult(
+            MatchSystemResultPayload value)
+        {
+            if (value == null
+                || !ValidToken(value.SystemActionId, 128)
+                || !EnumToken<MatchSystemResultKind>(value.SystemKind)
+                || value.StateRevision < 0
+                || value.HostAcceptSequence <= 0
+                || !ValidDetail(value.StableDetailCode)
+                || value.Delta != null
+                && (!ValidateDelta(value.Delta)
+                    || value.Delta.StateRevision != value.StateRevision))
+            {
+                return false;
+            }
+            if (!Enum.TryParse(
+                value.SystemKind,
+                false,
+                out MatchSystemResultKind kind))
+            {
+                return false;
+            }
+            switch (kind)
+            {
+                case MatchSystemResultKind.BattleSeal:
+                    return ValidateBattleSeal(value.BattleSeal)
+                        && value.PlaybackStart == null
+                        && value.MatchEnded == null;
+                case MatchSystemResultKind.PlaybackStarted:
+                    return value.BattleSeal == null
+                        && ValidatePlaybackStart(
+                            value.PlaybackStart)
+                        && value.MatchEnded == null;
+                case MatchSystemResultKind.MatchEnded:
+                case MatchSystemResultKind.HostAborted:
+                    return value.BattleSeal == null
+                        && value.PlaybackStart == null
+                        && ValidateMatchEnded(value.MatchEnded)
+                        && value.MatchEnded.FinalRevision
+                            == value.StateRevision;
+                default:
+                    return value.BattleSeal == null
+                        && value.PlaybackStart == null
+                        && value.MatchEnded == null
+                        && value.Delta != null;
+            }
+        }
+
+        private static bool ValidateBattleSeal(
+            MatchBattleSealPayload value)
+        {
+            return value != null
+                && value.RoundNumber > 0
+                && ValidToken(value.BattleSetId, 128)
+                && IsSha256(value.CanonicalInputHash)
+                && value.SealedPayload != null
+                && (value.BattleInputs == null
+                    || value.BattleInputs.Length <= 2
+                    && value.BattleInputs.All(item =>
+                        item != null
+                        && ValidToken(item.BattleId, 128)
+                        && IsSha256(item.InputSha256)
+                        && (string.IsNullOrEmpty(
+                                item.SealedInputHash)
+                            || IsSha256(
+                                item.SealedInputHash)))
+                    && value.BattleInputs
+                        .GroupBy(
+                            item => item.BattleId,
+                            StringComparer.Ordinal)
+                        .All(group => group.Count() == 1));
+        }
+
+        private static bool ValidatePlaybackStart(
+            MatchPlaybackStartPayload value)
+        {
+            return value != null
+                && value.RoundNumber > 0
+                && ValidToken(value.BattleSetId, 128)
+                && IsSha256(value.CanonicalInputHash)
+                && value.HostMonotonicStartMs >= 0
+                && value.StartTick >= 0;
+        }
+
+        private static bool ValidateMatchEnded(
+            MatchEndedPayload value)
+        {
+            return value != null
+                && EnumToken<MatchEndReason>(value.EndReason)
+                && value.EndReason
+                    != MatchEndReason.None.ToString()
+                && value.FinalRevision >= 0
+                && value.FinalStandings != null
+                && value.FinalStandings.Length <= 4
+                && value.FinalStandings.All(ValidateStanding);
+        }
+
+        private static bool ValidateDelta(MatchStateDeltaWire value)
+        {
+            if (value == null
+                || value.BaseStateRevision < 0
+                || value.StateRevision <= value.BaseStateRevision
+                || !EnumToken<MatchPhase>(value.Phase)
+                || value.RoundNumber < 0
+                || value.PreparationRemainingMs < 0
+                || value.Pairings == null
+                || value.Pairings.Length > 2
+                || !EnumToken<MatchEndReason>(value.EndReason)
+                || value.FinalStandings == null
+                || value.FinalStandings.Length > 4
+                || value.ChangedSeats == null
+                || value.ChangedSeats.Length > 4
+                || value.RemovedSeatPlayerIds == null
+                || value.RemovedSeatPlayerIds.Length > 4
+                || !EnumToken<MatchLocalConnectionState>(
+                    value.LocalConnectionState)
+                || value.HasOwnerPrivateState
+                    && value.OwnerPrivateState != null
+                    && !ValidateOwner(value.OwnerPrivateState)
+                || !value.HasOwnerPrivateState
+                    && value.OwnerPrivateState != null)
+            {
+                return false;
+            }
+            if (value.ChangedSeats
+                    .GroupBy(item => item == null ? -1 : item.SeatIndex)
+                    .Any(group => group.Count() != 1)
+                || value.ChangedSeats
+                    .Where(item => item != null)
+                    .GroupBy(item => item.PlayerId, StringComparer.Ordinal)
+                    .Any(group => group.Count() != 1)
+                || value.RemovedSeatPlayerIds.Any(
+                    playerId => !ValidPlayerId(playerId))
+                || value.RemovedSeatPlayerIds.Distinct(
+                    StringComparer.Ordinal).Count()
+                    != value.RemovedSeatPlayerIds.Length
+                || value.ChangedSeats.Any(item =>
+                    value.RemovedSeatPlayerIds.Contains(
+                        item?.PlayerId,
+                        StringComparer.Ordinal)))
+            {
+                return false;
+            }
+            return value.Pairings.All(ValidatePairing)
+                && value.FinalStandings.All(ValidateStanding)
+                && value.ChangedSeats.All(ValidatePublicSeat);
+        }
+
+        private static bool ValidatePairing(PublicMatchPairingWire pairing)
+        {
+            return pairing != null
+                && ValidToken(pairing.BattleId, 128)
+                && EnumToken<MatchPairingKind>(pairing.Kind)
+                && ValidPlayerId(pairing.HomePlayerId)
+                && ValidPlayerId(pairing.AwayPlayerId)
+                && (pairing.Kind == MatchPairingKind.Shadow.ToString()
+                    ? ValidPlayerId(pairing.ShadowOwnerPlayerId)
+                    : string.IsNullOrEmpty(pairing.ShadowOwnerPlayerId));
+        }
+
+        private static bool ValidatePublicSeat(PublicMatchSeatWire seat)
+        {
+            return seat != null
+                && seat.SeatIndex >= 1
+                && seat.SeatIndex <= 4
+                && ValidPlayerId(seat.PlayerId)
+                && ValidToken(seat.DisplayName, 128)
+                && ValidToken(seat.AvatarId, 128)
+                && seat.Life >= 0
+                && (!seat.HasPlacement || seat.Placement >= 1)
+                && EnumToken<PublicConnectionState>(seat.ConnectionState)
+                && seat.Units != null
+                && seat.Units.All(ValidateUnit)
+                && (seat.TargetedUnitBuffs == null
+                    || seat.TargetedUnitBuffs.All(ValidateTargetedBuff))
+                && (seat.GlobalBuffs == null
+                    || seat.GlobalBuffs.All(ValidateGlobalBuff))
+                && (seat.SourceEffects == null
+                    || seat.SourceEffects.All(ValidateSourceEffect));
         }
 
         private static bool ValidateStanding(MatchStandingWire value)
@@ -1242,12 +1388,14 @@ namespace ArknoNights.Lobby
 
         private static int MaximumPayloadBytes(MatchWireKind kind)
         {
-            if (kind == MatchWireKind.ScopedSnapshot
+            if (kind == MatchWireKind.RecoveryState
+                || kind == MatchWireKind.OperationResult
                 || kind == MatchWireKind.MatchInitialized)
             {
                 return ScopedSnapshotPayloadMaximum;
             }
-            if (kind == MatchWireKind.BattleSeal) return BattleSealPayloadMaximum;
+            if (kind == MatchWireKind.SystemResult)
+                return BattleSealPayloadMaximum;
             return ControlPayloadMaximum;
         }
 

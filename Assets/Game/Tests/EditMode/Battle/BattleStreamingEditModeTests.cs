@@ -125,7 +125,7 @@ namespace ArknoNights.Battle.Tests
             Assert.That(attack.PlannedDamageTick,
                 Is.GreaterThan(100));
 
-            producer.Advance(attack.PlannedDamageTick - 100);
+            producer.Advance(input.MaxTicks - 100);
 
             Assert.That(producer.Chunks.Last().Events,
                 Has.Some.Matches<BattleEvent>(item =>

@@ -65,7 +65,9 @@ namespace ArknoNights.Battle.Infrastructure
                 abilities.Add(Convert(source, skillAnimations.Catalog));
             if (abilities.Count == 0) errors.Add(new ValidationError("ability.catalog.empty", "Ability catalog must contain at least one ability."));
 
-            var definitions = unitCatalog == null ? Enumerable.Empty<UnitDefinition>() : unitCatalog.Entries.Select(entry => entry.Definition);
+            var definitions = unitCatalog == null
+                ? Enumerable.Empty<UnitDefinition>()
+                : unitCatalog.AllDefinitions;
             var specification = new BattleInputSpecification(BattleInput.LocalBattleSchemaVersion, "ability-catalog-validation", 1, definitions, abilities, new[]
             {
                 new PlayerSnapshot("home", BattleSide.Home, Array.Empty<UnitSnapshot>()),
@@ -77,9 +79,15 @@ namespace ArknoNights.Battle.Infrastructure
             {
                 foreach (var binding in skillAnimations.Catalog.Bindings)
                 {
-                    if (!unitCatalog.TryGet(binding.TypeId, out var unit)
-                        || !unit.Definition.InnateAbilityIds.Contains(
-                            binding.AbilityId))
+                    var matchesUnitAbility =
+                        unitCatalog.EliteVariants.Any(unit =>
+                            string.Equals(
+                                unit.Definition.TypeId,
+                                binding.TypeId,
+                                StringComparison.Ordinal)
+                            && unit.Definition.InnateAbilityIds.Contains(
+                                binding.AbilityId));
+                    if (!matchesUnitAbility)
                         errors.Add(new ValidationError(
                             "skillAnimation.unitAbility.mismatch",
                             "Skill animation binding does not match a unit innate ability: "
@@ -182,7 +190,9 @@ namespace ArknoNights.Battle.Infrastructure
                             hasSkillAnimation
                                 ? skillAnimation.OriginalAnimationTicks
                                 : 0,
-                            source.persistentPresentationStateTag),
+                            source.persistentPresentationStateTag,
+                            source
+                                .healthThresholdCombatRushesOpposingGate),
                 unblockedDamageTakenModifier:
                     source.unblockedPhysicalDamageTakenPermille == 0
                     && source.unblockedMagicDamageTakenPermille == 0
@@ -464,7 +474,7 @@ namespace ArknoNights.Battle.Infrastructure
             public int timedBlinkDistanceCentimetres;
             public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly;
             public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType;
-            public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable;
+            public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable; public bool healthThresholdCombatRushesOpposingGate;
             public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId;
         }
         [Serializable] private sealed class DeathSpawnOptionDto { public string summonTypeId; public int weight; }

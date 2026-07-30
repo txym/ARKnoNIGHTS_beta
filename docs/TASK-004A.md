@@ -175,7 +175,7 @@ Player-safe 载体优先使用项目已有 `Resources.Load<TextAsset>` 能力下
 - 不把真实单位数值直接硬编码在测试、工厂、MonoBehaviour 或 Core 类中；
 - 不让 Core 引用 UnityEngine、Spine、Resources、文件路径、UnitFactory、UnitTemplate 或表现目录；
 - 不通过自动读取动画状态来推进权威战斗；资源检查只用于生成/验证输入数据与表现播放；
-- 不把 `BlockRadius` 0.1 当成当前全局 0.25 米战斗阻挡规则；两者语义冲突时以 SPEC 的当前战斗规则为准并在文档中说明。
+- 不把 `BlockRadius` 0.1 当成当前全局 0.4 米战斗阻挡规则；两者语义冲突时以 SPEC 的当前战斗规则为准并在文档中说明。
 
 ## 预计影响文件或目录
 

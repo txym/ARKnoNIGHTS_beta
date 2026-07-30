@@ -10,8 +10,8 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Deterministically projects resolved elite-zero v2 sources into the frozen
-/// Player-safe unit-catalog-v1 transport shape.
+/// Deterministically projects all effective elite levels from v2 sources into
+/// the Player-safe unit-catalog-v1 transport shape.
 /// </summary>
 public static class UnitCatalogGenerator
 {
@@ -48,9 +48,12 @@ public static class UnitCatalogGenerator
 
         var resolved = loaded
             .OrderBy(pair => pair.Key)
-            .Select(pair => new ResolvedSource(
-                pair.Value.Path,
-                UnitEliteVariantResolver.Resolve(pair.Value, 0)))
+            .SelectMany(pair => Enumerable.Range(0, 4)
+                .Select(eliteLevel => new ResolvedSource(
+                    pair.Value.Path,
+                    UnitEliteVariantResolver.Resolve(
+                        pair.Value,
+                        eliteLevel))))
             .ToArray();
         var knownAbilityIds = LoadKnownAbilityIds(AbilitySourceDirectory);
 
@@ -63,7 +66,23 @@ public static class UnitCatalogGenerator
                 knownAbilityIds);
         }
 
-        var units = resolved.Select(Convert).ToArray();
+        var units = resolved
+            .GroupBy(item => item.Variant.typeId)
+            .OrderBy(group => group.Key)
+            .Select(group =>
+            {
+                var variants = group
+                    .OrderBy(item => item.Variant.eliteLevel)
+                    .Select(Convert)
+                    .ToArray();
+                var baseEntry = variants.Single(item =>
+                    item.eliteLevel == 0);
+                baseEntry.eliteVariants = variants
+                    .Where(item => item.eliteLevel > 0)
+                    .ToArray();
+                return baseEntry;
+            })
+            .ToArray();
         if (units.Select(entry => entry.typeId)
                 .Distinct(StringComparer.Ordinal)
                 .Count() != units.Length)
@@ -267,6 +286,7 @@ public static class UnitCatalogGenerator
                 + " actual=" + source.profilePictureResourceName);
         }
 
+        var idle = source.RequireAnimation("idle", sourcePath);
         var move = source.RequireAnimation("move", sourcePath);
         var attack = source.attackMethod == 0
             ? null
@@ -318,10 +338,13 @@ public static class UnitCatalogGenerator
             skillDescriptionZhHans =
                 source.skillDescriptionZhHans ?? string.Empty,
             sourceFile = Path.GetFileName(sourcePath),
-            deploymentCost = source.deploymentCost,
+            deploymentCost = checked(
+                source.deploymentCost
+                * EliteEntityCount(source.eliteLevel)),
             portraitResourcePath = portraitResourcePath,
             rarity = source.rarity,
-            initialEliteLevel = 0,
+            initialEliteLevel = source.eliteLevel,
+            eliteLevel = source.eliteLevel,
             maxHitPoints = source.maxHitPoints,
             attack = source.attack,
             defense = source.defense,
@@ -341,11 +364,27 @@ public static class UnitCatalogGenerator
             prefabResourcePath = "Prefabs/DefaultUnit",
             skeletonDataResourcePath = skeletonResourcePath,
             unitSkelType = LegacyMappedSkeletonType,
+            idleAnimation = idle.name,
             moveAnimation = move.name,
             attackAnimation = attack == null ? string.Empty : attack.name,
             hitAnimation = string.Empty,
-            deathAnimation = death.name
+            deathAnimation = death.name,
+            eliteVariants = Array.Empty<UnitCatalogEntry>()
         };
+    }
+
+    private static int EliteEntityCount(int eliteLevel)
+    {
+        switch (eliteLevel)
+        {
+            case 0: return 1;
+            case 1: return 2;
+            case 2: return 3;
+            case 3: return 5;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(eliteLevel));
+        }
     }
 
     private static void VerifyAnimations(
@@ -500,6 +539,7 @@ public static class UnitCatalogGenerator
         public string portraitResourcePath;
         public int rarity;
         public int initialEliteLevel;
+        public int eliteLevel;
         public int maxHitPoints;
         public int attack;
         public int defense;
@@ -518,9 +558,11 @@ public static class UnitCatalogGenerator
         public string prefabResourcePath;
         public string skeletonDataResourcePath;
         public int unitSkelType;
+        public string idleAnimation;
         public string moveAnimation;
         public string attackAnimation;
         public string hitAnimation;
         public string deathAnimation;
+        public UnitCatalogEntry[] eliteVariants;
     }
 }

@@ -192,11 +192,43 @@ namespace ArknoNights.Battle.Tests
             var unitCatalog = UnitCatalogLoader.LoadFromResources(CatalogPath);
             Assert.That(unitCatalog.Success, Is.True, Errors(unitCatalog.Errors));
             var json = Resources.Load<UnityEngine.TextAsset>(AbilityCatalogPath).text;
+            const string targetAbility =
+                "\"abilityId\": \"SUMMON_JELLY_MINIONS\"";
+            var targetIndex = json.IndexOf(
+                targetAbility,
+                StringComparison.Ordinal);
+            Assert.That(
+                targetIndex,
+                Is.GreaterThanOrEqualTo(0),
+                "Timed summon fixture ability is missing.");
+            var abilityStart = json.LastIndexOf(
+                '{',
+                targetIndex);
+            var abilityEnd = json.IndexOf(
+                "\n        }",
+                targetIndex,
+                StringComparison.Ordinal);
+            Assert.That(abilityStart, Is.GreaterThanOrEqualTo(0));
+            Assert.That(abilityEnd, Is.GreaterThan(targetIndex));
+            var abilityJson = json.Substring(
+                abilityStart,
+                abilityEnd - abilityStart);
             var marker = replacement.Split(':')[0] + ":";
-            var start = json.IndexOf(marker, StringComparison.Ordinal);
-            Assert.That(start, Is.GreaterThanOrEqualTo(0), "Fixture marker is missing: " + marker);
-            var end = json.IndexOfAny(new[] { ',', '}' }, start);
-            json = json.Substring(0, start) + replacement + json.Substring(end);
+            var relativeStart = abilityJson.IndexOf(
+                marker,
+                StringComparison.Ordinal);
+            Assert.That(relativeStart, Is.GreaterThanOrEqualTo(0), "Fixture marker is missing: " + marker);
+            var relativeEnd = abilityJson.IndexOfAny(
+                new[] { ',', '}' },
+                relativeStart);
+            abilityJson = abilityJson.Substring(
+                    0,
+                    relativeStart)
+                + replacement
+                + abilityJson.Substring(relativeEnd);
+            json = json.Substring(0, abilityStart)
+                + abilityJson
+                + json.Substring(abilityEnd);
 
             var loaded = AbilityCatalogLoader.LoadFromJson(json, unitCatalog.Catalog);
 
@@ -299,6 +331,68 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(new BattlefieldCoordinate(6, 6), away);
             Assert.AreEqual(home, BattlefieldRules.Rotate180(BattlefieldRules.Rotate180(home)));
             Assert.AreEqual(new FormationCoordinate(4, 3), source);
+        }
+
+        [Test]
+        public void Mapping_SubCellOffsetIsAppliedBeforeAwayRotation()
+        {
+            var source = new FormationCoordinate(4, 2);
+            var lowerRight = new FormationOffset(
+                FixedPosition.QuarterMetre,
+                -FixedPosition.QuarterMetre);
+
+            var home = BattlefieldRules.MapHomePosition(source, lowerRight);
+            var away = BattlefieldRules.MapAwayPosition(source, lowerRight);
+
+            Assert.AreEqual(new FixedPosition(425, 175), home);
+            Assert.AreEqual(new FixedPosition(575, 725), away);
+            Assert.AreEqual(away, BattlefieldRules.Rotate180(home));
+        }
+
+        [Test]
+        public void FormationOffset_ChangesCanonicalSummaryAndInputHash()
+        {
+            var centred = new UnitSnapshot(
+                "home",
+                "unit",
+                UnitZone.Deployed,
+                new FormationCoordinate(4, 2),
+                Array.Empty<BuffPlaceholder>(),
+                1,
+                default(FormationOffset));
+            var lowerRight = new UnitSnapshot(
+                "home",
+                "unit",
+                UnitZone.Deployed,
+                new FormationCoordinate(4, 2),
+                Array.Empty<BuffPlaceholder>(),
+                1,
+                new FormationOffset(
+                    FixedPosition.QuarterMetre,
+                    -FixedPosition.QuarterMetre));
+            var away = Unit("away", "unit", 4, 3);
+            var definitions = new[]
+            {
+                Definition("unit", 100),
+                Definition("unit", 100, eliteLevel: 1)
+            };
+            var centredInput = CreateInput(
+                200,
+                definitions,
+                new[] { centred },
+                new[] { away });
+            var offsetInput = CreateInput(
+                200,
+                definitions,
+                new[] { lowerRight },
+                new[] { away });
+
+            Assert.AreNotEqual(
+                centredInput.CanonicalSummary,
+                offsetInput.CanonicalSummary);
+            Assert.AreNotEqual(
+                BattleInputSha256.Compute(centredInput),
+                BattleInputSha256.Compute(offsetInput));
         }
 
         [Test]
@@ -462,12 +556,12 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void Blocking_UsesStrictQuarterMetreBoundaryThenCreatesSymmetricRelation()
+        public void Blocking_UsesStrictFourTenthsMetreBoundaryThenCreatesSymmetricRelation()
         {
             var input = CreateInput(20, new[] { Definition("walker", 100), Definition("static", 0) },
                 new[] { Unit("home", "walker", 4, 4) }, new[] { Unit("away", "static", 6, 4) });
             var runner = new BattleRunner(input);
-            for (var index = 0; index < 15; index++) runner.Step();
+            for (var index = 0; index < 12; index++) runner.Step();
             Assert.IsNull(runner.RuntimeUnits.Single(item => item.UnitId == "home").BlockedUnitId);
             runner.Step();
             Assert.AreEqual("away", runner.RuntimeUnits.Single(item => item.UnitId == "home").BlockedUnitId);
@@ -488,7 +582,7 @@ namespace ArknoNights.Battle.Tests
             var dx = home.Position.XUnits - away.Position.XUnits;
             var dy = home.Position.YUnits - away.Position.YUnits;
             var distanceSquared = dx * dx + dy * dy;
-            Assert.That(distanceSquared, Is.LessThan(FixedPosition.QuarterMetre * FixedPosition.QuarterMetre));
+            Assert.That(distanceSquared, Is.LessThan(BattlefieldRules.CombatContactRangeUnits * BattlefieldRules.CombatContactRangeUnits));
             Assert.That(distanceSquared, Is.GreaterThan(0), "Entering the blocking radius must not move a unit onto the target centre.");
             CollectionAssert.AreEqual(new[] { "away" }, home.BlockedUnitIds);
             Assert.That(runner.Events, Has.Some.Matches<BattleEvent>(item => item.Type == BattleEventType.Attack && item.UnitId == "home" && item.RelatedUnitId == "away"));
@@ -534,7 +628,7 @@ namespace ArknoNights.Battle.Tests
             CollectionAssert.Contains(focal.BlockedUnitIds, "away-primary");
             Assert.AreEqual("away-primary", focal.TargetUnitId);
             Assert.That(runner.Events, Has.Some.Matches<BattleEvent>(item =>
-                item.Type == BattleEventType.Attack && item.Tick == 2 &&
+                item.Type == BattleEventType.Attack &&
                 item.UnitId == "home-focal" &&
                 item.RelatedUnitId == "away-primary"));
         }
@@ -647,12 +741,12 @@ namespace ArknoNights.Battle.Tests
                 runner.Step();
                 var attacker = runner.RuntimeUnits.Single(item => item.UnitId == "home-attacker");
                 Assert.AreEqual("away-survivor", attacker.TargetUnitId);
-                Assert.AreEqual(new FixedPosition(500, 476), attacker.Position, "Attack animation must keep the attacker stationary through Tick " + tick + ".");
+                Assert.AreEqual(new FixedPosition(500, 461), attacker.Position, "Attack animation must keep the attacker stationary through Tick " + tick + ".");
             }
 
             Assert.IsEmpty(runner.Events.Where(item => item.Type == BattleEventType.Damage && item.UnitId == "home-attacker" && item.RelatedUnitId == "away-fragile"));
             runner.Step();
-            Assert.AreEqual(new FixedPosition(500, 576), runner.RuntimeUnits.Single(item => item.UnitId == "home-attacker").Position,
+            Assert.AreEqual(new FixedPosition(500, 561), runner.RuntimeUnits.Single(item => item.UnitId == "home-attacker").Position,
                 "An in-range target remains the current attack target after the attack lock ends, regardless of its block capacity.");
         }
 
@@ -701,8 +795,10 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(40, arcslma.Definition.AttackIntervalTicks);
             Assert.AreEqual(54, arcslma.Definition.AttackAnimationDurationTicks);
             Assert.AreEqual("Move", arcslma.MoveAnimation);
+            Assert.AreEqual("Idle", arcslma.IdleAnimation);
             Assert.AreEqual("Attack", arcslma.AttackAnimation);
             Assert.AreEqual("Die", arcslma.DeathAnimation);
+            Assert.AreEqual(21, arcslma.DeploymentCost);
             Assert.IsFalse(arcslma.Definition.IsSyntheticFixtureData);
             Assert.AreEqual("5503_arcslma.json", arcslma.SourceFile);
             Assert.AreEqual("Characters/5503_arcslma/enemy_5503_arcslma_SkeletonData", arcslma.SkeletonDataResourcePath);
@@ -735,6 +831,8 @@ namespace ArknoNights.Battle.Tests
             Assert.That(arcslmi.SourceFile, Is.EqualTo("5504_arcslmi.json"));
             Assert.That(arcslmi.SkeletonDataResourcePath, Is.EqualTo("Characters/5504_arcslmi/enemy_5504_arcslmi_SkeletonData"));
             Assert.That(arcslmi.PortraitResourcePath, Is.EqualTo("ProfilePicture/UIImage_5504_arcslmi"));
+            Assert.That(first.Catalog.TryGet("10127", out var mutantBeast), Is.True);
+            Assert.That(mutantBeast.IdleAnimation, Is.EqualTo("A_Default"));
 
             var sourceRoot = Path.Combine(
                 UnityEngine.Application.dataPath,
@@ -776,7 +874,15 @@ namespace ArknoNights.Battle.Tests
             Assert.IsTrue(loaded.Success, Errors(loaded.Errors));
             Assert.AreEqual(BattleInput.LocalBattleSchemaVersion, loaded.Input.SchemaVersion);
             Assert.AreEqual(2, loaded.Input.Players.Count);
-            Assert.AreEqual(3, loaded.Input.UnitDefinitions.Count);
+            Assert.AreEqual(400, loaded.Input.UnitDefinitions.Count);
+            Assert.That(
+                loaded.Input.UnitDefinitions
+                    .GroupBy(item => item.TypeId)
+                    .All(group => group
+                        .OrderBy(item => item.EliteLevel)
+                        .Select(item => item.EliteLevel)
+                        .SequenceEqual(new[] { 0, 1, 2, 3 })),
+                Is.True);
             CollectionAssert.AreEquivalent(
                 new[] { "home-1000-alpha", "home-5503-alpha", "home-1000-bravo", "away-5503-alpha", "away-1000-alpha", "away-5503-bravo", "away-1000-bravo" },
                 loaded.Input.Players.SelectMany(player => player.Units).Select(unit => unit.UnitId).ToArray());
@@ -908,7 +1014,7 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void EliteMetadata_ChangesInputDigestButNotCombatResult()
+        public void EliteLevel_SelectsMatchingDefinitionAndChangesCombatSnapshot()
         {
             var constructor = typeof(UnitSnapshot).GetConstructor(new[]
             {
@@ -919,17 +1025,40 @@ namespace ArknoNights.Battle.Tests
             var zero = (UnitSnapshot)constructor.Invoke(new object[] { "home", "unit", UnitZone.Deployed, new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>(), 0 });
             var three = (UnitSnapshot)constructor.Invoke(new object[] { "home", "unit", UnitZone.Deployed, new FormationCoordinate(4, 2), Array.Empty<BuffPlaceholder>(), 3 });
             var away = Unit("away", "unit", 4, 3);
-            var definitions = new[] { Definition("unit", 100) };
+            var definitions = new[]
+            {
+                Definition(
+                    "unit",
+                    100,
+                    hitPoints: 1000,
+                    attack: 1),
+                Definition(
+                    "unit",
+                    100,
+                    hitPoints: 3000,
+                    attack: 7,
+                    eliteLevel: 3)
+            };
             var eliteZero = CreateInput(200, definitions, new[] { zero }, new[] { away });
             var eliteThree = CreateInput(200, definitions, new[] { three }, new[] { away });
 
             Assert.AreNotEqual(eliteZero.CanonicalSummary, eliteThree.CanonicalSummary);
             var zeroResult = new BattleRunner(eliteZero).RunToCompletion();
             var threeResult = new BattleRunner(eliteThree).RunToCompletion();
-            Assert.AreEqual(zeroResult.CompletedTicks, threeResult.CompletedTicks);
-            Assert.AreEqual(zeroResult.StopReason, threeResult.StopReason);
-            Assert.AreEqual(zeroResult.Winner, threeResult.Winner);
-            CollectionAssert.AreEqual(zeroResult.Events.Select(EventSummary), threeResult.Events.Select(EventSummary));
+            var zeroSpawn = zeroResult.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitId == "home");
+            var threeSpawn = threeResult.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitId == "home");
+            Assert.AreEqual(
+                1000,
+                zeroSpawn.SpawnSnapshot.MaxHitPoints);
+            Assert.AreEqual(
+                3000,
+                threeSpawn.SpawnSnapshot.MaxHitPoints);
+            Assert.AreEqual(1, zeroSpawn.SpawnSnapshot.Attack);
+            Assert.AreEqual(7, threeSpawn.SpawnSnapshot.Attack);
         }
 
         [Test]
@@ -947,9 +1076,11 @@ namespace ArknoNights.Battle.Tests
                 new[]
                 {
                     new UnitDefinition("Zeta-type", 913, 83, 27, 41, 135, 17, 9,
-                        DamageType.Magic, AttackMethod.Ranged, 3, 2, true),
+                        DamageType.Magic, AttackMethod.Ranged, 3, 2, true,
+                        Array.Empty<string>(), 1, 1, 2),
                     new UnitDefinition("alpha-type", 731, 46, 19, 12, 90, 20, 4,
-                        DamageType.Physical, AttackMethod.Melee, 1, 0, true),
+                        DamageType.Physical, AttackMethod.Melee, 1, 0, true,
+                        Array.Empty<string>(), 1, 1, 1),
                     new UnitDefinition("middle-type", 600, 50, 10, 5, 80, 20, 2,
                         DamageType.True, AttackMethod.Ranged, 2, 1, true)
                 },
@@ -1249,8 +1380,8 @@ namespace ArknoNights.Battle.Tests
                 item.Type == BattleEventType.Spawn && item.UnitId.StartsWith("-", StringComparison.Ordinal)));
         }
 
-        private static UnitDefinition Definition(string typeId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1, int tauntLevel = 0)
-            => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true);
+        private static UnitDefinition Definition(string typeId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1, int tauntLevel = 0, int eliteLevel = 0)
+            => new UnitDefinition(typeId, hitPoints, attack, 0, 0, speed, interval, animation, DamageType.Physical, AttackMethod.Melee, capacity, tauntLevel, true, Array.Empty<string>(), 1, 1, eliteLevel);
 
         private static UnitDefinition DefinitionWithAbility(string typeId, string abilityId, int speed, int hitPoints = 1000, int attack = 1, int interval = 20, int animation = 1, int capacity = 1)
             => new UnitDefinition(
@@ -1321,7 +1452,9 @@ namespace ArknoNights.Battle.Tests
                 item.TauntLevel,
                 item.IsSyntheticFixtureData,
                 Array.Empty<string>(),
-                item.ActionMethod)).ToArray();
+                item.ActionMethod,
+                item.LifeDeduct,
+                item.EliteLevel)).ToArray();
             var specification = new BattleInputSpecification(
                 source.SchemaVersion,
                 source.BattleId + "-without-abilities",

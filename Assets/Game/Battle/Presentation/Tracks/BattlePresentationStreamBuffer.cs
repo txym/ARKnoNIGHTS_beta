@@ -179,6 +179,14 @@ namespace ArknoNights.Battle.Presentation
                                 item.Sequence,
                                 item.AnimationKey));
                         break;
+                    case BattleEventType.AttributesChanged:
+                        if (item.AttributesSnapshot != null)
+                            actor.Attributes.Add(
+                                new UnitPresentationTrack.AttributeKey(
+                                    item.Tick,
+                                    item.Sequence,
+                                    item.AttributesSnapshot));
+                        break;
                     case BattleEventType.Damage:
                         if (builders.TryGetValue(
                                 item.RelatedUnitId
@@ -224,7 +232,8 @@ namespace ArknoNights.Battle.Presentation
                             item.HitPoints,
                             item.Attacks,
                             item.Skills,
-                            item.States))
+                            item.States,
+                            item.Attributes))
                     .ToArray());
         }
 
@@ -250,6 +259,9 @@ namespace ArknoNights.Battle.Presentation
             internal readonly List<
                 UnitPresentationTrack.State> States =
                     new List<UnitPresentationTrack.State>();
+            internal readonly List<
+                UnitPresentationTrack.AttributeKey> Attributes =
+                    new List<UnitPresentationTrack.AttributeKey>();
         }
     }
 }

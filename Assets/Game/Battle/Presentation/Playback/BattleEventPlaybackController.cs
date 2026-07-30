@@ -205,13 +205,34 @@ namespace ArknoNights.Battle.Presentation
                         return false;
                     }
                     if (views.ContainsKey(item.UnitId)) { AddDiagnostic("spawn.duplicate", "Duplicate Spawn for unit " + item.UnitId + ".", item.Tick, item.Sequence); return false; }
-                    if (!factory.TryCreate(item.UnitId, item.UnitTypeId, out var created, out var createDiagnostic) || created == null)
+                    var spawnEliteLevel =
+                        item.SpawnSnapshot?.EliteLevel
+                        ?? (eliteLevels.TryGetValue(
+                            item.UnitId,
+                            out var configuredElite)
+                                ? configuredElite
+                                : 0);
+                    IBattlePresentationView created;
+                    BattlePresentationDiagnostic createDiagnostic;
+                    var createdSuccessfully =
+                        factory is IEliteBattlePresentationViewFactory eliteFactory
+                            ? eliteFactory.TryCreate(
+                                item.UnitId,
+                                item.UnitTypeId,
+                                spawnEliteLevel,
+                                out created,
+                                out createDiagnostic)
+                            : factory.TryCreate(
+                                item.UnitId,
+                                item.UnitTypeId,
+                                out created,
+                                out createDiagnostic);
+                    if (!createdSuccessfully || created == null)
                     {
                         diagnostics.Add(createDiagnostic ?? new BattlePresentationDiagnostic("view.create.failed", "No view was created for type " + item.UnitTypeId + ".", item.Tick, item.Sequence));
                         return false;
                     }
-                    eliteLevels.TryGetValue(item.UnitId, out var eliteLevel);
-                    var record = new ViewRecord(item.UnitId, item.UnitTypeId, item.UnitSide.Value, item.ToPosition.Value, item.HitPointsAfter, eliteLevel, created);
+                    var record = new ViewRecord(item.UnitId, item.UnitTypeId, item.UnitSide.Value, item.ToPosition.Value, item.HitPointsAfter, spawnEliteLevel, created);
                     views.Add(item.UnitId, record);
                     foreach (var move in events.Where(candidate => candidate.Type == BattleEventType.Move && string.Equals(candidate.UnitId, item.UnitId, StringComparison.Ordinal) && candidate.FromPosition.HasValue && candidate.ToPosition.HasValue))
                         record.AddMove(move.Tick, move.FromPosition.Value, move.ToPosition.Value);
@@ -363,7 +384,15 @@ namespace ArknoNights.Battle.Presentation
         private BattlePresentationViewState WithEliteOverride(BattlePresentationViewState source)
         {
             var elite = eliteLevels.TryGetValue(source.UnitId, out var value) ? value : source.EliteLevel;
-            return new BattlePresentationViewState(source.UnitId, source.TypeId, source.Side, source.Position, source.ContinuousPosition, source.MaxHitPoints, source.HitPoints, source.CurrentShield, source.HasSpawned, source.IsAlive, source.Action, elite);
+            return new BattlePresentationViewState(source.UnitId, source.TypeId, source.Side, source.Position, source.ContinuousPosition, source.MaxHitPoints, source.HitPoints, source.CurrentShield, source.HasSpawned, source.IsAlive, source.Action, elite, source.AttributesAvailable
+                ? new BattleUnitAttributesSnapshot(
+                    source.Attack,
+                    source.Defense,
+                    source.MagicResistance,
+                    source.MoveSpeedCentimetresPerSecond,
+                    source.AttackIntervalTicks,
+                    source.BlockCapacity)
+                : null);
         }
 
         private void ValidateCompletion()

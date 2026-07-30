@@ -539,7 +539,7 @@ internal sealed class ObservedPreparationFormation : IDisposable
         if (source == null) return;
         foreach (var unit in source.Units.Where(item => item.Zone == PlayerUnitZone.Deployed && item.Formation.HasValue))
         {
-            if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, parent, false, out var instance, out var diagnostic))
+            if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, unit.EliteLevel, parent, false, out var instance, out var diagnostic))
             {
                 Debug.LogError("[BattleHud][observedFormation.create.failed] unit=" + unit.UnitId + "; code=" + diagnostic);
                 continue;

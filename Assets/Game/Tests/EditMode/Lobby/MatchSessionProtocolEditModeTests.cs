@@ -39,10 +39,10 @@ namespace ArknoNights.Lobby.Tests
         public void Protocol_RejectsStrictUtf8UnknownSchemaDirectionAndTrailingBytes()
         {
             var frame = MatchProtocol.Encode(
-                MatchWireKind.Command,
+                MatchWireKind.OperationRequest,
                 "session-1",
                 "message-1",
-                CreatePayload(MatchWireKind.Command),
+                CreatePayload(MatchWireKind.OperationRequest),
                 MatchWireDirection.ClientToHost);
             var invalidUtf8 = (byte[])frame.Clone();
             invalidUtf8[invalidUtf8.Length - 2] = 0xc3;
@@ -70,7 +70,9 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(trailingError, Is.EqualTo(MatchProtocolError.InvalidFrameLength));
 
             var json = MatchProtocol.StrictUtf8.GetString(frame, sizeof(int), frame.Length - sizeof(int))
-                .Replace("\"schemaVersion\":1", "\"schemaVersion\":2");
+                .Replace(
+                    "\"schemaVersion\":" + MatchProtocol.SchemaVersion,
+                    "\"schemaVersion\":" + (MatchProtocol.SchemaVersion + 1));
             var unsupported = MatchProtocol.FrameForTests(MatchProtocol.StrictUtf8.GetBytes(json));
             Assert.That(MatchProtocol.TryDecode(
                 unsupported,
@@ -78,6 +80,31 @@ namespace ArknoNights.Lobby.Tests
                 out _,
                 out var schemaError), Is.False);
             Assert.That(schemaError, Is.EqualTo(MatchProtocolError.UnsupportedSchemaVersion));
+
+            var protocolJson = MatchProtocol.StrictUtf8.GetString(
+                    frame,
+                    sizeof(int),
+                    frame.Length - sizeof(int))
+                .Replace(
+                    "\"protocolVersion\":"
+                        + MatchProtocol.ProtocolVersion,
+                    "\"protocolVersion\":"
+                        + (MatchProtocol.ProtocolVersion - 1));
+            var oldProtocol = MatchProtocol.FrameForTests(
+                MatchProtocol.StrictUtf8.GetBytes(
+                    protocolJson));
+            Assert.That(
+                MatchProtocol.TryDecode(
+                    oldProtocol,
+                    MatchWireDirection.ClientToHost,
+                    out _,
+                    out var protocolError),
+                Is.False);
+            Assert.That(
+                protocolError,
+                Is.EqualTo(
+                    MatchProtocolError
+                        .UnsupportedProtocolVersion));
         }
 
         [Test]
@@ -133,10 +160,10 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(controlError, Is.EqualTo(MatchProtocolError.PayloadTooLarge));
 
             var snapshot = MatchProtocol.Encode(
-                MatchWireKind.ScopedSnapshot,
+                MatchWireKind.RecoveryState,
                 "session-1",
                 "message-1",
-                CreatePayload(MatchWireKind.ScopedSnapshot),
+                CreatePayload(MatchWireKind.RecoveryState),
                 MatchWireDirection.HostToClient);
             var largerThanControl = AddOuterWhitespace(
                 snapshot,
@@ -148,10 +175,10 @@ namespace ArknoNights.Lobby.Tests
                 out var snapshotError), Is.True, snapshotError.ToString());
 
             var seal = MatchProtocol.Encode(
-                MatchWireKind.BattleSeal,
+                MatchWireKind.SystemResult,
                 "session-1",
                 "message-1",
-                CreatePayload(MatchWireKind.BattleSeal),
+                CreatePayload(MatchWireKind.SystemResult),
                 MatchWireDirection.HostToClient);
             var largerThanSnapshot = AddOuterWhitespace(
                 seal,
@@ -168,7 +195,7 @@ namespace ArknoNights.Lobby.Tests
         {
             Assert.Throws<ArgumentException>(() =>
                 MatchProtocol.Encode(
-                    MatchWireKind.Command,
+                    MatchWireKind.OperationRequest,
                     "session-1",
                     "message-1",
                     new MatchCommandWirePayload
@@ -184,7 +211,7 @@ namespace ArknoNights.Lobby.Tests
                     MatchWireDirection.ClientToHost));
             Assert.Throws<ArgumentException>(() =>
                 MatchProtocol.Encode(
-                    MatchWireKind.Command,
+                    MatchWireKind.OperationRequest,
                     "session-1",
                     "message-1",
                     new MatchCommandWirePayload
@@ -199,7 +226,7 @@ namespace ArknoNights.Lobby.Tests
                     MatchWireDirection.ClientToHost));
             Assert.Throws<ArgumentException>(() =>
                 MatchProtocol.Encode(
-                    MatchWireKind.Command,
+                    MatchWireKind.OperationRequest,
                     "session-1",
                     "message-1",
                     new MatchCommandWirePayload
@@ -219,7 +246,7 @@ namespace ArknoNights.Lobby.Tests
                     MatchWireDirection.ClientToHost));
             Assert.Throws<ArgumentException>(() =>
                 MatchProtocol.Encode(
-                    MatchWireKind.ScopedSnapshot,
+                    MatchWireKind.RecoveryState,
                     "different-session",
                     "message-1",
                     Snapshot(1),
@@ -266,19 +293,43 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void ScopedSnapshotClient_AppliesOnlyNewerFullRevision()
+        public void ResultClient_AppliesIdentityDeltaAndRequiresRecoveryOnGap()
         {
-            var client = new ScopedSnapshotClientState();
-            var notifications = 0;
-            client.Changed += _ => notifications++;
+            var unchangedSeat = Seat(2, "lan-" + new string('2', 32), false);
+            var before = Snapshot(
+                1,
+                new[]
+                {
+                    Seat(1, "lan-" + new string('1', 32), false),
+                    unchangedSeat
+                },
+                Owner("lan-" + new string('1', 32), 7));
+            var after = Snapshot(
+                2,
+                new[]
+                {
+                    Seat(1, "lan-" + new string('1', 32), true),
+                    unchangedSeat
+                },
+                Owner("lan-" + new string('1', 32), 6));
+            var delta = MatchStateDeltaProjector.Project(before, after);
+            var client = new MatchResultClientState();
 
-            Assert.That(client.TryApply(Snapshot(2)), Is.True);
-            Assert.That(client.TryApply(Snapshot(2)), Is.False);
-            Assert.That(client.TryApply(Snapshot(1)), Is.False);
-            Assert.That(client.TryApply(Snapshot(4)), Is.True);
+            Assert.That(client.TryApplyRecovery(before), Is.True);
+            Assert.That(client.TryApply(delta), Is.EqualTo(MatchDeltaApplyStatus.Applied));
+            Assert.That(client.Current.StateRevision, Is.EqualTo(2));
+            Assert.That(client.Current.PublicState.Seats[0].Ready, Is.True);
+            Assert.That(client.Current.PublicState.Seats[1], Is.SameAs(unchangedSeat));
+            Assert.That(client.Current.OwnerPrivateState.Gold, Is.EqualTo(6));
+            Assert.That(client.TryApply(delta), Is.EqualTo(MatchDeltaApplyStatus.Duplicate));
 
-            Assert.That(client.Current.StateRevision, Is.EqualTo(4));
-            Assert.That(notifications, Is.EqualTo(2));
+            var gap = MatchStateDeltaProjector.Project(
+                Snapshot(5, before.PublicState.Seats, before.OwnerPrivateState),
+                Snapshot(6, after.PublicState.Seats, after.OwnerPrivateState));
+            Assert.That(
+                client.TryApply(gap),
+                Is.EqualTo(MatchDeltaApplyStatus.RecoveryRequired));
+            Assert.That(client.Current.StateRevision, Is.EqualTo(2));
         }
 
         private static IEnumerable<MatchWireKind> AllKinds()
@@ -298,24 +349,39 @@ namespace ArknoNights.Lobby.Tests
                     return new MatchRejectPayload { Code = "Rejected", StableDetailCode = "match.rejected" };
                 case MatchWireKind.MatchInitialized:
                     return new MatchInitializedPayload { PlayerId = "lan-" + new string('1', 32), SeatIndex = 1, ConnectionGeneration = 1, HostPlayerId = "lan-" + new string('1', 32), MatchSeed = "seed-1", ReconnectToken = new string('A', ReconnectTokenIssuer.RawTokenCharacters), Manifest = MatchCompatibilityWire.FromDomain(Manifest), Snapshot = Snapshot(1), Clock = Clock() };
-                case MatchWireKind.Command:
+                case MatchWireKind.OperationRequest:
                     return new MatchCommandWirePayload { PlayerId = "lan-" + new string('1', 32), ConnectionGeneration = 1, CommandId = "command-1", KnownStateRevision = 1, CommandKind = MatchCommandKind.SetPreparationReady.ToString(), DesiredReady = true };
-                case MatchWireKind.CommandAck:
-                    return new MatchCommandAckPayload { CommandId = "command-1", ResultCode = MatchCommandCode.Accepted.ToString(), CurrentStateRevision = 2, AcceptedStateRevision = 2, HasAcceptedStateRevision = true, DidChangeState = true, StableDetailCode = "match.ready.accepted", HostAcceptSequence = 1 };
-                case MatchWireKind.ScopedSnapshot:
+                case MatchWireKind.OperationResult:
+                    return new MatchOperationResultPayload
+                    {
+                        CommandId = "command-1",
+                        OriginPlayerId = "lan-" + new string('1', 32),
+                        CommandKind = MatchCommandKind.SetPreparationReady.ToString(),
+                        ResultCode = MatchCommandCode.Accepted.ToString(),
+                        CurrentStateRevision = 2,
+                        AcceptedStateRevision = 2,
+                        HasAcceptedStateRevision = true,
+                        DidChangeState = true,
+                        StableDetailCode = "match.ready.accepted",
+                        HostAcceptSequence = 1,
+                        Delta = MatchStateDeltaProjector.Project(Snapshot(1), Snapshot(2))
+                    };
+                case MatchWireKind.SystemResult:
+                    return new MatchSystemResultPayload
+                    {
+                        SystemActionId = "system-1",
+                        SystemKind = MatchSystemResultKind.PreparationAdvanced.ToString(),
+                        StateRevision = 2,
+                        HostAcceptSequence = 1,
+                        StableDetailCode = "match.system.accepted",
+                        Delta = MatchStateDeltaProjector.Project(Snapshot(1), Snapshot(2))
+                    };
+                case MatchWireKind.RecoveryState:
                     return Snapshot(1);
-                case MatchWireKind.SnapshotRequest:
+                case MatchWireKind.RecoveryStateRequest:
                     return new MatchSnapshotRequestPayload { ClientLastAppliedRevision = 1 };
-                case MatchWireKind.ClockSync:
-                    return Clock();
-                case MatchWireKind.BattleSeal:
-                    return new MatchBattleSealPayload { RoundNumber = 1, BattleSetId = "set-1", CanonicalInputHash = new string('c', 64), SealedPayload = "{}" };
                 case MatchWireKind.FirstChunkReady:
                     return new MatchFirstChunkReadyPayload { RoundNumber = 1, BattleSetId = "set-1", CanonicalInputHash = new string('c', 64), ReadyRevision = 2 };
-                case MatchWireKind.PlaybackStart:
-                    return new MatchPlaybackStartPayload { RoundNumber = 1, BattleSetId = "set-1", CanonicalInputHash = new string('c', 64), HostMonotonicStartMs = 100, StartTick = 0 };
-                case MatchWireKind.PlaybackClock:
-                    return new MatchPlaybackClockPayload { RoundNumber = 1, BattleSetId = "set-1", CanonicalInputHash = new string('c', 64), HostMonotonicNowMs = 200, CurrentTick = 10 };
                 case MatchWireKind.FinalSecondHash:
                     return new MatchFinalSecondHashPayload { RoundNumber = 1, BattleId = "battle-1", CanonicalInputHash = new string('c', 64), FinalSecondSha256 = new string('d', 64) };
                 case MatchWireKind.ClientBattleFailure:
@@ -328,11 +394,18 @@ namespace ArknoNights.Lobby.Tests
                     return new MatchReconnectRejectedPayload { Code = MatchReconnectRejectCode.InvalidToken.ToString(), StableDetailCode = "match.reconnect.rejected" };
                 case MatchWireKind.ExplicitQuit:
                     return new MatchExplicitQuitPayload { PlayerId = "lan-" + new string('1', 32), ConnectionGeneration = 1 };
-                case MatchWireKind.MatchEnded:
-                    return new MatchEndedPayload { EndReason = MatchEndReason.NoContest.ToString(), FinalRevision = 3, FinalStandings = Array.Empty<MatchStandingWire>() };
                 case MatchWireKind.Ping:
-                case MatchWireKind.Pong:
                     return new MatchHeartbeatPayload { ConnectionGeneration = 1, SentUnixMilliseconds = 42 };
+                case MatchWireKind.Pong:
+                    return new MatchHeartbeatPayload
+                    {
+                        ConnectionGeneration = 1,
+                        SentUnixMilliseconds = 42,
+                        HostMonotonicNowMs = 100,
+                        RoundNumber = 1,
+                        Phase = MatchPhase.Preparation.ToString(),
+                        PhaseDeadlineHostMonotonicMs = 30000
+                    };
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind));
             }
@@ -360,6 +433,17 @@ namespace ArknoNights.Lobby.Tests
 
         private static ScopedSnapshotPayload Snapshot(long revision)
         {
+            return Snapshot(
+                revision,
+                Array.Empty<PublicMatchSeatWire>(),
+                null);
+        }
+
+        private static ScopedSnapshotPayload Snapshot(
+            long revision,
+            PublicMatchSeatWire[] seats,
+            OwnerMatchStateWire owner)
+        {
             return new ScopedSnapshotPayload
             {
                 SessionId = "session-1",
@@ -374,8 +458,49 @@ namespace ArknoNights.Lobby.Tests
                     EndReason = MatchEndReason.None.ToString(),
                     Pairings = Array.Empty<PublicMatchPairingWire>(),
                     FinalStandings = Array.Empty<MatchStandingWire>(),
-                    Seats = Array.Empty<PublicMatchSeatWire>()
-                }
+                    Seats = seats
+                },
+                OwnerPrivateState = owner
+            };
+        }
+
+        private static PublicMatchSeatWire Seat(
+            int seatIndex,
+            string playerId,
+            bool ready)
+        {
+            return new PublicMatchSeatWire
+            {
+                SeatIndex = seatIndex,
+                PlayerId = playerId,
+                DisplayName = "Player " + seatIndex,
+                AvatarId = "avatar-" + (seatIndex - 1),
+                Life = 400,
+                ConnectionState = MatchConnectionState.Connected.ToString(),
+                Ready = ready,
+                Units = Array.Empty<MatchUnitWire>(),
+                TargetedUnitBuffs = Array.Empty<MatchTargetedBuffWire>(),
+                GlobalBuffs = Array.Empty<MatchGlobalBuffWire>(),
+                SourceEffects = Array.Empty<MatchSourceEffectWire>()
+            };
+        }
+
+        private static OwnerMatchStateWire Owner(string playerId, int gold)
+        {
+            return new OwnerMatchStateWire
+            {
+                PlayerId = playerId,
+                Gold = gold,
+                Level = 1,
+                CurrentUpgradePrice = 4,
+                StreakKind = MatchStreakKind.None.ToString(),
+                Units = Array.Empty<MatchUnitWire>(),
+                ShopOffers = Array.Empty<MatchShopOfferWire>(),
+                OverflowUnits = Array.Empty<MatchUnitWire>(),
+                StagingStacks = Array.Empty<MatchStagingStackWire>(),
+                TargetedUnitBuffs = Array.Empty<MatchTargetedBuffWire>(),
+                GlobalBuffs = Array.Empty<MatchGlobalBuffWire>(),
+                SourceEffects = Array.Empty<MatchSourceEffectWire>()
             };
         }
 

@@ -55,22 +55,37 @@ namespace ArknoNights.Battle.Tests
 
             var result = new BattleRunner(input).RunToCompletion();
 
-            Assert.That(result.Events, Has.Some.Matches<BattleEvent>(item =>
-                item.Type == BattleEventType.Attack
-                && item.UnitId == "caster"
-                && item.Tick == 100
-                && item.PlannedDamageTick == 120));
+            var blockingAttack = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Attack
+                    && item.UnitId == "caster"
+                    && item.Tick <= 100
+                    && item.PlannedDamageTick > 100)
+                .OrderByDescending(item => item.Tick)
+                .First();
             Assert.That(result.Events, Has.None.Matches<BattleEvent>(item =>
                 item.Type == BattleEventType.Skill
                 && item.UnitId == "caster"
-                && item.Tick <= 120));
+                && item.Tick <= blockingAttack.PlannedDamageTick));
+            var skills = result.Events
+                .Where(item =>
+                    item.Type == BattleEventType.Skill
+                    && item.UnitId == "caster")
+                .Select(item => item.Tick)
+                .ToArray();
+            Assert.That(skills, Has.Length.EqualTo(2));
             Assert.That(
-                result.Events
-                    .Where(item =>
-                        item.Type == BattleEventType.Skill
-                        && item.UnitId == "caster")
-                    .Select(item => item.Tick),
-                Is.EqualTo(new[] { 121, 270 }));
+                skills[0],
+                Is.EqualTo(
+                    blockingAttack.PlannedDamageTick + 1));
+            Assert.That(
+                skills[1] - skills[0],
+                Is.EqualTo(
+                    // The first cast now lands on an automatic gain tick;
+                    // that tick starts the next recovery cycle immediately.
+                    14
+                    * BattleInput.TicksPerSecond
+                    / BattleInput.AutomaticSkillPointsPerSecond));
         }
 
         [Test]
@@ -102,7 +117,9 @@ namespace ArknoNights.Battle.Tests
                 0,
                 true,
                 new[] { abilityId },
-                1);
+                1,
+                1,
+                2);
             var helper = new UnitDefinition(
                 "10073",
                 1000,
@@ -116,7 +133,11 @@ namespace ArknoNights.Battle.Tests
                 AttackMethod.Melee,
                 1,
                 0,
-                true);
+                true,
+                Array.Empty<string>(),
+                1,
+                1,
+                2);
             var ability = new AbilityDefinition(
                 abilityId,
                 string.Empty,

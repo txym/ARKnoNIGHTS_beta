@@ -14,7 +14,7 @@ namespace ArknoNights.Lobby
     public sealed class LanRoomHost : IDisposable
     {
         private const int HeartbeatMilliseconds = 1000;
-        private const int MaximumMissedPongs = 3;
+        private const int MaximumMissedHeartbeats = 3;
         private static readonly Stopwatch MonotonicClock = Stopwatch.StartNew();
 
         private readonly object gate = new object();
@@ -295,12 +295,6 @@ namespace ArknoNights.Lobby
                 sessionActor?.PublishPlaybackStart(start));
         }
 
-        public bool PublishPlaybackClock(MatchPlaybackClockPayload clock)
-        {
-            return ProcessActorDispatches(
-                sessionActor?.PublishPlaybackClock(clock));
-        }
-
         public bool CompleteBattleRound(
             IReadOnlyList<MatchBattleResolution> resolutions,
             out string diagnosticCode)
@@ -435,12 +429,7 @@ namespace ArknoNights.Lobby
                         out var match,
                         out _))
                     {
-                        if (TryHandleMatchPong(
-                            connection,
-                            match))
-                        {
-                            continue;
-                        }
+                        ObserveMatchPing(connection, match);
                         sessionActor?.EnqueueRemote(
                             connection.ConnectionId,
                             connection.ConnectionGeneration,
@@ -483,22 +472,22 @@ namespace ArknoNights.Lobby
             }
         }
 
-        private bool TryHandleMatchPong(
+        private void ObserveMatchPing(
             GuestConnection connection,
             MatchWireEnvelope envelope)
         {
             if (envelope == null
                 || !string.Equals(
                     envelope.Kind,
-                    MatchWireKind.Pong.ToString(),
+                    MatchWireKind.Ping.ToString(),
                     StringComparison.Ordinal)
                 || !MatchProtocol.TryDeserializePayload(
                     envelope,
-                    out MatchHeartbeatPayload pong)
-                || pong.ConnectionGeneration
+                    out MatchHeartbeatPayload ping)
+                || ping.ConnectionGeneration
                     != connection.ConnectionGeneration)
             {
-                return false;
+                return;
             }
             lock (gate)
             {
@@ -510,16 +499,15 @@ namespace ArknoNights.Lobby
                         out var active)
                     || active != connection)
                 {
-                    return true;
+                    return;
                 }
-                connection.MissedPongs = 0;
+                connection.MissedHeartbeats = 0;
                 connection.LatencyMilliseconds = Math.Max(
                     0,
                     DateTimeOffset.UtcNow
                         .ToUnixTimeMilliseconds()
-                        - pong.SentUnixMilliseconds);
+                        - ping.SentUnixMilliseconds);
             }
-            return true;
         }
 
         private async Task HandleGuestLobbyMessageAsync(
@@ -575,7 +563,7 @@ namespace ArknoNights.Lobby
             {
                 lock (gate)
                 {
-                    connection.MissedPongs = 0;
+                    connection.MissedHeartbeats = 0;
                     connection.LatencyMilliseconds = Math.Max(
                         0,
                         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
@@ -677,8 +665,9 @@ namespace ArknoNights.Lobby
                     active = guestsByPlayerId.Values.Distinct().ToList();
                     foreach (var connection in active)
                     {
-                        connection.MissedPongs++;
-                        if (connection.MissedPongs >= MaximumMissedPongs)
+                        connection.MissedHeartbeats++;
+                        if (connection.MissedHeartbeats
+                            >= MaximumMissedHeartbeats)
                         {
                             if (expired == null) expired = new List<GuestConnection>();
                             expired.Add(connection);
@@ -697,24 +686,6 @@ namespace ArknoNights.Lobby
                             LobbyMessageKind.Ping,
                             connection.PlayerId,
                             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())))
-                        {
-                            RemoveConnection(connection);
-                        }
-                    }
-                    else if (sessionActor != null
-                        && Lifecycle != MatchSessionLifecycle.Ended)
-                    {
-                        var heartbeat = new MatchHeartbeatPayload
-                        {
-                            ConnectionGeneration =
-                                connection.ConnectionGeneration,
-                            SentUnixMilliseconds =
-                                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                        };
-                        if (!SendMatch(
-                            connection,
-                            MatchWireKind.Ping,
-                            heartbeat))
                         {
                             RemoveConnection(connection);
                         }
@@ -800,7 +771,9 @@ namespace ArknoNights.Lobby
                 connection,
                 dispatch.Kind,
                 dispatch.Payload,
-                dispatch.Kind == MatchWireKind.ScopedSnapshot))
+                dispatch.Kind == MatchWireKind.RecoveryState
+                    || dispatch.Kind == MatchWireKind.OperationResult
+                    || dispatch.Kind == MatchWireKind.SystemResult))
             {
                 RemoveConnection(connection);
             }
@@ -1094,7 +1067,7 @@ namespace ArknoNights.Lobby
             public string PlayerId { get; set; }
             public long ConnectionGeneration { get; set; }
             public long LatencyMilliseconds { get; set; }
-            public int MissedPongs { get; set; }
+            public int MissedHeartbeats { get; set; }
             public Task ReadTask { get; set; }
             public bool Removed { get; set; }
             public bool Closed { get; private set; }

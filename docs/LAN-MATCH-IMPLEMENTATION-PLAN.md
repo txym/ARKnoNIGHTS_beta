@@ -1,6 +1,6 @@
 # 局域网同步对局实施计划
 
-> 状态：M1—M8 已完成并形成统一线性集成链；M8 提交为 `b3bfb44`，Battle 基线修复已移植为 `9807472`，最终验证记录见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)。
+> 状态：M1—M9 已完成并形成统一线性集成链；M8 提交为 `b3bfb44`，Battle 基线修复已移植为 `9807472`。M9 已把正式协议升级为 `lan-match-v3` 并切换到 OperationResult/SystemResult、RecoveryState、本地交互和单向 Ping/Pong。最终验证记录见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)。
 >
 > 玩家可见规则见 [LAN-MATCH-DESIGN.md](LAN-MATCH-DESIGN.md)。战斗分块计算的独立 Agent 提示词见 [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md)；M1 暴露出的既有 Battle 基线漂移由 [TASK-BATTLE-BASELINE-CLEANUP.md](TASK-BATTLE-BASELINE-CLEANUP.md) 单独处理。
 
@@ -16,6 +16,7 @@
 | M6 LAN 会话、同步与重连 | [TASK-LAN-MATCH-SESSION.md](TASK-LAN-MATCH-SESSION.md) |
 | M7 战斗分块与增量播放 | [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md) |
 | M8 正式运行时与端到端集成 | [TASK-LAN-MATCH-INTEGRATION.md](TASK-LAN-MATCH-INTEGRATION.md) |
+| M9 操作结果同步与本地交互恢复 | 本文第 M9 节（已实现） |
 
 ## 1. 实施前基线结论（历史）
 
@@ -53,9 +54,11 @@ flowchart TD
     SessionHost --> AuthorityCommands
     AuthorityCommands --> Authority["MatchAuthority（唯一可变权威）"]
     Authority --> Domain["Pool / Shop / Fusion / Pairing / Settlement"]
-    Authority --> SnapshotProjector["按权限投影 Snapshot"]
-    SnapshotProjector --> SessionHost
-    SessionHost -->|"Owner-scoped full snapshot"| SessionClient
+    Authority --> ResultProjector["按权限投影原子 OperationResult"]
+    ResultProjector --> SessionHost
+    SessionHost -->|"Owner/Public scoped result"| SessionClient
+    Authority --> RecoveryProjector["恢复状态投影"]
+    RecoveryProjector -->|"仅初始/重连/显式纠错"| SessionClient
     Authority --> BattleSeal["SealedBattleInput"]
     BattleSeal --> BattleCore["每台在线设备的 Battle Core"]
     BattleCore --> Playback["分块表现播放"]
@@ -315,6 +318,10 @@ Discovering
 - 所有连接到达的命令由房主分配全局接受序号；
 - 房主本地命令也经过同一权威队列。
 
+上述 `CommandAck + ScopedSnapshot + ClockSync/PlaybackClock` 是已完成
+`lan-match-v2` 的历史实现口径。其稳定运行期同步方式已被 M9 目标替代；M6 的
+连接提升、长度前缀、严格解码、权限隔离、actor、token 和重连边界继续复用。
+
 #### 重连
 
 - 首次 Match 初始化时为真人席位签发高熵 token；
@@ -354,6 +361,82 @@ M7 可与 M5、M6 并行，但必须使用独立 worktree；Unity 测试仍串�
 - 保留显式 Offline Fixture 入口供现有 UI 回归测试使用，不能让测试 fixture 暗中成为正式联网状态源。
 
 优先使用运行时 Bootstrap 接线，避免不必要地修改场景和 Prefab。
+
+上述 HUD 快照驱动和 Ack/Snapshot 更新方式是 M8 的已完成历史基线。M9 必须
+保留正式画布与既有控件，但将稳定运行期数据源替换为客户端权威结果镜像，并把
+所有交互中间态归还给本地 UI。
+
+### M9：操作结果同步与本地交互恢复（已实现）
+
+目标：在不改变 `MatchAuthority` 房主权威、共享牌库、经济、合成、阵型和结算
+规则的前提下，移除稳定运行期的完整快照驱动，恢复本地商店与部署交互生命周期。
+
+#### 协议目标
+
+- 升级 Match 协议版本，旧 v2 客户端在占席前明确拒绝，不维护正式双协议；
+- 保留四字节大端长度前缀、严格 UTF-8、有界帧、兼容清单和同一 TCP 连接；
+- 稳定运行期的逻辑消息收敛为：玩家 OperationRequest、房主
+  OperationResult、房主 SystemResult、计算端 ClientReport，以及单组
+  Ping/Pong；
+- OperationResult 同时承担 Ack，包含 CommandId、HostSequence、
+  StateRevision、接受/拒绝、稳定诊断和受影响对象的最终绝对值；
+- SystemResult 覆盖阶段、AI、连接/接管、自然刷新/收入、Battle
+  seal/start、结算、淘汰和终局；
+- ClientReport 覆盖 FirstChunkReady、末秒 hash 和本地战斗失败；
+- 完整权限恢复状态仅用于首次初始化、重连和检测到非法顺序后的显式纠错；
+- 不发送日常 ScopedSnapshot，不因纯准备时钟推进发布 revision/完整状态，不再
+  独立每秒发送 PlaybackClock；
+- 同一原子事务可以为不同接收者生成 Public/Owner 两种结果投影，但不能泄露
+  其他玩家 Gold、Shop、Overflow、池、随机状态或 token。
+
+#### 客户端状态与 UI
+
+- 客户端以稳定 UnitId/SlotId 幂等应用结果的最终值，不使用相对加减推演权威
+  状态；
+- 购买、获得、合成、退休 UnitId、Overflow 提升、商店和经济变化必须在同一
+  原子结果中应用；
+- 选中、悬停、二次确认、拖动、拖动影子、选择菱形、撤退 UI、Pending 和动画
+  状态全部留在本地，不进入客户端权威镜像；
+- 商店确认绑定 `SlotId + UnitId`，无关结果不能清除；
+- 拖动只在松手发送一个命令；目标位置可本地 Pending 显示，拒绝时按保存的操作
+  前表现回滚；
+- Pending 锁按 UnitId、槽或按钮隔离，不能冻结整个 HUD；
+- 初次/重连/纠错恢复状态按稳定身份做差异协调，不得无条件销毁重建全部单位、
+  商店或 HUD。
+
+#### 保活、断线与时间
+
+- 每连接只保留每秒一次的客户端 Ping/房主 Pong；Pong 返回房主单调时间、阶段
+  和截止时间；
+- 连续三次缺失仍触发现有掉线与接管流程；
+- 准备倒计时与播放 Tick 从绝对房主时间本地推导；
+- 断线时清除本地 Pending/拖动/确认；未收到结果的命令不自动重发；
+- 重连恢复状态决定断线前命令是否已经提交。
+
+#### 实施结果
+
+已完成协议 v3 DTO、接收者权限增量、actor 玩家/系统结果流、初始/重连/缺口恢复、客户端 reducer、单向 Ping/Pong、纯时钟无 revision、移除旧稳态消息种类，以及正式 HUD 的商店确认和部署交互接回。下列顺序保留为本次迁移记录。
+
+#### 实施顺序
+
+1. 为现有 transport 增加仅开发期的按 kind 帧数、字节数、最大帧和 writer
+   队列深度统计，建立 v2 基线；
+2. 定义 v3 结果 DTO、权限投影和幂等客户端 reducer；
+3. 让 actor 对房主本地与远端命令生成同一结果流；
+4. 接入系统结果、AI、阶段、结算和 Battle transport；
+5. 将正式 HUD 改为读取结果镜像并恢复原本的本地交互控制器；
+6. 合并心跳与时钟，移除稳定运行期快照/独立 PlaybackClock；
+7. 补齐初始化、重连、非法顺序纠错及 v2 拒绝测试；
+8. 删除不再可达的 v2 日常快照分支和临时兼容代码。
+
+停止条件：
+
+- 稳定运行的完整准备阶段没有日常 ScopedSnapshot；
+- 无玩家操作时，除单组 Ping/Pong 外没有每秒业务状态消息；
+- 单位动画不因网络结果重建，商店确认不被无关结果取消；
+- 选中菱形、撤退 UI、拖动和拒绝回滚恢复到离线交互行为；
+- 购买/合成/Overflow、阵型、Ready、系统阶段和结算结果均能原子重放；
+- 初始、重连和显式纠错三条恢复路径仍通过权限、幂等和断线测试。
 
 ## 4. Worktree 与冲突划分
 

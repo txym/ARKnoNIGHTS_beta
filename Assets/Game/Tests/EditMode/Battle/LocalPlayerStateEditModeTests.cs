@@ -29,15 +29,32 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("猎狗", gopro.DisplayNameZhHans);
             Assert.AreEqual(string.Empty, gopro.SkillDescriptionZhHans);
             Assert.AreEqual(1, gopro.LifeDeduct);
+            Assert.IsTrue(
+                result.Catalog.TryGet(
+                    "1000",
+                    1,
+                    out var goproEliteOne));
+            Assert.AreEqual(1091, goproEliteOne.Definition.MaxHitPoints);
+            Assert.AreEqual(238, goproEliteOne.Definition.Attack);
+            Assert.AreEqual(4, goproEliteOne.DeploymentCost);
+            Assert.IsTrue(
+                result.Catalog.TryGet(
+                    "1000",
+                    2,
+                    out var goproEliteTwo));
+            Assert.AreEqual(1700, goproEliteTwo.Definition.MaxHitPoints);
+            Assert.AreEqual(6, goproEliteTwo.DeploymentCost);
 
             Assert.IsTrue(result.Catalog.TryGet("5503", out var arcslma));
-            Assert.AreEqual(12, arcslma.DeploymentCost);
+            Assert.AreEqual(21, arcslma.DeploymentCost);
             Assert.AreEqual("ProfilePicture/UIImage_5503_arcslma", arcslma.PortraitResourcePath);
-            Assert.AreEqual(4, arcslma.Rarity);
+            Assert.AreEqual(6, arcslma.Rarity);
             Assert.AreEqual(0, arcslma.InitialEliteLevel);
             Assert.AreEqual("arcslma", arcslma.ResourceKey);
             Assert.AreEqual("果冻小子", arcslma.DisplayNameZhHans);
-            Assert.AreEqual(string.Empty, arcslma.SkillDescriptionZhHans);
+            Assert.AreEqual(
+                "每隔一段时间，分裂出三个<果冻丁>。",
+                arcslma.SkillDescriptionZhHans);
             Assert.AreEqual(1, arcslma.LifeDeduct);
         }
 
@@ -55,8 +72,8 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(4, snapshot.Units.Count);
             Assert.AreEqual(2, snapshot.StagingSlots.Count);
             CollectionAssert.AreEqual(new[] { "1000", "5503" }, snapshot.StagingSlots.Select(slot => slot.TypeId).ToArray());
-            CollectionAssert.AreEqual(new[] { 2, 12 }, snapshot.StagingSlots.Select(slot => slot.DeploymentCost).ToArray());
-            CollectionAssert.AreEqual(new[] { 1, 4 }, snapshot.StagingSlots.Select(slot => slot.Rarity).ToArray(), "Rarity must come from the Player-safe catalog, not elite level.");
+            CollectionAssert.AreEqual(new[] { 2, 21 }, snapshot.StagingSlots.Select(slot => slot.DeploymentCost).ToArray());
+            CollectionAssert.AreEqual(new[] { 1, 6 }, snapshot.StagingSlots.Select(slot => slot.Rarity).ToArray(), "Rarity must come from the Player-safe catalog, not elite level.");
             CollectionAssert.AreEqual(new[] { 2, 1 }, snapshot.StagingSlots.Select(slot => slot.Count).ToArray());
             CollectionAssert.AreEqual(new[] { "local-1000-alpha", "local-1000-bravo" }, snapshot.StagingSlots[0].UnitIds);
             Assert.AreEqual(1, first.State.GetUnits(PlayerUnitZone.Overflow).Count);
@@ -145,6 +162,39 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual(99, state.DeploymentCost);
             Assert.AreEqual(0, state.GetUnits(PlayerUnitZone.Deployed).Count);
             Assert.AreEqual(2, notifications);
+        }
+
+        [Test]
+        public void ReplaceDeployed_AtomicallyExchangesStagingAndDeployedUnitsWithTheirRealCosts()
+        {
+            var state = LocalPlayerStateLoader.LoadFromResources(
+                CatalogPath,
+                PlayerStatePath).State;
+            Assert.IsTrue(
+                state.TryDeploy("local-1000-alpha", 5, 2).Success);
+            Assert.AreEqual(97, state.DeploymentCost);
+            var notifications = 0;
+            state.Changed += _ => notifications++;
+
+            var result = state.TryReplaceDeployed(
+                "local-5503-alpha",
+                "local-1000-alpha",
+                5,
+                2);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(78, result.Snapshot.DeploymentCost);
+            Assert.AreEqual(1, notifications);
+            var deployed = result.Snapshot.Units.Single(unit =>
+                unit.Zone == PlayerUnitZone.Deployed);
+            Assert.AreEqual("local-5503-alpha", deployed.UnitId);
+            Assert.AreEqual(
+                new LocalFormationCoordinate(5, 2),
+                deployed.Formation.Value);
+            Assert.That(
+                result.Snapshot.Units.Single(unit =>
+                    unit.UnitId == "local-1000-alpha").Zone,
+                Is.EqualTo(PlayerUnitZone.Staging));
         }
 
         [Test]

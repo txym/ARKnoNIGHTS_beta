@@ -13,7 +13,6 @@ using ArknoNights.UI;
 using ArknoNights.UI.FormalHud.ShopReady;
 using ArknoNights.UI.PlayerListObserver;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
@@ -34,18 +33,8 @@ public sealed class LanMatchHudController : MonoBehaviour
     private bool formalHudBound;
     private bool playerListVisible = true;
     private string observedPlayerId;
-    private string selectedStagingUnitId;
-    private string selectedDeployedUnitId;
-    private string pendingReplaceUnitId;
-    private MatchFormationPosition? pendingReplacePosition;
-    private int pendingPurchaseSlot = -1;
-    private string pendingPurchaseUnitId;
-    private int pendingUpgradeLevel = -1;
-    private int pendingUpgradePrice = -1;
     private long renderedRevision = -1;
     private int renderedCountdown = -1;
-    private readonly Dictionary<string, PreparationUnitView> formationViews =
-        new Dictionary<string, PreparationUnitView>(StringComparer.Ordinal);
     private IReadOnlyList<PlayerListEntryPresentation> playerEntries =
         new ReadOnlyCollection<PlayerListEntryPresentation>(
             Array.Empty<PlayerListEntryPresentation>());
@@ -95,7 +84,6 @@ public sealed class LanMatchHudController : MonoBehaviour
         {
             Refresh();
         }
-        HandleWorldInput();
     }
 
     public void Refresh()
@@ -106,7 +94,6 @@ public sealed class LanMatchHudController : MonoBehaviour
         var revisionChanged =
             renderedRevision != snapshot.StateRevision;
         renderedRevision = snapshot.StateRevision;
-        if (revisionChanged) ClearPendingConfirmations();
         renderedCountdown = Mathf.CeilToInt(
             runtime.PreparationRemainingMilliseconds / 1000f);
 
@@ -142,16 +129,26 @@ public sealed class LanMatchHudController : MonoBehaviour
                 item.PlayerId,
                 observedPlayerId,
                 StringComparison.Ordinal));
+        var observedProjection =
+            BuildPlayerProjection(
+                observed,
+                snapshot.OwnerPrivateState);
+        var canMutateObserved = CanMutateFormation(publicState)
+            && string.Equals(
+                observedPlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal);
         if (stagingHud != null)
         {
             stagingHud.SetExternalDisplayedSnapshot(
-                BuildPlayerProjection(observed, snapshot.OwnerPrivateState),
-                !CanMutateFormation(publicState)
-                || !string.Equals(
-                    observedPlayerId,
-                    runtime.LocalPlayerId,
-                    StringComparison.Ordinal));
+                observedProjection,
+                !canMutateObserved);
         }
+        deployment?.SetPreparationViewsVisible(
+            IsPreparation(publicState));
+        deployment?.ApplyExternalSnapshot(
+            observedProjection,
+            canMutateObserved);
 
         if (shopReady != null)
         {
@@ -173,23 +170,64 @@ public sealed class LanMatchHudController : MonoBehaviour
         }
 
         UpdateStatus();
-        RebuildFormation(publicState);
     }
 
-    public void ShowCommandResult(MatchCommandAckPayload ack)
+    public void ShowCommandResult(MatchOperationResultPayload result)
     {
-        if (ack == null) return;
-        var accepted = string.Equals(
-            ack.ResultCode,
-            MatchCommandCode.Accepted.ToString(),
-            StringComparison.Ordinal);
+        if (result == null) return;
+        var accepted =
+            string.Equals(
+                result.ResultCode,
+                MatchCommandCode.Accepted.ToString(),
+                StringComparison.Ordinal)
+            || string.Equals(
+                result.ResultCode,
+                MatchCommandCode.AcceptedNoChange.ToString(),
+                StringComparison.Ordinal)
+            || string.Equals(
+                result.ResultCode,
+                MatchCommandCode.PoolExhaustedDiagnostic.ToString(),
+                StringComparison.Ordinal);
+        if (string.Equals(
+                result.OriginPlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal))
+        {
+            if (string.Equals(
+                    result.CommandKind,
+                    MatchCommandKind.PurchaseShopOffer.ToString(),
+                    StringComparison.Ordinal))
+            {
+                shopReady?.ResolveExternalPurchase(
+                    result.ShopSlotIndex,
+                    result.PrimaryUnitId,
+                    accepted);
+            }
+            else if (string.Equals(
+                         result.CommandKind,
+                         MatchCommandKind.PurchaseLevelUpgrade
+                             .ToString(),
+                         StringComparison.Ordinal))
+            {
+                shopReady?.ResolveExternalUpgrade(accepted);
+            }
+            deployment?.ResolveExternalOperation(
+                result.PrimaryUnitId);
+        }
         stagingHud?.ShowExternalStatus(
-            accepted ? string.Empty : "操作失败：" + ack.StableDetailCode);
+            accepted ? string.Empty : "操作失败：" + result.StableDetailCode);
     }
 
     public void ShowStatus(string value)
     {
         stagingHud?.ShowExternalStatus(value);
+    }
+
+    public void ResetLocalInteractionState()
+    {
+        ClearSelection();
+        shopReady?.ClearExternalPendingConfirmation();
+        deployment?.ClearExternalPendingOperations();
     }
 
     private void BindFormalHud()
@@ -239,10 +277,12 @@ public sealed class LanMatchHudController : MonoBehaviour
         }
 
         sceneCoordinator?.SetExternalMatchMode(true);
-        deployment?.SuspendHudInputForExternalMatch();
-        stagingHud.SetStagingDragStartedHandler(HandleStagingSelected);
-        stagingHud.SetStagingSelectionChangedHandler(
-            HandleStagingSelected);
+        deployment?.InitializeExternal(
+            stagingHud,
+            SendDeploy,
+            SendReplace,
+            SendRelocate,
+            SendRetreat);
 
         shopReady.InitializeExternal(
             SendRefresh,
@@ -478,6 +518,7 @@ public sealed class LanMatchHudController : MonoBehaviour
                 return ShopReadySlotViewState.CreateProjection(
                     item.SlotIndex,
                     item.TypeId,
+                    item.UnitId,
                     rarity,
                     shopEntry?.BaseDeploymentCost
                     ?? unitEntry?.DeploymentCost
@@ -506,50 +547,6 @@ public sealed class LanMatchHudController : MonoBehaviour
             slots);
     }
 
-    private void RebuildFormation(PublicMatchStateWire publicState)
-    {
-        ClearFormation();
-        if (!IsPreparation(publicState)) return;
-        var observed = publicState.Seats.First(item =>
-            string.Equals(
-                item.PlayerId,
-                observedPlayerId,
-                StringComparison.Ordinal));
-        foreach (var unit in (observed.Units
-                     ?? Array.Empty<MatchUnitWire>())
-                 .Where(item =>
-                     string.Equals(
-                         item.Zone,
-                         MatchUnitZone.Deployed.ToString(),
-                         StringComparison.Ordinal)
-                     && item.HasFormation))
-        {
-            if (!PreparationUnitViewBuilder.TryCreate(
-                    unit.UnitId,
-                    unit.TypeId,
-                    transform,
-                    false,
-                    out var instance,
-                    out var diagnostic))
-            {
-                Debug.LogWarning(
-                    "[LanMatch][formation.create.failed] " + diagnostic,
-                    this);
-                continue;
-            }
-            instance.name = "LanFormation_" + unit.UnitId;
-            instance.transform.position =
-                BattlefieldWorldProjection.Default.ToWorld(
-                    new FixedPosition(
-                        unit.FormationX * 100,
-                        unit.FormationY * 100),
-                    BattleObserverView.Home);
-            formationViews.Add(
-                unit.UnitId,
-                instance.GetComponent<PreparationUnitView>());
-        }
-    }
-
     private void UpdateStatus()
     {
         if (runtime.IsReconnecting)
@@ -564,216 +561,6 @@ public sealed class LanMatchHudController : MonoBehaviour
             return;
         }
         stagingHud?.ShowExternalStatus(string.Empty);
-    }
-
-    private void HandleStagingSelected(string slotId)
-    {
-        if (string.IsNullOrEmpty(slotId))
-        {
-            selectedStagingUnitId = null;
-            return;
-        }
-        var publicState = runtime?.Snapshot?.PublicState;
-        if (publicState == null
-            || !CanMutateFormation(publicState)
-            || !string.Equals(
-                observedPlayerId,
-                runtime.LocalPlayerId,
-                StringComparison.Ordinal))
-        {
-            stagingHud?.ClearStagingSelection();
-            return;
-        }
-        var stack = stagingHud?.DisplayedSnapshot?.StagingSlots
-            .FirstOrDefault(item =>
-                string.Equals(
-                    StagingHudController.BuildSlotId(item),
-                    slotId,
-                    StringComparison.Ordinal));
-        selectedStagingUnitId = stack?.UnitIds.FirstOrDefault();
-        selectedDeployedUnitId = null;
-        pendingReplacePosition = null;
-        pendingReplaceUnitId = null;
-    }
-
-    private void HandleWorldInput()
-    {
-        var publicState = runtime?.Snapshot?.PublicState;
-        if (publicState == null
-            || !CanMutateFormation(publicState)
-            || !string.Equals(
-                observedPlayerId,
-                runtime.LocalPlayerId,
-                StringComparison.Ordinal)
-            || EventSystem.current != null
-            && EventSystem.current.IsPointerOverGameObject())
-        {
-            return;
-        }
-        if (Input.GetMouseButtonUp(1)
-            && !string.IsNullOrEmpty(selectedDeployedUnitId))
-        {
-            runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind = MatchCommandKind.RetreatUnit.ToString(),
-                UnitId = selectedDeployedUnitId
-            });
-            ClearSelection();
-            return;
-        }
-        if (!Input.GetMouseButtonUp(0) || Camera.main == null) return;
-        var pointerRay = Camera.main.ScreenPointToRay(Input.mousePosition);
-        var hits = Physics.RaycastAll(
-                pointerRay,
-                2000f)
-            .OrderBy(item => item.distance)
-            .ToArray();
-        var clickedView = hits
-            .Select(hit =>
-                hit.collider.GetComponentInParent<PreparationUnitView>())
-            .FirstOrDefault(view =>
-                view != null
-                && formationViews.ContainsKey(view.PlayerUnitId));
-        if (clickedView != null
-            && string.IsNullOrEmpty(selectedStagingUnitId)
-            && string.IsNullOrEmpty(selectedDeployedUnitId))
-        {
-            selectedDeployedUnitId = clickedView.PlayerUnitId;
-            selectedStagingUnitId = null;
-            pendingReplacePosition = null;
-            formalHud?.SelectObservedPreparationUnitForHud(
-                clickedView.PlayerUnitId);
-            return;
-        }
-        var clickedUnit = clickedView == null
-            ? null
-            : publicState.Seats
-                .First(item => string.Equals(
-                    item.PlayerId,
-                    runtime.LocalPlayerId,
-                    StringComparison.Ordinal))
-                .Units
-                .FirstOrDefault(item => string.Equals(
-                    item.UnitId,
-                    clickedView.PlayerUnitId,
-                    StringComparison.Ordinal));
-        int x;
-        int y;
-        if (clickedUnit != null && clickedUnit.HasFormation)
-        {
-            x = clickedUnit.FormationX;
-            y = clickedUnit.FormationY;
-        }
-        else
-        {
-            if (!TryProjectFormationRay(pointerRay, out var target))
-            {
-                return;
-            }
-
-            x = target.X;
-            y = target.Y;
-        }
-
-        TrySubmitSelectedAt(publicState, x, y);
-    }
-
-    private static bool TryProjectFormationRay(
-        Ray pointerRay,
-        out MatchFormationPosition target)
-    {
-        var formationPlane = new Plane(
-            Vector3.up,
-            new Vector3(0f, PreparationGridProjection.UnitWorldY, 0f));
-        if (!formationPlane.Raycast(pointerRay, out var distance)
-            || !PreparationGridProjection.TryWorldToCoordinate(
-                pointerRay.GetPoint(distance),
-                out var coordinate))
-        {
-            target = default;
-            return false;
-        }
-
-        target = new MatchFormationPosition(coordinate.X, coordinate.Y);
-        return target.IsValid;
-    }
-
-    private bool TrySubmitSelectedAt(
-        PublicMatchStateWire publicState,
-        int x,
-        int y)
-    {
-        if (publicState == null || !CanMutateFormation(publicState))
-            return false;
-        var target = new MatchFormationPosition(x, y);
-        if (!target.IsValid) return false;
-        if (!string.IsNullOrEmpty(selectedDeployedUnitId))
-        {
-            runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind =
-                    MatchCommandKind.RelocateOrSwapUnit.ToString(),
-                UnitId = selectedDeployedUnitId,
-                TargetX = x,
-                TargetY = y
-            });
-            ClearSelection();
-            return true;
-        }
-        if (string.IsNullOrEmpty(selectedStagingUnitId)) return false;
-        var local = publicState.Seats.First(item =>
-            string.Equals(
-                item.PlayerId,
-                runtime.LocalPlayerId,
-                StringComparison.Ordinal));
-        var occupant = (local.Units ?? Array.Empty<MatchUnitWire>())
-            .FirstOrDefault(item =>
-                item.HasFormation
-                && item.FormationX == x
-                && item.FormationY == y
-                && string.Equals(
-                    item.Zone,
-                    MatchUnitZone.Deployed.ToString(),
-                    StringComparison.Ordinal));
-        if (occupant != null)
-        {
-            if (!pendingReplacePosition.HasValue
-                || pendingReplacePosition.Value.X != x
-                || pendingReplacePosition.Value.Y != y
-                || !string.Equals(
-                    pendingReplaceUnitId,
-                    occupant.UnitId,
-                    StringComparison.Ordinal))
-            {
-                pendingReplacePosition = target;
-                pendingReplaceUnitId = occupant.UnitId;
-                return false;
-            }
-            runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind =
-                    MatchCommandKind.ReplaceDeployedUnit.ToString(),
-                StagingUnitId = selectedStagingUnitId,
-                ExpectedDeployedUnitId = occupant.UnitId,
-                TargetX = x,
-                TargetY = y
-            });
-        }
-        else
-        {
-            runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind = MatchCommandKind.DeployUnit.ToString(),
-                UnitId = selectedStagingUnitId,
-                TargetX = x,
-                TargetY = y,
-                ExpectedAvailableCost =
-                    runtime.Snapshot.OwnerPrivateState
-                        .AvailableDeploymentCost
-            });
-        }
-        ClearSelection();
-        return true;
     }
 
     private bool CanMutateFormation(PublicMatchStateWire publicState)
@@ -820,6 +607,64 @@ public sealed class LanMatchHudController : MonoBehaviour
         });
     }
 
+    private void SendDeploy(
+        string unitId,
+        int x,
+        int y)
+    {
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind = MatchCommandKind.DeployUnit.ToString(),
+            UnitId = unitId,
+            TargetX = x,
+            TargetY = y,
+            ExpectedAvailableCost =
+                runtime.Snapshot.OwnerPrivateState
+                    ?.AvailableDeploymentCost ?? 0
+        });
+    }
+
+    private void SendRelocate(
+        string unitId,
+        int x,
+        int y)
+    {
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind =
+                MatchCommandKind.RelocateOrSwapUnit.ToString(),
+            UnitId = unitId,
+            TargetX = x,
+            TargetY = y
+        });
+    }
+
+    private void SendReplace(
+        string stagingUnitId,
+        string expectedDeployedUnitId,
+        int x,
+        int y)
+    {
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind =
+                MatchCommandKind.ReplaceDeployedUnit.ToString(),
+            StagingUnitId = stagingUnitId,
+            ExpectedDeployedUnitId = expectedDeployedUnitId,
+            TargetX = x,
+            TargetY = y
+        });
+    }
+
+    private void SendRetreat(string unitId)
+    {
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind = MatchCommandKind.RetreatUnit.ToString(),
+            UnitId = unitId
+        });
+    }
+
     private void SubmitPurchaseFromFormalHud(int slotIndex)
     {
         var offer = runtime.Snapshot.OwnerPrivateState?.ShopOffers
@@ -833,24 +678,6 @@ public sealed class LanMatchHudController : MonoBehaviour
         SubmitUpgrade(runtime.Snapshot.OwnerPrivateState);
     }
 
-    private void ConfirmPurchase(MatchShopOfferWire offer)
-    {
-        if (offer == null || string.IsNullOrEmpty(offer.UnitId)) return;
-        if (pendingPurchaseSlot != offer.SlotIndex
-            || !string.Equals(
-                pendingPurchaseUnitId,
-                offer.UnitId,
-                StringComparison.Ordinal))
-        {
-            ClearPendingConfirmations();
-            pendingPurchaseSlot = offer.SlotIndex;
-            pendingPurchaseUnitId = offer.UnitId;
-            return;
-        }
-        ClearPendingConfirmations();
-        SubmitPurchase(offer);
-    }
-
     private void SubmitPurchase(MatchShopOfferWire offer)
     {
         runtime.SendCommand(new MatchCommandWirePayload
@@ -860,21 +687,6 @@ public sealed class LanMatchHudController : MonoBehaviour
             SlotIndex = offer.SlotIndex,
             ExpectedUnitId = offer.UnitId
         });
-    }
-
-    private void ConfirmUpgrade(OwnerMatchStateWire owner)
-    {
-        if (owner == null) return;
-        if (pendingUpgradeLevel != owner.Level
-            || pendingUpgradePrice != owner.CurrentUpgradePrice)
-        {
-            ClearPendingConfirmations();
-            pendingUpgradeLevel = owner.Level;
-            pendingUpgradePrice = owner.CurrentUpgradePrice;
-            return;
-        }
-        ClearPendingConfirmations();
-        SubmitUpgrade(owner);
     }
 
     private void SubmitUpgrade(OwnerMatchStateWire owner)
@@ -984,33 +796,13 @@ public sealed class LanMatchHudController : MonoBehaviour
         }
     }
 
-    private void ClearPendingConfirmations()
-    {
-        pendingPurchaseSlot = -1;
-        pendingPurchaseUnitId = null;
-        pendingUpgradeLevel = -1;
-        pendingUpgradePrice = -1;
-    }
-
     private void ClearSelection()
     {
-        selectedStagingUnitId = null;
-        selectedDeployedUnitId = null;
-        pendingReplaceUnitId = null;
-        pendingReplacePosition = null;
         stagingHud?.ClearStagingSelection();
-    }
-
-    private void ClearFormation()
-    {
-        foreach (var view in formationViews.Values)
-            if (view != null) Destroy(view.gameObject);
-        formationViews.Clear();
     }
 
     public void DisposeHud()
     {
-        ClearFormation();
         if (shopReady != null)
         {
             shopReady.ShopVisibilityChanged -=

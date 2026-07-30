@@ -111,11 +111,30 @@ namespace ArknoNights.Deployment
         private string selectedUnitId;
         private bool submittedCurrentDrag;
         private bool initialized;
+        private bool externalMode;
+        private PlayerStateSnapshot externalSnapshot;
+        private Action<string, int, int> externalDeploy;
+        private Action<string, string, int, int> externalReplace;
+        private Action<string, int, int> externalRelocate;
+        private Action<string> externalRetreat;
+        private readonly HashSet<string> pendingExternalUnitIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, GameObject>
+            pendingExternalDeployViews =
+                new Dictionary<string, GameObject>(
+                    StringComparer.Ordinal);
 
         public PreparationInteractionState State { get; private set; } = PreparationInteractionState.Idle;
         public bool InteractionEnabled => interactionEnabled;
         public string SelectedUnitId => selectedUnitId;
         public int PreparationViewCount => viewCoordinator == null ? 0 : viewCoordinator.ViewCount;
+        public bool PreparationViewsVisible =>
+            viewCoordinator != null
+            && viewCoordinator.gameObject.activeSelf;
+        private PlayerStateSnapshot CurrentSnapshot =>
+            externalMode
+                ? externalSnapshot ?? hud?.DisplayedSnapshot
+                : hud?.Snapshot;
         /// <summary>Stable PlayerState unit ID selection notification for read-only HUD consumers.</summary>
         public event Action<string> DeployedSelectionChanged;
 
@@ -158,6 +177,99 @@ namespace ArknoNights.Deployment
             State = interactionEnabled ? PreparationInteractionState.Idle : PreparationInteractionState.Disabled;
         }
 
+        public void InitializeExternal(
+            StagingHudController sourceHud,
+            Action<string, int, int> deploy,
+            Action<string, string, int, int> replace,
+            Action<string, int, int> relocate,
+            Action<string> retreat)
+        {
+            Initialize(sourceHud);
+            if (!initialized) return;
+            externalMode = true;
+            externalDeploy = deploy;
+            externalReplace = replace;
+            externalRelocate = relocate;
+            externalRetreat = retreat;
+            externalSnapshot = sourceHud.DisplayedSnapshot;
+            viewCoordinator.InitializeExternal(
+                externalSnapshot);
+            enabled = true;
+            SetPreparationViewsVisible(true);
+            SetInteractionEnabled(true);
+        }
+
+        public void ApplyExternalSnapshot(
+            PlayerStateSnapshot projection,
+            bool canInteract)
+        {
+            if (!externalMode || projection == null) return;
+            externalSnapshot = projection;
+            viewCoordinator?.ReconcileExternal(
+                projection,
+                pendingExternalUnitIds);
+            SetInteractionEnabled(canInteract);
+        }
+
+        public void ResolveExternalOperation(
+            string unitId)
+        {
+            if (!externalMode
+                || string.IsNullOrWhiteSpace(unitId))
+            {
+                return;
+            }
+            pendingExternalUnitIds.Remove(unitId);
+            if (pendingExternalDeployViews.TryGetValue(
+                    unitId,
+                    out var pendingView))
+            {
+                pendingExternalDeployViews.Remove(unitId);
+                if (pendingView != null)
+                    Destroy(pendingView);
+            }
+            if (externalSnapshot != null)
+            {
+                viewCoordinator?.ReconcileExternal(
+                    externalSnapshot,
+                    pendingExternalUnitIds);
+                if (string.Equals(
+                        selectedUnitId,
+                        unitId,
+                        StringComparison.Ordinal)
+                    && !externalSnapshot.Units.Any(unit =>
+                        string.Equals(
+                            unit.UnitId,
+                            unitId,
+                            StringComparison.Ordinal)
+                        && unit.Zone
+                            == PlayerUnitZone.Deployed))
+                {
+                    ClearSelection();
+                }
+            }
+        }
+
+        public void ClearExternalPendingOperations()
+        {
+            if (!externalMode) return;
+            CancelDrag("external.recovery", false);
+            foreach (var pending in
+                     pendingExternalDeployViews.Values)
+            {
+                if (pending != null) Destroy(pending);
+            }
+            pendingExternalDeployViews.Clear();
+            pendingExternalUnitIds.Clear();
+            ClearSelection();
+            if (externalSnapshot != null)
+            {
+                viewCoordinator?.ReconcileExternal(
+                    externalSnapshot,
+                    pendingExternalUnitIds);
+            }
+        }
+
         private void Update()
         {
             if (!initialized || !interactionEnabled) return;
@@ -173,11 +285,16 @@ namespace ArknoNights.Deployment
                 return;
             }
 
-            if (State == PreparationInteractionState.SelectedDeployed)
+            if (State == PreparationInteractionState.Idle
+                || State
+                    == PreparationInteractionState
+                        .SelectedDeployed)
             {
                 if (Input.GetMouseButtonDown(0) && !IsPointerOverUi())
                 {
-                    pendingRelocationView = FindSelectedViewAtScreen(Input.mousePosition);
+                    pendingRelocationView =
+                        FindDeployedViewAtScreen(
+                            Input.mousePosition);
                     pendingRelocationScreenPosition = Input.mousePosition;
                 }
                 if (pendingRelocationView != null && Input.GetMouseButton(0) &&
@@ -193,10 +310,7 @@ namespace ArknoNights.Deployment
                     pendingRelocationView = null;
                     if (!IsPointerOverUi()) ProcessWorldClick(Input.mousePosition);
                 }
-                return;
             }
-
-            if (Input.GetMouseButtonUp(0) && !IsPointerOverUi()) ProcessWorldClick(Input.mousePosition);
         }
 
         private void OnApplicationFocus(bool hasFocus)
@@ -218,6 +332,16 @@ namespace ArknoNights.Deployment
         /// <summary>UI-004 phase boundary. Disabling always tears down transient preview and selection input.</summary>
         public void SetInteractionEnabled(bool enabled)
         {
+            if (interactionEnabled == enabled)
+            {
+                if (enabled
+                    && initialized
+                    && State == PreparationInteractionState.Disabled)
+                {
+                    State = PreparationInteractionState.Idle;
+                }
+                return;
+            }
             interactionEnabled = enabled;
             if (!enabled)
             {
@@ -243,6 +367,13 @@ namespace ArknoNights.Deployment
 
         public void RestoreHudInputAfterExternalMatch()
         {
+            if (externalMode)
+            {
+                var sourceHud = hud;
+                ShutdownBindings();
+                Initialize(sourceHud);
+                return;
+            }
             enabled = true;
             if (hud == null) return;
             hud.SetStagingDragStartedHandler(slotId => BeginDragFromSlot(slotId));
@@ -255,16 +386,22 @@ namespace ArknoNights.Deployment
         public bool BeginDragFromSlot(string slotId)
         {
             if (!initialized || !interactionEnabled || State == PreparationInteractionState.Dragging) return false;
-            var stack = hud.Snapshot.StagingSlots.FirstOrDefault(slot => string.Equals(StagingHudController.BuildSlotId(slot), slotId, StringComparison.Ordinal));
+            var current = CurrentSnapshot;
+            var stack = current?.StagingSlots.FirstOrDefault(slot => string.Equals(StagingHudController.BuildSlotId(slot), slotId, StringComparison.Ordinal));
             if (stack == null || stack.UnitIds.Count == 0) return false;
             var unitId = stack.UnitIds[0];
-            var unit = hud.Snapshot.Units.FirstOrDefault(item => string.Equals(item.UnitId, unitId, StringComparison.Ordinal));
-            if (unit == null || unit.Zone != PlayerUnitZone.Staging) return false;
+            var unit = current.Units.FirstOrDefault(item => string.Equals(item.UnitId, unitId, StringComparison.Ordinal));
+            if (unit == null
+                || unit.Zone != PlayerUnitZone.Staging
+                || pendingExternalUnitIds.Contains(unitId))
+            {
+                return false;
+            }
 
             ClearSelection();
             hud.ClearStagingSelection();
             dragSession = new PreparationDragSession(unit.UnitId, unit.TypeId, PreparationDragSource.Staging, null);
-            if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, transform, true, out dragPreview, out var diagnostic))
+            if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, unit.EliteLevel, transform, true, out dragPreview, out var diagnostic))
             {
                 Debug.LogError("[PreparationDeployment][drag.preview.create.failed] unit=" + unit.UnitId + "; type=" + unit.TypeId + "; code=" + diagnostic, this);
                 dragSession = null;
@@ -341,19 +478,85 @@ namespace ArknoNights.Deployment
         {
             if (State != PreparationInteractionState.Dragging || dragSession == null || submittedCurrentDrag) return null;
             submittedCurrentDrag = true;
-            var before = hud.Snapshot;
+            var before = CurrentSnapshot;
             if (dragPreview) dragSession.SetCandidate(dragPreview.transform.position);
             else if (relocatingView != null) dragSession.SetCandidate(relocatingView.transform.position);
             var candidate = dragSession.Candidate;
+            if (externalMode)
+            {
+                var submittedUnitId = dragSession.UnitId;
+                var submittedSource = dragSession.Source;
+                var submittedX = candidate?.X ?? 0;
+                var submittedY = candidate?.Y ?? 0;
+                var replacedUnit = submittedSource
+                        == PreparationDragSource.Staging
+                    && candidate.HasValue
+                        ? before.Units.FirstOrDefault(unit =>
+                            unit.Zone
+                                == PlayerUnitZone.Deployed
+                            && unit.Formation.HasValue
+                            && unit.Formation.Value.Equals(
+                                candidate.Value))
+                        : null;
+                pendingExternalUnitIds.Add(submittedUnitId);
+                if (submittedSource == PreparationDragSource.Staging
+                    && dragPreview != null)
+                {
+                    pendingExternalDeployViews[submittedUnitId] =
+                        dragPreview;
+                    dragPreview = null;
+                }
+                else if (submittedSource
+                    == PreparationDragSource.DeployedRelocation)
+                {
+                    relocatingView = null;
+                }
+                if (submittedSource
+                    == PreparationDragSource.DeployedRelocation)
+                {
+                    externalRelocate?.Invoke(
+                        submittedUnitId,
+                        submittedX,
+                        submittedY);
+                }
+                else
+                {
+                    if (replacedUnit != null)
+                        externalReplace?.Invoke(
+                            submittedUnitId,
+                            replacedUnit.UnitId,
+                            submittedX,
+                            submittedY);
+                    else
+                        externalDeploy?.Invoke(
+                            submittedUnitId,
+                            submittedX,
+                            submittedY);
+                }
+                CancelDrag("drag.committed");
+                return null;
+            }
             // Even an off-board release is submitted once to the authoritative command so callers receive
             // the same stable CoordinateOutOfBounds result rather than a presentation-only failure.
             var result = dragSession.Source == PreparationDragSource.DeployedRelocation
                 ? (candidate.HasValue
                     ? hud.PlayerState.TryRelocateDeployed(dragSession.UnitId, candidate.Value.X, candidate.Value.Y)
                     : hud.PlayerState.TryRelocateDeployed(dragSession.UnitId, 0, 0))
-                : (candidate.HasValue
-                    ? hud.PlayerState.TryDeploy(dragSession.UnitId, candidate.Value.X, candidate.Value.Y)
-                    : hud.PlayerState.TryDeploy(dragSession.UnitId, 0, 0));
+                : candidate.HasValue
+                  && before.Units.FirstOrDefault(unit =>
+                      unit.Zone == PlayerUnitZone.Deployed
+                      && unit.Formation.HasValue
+                      && unit.Formation.Value.Equals(
+                          candidate.Value))
+                  is PlayerUnitSnapshot occupied
+                    ? hud.PlayerState.TryReplaceDeployed(
+                        dragSession.UnitId,
+                        occupied.UnitId,
+                        candidate.Value.X,
+                        candidate.Value.Y)
+                    : (candidate.HasValue
+                        ? hud.PlayerState.TryDeploy(dragSession.UnitId, candidate.Value.X, candidate.Value.Y)
+                        : hud.PlayerState.TryDeploy(dragSession.UnitId, 0, 0));
 
             if (dragSession.Source == PreparationDragSource.DeployedRelocation)
             {
@@ -404,11 +607,30 @@ namespace ArknoNights.Deployment
 
         private bool BeginRelocateSelected(PreparationUnitView view)
         {
-            if (!initialized || !interactionEnabled || State != PreparationInteractionState.SelectedDeployed || view == null || view.IsPreview ||
-                !string.Equals(view.PlayerUnitId, selectedUnitId, StringComparison.Ordinal)) return false;
-            var unit = hud.Snapshot.Units.FirstOrDefault(item => string.Equals(item.UnitId, selectedUnitId, StringComparison.Ordinal));
-            if (unit == null || unit.Zone != PlayerUnitZone.Deployed || !unit.Formation.HasValue) return false;
+            if (!initialized
+                || !interactionEnabled
+                || State == PreparationInteractionState.Dragging
+                || view == null
+                || view.IsPreview)
+                return false;
+            var unit = CurrentSnapshot?.Units.FirstOrDefault(item =>
+                string.Equals(
+                    item.UnitId,
+                    view.PlayerUnitId,
+                    StringComparison.Ordinal));
+            if (unit == null
+                || unit.Zone != PlayerUnitZone.Deployed
+                || !unit.Formation.HasValue
+                || pendingExternalUnitIds.Contains(unit.UnitId))
+            {
+                return false;
+            }
 
+            if (!string.Equals(
+                    selectedUnitId,
+                    unit.UnitId,
+                    StringComparison.Ordinal))
+                SelectView(view);
             dragSession = new PreparationDragSession(unit.UnitId, unit.TypeId, PreparationDragSource.DeployedRelocation, unit.Formation);
             relocatingView = view;
             submittedCurrentDrag = false;
@@ -418,15 +640,15 @@ namespace ArknoNights.Deployment
             return true;
         }
 
-        private PreparationUnitView FindSelectedViewAtScreen(Vector3 screenPosition)
+        private PreparationUnitView FindDeployedViewAtScreen(Vector3 screenPosition)
         {
             if (worldCamera == null) worldCamera = Camera.main;
-            if (worldCamera == null || string.IsNullOrEmpty(selectedUnitId)) return null;
+            if (worldCamera == null) return null;
             foreach (var hit in Physics.RaycastAll(worldCamera.ScreenPointToRay(screenPosition), 2000f).OrderBy(item => item.distance))
             {
                 if (hit.collider.GetComponentInParent<PreparationRetreatHitbox>() != null) return null;
                 var view = hit.collider.GetComponentInParent<PreparationUnitView>();
-                if (view != null && !view.IsPreview && string.Equals(view.PlayerUnitId, selectedUnitId, StringComparison.Ordinal)) return view;
+                if (view != null && !view.IsPreview) return view;
             }
             return null;
         }
@@ -472,7 +694,15 @@ namespace ArknoNights.Deployment
         private PlayerOperationResult RetreatSelected()
         {
             if (!interactionEnabled || string.IsNullOrEmpty(selectedUnitId)) return null;
-            var before = hud.Snapshot;
+            var before = CurrentSnapshot;
+            if (externalMode)
+            {
+                if (pendingExternalUnitIds.Contains(selectedUnitId))
+                    return null;
+                pendingExternalUnitIds.Add(selectedUnitId);
+                externalRetreat?.Invoke(selectedUnitId);
+                return null;
+            }
             var result = hud.PlayerState.TryRetreat(selectedUnitId);
             if (result.Success)
             {
@@ -488,7 +718,14 @@ namespace ArknoNights.Deployment
 
         private void SelectView(PreparationUnitView view)
         {
-            if (!interactionEnabled || view == null || view.IsPreview) return;
+            if (!interactionEnabled
+                || view == null
+                || view.IsPreview
+                || pendingExternalUnitIds.Contains(
+                    view.PlayerUnitId))
+            {
+                return;
+            }
             // The preparation-area and staging-area highlights represent one shared selection.
             hud.ClearStagingSelection();
             selectedUnitId = view.PlayerUnitId;
@@ -545,6 +782,19 @@ namespace ArknoNights.Deployment
             }
             if (viewCoordinator != null) viewCoordinator.Dispose();
             viewCoordinator = null;
+            foreach (var pending in
+                     pendingExternalDeployViews.Values)
+            {
+                if (pending != null) Destroy(pending);
+            }
+            pendingExternalDeployViews.Clear();
+            pendingExternalUnitIds.Clear();
+            externalMode = false;
+            externalSnapshot = null;
+            externalDeploy = null;
+            externalReplace = null;
+            externalRelocate = null;
+            externalRetreat = null;
             initialized = false;
         }
     }
@@ -568,6 +818,20 @@ namespace ArknoNights.Deployment
             Reconcile(playerState.Snapshot);
         }
 
+        public void InitializeExternal(
+            PlayerStateSnapshot snapshot)
+        {
+            Dispose();
+            ReconcileExternal(snapshot, null);
+        }
+
+        public void ReconcileExternal(
+            PlayerStateSnapshot snapshot,
+            ISet<string> preservedUnitIds)
+        {
+            Reconcile(snapshot, preservedUnitIds);
+        }
+
         public bool TryGetView(string unitId, out PreparationUnitView view) => viewsByUnitId.TryGetValue(unitId ?? string.Empty, out view) && view != null;
 
         public void Dispose()
@@ -582,6 +846,13 @@ namespace ArknoNights.Deployment
 
         private void Reconcile(PlayerStateSnapshot snapshot)
         {
+            Reconcile(snapshot, null);
+        }
+
+        private void Reconcile(
+            PlayerStateSnapshot snapshot,
+            ISet<string> preservedUnitIds)
+        {
             if (snapshot == null) return;
             var deployed = snapshot.Units.Where(unit => unit.Zone == PlayerUnitZone.Deployed && unit.Formation.HasValue).ToDictionary(unit => unit.UnitId, StringComparer.Ordinal);
             foreach (var obsolete in viewsByUnitId.Keys.Where(id => !deployed.ContainsKey(id)).ToArray())
@@ -592,9 +863,22 @@ namespace ArknoNights.Deployment
 
             foreach (var unit in deployed.Values)
             {
+                if (viewsByUnitId.TryGetValue(
+                        unit.UnitId,
+                        out var existing)
+                    && existing != null
+                    && (existing.EliteLevel != unit.EliteLevel
+                        || !string.Equals(
+                            existing.TypeId,
+                            unit.TypeId,
+                            StringComparison.Ordinal)))
+                {
+                    Destroy(existing.gameObject);
+                    viewsByUnitId.Remove(unit.UnitId);
+                }
                 if (!viewsByUnitId.TryGetValue(unit.UnitId, out var view) || view == null)
                 {
-                    if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, transform, false, out var instance, out var diagnostic))
+                    if (!PreparationUnitViewBuilder.TryCreate(unit.UnitId, unit.TypeId, unit.EliteLevel, transform, false, out var instance, out var diagnostic))
                     {
                         Debug.LogError("[PreparationViews][create.failed] unit=" + unit.UnitId + "; type=" + unit.TypeId + "; code=" + diagnostic, this);
                         continue;
@@ -602,7 +886,13 @@ namespace ArknoNights.Deployment
                     view = instance.GetComponent<PreparationUnitView>();
                     viewsByUnitId[unit.UnitId] = view;
                 }
-                view.transform.position = PreparationGridProjection.ToWorld(unit.Formation.Value);
+                if (preservedUnitIds == null
+                    || !preservedUnitIds.Contains(unit.UnitId))
+                {
+                    view.transform.position =
+                        PreparationGridProjection.ToWorld(
+                            unit.Formation.Value);
+                }
             }
         }
     }
@@ -612,12 +902,18 @@ namespace ArknoNights.Deployment
     {
         public string PlayerUnitId { get; private set; }
         public string TypeId { get; private set; }
+        public int EliteLevel { get; private set; }
         public bool IsPreview { get; private set; }
 
-        public void Initialize(string playerUnitId, string typeId, bool isPreview)
+        public void Initialize(
+            string playerUnitId,
+            string typeId,
+            int eliteLevel,
+            bool isPreview)
         {
             PlayerUnitId = playerUnitId ?? string.Empty;
             TypeId = typeId ?? string.Empty;
+            EliteLevel = eliteLevel;
             IsPreview = isPreview;
         }
 
@@ -641,12 +937,12 @@ namespace ArknoNights.Deployment
     {
         private const string CatalogPath = "BattleData/unit-catalog-v1";
 
-        public static bool TryCreate(string unitId, string typeId, Transform parent, bool isPreview, out GameObject instance, out string diagnostic)
+        public static bool TryCreate(string unitId, string typeId, int eliteLevel, Transform parent, bool isPreview, out GameObject instance, out string diagnostic)
         {
             instance = null;
             diagnostic = string.Empty;
             var catalogResult = UnitCatalogLoader.LoadFromResources(CatalogPath);
-            if (!catalogResult.Success || !catalogResult.Catalog.TryGet(typeId, out var entry)) { diagnostic = "resource.mapping.missing"; return false; }
+            if (!catalogResult.Success || !catalogResult.Catalog.TryGet(typeId, eliteLevel, out var entry)) { diagnostic = "resource.mapping.missing"; return false; }
             var prefab = Resources.Load<GameObject>(entry.PrefabResourcePath);
             if (!prefab) { diagnostic = "resource.prefab.missing"; return false; }
 
@@ -671,7 +967,11 @@ namespace ArknoNights.Deployment
             }
             unitSkel.ConfigureCatalogPresentationData(identity, entry.Definition.MoveSpeedCentimetresPerSecond / 100f, entry.Definition.AttackIntervalTicks / (float)ArknoNights.Battle.Core.BattleInput.TicksPerSecond);
             var marker = instance.GetComponent<PreparationUnitView>() ?? instance.AddComponent<PreparationUnitView>();
-            marker.Initialize(unitId, typeId, isPreview);
+            marker.Initialize(
+                unitId,
+                typeId,
+                eliteLevel,
+                isPreview);
             instance.name = (isPreview ? "PreparationPreview_" : "PreparationView_") + unitId;
             return true;
         }

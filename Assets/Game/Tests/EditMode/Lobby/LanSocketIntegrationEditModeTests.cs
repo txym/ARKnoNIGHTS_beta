@@ -61,9 +61,11 @@ namespace ArknoNights.Lobby.Tests
                 {
                     host.Tick();
                     client.Tick();
-                    return client.LastCommandAck != null;
+                    return client.LastOperationResult != null;
                 }, TimeSpan.FromSeconds(2));
-                Assert.That(client.LastCommandAck.ResultCode, Is.EqualTo(MatchCommandCode.Accepted.ToString()));
+                Assert.That(
+                    client.LastOperationResult.ResultCode,
+                    Is.EqualTo(MatchCommandCode.Accepted.ToString()));
 
                 Run(() => client.StopAsync());
                 WaitUntil(() =>

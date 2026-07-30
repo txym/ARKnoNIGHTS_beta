@@ -50,21 +50,23 @@ namespace ArknoNights.Lobby
                 TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ConcurrentQueue<ClientEvent> receivedEvents =
             new ConcurrentQueue<ClientEvent>();
-        private readonly ScopedSnapshotClientState matchSnapshotState =
-            new ScopedSnapshotClientState();
+        private readonly MatchResultClientState matchSnapshotState =
+            new MatchResultClientState();
         private readonly Task readTask;
         private readonly Task heartbeatTask;
         private readonly bool reconnectingConnection;
         private ReconnectCredential reconnectCredential;
         private LobbyRoomSnapshot snapshot;
         private MatchInitializedPayload matchInitialization;
-        private MatchCommandAckPayload lastCommandAck;
+        private MatchOperationResultPayload lastOperationResult;
+        private MatchSystemResultPayload lastSystemResult;
         private MatchClockSyncPayload currentClock;
         private MatchBattleSealPayload currentBattleSeal;
         private MatchPlaybackStartPayload currentPlaybackStart;
-        private MatchPlaybackClockPayload currentPlaybackClock;
         private long latencyMilliseconds = -1;
         private long messageId;
+        private int missedMatchPongs;
+        private bool recoveryRequested;
         private volatile bool matchMode;
         private volatile bool disconnected;
         private volatile bool ended;
@@ -111,21 +113,24 @@ namespace ArknoNights.Lobby
         public bool HasEnded => ended;
         public MatchInitializedPayload MatchInitialization => matchInitialization;
         public ScopedSnapshotPayload MatchSnapshot => matchSnapshotState.Current;
-        public MatchCommandAckPayload LastCommandAck => lastCommandAck;
+        public MatchOperationResultPayload LastOperationResult =>
+            lastOperationResult;
+        public MatchSystemResultPayload LastSystemResult =>
+            lastSystemResult;
         public MatchClockSyncPayload CurrentClock => currentClock;
         public MatchBattleSealPayload CurrentBattleSeal => currentBattleSeal;
         public MatchPlaybackStartPayload CurrentPlaybackStart => currentPlaybackStart;
-        public MatchPlaybackClockPayload CurrentPlaybackClock => currentPlaybackClock;
         public long ConnectionGeneration { get; private set; }
         public string SessionId { get; private set; }
 
         public event Action<ScopedSnapshotPayload> MatchSnapshotChanged;
-        public event Action<MatchCommandAckPayload> CommandAcknowledged;
+        public event Action RecoveryStateApplied;
+        public event Action<MatchOperationResultPayload> OperationResultReceived;
+        public event Action<MatchSystemResultPayload> SystemResultReceived;
         public event Action<MatchEndedPayload> MatchEnded;
         public event Action<MatchClockSyncPayload> ClockSynchronized;
         public event Action<MatchBattleSealPayload> BattleSealReceived;
         public event Action<MatchPlaybackStartPayload> PlaybackStarted;
-        public event Action<MatchPlaybackClockPayload> PlaybackClockReceived;
         public event Action Reconnecting;
 
         public void Tick()
@@ -150,7 +155,7 @@ namespace ArknoNights.Lobby
                         received.Initialization.ReconnectToken,
                         received.Initialization.Manifest.ToDomain());
                     credentialStore.Save(reconnectCredential);
-                    ApplySnapshot(received.Initialization.Snapshot);
+                    ApplyRecovery(received.Initialization.Snapshot);
                 }
                 if (received.ReconnectAccepted != null)
                 {
@@ -159,41 +164,26 @@ namespace ArknoNights.Lobby
                         received.ReconnectAccepted.ConnectionGeneration;
                     credentialStore.Save(reconnectCredential);
                 }
-                if (received.ScopedSnapshot != null)
-                    ApplySnapshot(received.ScopedSnapshot);
-                if (received.CommandAck != null)
+                if (received.RecoveryState != null)
+                    ApplyRecovery(received.RecoveryState);
+                if (received.OperationResult != null)
                 {
-                    lastCommandAck = received.CommandAck;
-                    CommandAcknowledged?.Invoke(received.CommandAck);
+                    ApplyDelta(received.OperationResult.Delta);
+                    lastOperationResult = received.OperationResult;
+                    OperationResultReceived?.Invoke(
+                        received.OperationResult);
                 }
-                if (received.Ended != null)
+                if (received.SystemResult != null)
                 {
-                    if (!ended)
-                    {
-                        ended = true;
-                        credentialStore.Clear();
-                        MatchEnded?.Invoke(received.Ended);
-                    }
+                    ApplyDelta(received.SystemResult.Delta);
+                    lastSystemResult = received.SystemResult;
+                    SystemResultReceived?.Invoke(received.SystemResult);
+                    ApplySystemPayloads(received.SystemResult);
                 }
                 if (received.Clock != null)
                 {
                     currentClock = received.Clock;
                     ClockSynchronized?.Invoke(received.Clock);
-                }
-                if (received.BattleSeal != null)
-                {
-                    currentBattleSeal = received.BattleSeal;
-                    BattleSealReceived?.Invoke(received.BattleSeal);
-                }
-                if (received.PlaybackStart != null)
-                {
-                    currentPlaybackStart = received.PlaybackStart;
-                    PlaybackStarted?.Invoke(received.PlaybackStart);
-                }
-                if (received.PlaybackClock != null)
-                {
-                    currentPlaybackClock = received.PlaybackClock;
-                    PlaybackClockReceived?.Invoke(received.PlaybackClock);
                 }
                 if (received.Disconnected && !ended)
                     Reconnecting?.Invoke();
@@ -338,7 +328,8 @@ namespace ArknoNights.Lobby
                 true,
                 credential);
             if (retainedSnapshot != null)
-                client.matchSnapshotState.TryApply(retainedSnapshot);
+                client.matchSnapshotState.TryApplyRecovery(
+                    retainedSnapshot);
             client.SessionId = credential.SessionId;
             try
             {
@@ -388,7 +379,7 @@ namespace ArknoNights.Lobby
                     "The Match connection is not available for commands.");
             command.PlayerId = profile.PlayerId;
             command.ConnectionGeneration = ConnectionGeneration;
-            SendMatch(MatchWireKind.Command, command);
+            SendMatch(MatchWireKind.OperationRequest, command);
             return Task.CompletedTask;
         }
 
@@ -397,7 +388,10 @@ namespace ArknoNights.Lobby
             if (!matchMode || disconnected || ended)
                 throw new InvalidOperationException(
                     "The Match connection is unavailable.");
-            SendMatch(MatchWireKind.SnapshotRequest, new MatchSnapshotRequestPayload
+            recoveryRequested = true;
+            SendMatch(
+                MatchWireKind.RecoveryStateRequest,
+                new MatchSnapshotRequestPayload
             {
                 ClientLastAppliedRevision =
                     matchSnapshotState.Current?.StateRevision ?? 0
@@ -668,14 +662,23 @@ namespace ArknoNights.Lobby
                     ClientEvent.ForInitialization(initialization));
                 matchInitializationCompletion.TrySetResult(initialization);
             }
-            else if (kind == MatchWireKind.CommandAck
+            else if (kind == MatchWireKind.OperationResult
                 && MatchProtocol.TryDeserializePayload(
                     envelope,
-                    out MatchCommandAckPayload ack))
+                    out MatchOperationResultPayload operationResult))
             {
-                receivedEvents.Enqueue(ClientEvent.ForAck(ack));
+                receivedEvents.Enqueue(
+                    ClientEvent.ForOperationResult(operationResult));
             }
-            else if (kind == MatchWireKind.ScopedSnapshot
+            else if (kind == MatchWireKind.SystemResult
+                && MatchProtocol.TryDeserializePayload(
+                    envelope,
+                    out MatchSystemResultPayload systemResult))
+            {
+                receivedEvents.Enqueue(
+                    ClientEvent.ForSystemResult(systemResult));
+            }
+            else if (kind == MatchWireKind.RecoveryState
                 && MatchProtocol.TryDeserializePayload(
                     envelope,
                     out ScopedSnapshotPayload scoped))
@@ -693,7 +696,8 @@ namespace ArknoNights.Lobby
                     throw new InvalidDataException(
                         "match.snapshot.session.invalid");
                 }
-                receivedEvents.Enqueue(ClientEvent.ForSnapshot(scoped));
+                receivedEvents.Enqueue(
+                    ClientEvent.ForRecoveryState(scoped));
             }
             else if (kind == MatchWireKind.ReconnectAccepted
                 && MatchProtocol.TryDeserializePayload(
@@ -719,60 +723,28 @@ namespace ArknoNights.Lobby
                         rejectCode,
                         rejected.StableDetailCode));
             }
-            else if (kind == MatchWireKind.MatchEnded
-                && MatchProtocol.TryDeserializePayload(
-                    envelope,
-                    out MatchEndedPayload matchEnded))
-            {
-                receivedEvents.Enqueue(ClientEvent.ForEnded(matchEnded));
-            }
-            else if (kind == MatchWireKind.ClockSync
-                && MatchProtocol.TryDeserializePayload(
-                    envelope,
-                    out MatchClockSyncPayload clock))
-            {
-                receivedEvents.Enqueue(ClientEvent.ForClock(clock));
-            }
-            else if (kind == MatchWireKind.BattleSeal
-                && MatchProtocol.TryDeserializePayload(
-                    envelope,
-                    out MatchBattleSealPayload battleSeal))
-            {
-                receivedEvents.Enqueue(ClientEvent.ForBattleSeal(battleSeal));
-            }
-            else if (kind == MatchWireKind.PlaybackStart
-                && MatchProtocol.TryDeserializePayload(
-                    envelope,
-                    out MatchPlaybackStartPayload playbackStart))
-            {
-                receivedEvents.Enqueue(ClientEvent.ForPlaybackStart(playbackStart));
-            }
-            else if (kind == MatchWireKind.PlaybackClock
-                && MatchProtocol.TryDeserializePayload(
-                    envelope,
-                    out MatchPlaybackClockPayload playbackClock))
-            {
-                receivedEvents.Enqueue(ClientEvent.ForPlaybackClock(playbackClock));
-            }
-            else if (kind == MatchWireKind.Ping
-                && MatchProtocol.TryDeserializePayload(
-                    envelope,
-                    out MatchHeartbeatPayload heartbeat)
-                && heartbeat.ConnectionGeneration == ConnectionGeneration)
-            {
-                SendMatch(MatchWireKind.Pong, heartbeat);
-            }
             else if (kind == MatchWireKind.Pong
                 && MatchProtocol.TryDeserializePayload(
                     envelope,
                     out MatchHeartbeatPayload pong)
                 && pong.ConnectionGeneration == ConnectionGeneration)
             {
+                Interlocked.Exchange(ref missedMatchPongs, 0);
                 receivedEvents.Enqueue(ClientEvent.ForLatency(
                     Math.Max(
                         0,
                         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
                             - pong.SentUnixMilliseconds)));
+                receivedEvents.Enqueue(ClientEvent.ForClock(
+                    new MatchClockSyncPayload
+                    {
+                        RoundNumber = pong.RoundNumber,
+                        Phase = pong.Phase,
+                        HostMonotonicNowMs =
+                            pong.HostMonotonicNowMs,
+                        PreparationDeadlineHostMonotonicMs =
+                            pong.PhaseDeadlineHostMonotonicMs
+                    }));
             }
             await Task.CompletedTask;
         }
@@ -799,6 +771,15 @@ namespace ArknoNights.Lobby
                     }
                     else if (ConnectionGeneration > 0 && !ended)
                     {
+                        if (Interlocked.Increment(
+                                ref missedMatchPongs)
+                            >= 3)
+                        {
+                            disconnected = true;
+                            try { tcpClient.Close(); }
+                            catch (Exception) { }
+                            return;
+                        }
                         SendMatch(
                             MatchWireKind.Ping,
                             new MatchHeartbeatPayload
@@ -813,7 +794,7 @@ namespace ArknoNights.Lobby
             }
         }
 
-        private void ApplySnapshot(ScopedSnapshotPayload scoped)
+        private void ApplyRecovery(ScopedSnapshotPayload scoped)
         {
             if (!MatchSnapshotWireProjector.ContainsOnlyRecipientPrivateState(
                 scoped,
@@ -822,9 +803,62 @@ namespace ArknoNights.Lobby
                 throw new InvalidDataException(
                     "match.snapshot.privacy.invalid");
             }
-            if (matchSnapshotState.TryApply(scoped))
+            if (matchSnapshotState.TryApplyRecovery(scoped))
             {
+                recoveryRequested = false;
                 MatchSnapshotChanged?.Invoke(scoped);
+                RecoveryStateApplied?.Invoke();
+            }
+        }
+
+        private void ApplyDelta(MatchStateDeltaWire delta)
+        {
+            if (delta == null) return;
+            var status = matchSnapshotState.TryApply(delta);
+            if (status == MatchDeltaApplyStatus.Applied)
+            {
+                var current = matchSnapshotState.Current;
+                if (!MatchSnapshotWireProjector
+                    .ContainsOnlyRecipientPrivateState(
+                        current,
+                        profile.PlayerId))
+                {
+                    throw new InvalidDataException(
+                        "match.delta.privacy.invalid");
+                }
+                MatchSnapshotChanged?.Invoke(current);
+                return;
+            }
+            if ((status
+                    == MatchDeltaApplyStatus.RecoveryRequired
+                 || status == MatchDeltaApplyStatus.Invalid)
+                && !recoveryRequested
+                && matchMode
+                && !disconnected
+                && !ended)
+            {
+                _ = RequestSnapshotAsync();
+            }
+        }
+
+        private void ApplySystemPayloads(
+            MatchSystemResultPayload result)
+        {
+            if (result.BattleSeal != null)
+            {
+                currentBattleSeal = result.BattleSeal;
+                BattleSealReceived?.Invoke(result.BattleSeal);
+            }
+            if (result.PlaybackStart != null)
+            {
+                currentPlaybackStart = result.PlaybackStart;
+                PlaybackStarted?.Invoke(result.PlaybackStart);
+            }
+            if (result.MatchEnded != null && !ended)
+            {
+                ended = true;
+                credentialStore.Clear();
+                MatchEnded?.Invoke(result.MatchEnded);
             }
         }
 
@@ -882,13 +916,10 @@ namespace ArknoNights.Lobby
             public long LatencyMilliseconds { get; private set; } = -1;
             public MatchInitializedPayload Initialization { get; private set; }
             public MatchReconnectAcceptedPayload ReconnectAccepted { get; private set; }
-            public ScopedSnapshotPayload ScopedSnapshot { get; private set; }
-            public MatchCommandAckPayload CommandAck { get; private set; }
-            public MatchEndedPayload Ended { get; private set; }
+            public ScopedSnapshotPayload RecoveryState { get; private set; }
+            public MatchOperationResultPayload OperationResult { get; private set; }
+            public MatchSystemResultPayload SystemResult { get; private set; }
             public MatchClockSyncPayload Clock { get; private set; }
-            public MatchBattleSealPayload BattleSeal { get; private set; }
-            public MatchPlaybackStartPayload PlaybackStart { get; private set; }
-            public MatchPlaybackClockPayload PlaybackClock { get; private set; }
             public bool Disconnected { get; private set; }
 
             public static ClientEvent ForLobby(LobbyRoomSnapshot value) =>
@@ -899,20 +930,17 @@ namespace ArknoNights.Lobby
                 new ClientEvent { Initialization = value };
             public static ClientEvent ForReconnectAccepted(MatchReconnectAcceptedPayload value) =>
                 new ClientEvent { ReconnectAccepted = value };
-            public static ClientEvent ForSnapshot(ScopedSnapshotPayload value) =>
-                new ClientEvent { ScopedSnapshot = value };
-            public static ClientEvent ForAck(MatchCommandAckPayload value) =>
-                new ClientEvent { CommandAck = value };
-            public static ClientEvent ForEnded(MatchEndedPayload value) =>
-                new ClientEvent { Ended = value };
+            public static ClientEvent ForRecoveryState(
+                ScopedSnapshotPayload value) =>
+                new ClientEvent { RecoveryState = value };
+            public static ClientEvent ForOperationResult(
+                MatchOperationResultPayload value) =>
+                new ClientEvent { OperationResult = value };
+            public static ClientEvent ForSystemResult(
+                MatchSystemResultPayload value) =>
+                new ClientEvent { SystemResult = value };
             public static ClientEvent ForClock(MatchClockSyncPayload value) =>
                 new ClientEvent { Clock = value };
-            public static ClientEvent ForBattleSeal(MatchBattleSealPayload value) =>
-                new ClientEvent { BattleSeal = value };
-            public static ClientEvent ForPlaybackStart(MatchPlaybackStartPayload value) =>
-                new ClientEvent { PlaybackStart = value };
-            public static ClientEvent ForPlaybackClock(MatchPlaybackClockPayload value) =>
-                new ClientEvent { PlaybackClock = value };
             public static ClientEvent DisconnectedEvent() =>
                 new ClientEvent { Disconnected = true };
         }

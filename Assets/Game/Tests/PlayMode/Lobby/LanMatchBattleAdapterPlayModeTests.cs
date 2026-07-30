@@ -76,14 +76,48 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(
                 observations.Single(item => item.PlayerId == "player-c").Observer,
                 Is.EqualTo(BattleObserverView.Away));
+            var official = requests.Single(item => item.MatchId == "official");
+            var officialHomeUnits = official.Input.Players
+                .Single(item => item.PlayerId == "player-a")
+                .Units;
+            Assert.That(officialHomeUnits, Has.Count.EqualTo(3));
             Assert.That(
-                requests.Single(item => item.MatchId == "official")
-                    .Input.Players.Single(item => item.PlayerId == "player-a")
-                    .Units,
-                Has.Count.EqualTo(1));
+                officialHomeUnits.Count(item => item.UnitId.StartsWith(
+                    "player-a-unit~entity-",
+                    StringComparison.Ordinal)),
+                Is.EqualTo(1));
+            var officialHomeEliteOneUnits = officialHomeUnits
+                .Where(item => item.UnitId.StartsWith(
+                    "player-a-elite-one~entity-",
+                    StringComparison.Ordinal))
+                .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                .ToArray();
+            Assert.That(officialHomeEliteOneUnits, Has.Length.EqualTo(2));
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    default(FormationOffset),
+                    new FormationOffset(25, -25)
+                },
+                officialHomeEliteOneUnits
+                    .Select(item => item.FormationOffset)
+                    .ToArray());
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    new FixedPosition(300, 200),
+                    new FixedPosition(325, 175)
+                },
+                new BattleRunner(official.Input).Events
+                    .Where(item => item.Type == BattleEventType.Spawn
+                                   && item.UnitId.StartsWith(
+                                       "player-a-elite-one~entity-",
+                                       StringComparison.Ordinal))
+                    .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                    .Select(item => item.SpawnSnapshot.Position)
+                    .ToArray());
             Assert.That(
-                requests.Single(item => item.MatchId == "official")
-                    .Input.Players.Single(item => item.PlayerId == "player-b")
+                official.Input.Players.Single(item => item.PlayerId == "player-b")
                     .Units,
                 Has.Count.EqualTo(3));
             Assert.That(
@@ -91,6 +125,68 @@ namespace ArknoNights.Lobby.Tests
                     .Input.Players.Single(item => item.PlayerId == "player-c")
                     .Units,
                 Has.Count.EqualTo(5));
+            var officialAwayUnits = official.Input.Players
+                .Single(item => item.PlayerId == "player-b")
+                .Units
+                .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                .ToArray();
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    default(FormationOffset),
+                    new FormationOffset(25, -25),
+                    new FormationOffset(-25, -25)
+                },
+                officialAwayUnits.Select(item => item.FormationOffset).ToArray());
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    new FixedPosition(600, 700),
+                    new FixedPosition(575, 725),
+                    new FixedPosition(625, 725)
+                },
+                new BattleRunner(official.Input).Events
+                    .Where(item => item.Type == BattleEventType.Spawn
+                                   && item.UnitId.StartsWith(
+                                       "player-b-unit~entity-",
+                                       StringComparison.Ordinal))
+                    .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                    .Select(item => item.SpawnSnapshot.Position)
+                    .ToArray());
+            var shadow = requests.Single(item => item.MatchId == "shadow");
+            var shadowAwayUnits = shadow.Input.Players
+                .Single(item => item.PlayerId == "player-c")
+                .Units
+                .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                .ToArray();
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    default(FormationOffset),
+                    new FormationOffset(25, -25),
+                    new FormationOffset(-25, -25),
+                    new FormationOffset(-25, 25),
+                    new FormationOffset(25, 25)
+                },
+                shadowAwayUnits.Select(item => item.FormationOffset).ToArray());
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    new FixedPosition(400, 700),
+                    new FixedPosition(375, 725),
+                    new FixedPosition(425, 725),
+                    new FixedPosition(425, 675),
+                    new FixedPosition(375, 675)
+                },
+                new BattleRunner(shadow.Input).Events
+                    .Where(item => item.Type == BattleEventType.Spawn
+                                   && item.UnitId.StartsWith(
+                                       "player-c-unit~entity-",
+                                       StringComparison.Ordinal))
+                    .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                    .Select(item => item.SpawnSnapshot.Position)
+                    .ToArray());
+            Assert.That(official.Input.CanonicalSummary, Does.Contain("|O:25,-25"));
             Assert.That(hashes, Is.EqualTo(repeatedHashes));
         }
 
@@ -113,22 +209,74 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [Test]
-        public void FormationPointerProjection_UsesBoardPlaneWithoutPhysicsCollider()
+        public void Runtime_NewPreparationRoundRebasesCountdownAndBattleShowsNinetySeconds()
         {
-            var method = RuntimeType("LanMatchHudController").GetMethod(
-                "TryProjectFormationRay",
-                BindingFlags.Static | BindingFlags.NonPublic);
+            var gameObject = new GameObject("LanRuntimeClockProbe");
+            var runtime = (Component)gameObject.AddComponent(
+                RuntimeType("LanMatchRuntimeController"));
+            try
+            {
+                InvokePrivate(
+                    runtime,
+                    "ApplySnapshot",
+                    PhaseSnapshot(1, MatchPhase.Preparation, 1, 30000));
+                Assert.That(
+                    Property<long>(
+                        runtime,
+                        "PreparationRemainingMilliseconds"),
+                    Is.InRange(29000L, 30000L));
+
+                InvokePrivate(
+                    runtime,
+                    "ApplySnapshot",
+                    PhaseSnapshot(2, MatchPhase.Battle, 1, 0));
+                Assert.That(
+                    Property<long>(
+                        runtime,
+                        "PreparationRemainingMilliseconds"),
+                    Is.Zero);
+                Assert.That(
+                    Property<int>(runtime, "BattleRemainingSeconds"),
+                    Is.EqualTo(90));
+
+                InvokePrivate(
+                    runtime,
+                    "ApplySnapshot",
+                    PhaseSnapshot(3, MatchPhase.Preparation, 2, 30000));
+                Assert.That(
+                    Property<long>(
+                        runtime,
+                        "PreparationRemainingMilliseconds"),
+                    Is.InRange(29000L, 30000L));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void FormationPointerProjection_UsesSharedGridWithoutPhysicsCollider()
+        {
+            var method = RuntimeType(
+                    "ArknoNights.Deployment.PreparationGridProjection")
+                .GetMethod(
+                    "TryWorldToCoordinate",
+                    BindingFlags.Public | BindingFlags.Static);
             Assert.That(method, Is.Not.Null);
             var arguments = new object[]
             {
-                new Ray(new Vector3(200f, 100f, 200f), Vector3.down),
+                new Vector3(200f, 0f, 200f),
                 null
             };
 
             Assert.That((bool)method.Invoke(null, arguments), Is.True);
-            var target = (MatchFormationPosition)arguments[1];
-            Assert.That(target.X, Is.EqualTo(2));
-            Assert.That(target.Y, Is.EqualTo(2));
+            Assert.That(
+                Property<int>(arguments[1], "X"),
+                Is.EqualTo(2));
+            Assert.That(
+                Property<int>(arguments[1], "Y"),
+                Is.EqualTo(2));
         }
 
         [UnityTest]
@@ -243,8 +391,7 @@ namespace ArknoNights.Lobby.Tests
                     Is.EqualTo(
                         Resources.Load<Texture2D>(
                             offeredCatalogEntry.PortraitResourcePath).name));
-                InvokePrivate(lanHud, "ConfirmPurchase", offer);
-                InvokePrivate(lanHud, "ConfirmPurchase", offer);
+                InvokePrivate(lanHud, "SubmitPurchase", offer);
                 host.Tick();
                 yield return null;
                 var afterPurchase = Snapshot(runtime);
@@ -267,19 +414,34 @@ namespace ArknoNights.Lobby.Tests
                     "BuildSlotId",
                     BindingFlags.Static | BindingFlags.Public);
                 Assert.That(buildSlotId, Is.Not.Null);
-                InvokePrivate(
-                    lanHud,
-                    "HandleStagingSelected",
-                    (string)buildSlotId.Invoke(null, new[] { stagingSlot }));
-                var submitFormation = lanHud.GetType().GetMethod(
-                    "TrySubmitSelectedAt",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
-                Assert.That(submitFormation, Is.Not.Null);
+                var deployment = stagingHud.GetComponent(
+                    RuntimeType(
+                        "ArknoNights.Deployment.StateDrivenDeploymentController"));
+                Assert.That(deployment, Is.Not.Null);
+                var beginDrag = deployment.GetType().GetMethod(
+                    "BeginDragFromSlot",
+                    BindingFlags.Instance | BindingFlags.Public);
+                var setDragWorldPosition = deployment.GetType().GetMethod(
+                    "SetDragWorldPositionForTests",
+                    BindingFlags.Instance | BindingFlags.Public);
+                var commitDrag = deployment.GetType().GetMethod(
+                    "CommitCurrentDragForTests",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(beginDrag, Is.Not.Null);
+                Assert.That(setDragWorldPosition, Is.Not.Null);
+                Assert.That(commitDrag, Is.Not.Null);
                 Assert.That(
-                    (bool)submitFormation.Invoke(
-                        lanHud,
-                        new object[] { afterPurchase.PublicState, 2, 2 }),
+                    (bool)beginDrag.Invoke(
+                        deployment,
+                        new[]
+                        {
+                            buildSlotId.Invoke(null, new[] { stagingSlot })
+                        }),
                     Is.True);
+                setDragWorldPosition.Invoke(
+                    deployment,
+                    new object[] { new Vector3(200f, 0f, 200f) });
+                commitDrag.Invoke(deployment, null);
                 host.Tick();
                 yield return null;
                 var afterDeployment = Snapshot(runtime);
@@ -289,6 +451,32 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(deployed.Zone, Is.EqualTo(MatchUnitZone.Deployed.ToString()));
                 Assert.That(deployed.FormationX, Is.EqualTo(2));
                 Assert.That(deployed.FormationY, Is.EqualTo(2));
+                Assert.That(
+                    Property<bool>(
+                        deployment,
+                        "PreparationViewsVisible"),
+                    Is.True);
+
+                SendReady(runtime, "host-ready-hide-preparation");
+                yield return WaitUntil(
+                    () =>
+                    {
+                        host.Tick();
+                        return IsPlaying(runtime);
+                    },
+                    15f,
+                    "host battle playback after ready");
+                var refreshHud = lanHud.GetType().GetMethod(
+                    "Refresh",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(refreshHud, Is.Not.Null);
+                refreshHud.Invoke(lanHud, null);
+                Assert.That(
+                    Property<bool>(
+                        deployment,
+                        "PreparationViewsVisible"),
+                    Is.False,
+                    "Entering battle must hide the sealed preparation formation.");
 
                 UnityEngine.Object.DestroyImmediate(runtimeObject);
                 runtimeObject = null;
@@ -446,18 +634,12 @@ namespace ArknoNights.Lobby.Tests
                     .First(item => !string.IsNullOrEmpty(item.UnitId));
                 var beforePurchaseRevision =
                     host.SessionActor.ProjectHostState().StateRevision;
-                InvokePrivate(hostHud, "ConfirmPurchase", offer);
-                host.Tick();
-                Assert.That(
-                    host.SessionActor.ProjectHostState().StateRevision,
-                    Is.EqualTo(beforePurchaseRevision),
-                    "The first click must only arm purchase confirmation.");
-                InvokePrivate(hostHud, "ConfirmPurchase", offer);
+                InvokePrivate(hostHud, "SubmitPurchase", offer);
                 host.Tick();
                 Assert.That(
                     host.SessionActor.ProjectHostState().StateRevision,
                     Is.GreaterThan(beforePurchaseRevision),
-                    "The second click must submit through the authority queue.");
+                    "The confirmed formal-HUD purchase must submit through the authority queue.");
             }
             finally
             {
@@ -645,6 +827,13 @@ namespace ArknoNights.Lobby.Tests
 
         private static ScopedSnapshotPayload Snapshot(string typeId)
         {
+            var playerA = Seat("player-a", typeId, 0, 2);
+            playerA.Units = playerA.Units
+                .Concat(new[]
+                {
+                    DeployedUnit("player-a-elite-one", typeId, 1, 3)
+                })
+                .ToArray();
             return new ScopedSnapshotPayload
             {
                 SessionId = "session",
@@ -681,7 +870,7 @@ namespace ArknoNights.Lobby.Tests
                     FinalStandings = Array.Empty<MatchStandingWire>(),
                     Seats = new[]
                     {
-                        Seat("player-a", typeId, 0, 2),
+                        playerA,
                         Seat("player-b", typeId, 2, 4),
                         Seat("player-c", typeId, 3, 6)
                     }
@@ -705,21 +894,57 @@ namespace ArknoNights.Lobby.Tests
                 ConnectionState = PublicConnectionState.Online.ToString(),
                 Units = new[]
                 {
-                    new MatchUnitWire
-                    {
-                        UnitId = playerId + "-unit",
-                        TypeId = typeId,
-                        Zone = MatchUnitZone.Deployed.ToString(),
-                        EliteLevel = elite,
-                        HasFormation = true,
-                        FormationX = x,
-                        FormationY = 2,
-                        Buffs = Array.Empty<MatchBuffWire>()
-                    }
+                    DeployedUnit(playerId + "-unit", typeId, elite, x)
                 },
                 TargetedUnitBuffs = Array.Empty<MatchTargetedBuffWire>(),
                 GlobalBuffs = Array.Empty<MatchGlobalBuffWire>(),
                 SourceEffects = Array.Empty<MatchSourceEffectWire>()
+            };
+        }
+
+        private static ScopedSnapshotPayload PhaseSnapshot(
+            long revision,
+            MatchPhase phase,
+            int roundNumber,
+            long preparationRemainingMs)
+        {
+            return new ScopedSnapshotPayload
+            {
+                SessionId = "clock-session",
+                StateRevision = revision,
+                LocalConnectionState =
+                    MatchLocalConnectionState.Connected.ToString(),
+                PublicState = new PublicMatchStateWire
+                {
+                    SessionId = "clock-session",
+                    StateRevision = revision,
+                    Phase = phase.ToString(),
+                    RoundNumber = roundNumber,
+                    PreparationRemainingMs = preparationRemainingMs,
+                    Pairings = Array.Empty<PublicMatchPairingWire>(),
+                    EndReason = MatchEndReason.None.ToString(),
+                    FinalStandings = Array.Empty<MatchStandingWire>(),
+                    Seats = Array.Empty<PublicMatchSeatWire>()
+                }
+            };
+        }
+
+        private static MatchUnitWire DeployedUnit(
+            string unitId,
+            string typeId,
+            int elite,
+            int x)
+        {
+            return new MatchUnitWire
+            {
+                UnitId = unitId,
+                TypeId = typeId,
+                Zone = MatchUnitZone.Deployed.ToString(),
+                EliteLevel = elite,
+                HasFormation = true,
+                FormationX = x,
+                FormationY = 2,
+                Buffs = Array.Empty<MatchBuffWire>()
             };
         }
 

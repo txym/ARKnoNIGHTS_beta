@@ -3,7 +3,7 @@
     "typeId":  1146,
     "common":  {
                    "rarity":  6,
-                   "deploymentCost":  2,
+                   "deploymentCost":  21,
                    "attackMethod":  0,
                    "actionMethod":  3,
                    "attackRadiusMetres":  0,

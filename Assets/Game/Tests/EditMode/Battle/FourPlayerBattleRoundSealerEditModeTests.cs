@@ -7,6 +7,7 @@ using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Player;
 using ArknoNights.Round;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace ArknoNights.Battle.Tests
 {
@@ -18,8 +19,8 @@ namespace ArknoNights.Battle.Tests
         [Test]
         public void SealRound_PreparesAllFourPlayersAndBuildsTheTwoConfirmedPairs()
         {
-            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
-            var match = LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath).State;
+            var catalog = LoadUniqueAutoDeployCatalog();
+            var match = LocalMatchStateLoader.LoadFromResources(catalog, MatchPath).State;
 
             var result = InvokeSealRound(match, catalog, "ui009-round-1");
             var matches = ReadMatches(result);
@@ -35,15 +36,15 @@ namespace ArknoNights.Battle.Tests
             var players = match.Snapshot.Players;
             Assert.That(players.Single(item => item.PlayerId == "local-ui-player").PlayerState.Units.Any(item => item.UnitId == "local-1000-overflow"), Is.False);
             Assert.That(players.All(item => item.PlayerState.Units.Count(unit => unit.Zone == PlayerUnitZone.Deployed) == 1), Is.True);
-            Assert.That(players.Single(item => item.PlayerId == "local-ui-player").PlayerState.DeploymentCost, Is.EqualTo(87));
+            Assert.That(players.Single(item => item.PlayerId == "local-ui-player").PlayerState.DeploymentCost, Is.EqualTo(78));
         }
 
         [Test]
         public void SealRound_RepeatedFreshFixturesProduceStableIndependentInputs()
         {
-            var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;
-            var first = InvokeSealRound(LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath).State, catalog, "ui009-round-stable");
-            var second = InvokeSealRound(LocalMatchStateLoader.LoadFromResources(CatalogPath, MatchPath).State, catalog, "ui009-round-stable");
+            var catalog = LoadUniqueAutoDeployCatalog();
+            var first = InvokeSealRound(LocalMatchStateLoader.LoadFromResources(catalog, MatchPath).State, catalog, "ui009-round-stable");
+            var second = InvokeSealRound(LocalMatchStateLoader.LoadFromResources(catalog, MatchPath).State, catalog, "ui009-round-stable");
 
             var firstInputs = ReadMatches(first).Select(item => item.Input.CanonicalSummary).ToArray();
             var secondInputs = ReadMatches(second).Select(item => item.Input.CanonicalSummary).ToArray();
@@ -92,6 +93,14 @@ namespace ArknoNights.Battle.Tests
             Assert.That((bool)method.Invoke(null, arguments), Is.True, arguments[5] as string);
             Assert.That(arguments[4], Is.Not.Null);
             return arguments[4];
+        }
+
+        private static UnitCatalog LoadUniqueAutoDeployCatalog()
+        {
+            var result =
+                UnitCatalogLoader.LoadFromResources(CatalogPath);
+            Assert.IsTrue(result.Success, string.Join(" | ", result.Errors.Select(item => item.ToString()).ToArray()));
+            return result.Catalog;
         }
 
         private static SealedMatch[] ReadMatches(object result)

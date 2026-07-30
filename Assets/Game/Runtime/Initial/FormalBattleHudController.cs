@@ -48,6 +48,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
     private PreparationBattleLoopController loop;
     private BattleDemoController demo;
     private UnitCatalog catalog;
+    private AbilityCatalog abilityCatalog;
     private RectTransform root;
     private RectTransform infoPanel;
     private Image portrait;
@@ -55,6 +56,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
     private Image eliteIcon;
     private Text unitName;
     private Text combatSummary;
+    private Text abilityDescription;
     private Text targetValue;
     private readonly Dictionary<string, Text> statValues = new Dictionary<string, Text>(StringComparer.Ordinal);
     private readonly HashSet<string> reportedDetailDiagnostics = new HashSet<string>(StringComparer.Ordinal);
@@ -144,6 +146,17 @@ public sealed class FormalBattleHudController : MonoBehaviour
         var catalogLoad = UnitCatalogLoader.LoadFromResources("BattleData/unit-catalog-v1");
         if (!catalogLoad.Success) { Debug.LogError("[FormalBattleHud][catalog.load.failed]", this); yield break; }
         catalog = catalogLoad.Catalog;
+        var abilityLoad = AbilityCatalogLoader.LoadFromResources(
+            "BattleData/ability-catalog-v1",
+            catalog);
+        if (!abilityLoad.Success)
+        {
+            Debug.LogError(
+                "[FormalBattleHud][abilityCatalog.load.failed]",
+                this);
+            yield break;
+        }
+        abilityCatalog = abilityLoad.Catalog;
         Build();
         hud.StagingSelectionChanged += SelectStagingSlot;
         deployment.DeployedSelectionChanged += SelectDeployed;
@@ -320,7 +333,39 @@ public sealed class FormalBattleHudController : MonoBehaviour
         hpValueRoot = Rect("HealthValue", infoPanel); hpValueRoot.anchorMin = hpValueRoot.anchorMax = new Vector2(0f, 1f); hpValueRoot.pivot = new Vector2(0f, 1f); hpValueRoot.anchoredPosition = new Vector2(556f, -490f); hpValueRoot.sizeDelta = new Vector2(149f, 50f);
         var valueBack = Image("Background", hpValueRoot, Sprite("UnitInformationPanelHealthValueBackground")); Stretch(valueBack.rectTransform); valueBack.preserveAspect = false;
         hpValue = NumberText("Text", hpValueRoot, 24, TextAnchor.MiddleCenter, Color.white); Stretch(hpValue.rectTransform); hpValue.rectTransform.offsetMax = new Vector2(0f, -5f);
-        foreach (var label in new[] { "技能", "阵营", "种族" }) { var tab = Text("Tab_" + label, infoPanel, 20, TextAnchor.MiddleCenter, new Color(.65f, .65f, .65f)); Position(tab.rectTransform, .18f + Array.IndexOf(new[] { "技能", "阵营", "种族" }, label) * .22f, .44f, 130f, 38f); tab.text = label + "\n未接入"; }
+        abilityDescription = Text(
+            "Tab_技能",
+            infoPanel,
+            20,
+            TextAnchor.UpperLeft,
+            new Color(.8f, .8f, .8f));
+        Position(
+            abilityDescription.rectTransform,
+            .18f,
+            .2375f,
+            180f,
+            430f);
+        abilityDescription.horizontalOverflow =
+            HorizontalWrapMode.Wrap;
+        abilityDescription.verticalOverflow =
+            VerticalWrapMode.Truncate;
+        abilityDescription.text = string.Empty;
+        foreach (var label in new[] { "阵营", "种族" })
+        {
+            var tab = Text(
+                "Tab_" + label,
+                infoPanel,
+                20,
+                TextAnchor.MiddleCenter,
+                new Color(.65f, .65f, .65f));
+            Position(
+                tab.rectTransform,
+                label == "阵营" ? .4f : .62f,
+                .44f,
+                130f,
+                38f);
+            tab.text = label + "\n未接入";
+        }
         infoPanel.gameObject.SetActive(false);
     }
 
@@ -337,13 +382,9 @@ public sealed class FormalBattleHudController : MonoBehaviour
             var defeated = states.Count(state => initialEnemies.Contains(state.UnitId) && !state.IsAlive);
             statusLeft.font = StagingHudController.FormalNumericFont;
             statusLeft.text = defeated + "/" + initialEnemies.Length;
-            statusClockIcon.gameObject.SetActive(false);
-            statusMiddle.font = StagingHudController.FormalUiFont;
-            statusMiddle.text = lanRuntime != null
-                ? lanRuntime.BattleState.ToString()
-                : loop.MultiBattle == null
-                    ? demo.State.ToString()
-                    : loop.MultiBattle.State.ToString();
+            statusClockIcon.gameObject.SetActive(true);
+            statusMiddle.font = StagingHudController.FormalNumericFont;
+            statusMiddle.text = CurrentBattleRemainingSeconds().ToString();
         }
         else
         {
@@ -422,6 +463,8 @@ public sealed class FormalBattleHudController : MonoBehaviour
         eliteIcon.sprite = Sprite("StagingSlotElite" + detail.EliteLevel + "Icon"); eliteIcon.enabled = eliteIcon.sprite != null;
         unitName.text = string.IsNullOrWhiteSpace(detail.DisplayNameZhHans) ? "--" : detail.DisplayNameZhHans;
         combatSummary.text = AttackMethodText(detail.AttackMethod) + "  " + DamageTypeText(detail.DamageType);
+        abilityDescription.text =
+            detail.AbilityDescriptionZhHans;
         targetValue.text = detail.LifeDeduct.ToString();
         SetStat("maxHp", UnitDetailNumberFormatter.Value(detail.MaxHitPoints));
         SetStat("moveSpeed", DetailValue(detail.MoveSpeedCentimetresPerSecond, UnitDetailNumberFormatter.MoveSpeed));
@@ -451,6 +494,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
         }
         unitName.text = string.Equals(visualFixtureId, "empty-name", StringComparison.Ordinal) ? "--" : "视觉验证单位";
         combatSummary.text = "近战  物理";
+        abilityDescription.text = "视觉验证能力描述。";
         targetValue.text = "2";
         SetStat("maxHp", "18000");
         SetStat("moveSpeed", "1.9");
@@ -479,7 +523,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
             var input = CurrentBattleInput();
             return input != null && UnitDetailResolver.TryResolveBattle(input, CurrentBattleStates(), catalog, selectedUnitId, out detail);
         }
-        return hud?.DisplayedSnapshot != null && UnitDetailResolver.TryResolvePreparation(hud.DisplayedSnapshot, catalog, selectedUnitId, out detail);
+        return hud?.DisplayedSnapshot != null && UnitDetailResolver.TryResolvePreparation(hud.DisplayedSnapshot, catalog, abilityCatalog, selectedUnitId, out detail);
     }
 
     private IReadOnlyList<BattlePresentationViewState> CurrentBattleStates()
@@ -509,6 +553,20 @@ public sealed class FormalBattleHudController : MonoBehaviour
         if (lanRuntime != null)
             return lanRuntime.CurrentObserverSide;
         return loop?.MultiBattle?.Observer == BattleObserverView.Away ? BattleSide.Away : BattleSide.Home;
+    }
+
+    private int CurrentBattleRemainingSeconds()
+    {
+        if (lanRuntime != null)
+            return lanRuntime.BattleRemainingSeconds;
+        var maximumTicks = CurrentBattleInput()?.MaxTicks
+            ?? LanMatchBattleAdapter.MaximumBattleTicks;
+        var currentTick = loop?.MultiBattle != null
+            ? Mathf.FloorToInt((float)loop.MultiBattle.PresentationTick)
+            : Mathf.FloorToInt(demo?.Coordinator?.PresentationTick ?? 0f);
+        var remainingTicks = Math.Max(0, maximumTicks - currentTick);
+        return (remainingTicks + BattleInput.TicksPerSecond - 1)
+            / BattleInput.TicksPerSecond;
     }
 
     private bool IsBattlePhase =>

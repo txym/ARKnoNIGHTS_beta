@@ -79,6 +79,7 @@ public sealed class ResolvedUnitVariant
     public const float BaseAttackIntervalMultiplier = 0.5f;
 
     public int typeId;
+    public int eliteLevel;
     public int minEliteLevel;
     public string sourceVariant;
     public int statsLevel;

@@ -271,12 +271,90 @@ namespace ArknoNights.Player
             if (!LocalFormationCoordinate.TryCreate(x, y, out var formation)) return Result(PlayerOperationCode.CoordinateOutOfBounds);
             if (!LocalFormationCoordinate.IsDeployable(x, y)) return Result(PlayerOperationCode.CoordinateIsGate);
             if (unitsById.Values.Any(candidate => candidate.Zone == PlayerUnitZone.Deployed && candidate.Formation.HasValue && candidate.Formation.Value.Equals(formation))) return Result(PlayerOperationCode.CoordinateOccupied);
-            if (!catalog.TryGet(unit.TypeId, out var type)) return Result(PlayerOperationCode.TypeUnknown);
+            if (!catalog.TryGet(
+                    unit.TypeId,
+                    unit.EliteLevel,
+                    out var type))
+                return Result(PlayerOperationCode.TypeUnknown);
             if (deploymentCost < type.DeploymentCost) return Result(PlayerOperationCode.InsufficientDeploymentCost);
 
             deploymentCost -= type.DeploymentCost;
             unit.Zone = PlayerUnitZone.Deployed;
             unit.Formation = formation;
+            NotifyChanged();
+            return Result(PlayerOperationCode.Success);
+        }
+
+        public PlayerOperationResult TryReplaceDeployed(
+            string stagingUnitId,
+            string expectedDeployedUnitId,
+            int x,
+            int y)
+        {
+            if (!unitsById.TryGetValue(
+                    stagingUnitId ?? string.Empty,
+                    out var incoming))
+                return Result(PlayerOperationCode.UnitNotFound);
+            if (incoming.Zone != PlayerUnitZone.Staging)
+                return Result(PlayerOperationCode.UnitNotStaging);
+            if (!LocalFormationCoordinate.TryCreate(
+                    x,
+                    y,
+                    out var target))
+                return Result(PlayerOperationCode.CoordinateOutOfBounds);
+            if (!LocalFormationCoordinate.IsDeployable(x, y))
+                return Result(PlayerOperationCode.CoordinateIsGate);
+            var outgoing = unitsById.Values.FirstOrDefault(candidate =>
+                candidate.Zone == PlayerUnitZone.Deployed
+                && candidate.Formation.HasValue
+                && candidate.Formation.Value.Equals(target));
+            if (outgoing == null
+                || !string.Equals(
+                    outgoing.UnitId,
+                    expectedDeployedUnitId,
+                    StringComparison.Ordinal))
+                return Result(PlayerOperationCode.CoordinateOccupied);
+            if (!catalog.TryGet(
+                    incoming.TypeId,
+                    incoming.EliteLevel,
+                    out var incomingType)
+                || !catalog.TryGet(
+                    outgoing.TypeId,
+                    outgoing.EliteLevel,
+                    out var outgoingType))
+                return Result(PlayerOperationCode.TypeUnknown);
+            var nextDeploymentCost =
+                (long)deploymentCost
+                + outgoingType.DeploymentCost
+                - incomingType.DeploymentCost;
+            if (nextDeploymentCost < 0)
+                return Result(
+                    PlayerOperationCode
+                        .InsufficientDeploymentCost);
+
+            var prospective = unitsById.Values.Select(candidate =>
+            {
+                if (candidate == incoming)
+                    return candidate.WithZone(
+                        PlayerUnitZone.Deployed,
+                        target);
+                if (candidate == outgoing)
+                    return candidate.WithZone(
+                        PlayerUnitZone.Staging,
+                        null);
+                return candidate;
+            }).ToArray();
+            if (CountStagingSlots(prospective, catalog)
+                > StagingSlotCapacity)
+                return Result(
+                    PlayerOperationCode
+                        .StagingCapacityExceeded);
+
+            incoming.Zone = PlayerUnitZone.Deployed;
+            incoming.Formation = target;
+            outgoing.Zone = PlayerUnitZone.Staging;
+            outgoing.Formation = null;
+            deploymentCost = checked((int)nextDeploymentCost);
             NotifyChanged();
             return Result(PlayerOperationCode.Success);
         }
@@ -310,7 +388,11 @@ namespace ArknoNights.Player
         {
             if (!unitsById.TryGetValue(unitId ?? string.Empty, out var unit)) return Result(PlayerOperationCode.UnitNotFound);
             if (unit.Zone != PlayerUnitZone.Deployed) return Result(PlayerOperationCode.UnitNotDeployed);
-            if (!catalog.TryGet(unit.TypeId, out var type)) return Result(PlayerOperationCode.TypeUnknown);
+            if (!catalog.TryGet(
+                    unit.TypeId,
+                    unit.EliteLevel,
+                    out var type))
+                return Result(PlayerOperationCode.TypeUnknown);
 
             var prospective = unitsById.Values.Select(candidate => candidate == unit ? candidate.WithZone(PlayerUnitZone.Staging, null) : candidate).ToArray();
             if (CountStagingSlots(prospective, catalog) > StagingSlotCapacity) return Result(PlayerOperationCode.StagingCapacityExceeded);
@@ -395,7 +477,10 @@ namespace ArknoNights.Player
             var slots = groups.Select(group =>
             {
                 var unit = group[0];
-                catalog.TryGet(unit.TypeId, out var type);
+                catalog.TryGet(
+                    unit.TypeId,
+                    unit.EliteLevel,
+                    out var type);
                 return new StagingStackSnapshot(
                     unit.TypeId,
                     type == null ? int.MaxValue : type.DeploymentCost,

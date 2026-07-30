@@ -211,10 +211,8 @@
 
 - 完成状态：**已实现**
 - 能力描述：死亡时分裂三个<畸变赘生物>。
-- 能力详情：死亡 `0.1s=2 Tick` 后，在最近非门地块中心 `0.4格` 方形范围内生成后继；精英 0 变体接入 `MUTANT_ROCKSPIDER_DEATH_SPAWN` 并生成 `3` 个 `1137`，精英 2 变体接入 `MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO` 并生成 `2` 个 `1138`。
-- 精英化数值变化：有；召唤数量由 `3` 变为 `2`，后继类型同时从畸变赘生物改为<畸变恶性瘤>。
-
-- 这里出现问题了，召唤数量不变。
+- 能力详情：死亡 `0.1s=2 Tick` 后，在最近非门地块中心 `0.4格` 方形范围内生成后继；精英 0 变体接入 `MUTANT_ROCKSPIDER_DEATH_SPAWN` 并生成 `3` 个 `1137`，精英 2 变体接入 `MUTANT_ROCKSPIDER_DEATH_SPAWN_ELITE_TWO` 并生成 `3` 个 `1138`。
+- 精英化数值变化：召唤数量保持为 `3`；精英 2 只把后继类型从畸变赘生物改为<畸变恶性瘤>。
 
 ### `1138` 畸变恶性瘤
 
@@ -409,7 +407,7 @@
 
 - 完成状态：**已实现**
 - 能力描述：首次低于半血时切换状态，短时间无法被阻挡并大幅加速。
-- 能力详情：生命值首次严格低于 `50%` 时触发一次，立即解除阻挡，持续 `1.5s=30 Tick` 无法被阻挡且移速加 `150%`；全部 v2 变体接入 `FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM`。`Skill_Begin` 源时长 `20 Tick`，二倍速占用 `10 Tick`；若触发时正在攻击则等待攻击结束再播放，完成后永久切换至 `_B` 待机、移动、攻击和死亡动画。
+- 能力详情：生命值首次严格低于 `50%` 时触发一次，立即清空普通攻击目标并解除阻挡，持续 `1.5s=30 Tick` 无法被阻挡、移速加 `150%`，且直接向敌方门中心移动；状态结束后若尚未冲家则恢复普通索敌。全部 v2 变体接入 `FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM`。`Skill_Begin` 源时长 `20 Tick`，二倍速占用 `10 Tick`；若触发时正在攻击则等待攻击结束再播放，完成后永久切换至 `_B` 待机、移动、攻击和死亡动画。
 - 精英化数值变化：无；两个 v2 精英变体使用相同能力目标值。
 
 ### `10002` 浆果虫
@@ -472,7 +470,7 @@
 
 - 完成状态：**已实现**
 - 能力描述：受到伤害降低，攻击速度提升。
-- 能力详情：攻速 `+100`，物理/法术承伤乘 `50%`，真实伤害不减免；全部 v2 变体接入 `HETEROGENEOUS_BEAST_FORTIFICATION`，表现只使用 A 组动画。
+- 能力详情：攻速 `+100`，物理/法术承伤乘 `50%`，真实伤害不减免；全部 v2 变体接入 `HETEROGENEOUS_BEAST_FORTIFICATION`，表现只使用 A 组动画。资源没有独立 `Idle` 名，v2 的 `idle` 语义键显式绑定真实 Spine 动画 `A_Default`，运行时不再猜测通用回退名。
 - 精英化数值变化：无；各精英变体使用相同能力数值。
 
 ## 尚未完成项汇总
@@ -483,8 +481,8 @@
 
 - 全局技能动画定向测试覆盖 `30→15`、`31→16` 以及攻击中满 SP 后延迟施法。
 - `BondsTargetingEditModeTests` 已覆盖不攻击、无人机排除近战与远程索敌、零阻挡、直冲敌方门和冲门退出；范围技能、进入半径伤害与直接伤害套件共同覆盖无人机从伤害候选中排除。
-- `BondsPassiveCombatModifierEditModeTests` 已覆盖被动修正、光环、标签条件、寿命、死亡后继、囚犯释放、半血技能与永久表现状态等 Core 语义。
+- `BondsPassiveCombatModifierEditModeTests` 已覆盖被动修正、光环、标签条件、寿命、死亡后继、囚犯释放、半血技能、简饲源石虫变身冲家、全局时间强化与永久表现状态等 Core 语义。
 - 已实现能力的生产接线由 `UnitSourceConsumerEditModeTests` 与对应能力聚焦套件验证。
-- 本文 `59` 条“能力描述”已同步到对应 v2 单位 JSON 的全部 `108` 个能力单位变体；`1131/1132` 的精英 2 变体按精英化产物改用“两个<畸变恶性瘤>”。`scripts/Sync-BondsUnitDescriptions.ps1 -Check` 会逐项比较本文与生产单位源，防止后续修改描述后漏同步。
+- 本文 `59` 条“能力描述”已同步到对应 v2 单位 JSON 的全部 `108` 个能力单位变体；`1131` 的精英 2 变体改为“两个<畸变恶性瘤>”，`1132` 的精英 2 变体改为“三个<畸变恶性瘤>”。`scripts/Sync-BondsUnitDescriptions.ps1 -Check` 会逐项比较本文与生产单位源，防止后续修改描述后漏同步。
 - 2026-07-29 描述同步后的最终定向 EditMode 合计 `169/169` 通过、`0` 失败、`0` 跳过：`BondsTargeting=7`、`BondsPassiveCombatModifier=45`、`BondsSkillAnimation=5`、`UnitSourceConsumer=17`、`BattleCore=59`、`BattlePresentation=23`、`BattlePresentationTrack=13`。其中 1146 生产投影断言覆盖 `250cm` 半径、基础/精英 2 增量数值、排除自身、按能力 ID 不叠加及两个精英变体接线；结果位于 `Artifacts/BondsAbilities/FinalDescriptions/EditModeResults.xml`。
 - 尚未运行 PlayMode 真实 Spine 动画冒烟、Windows Player 构建或人工动画检查；这些项目不得记为通过。

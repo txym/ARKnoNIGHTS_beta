@@ -448,6 +448,18 @@ namespace ArknoNights.Battle.Tests
             Assert.That(threshold.CurrentHitPoints, Is.EqualTo(100));
             Assert.That(threshold.EffectiveDefense, Is.EqualTo(400));
             Assert.That(threshold.EffectiveBlockCapacity, Is.EqualTo(2));
+            var attributesChanged = runner.Events.Last(item =>
+                item.Type == BattleEventType.AttributesChanged
+                && item.UnitId == "threshold");
+            Assert.That(
+                attributesChanged.AttributesSnapshot,
+                Is.Not.Null);
+            Assert.That(
+                attributesChanged.AttributesSnapshot.Defense,
+                Is.EqualTo(400));
+            Assert.That(
+                attributesChanged.AttributesSnapshot.BlockCapacity,
+                Is.EqualTo(2));
         }
 
         [Test]
@@ -509,6 +521,200 @@ namespace ArknoNights.Battle.Tests
             Assert.That(
                 threshold.EffectiveMoveSpeedCentimetresPerSecond,
                 Is.EqualTo(100));
+        }
+
+        [Test]
+        public void BattleTimePower_AppliesSeparateAttackAndIntervalSectorsAtExactThresholdTicks()
+        {
+            var input = CreateInput(
+                601,
+                new[]
+                {
+                    Attacker(
+                        "scaling",
+                        0,
+                        1,
+                        attackIntervalTicks: 20,
+                        attack: 100),
+                    NonAttacker("durable", 1000000)
+                },
+                Array.Empty<AbilityDefinition>(),
+                new[] { Unit("scaling", "scaling", 5, 4) },
+                new[] { Unit("durable", "durable", 5, 4) });
+            var runner = new BattleRunner(input);
+            var scaling = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "scaling");
+
+            while (runner.CurrentTick < 399)
+                runner.Step();
+            Assert.That(scaling.EffectiveAttack, Is.EqualTo(100));
+            Assert.That(
+                scaling.EffectiveAttackIntervalTicks,
+                Is.EqualTo(20));
+
+            runner.Step();
+            Assert.That(runner.CurrentTick, Is.EqualTo(400));
+            Assert.That(scaling.EffectiveAttack, Is.EqualTo(140));
+            Assert.That(
+                scaling.EffectiveAttackIntervalTicks,
+                Is.EqualTo(18));
+            var firstStack = runner.Events.Single(item =>
+                item.Type == BattleEventType.AttributesChanged
+                && item.Tick == 400
+                && item.UnitId == "scaling");
+            Assert.That(
+                firstStack.AttributesSnapshot.Attack,
+                Is.EqualTo(140));
+            Assert.That(
+                firstStack.AttributesSnapshot.AttackIntervalTicks,
+                Is.EqualTo(18));
+
+            while (runner.CurrentTick < 599)
+                runner.Step();
+            Assert.That(scaling.EffectiveAttack, Is.EqualTo(140));
+            Assert.That(
+                scaling.EffectiveAttackIntervalTicks,
+                Is.EqualTo(18));
+
+            runner.Step();
+            Assert.That(runner.CurrentTick, Is.EqualTo(600));
+            Assert.That(scaling.EffectiveAttack, Is.EqualTo(180));
+            Assert.That(
+                scaling.EffectiveAttackIntervalTicks,
+                Is.EqualTo(16));
+            var secondStack = runner.Events.Single(item =>
+                item.Type == BattleEventType.AttributesChanged
+                && item.Tick == 600
+                && item.UnitId == "scaling");
+            Assert.That(
+                secondStack.AttributesSnapshot.Attack,
+                Is.EqualTo(180));
+            Assert.That(
+                secondStack.AttributesSnapshot.AttackIntervalTicks,
+                Is.EqualTo(16));
+        }
+
+        [Test]
+        public void BattleTimePower_IsIncludedInLateDynamicUnitSpawnSnapshots()
+        {
+            var summon = new AbilityDefinition(
+                "LATE_SUMMON",
+                string.Empty,
+                string.Empty,
+                AbilityActivationKind.Timed,
+                SilencePolicy.Unaffected,
+                0,
+                40,
+                SkillPointGeneration.Automatic,
+                new SummonEffectDefinition(
+                    "child",
+                    1,
+                    100,
+                    false),
+                null,
+                "skill",
+                1);
+            var input = CreateInput(
+                401,
+                new[]
+                {
+                    Attacker(
+                        "caster",
+                        0,
+                        1,
+                        "LATE_SUMMON",
+                        attackIntervalTicks: 1000,
+                        attack: 1),
+                    Attacker(
+                        "child",
+                        0,
+                        1,
+                        attackIntervalTicks: 20,
+                        attack: 100),
+                    NonAttacker("durable", 1000000)
+                },
+                new[] { summon },
+                new[] { Unit("caster", "caster", 5, 4) },
+                new[] { Unit("durable", "durable", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            while (runner.CurrentTick < 400)
+                runner.Step();
+
+            var child = runner.RuntimeUnits.Single(item =>
+                item.TypeId == "child");
+            Assert.That(child.EffectiveAttack, Is.EqualTo(140));
+            Assert.That(
+                child.EffectiveAttackIntervalTicks,
+                Is.EqualTo(18));
+            var spawn = runner.Events.Single(item =>
+                item.Type == BattleEventType.Spawn
+                && item.UnitTypeId == "child");
+            Assert.That(spawn.Tick, Is.EqualTo(400));
+            Assert.That(spawn.SpawnSnapshot.Attack, Is.EqualTo(140));
+            Assert.That(
+                spawn.SpawnSnapshot.AttackIntervalTicks,
+                Is.EqualTo(18));
+        }
+
+        [Test]
+        public void OneShotHealthThreshold_RushesOpposingGateWithoutRetargetingWhileActive()
+        {
+            var input = CreateInput(
+                8,
+                new[]
+                {
+                    Attacker(
+                        "runner",
+                        100,
+                        1,
+                        "RUSH_GATE",
+                        attackIntervalTicks: 1000,
+                        maxHitPoints: 1000,
+                        attack: 1),
+                    Attacker(
+                        "enemy",
+                        2000,
+                        1,
+                        attackIntervalTicks: 1000,
+                        attack: 600)
+                },
+                new[]
+                {
+                    PassiveThreshold(
+                        "RUSH_GATE",
+                        thresholdHitPointsPermille: 500,
+                        inclusiveThreshold: false,
+                        triggerOnce: true,
+                        durationTicks: 3,
+                        moveSpeedMultiplierPermille: 2500,
+                        makesUnblockable: true,
+                        rushesOpposingGate: true)
+                },
+                new[] { Unit("runner", "runner", 5, 4) },
+                new[] { Unit("enemy", "enemy", 5, 4) });
+            var runner = new BattleRunner(input);
+
+            runner.Step();
+            runner.Step();
+            var runtime = runner.RuntimeUnits.Single(item =>
+                item.UnitId == "runner");
+            Assert.That(runtime.CurrentHitPoints, Is.EqualTo(400));
+            Assert.That(runtime.BlockedUnitIds, Is.Empty);
+            var beforeRush = runtime.Position;
+
+            runner.Step();
+
+            Assert.That(runtime.TargetUnitId, Is.Null);
+            Assert.That(
+                runtime.Position.YUnits,
+                Is.GreaterThan(beforeRush.YUnits));
+            Assert.That(
+                runner.Events.Any(item =>
+                    item.Type == BattleEventType.Attack
+                    && item.Tick == 3
+                    && item.UnitId == "runner"),
+                Is.False);
         }
 
         [Test]
@@ -1034,8 +1240,15 @@ namespace ArknoNights.Battle.Tests
                         0,
                         attackIntervalTicks: 100,
                         attack: 1000),
-                    NonAttacker("parent", 100, "DEATH_SPLIT"),
-                    NonAttacker("child", 1000)
+                    NonAttacker(
+                        "parent",
+                        100,
+                        "DEATH_SPLIT",
+                        eliteLevel: 2),
+                    NonAttacker(
+                        "child",
+                        1000,
+                        eliteLevel: 2)
                 },
                 new[]
                 {
@@ -1544,9 +1757,13 @@ namespace ArknoNights.Battle.Tests
                         0,
                         "ATTACK_SPAWN",
                         attackIntervalTicks: 2,
-                        attack: 10),
+                        attack: 10,
+                        eliteLevel: 2),
                     NonAttacker("target", 10000),
-                    NonAttacker("fragment", 1000)
+                    NonAttacker(
+                        "fragment",
+                        1000,
+                        eliteLevel: 2)
                 },
                 new[]
                 {
@@ -2063,8 +2280,12 @@ namespace ArknoNights.Battle.Tests
                     NonAttacker(
                         "golem",
                         1000,
-                        "HALF_HEALTH_DROP"),
-                    NonAttacker("berry", 1000)
+                        "HALF_HEALTH_DROP",
+                        eliteLevel: 2),
+                    NonAttacker(
+                        "berry",
+                        1000,
+                        eliteLevel: 2)
                 },
                 new[]
                 {
@@ -2820,7 +3041,8 @@ namespace ArknoNights.Battle.Tests
             bool makesUnblockable = false,
             string transitionAnimationKey = "",
             int transitionAnimationOriginalDurationTicks = 0,
-            string completedPresentationStateTag = "")
+            string completedPresentationStateTag = "",
+            bool rushesOpposingGate = false)
         {
             return new AbilityDefinition(
                 abilityId,
@@ -2849,7 +3071,8 @@ namespace ArknoNights.Battle.Tests
                     makesUnblockable,
                     transitionAnimationKey,
                     transitionAnimationOriginalDurationTicks,
-                    completedPresentationStateTag),
+                    completedPresentationStateTag,
+                    rushesOpposingGate),
                 string.Empty,
                 0);
         }
@@ -3549,7 +3772,8 @@ namespace ArknoNights.Battle.Tests
             int maxHitPoints = 100000,
             int attack = 1000,
             int defense = 0,
-            int attackAnimationDurationTicks = 1)
+            int attackAnimationDurationTicks = 1,
+            int eliteLevel = 0)
         {
             return new UnitDefinition(
                 typeId,
@@ -3567,7 +3791,10 @@ namespace ArknoNights.Battle.Tests
                 true,
                 abilityId == null
                     ? Array.Empty<string>()
-                    : new[] { abilityId });
+                    : new[] { abilityId },
+                1,
+                1,
+                eliteLevel);
         }
 
         private static AbilityDefinition TimedBlink(
@@ -3626,7 +3853,8 @@ namespace ArknoNights.Battle.Tests
             string typeId,
             int maxHitPoints,
             string abilityId = null,
-            int defense = 0)
+            int defense = 0,
+            int eliteLevel = 0)
         {
             return new UnitDefinition(
                 typeId,
@@ -3645,7 +3873,9 @@ namespace ArknoNights.Battle.Tests
                 abilityId == null
                     ? Array.Empty<string>()
                     : new[] { abilityId },
-                4);
+                4,
+                1,
+                eliteLevel);
         }
 
         private static UnitDefinition MovingNonAttacker(

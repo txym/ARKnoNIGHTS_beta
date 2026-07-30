@@ -634,7 +634,8 @@ public static class AbilityCatalogGenerator
                     && effect.blockCapacityAdditive == 0
                     && effect.attackSpeedAdditive == 0
                     && effect.moveSpeedMultiplierPermille == 1000
-                    && !effect.makesUnblockable))
+                    && !effect.makesUnblockable
+                    && !effect.rushesOpposingGate))
                 throw new InvalidOperationException("ABILITY_CATALOG_SOURCE_HEALTH_THRESHOLD_COMBAT_MODIFIER_INVALID path=" + sourcePath);
             entry.healthThresholdCombatHitPointsPermille =
                 effect.thresholdHitPointsPermille;
@@ -656,6 +657,8 @@ public static class AbilityCatalogGenerator
                 effect.moveSpeedMultiplierPermille;
             entry.healthThresholdCombatMakesUnblockable =
                 effect.makesUnblockable;
+            entry.healthThresholdCombatRushesOpposingGate =
+                effect.rushesOpposingGate;
             return entry;
         }
         if (effect.kind == "HealthThresholdAdjacentSpawn")
@@ -751,7 +754,7 @@ public static class AbilityCatalogGenerator
         public int timedBlinkDistanceCentimetres;
         public int proximityEntryRadiusCentimetres; public string proximityEntryDamageType; public int proximityEntryAttackMultiplierPermille; public bool proximityEntryGroundTargetsOnly;
         public string triggeredSpawnKind; public int triggeredSpawnFirstTriggerOrdinal; public int triggeredSpawnRepeatInterval; public string triggeredSpawnSummonTypeId; public int triggeredSpawnSideLengthCentimetres; public int triggeredSpawnMaxActiveSameType;
-        public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable;
+        public int healthThresholdCombatHitPointsPermille; public bool healthThresholdCombatInclusive; public bool healthThresholdCombatTriggerOnce; public int healthThresholdCombatDurationTicks; public int healthThresholdCombatAttackMultiplierPermille; public int healthThresholdCombatDefenseMultiplierPermille; public int healthThresholdCombatBlockCapacityAdditive; public int healthThresholdCombatAttackSpeedAdditive; public int healthThresholdCombatMoveSpeedMultiplierPermille; public bool healthThresholdCombatMakesUnblockable; public bool healthThresholdCombatRushesOpposingGate;
         public int healthThresholdAdjacentSpawnHitPointsPermille; public bool healthThresholdAdjacentSpawnInclusive; public string healthThresholdAdjacentSpawnTypeId;
     }
     [Serializable] private sealed class AbilitySource { public string schemaVersion; public string abilityId; public string displayNameZhHans; public string descriptionZhHans; public string activationKind; public string silencePolicy; public SkillPoints skillPoints; public string animationKey; public string persistentPresentationStateTag; public AbilityEffect[] effects; }
@@ -763,7 +766,7 @@ public static class AbilityCatalogGenerator
         public int hitPointsPerSecond; public int lifetimeTicks;
         public float targetRangeMetres; public float radiusMetres; public string damageType; public int damageAmount; public int attackMultiplierPermille; public bool groundTargetsOnly;
         public int firstTriggerOrdinal; public int repeatInterval; public float dashDistanceMetres; public float unblockableDurationSeconds; public float blinkDistanceMetres; public string triggerKind; public int maxActiveSameType;
-        public int thresholdHitPointsPermille; public bool inclusiveThreshold; public bool triggerOnce; public int durationTicks; public int defenseMultiplierPermille; public int moveSpeedMultiplierPermille; public bool makesUnblockable;
+        public int thresholdHitPointsPermille; public bool inclusiveThreshold; public bool triggerOnce; public int durationTicks; public int defenseMultiplierPermille; public int moveSpeedMultiplierPermille; public bool makesUnblockable; public bool rushesOpposingGate;
         public int transitionBeforeAttackOrdinal; public int lockedAttackSpeedAdditive; public int lockedDefenseAdditive; public int unlockedAttackMultiplierPermille; public int unlockedMagicResistanceAdditive; public int unlockedHitPointsPerSecond; public int unlockedTargetDefenseMultiplierPermille; public bool releasesAlliedAttackCountStates;
         public DeathSpawnOptionSource[] options; public int delayTicks; public bool snapToNearestPassableCell; public int summonedMoveSpeedMultiplierPermille;
         public string targetSide; public bool isGlobal; public bool excludeSource; public bool nonStackingByAbilityId; public int defenseAdditive; public int attackSpeedMultiplierPermille; public string grantedStatusTag;

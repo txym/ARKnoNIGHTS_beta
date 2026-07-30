@@ -139,7 +139,8 @@ namespace ArknoNights.Battle.Core
                 false,
                 string.Empty,
                 0,
-                string.Empty)
+                string.Empty,
+                false)
         {
         }
 
@@ -156,7 +157,8 @@ namespace ArknoNights.Battle.Core
             bool makesUnblockable,
             string transitionAnimationKey = "",
             int transitionAnimationOriginalDurationTicks = 0,
-            string completedPresentationStateTag = "")
+            string completedPresentationStateTag = "",
+            bool rushesOpposingGate = false)
         {
             ThresholdHitPointsPermille =
                 thresholdHitPointsPermille;
@@ -173,6 +175,7 @@ namespace ArknoNights.Battle.Core
             MoveSpeedMultiplierPermille =
                 moveSpeedMultiplierPermille;
             MakesUnblockable = makesUnblockable;
+            RushesOpposingGate = rushesOpposingGate;
             TransitionAnimationKey =
                 transitionAnimationKey ?? string.Empty;
             TransitionAnimationOriginalDurationTicks =
@@ -191,6 +194,7 @@ namespace ArknoNights.Battle.Core
         public int AttackSpeedAdditive { get; }
         public int MoveSpeedMultiplierPermille { get; }
         public bool MakesUnblockable { get; }
+        public bool RushesOpposingGate { get; }
         public string TransitionAnimationKey { get; }
         public int TransitionAnimationOriginalDurationTicks { get; }
         public int TransitionAnimationEffectiveDurationTicks =>
@@ -207,7 +211,8 @@ namespace ArknoNights.Battle.Core
             && AttackSpeedAdditive == 0
             && MoveSpeedMultiplierPermille
             == NeutralMultiplierPermille
-            && !MakesUnblockable;
+            && !MakesUnblockable
+            && !RushesOpposingGate;
     }
 
     public sealed class AttackSequenceModifierDefinition

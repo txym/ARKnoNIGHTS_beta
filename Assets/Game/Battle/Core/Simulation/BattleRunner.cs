@@ -68,6 +68,11 @@ namespace ArknoNights.Battle.Core
             && Definition.HealthThresholdCombatModifier != null
             && Definition.HealthThresholdCombatModifier
                 .MakesUnblockable;
+        internal bool IsHealthThresholdRushingGate =>
+            healthThresholdActive
+            && Definition.HealthThresholdCombatModifier != null
+            && Definition.HealthThresholdCombatModifier
+                .RushesOpposingGate;
         internal bool IsAttackCountStateUnlocked(
             int startedAttackCount)
         {
@@ -457,6 +462,7 @@ namespace ArknoNights.Battle.Core
         private bool temporaryUnblockable;
         private int temporaryUnblockableUntilTick =
             int.MinValue;
+        private int battleTimePowerStack;
 
         internal RuntimeUnitState(
             string unitId,
@@ -465,7 +471,14 @@ namespace ArknoNights.Battle.Core
             UnitDefinition definition,
             UnitSnapshot source,
             BattlefieldCoordinate coordinate)
-            : this(unitId, playerId, side, definition, source, coordinate, Enumerable.Empty<RuntimeAbilityState>())
+            : this(
+                unitId,
+                playerId,
+                side,
+                definition,
+                source,
+                FixedPosition.FromCell(coordinate),
+                Enumerable.Empty<RuntimeAbilityState>())
         {
         }
 
@@ -475,14 +488,14 @@ namespace ArknoNights.Battle.Core
             BattleSide side,
             UnitDefinition definition,
             UnitSnapshot source,
-            BattlefieldCoordinate coordinate,
+            FixedPosition position,
             IEnumerable<RuntimeAbilityState> abilities)
             : this(
                 unitId,
                 playerId,
                 side,
                 definition,
-                FixedPosition.FromCell(coordinate),
+                position,
                 source.EliteLevel,
                 source.Buffs,
                 0,
@@ -601,6 +614,9 @@ namespace ArknoNights.Battle.Core
             HasDeploymentApproach
             && !Position.Equals(
                 DeploymentApproachDestination.Value);
+        internal bool RushesOpposingGate =>
+            abilityStates.Any(item =>
+                item.IsHealthThresholdRushingGate);
         internal bool IsTargetableBy(AttackMethod attackMethod)
         {
             _ = attackMethod;
@@ -666,12 +682,23 @@ namespace ArknoNights.Battle.Core
                     return 0;
                 var numerator =
                     (long)Definition.AttackIntervalTicks * 100;
-                return Math.Max(
+                var interval = Math.Max(
                     1,
                     (int)Math.Min(
                         int.MaxValue,
                         (numerator + finalAttackSpeed - 1)
                         / finalAttackSpeed));
+                var intervalMultiplierPermille = Math.Max(
+                    0,
+                    1000 - battleTimePowerStack * 100);
+                return Math.Max(
+                    1,
+                    (int)Math.Min(
+                        int.MaxValue,
+                        ((long)interval
+                             * intervalMultiplierPermille
+                         + 999)
+                        / 1000));
             }
         }
         internal bool HasBlockingCapacity =>
@@ -699,10 +726,19 @@ namespace ArknoNights.Battle.Core
                         modifier.AttackMultiplierPermille);
                 var charge = abilityStates.Sum(item =>
                     (long)item.UnblockedAttackChargeAdditive);
-                return (int)Math.Min(
+                var finalAttack = (int)Math.Min(
                     int.MaxValue,
                     attack + charge);
+                return ApplyMultiplier(
+                    finalAttack,
+                    1000 + battleTimePowerStack * 400);
             }
+        }
+        internal int BattleTimePowerStack =>
+            battleTimePowerStack;
+        internal void SetBattleTimePowerStack(int stack)
+        {
+            battleTimePowerStack = Math.Max(0, stack);
         }
         internal void UpdateUnblockedAttackCharges(int currentTick)
         {
@@ -1133,6 +1169,8 @@ namespace ArknoNights.Battle.Core
                     CultureInfo.InvariantCulture),
                 InstanceMoveSpeedMultiplierPermille.ToString(
                     CultureInfo.InvariantCulture),
+                battleTimePowerStack.ToString(
+                    CultureInfo.InvariantCulture),
                 ActivationTick.ToString(
                     CultureInfo.InvariantCulture),
                 DeploymentApproachDestination.HasValue ? "1" : "0",
@@ -1430,6 +1468,10 @@ namespace ArknoNights.Battle.Core
     public sealed class BattleRunner
     {
         private const int AutomaticSkillPointGainIntervalTicks = BattleInput.TicksPerSecond / BattleInput.AutomaticSkillPointsPerSecond;
+        public const int BattleTimePowerStartTick =
+            20 * BattleInput.TicksPerSecond;
+        public const int BattleTimePowerIntervalTicks =
+            10 * BattleInput.TicksPerSecond;
         private const int OpposingGateHalfExtentUnits =
             FixedPosition.UnitsPerMetre * 4 / 10;
         private readonly List<RuntimeUnitState> runtimeUnits;
@@ -1450,6 +1492,10 @@ namespace ArknoNights.Battle.Core
         private readonly Dictionary<string, UnitDefinition> unitDefinitions;
         private readonly Dictionary<string, AbilityDefinition> abilityDefinitions;
         private readonly Dictionary<string, BattleUnitInstanceSnapshot> unitSnapshots = new Dictionary<string, BattleUnitInstanceSnapshot>(StringComparer.Ordinal);
+        private readonly Dictionary<string, BattleUnitAttributesSnapshot>
+            lastUnitAttributes =
+                new Dictionary<string, BattleUnitAttributesSnapshot>(
+                    StringComparer.Ordinal);
         private readonly DynamicUnitIdAllocator dynamicUnitIdAllocator = new DynamicUnitIdAllocator();
         private int eventTick = int.MinValue;
         private int eventSequence;
@@ -1462,7 +1508,11 @@ namespace ArknoNights.Battle.Core
             Input = input ?? throw new ArgumentNullException(nameof(input));
             if (BattleInput.TicksPerSecond % BattleInput.AutomaticSkillPointsPerSecond != 0)
                 throw new InvalidOperationException("Automatic skill-point cadence must divide the authoritative tick rate evenly.");
-            unitDefinitions = input.UnitDefinitions.ToDictionary(item => item.TypeId, StringComparer.Ordinal);
+            unitDefinitions = input.UnitDefinitions.ToDictionary(
+                item => DefinitionKey(
+                    item.TypeId,
+                    item.EliteLevel),
+                StringComparer.Ordinal);
             abilityDefinitions = input.AbilityDefinitions.ToDictionary(item => item.AbilityId, StringComparer.Ordinal);
             runtimeUnits = BuildInitialUnits(input, unitDefinitions, abilityDefinitions);
             RuntimeUnits = new ReadOnlyCollection<RuntimeUnitState>(runtimeUnits);
@@ -1517,6 +1567,7 @@ namespace ArknoNights.Battle.Core
             var awayPlayerId = Input.Players.Single(player => player.Side == BattleSide.Away).PlayerId;
             var knownUnitTypeIds = new ReadOnlyCollection<string>(Input.UnitDefinitions
                 .Select(definition => definition.TypeId)
+                .Distinct(StringComparer.Ordinal)
                 .OrderBy(typeId => typeId, StringComparer.Ordinal)
                 .ToArray());
             var immutableUnitSnapshots = new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
@@ -1565,8 +1616,14 @@ namespace ArknoNights.Battle.Core
 
         private void RunAuthoritativeTick()
         {
+            var battleTimePowerStack =
+                CalculateBattleTimePowerStack(CurrentTick);
             foreach (var unit in runtimeUnits)
+            {
                 unit.UpdateTemporaryUnblockable(CurrentTick);
+                unit.SetBattleTimePowerStack(
+                    battleTimePowerStack);
+            }
             ResolveDueRelocations();
             ResolveDueTimedTargetAreaDamage();
             ResolveDueDeathSpawns();
@@ -1600,9 +1657,24 @@ namespace ArknoNights.Battle.Core
             ResolveDeathsAndCleanup();
             ResolveDueDeathSpawns();
             RefreshAuraCombatModifiers();
+            EmitAttributeChanges();
             EvaluateBattleEnd();
-            if (Status == BattleRunnerStatus.Stopped) return;
+            if (Status == BattleRunnerStatus.Stopped)
+            {
+                return;
+            }
             RecoverAutomaticSkillPointsAndCast();
+            EmitAttributeChanges();
+        }
+
+        public static int CalculateBattleTimePowerStack(
+            int tick)
+        {
+            if (tick < BattleTimePowerStartTick)
+                return 0;
+            return 1
+                + (tick - BattleTimePowerStartTick)
+                / BattleTimePowerIntervalTicks;
         }
 
         private void RemoveInvalidPendingAttacks()
@@ -1618,7 +1690,8 @@ namespace ArknoNights.Battle.Core
             foreach (var unit in runtimeUnits.Where(IsActive).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 if (unit.IsDeploymentApproachInProgress
-                    || !unit.Definition.CanAttack)
+                    || !unit.Definition.CanAttack
+                    || unit.RushesOpposingGate)
                 {
                     SetTarget(unit, null);
                     continue;
@@ -1639,7 +1712,7 @@ namespace ArknoNights.Battle.Core
         private void ApplyMovement()
         {
             var intents = new List<MoveIntent>();
-            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && (item.HasDeploymentApproach || item.Definition.ActionMethod != 4) && !item.IsBlocked && !IsSkillAnimationLocked(item) && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
+            foreach (var unit in runtimeUnits.Where(item => IsActive(item) && (item.HasDeploymentApproach || item.Definition.ActionMethod != 4) && (!item.IsBlocked || item.RushesOpposingGate) && !IsSkillAnimationLocked(item) && !HasTargetDeathAnimationLock(item)).OrderBy(item => item.UnitId, StringComparer.Ordinal))
             {
                 if (unit.HasDeploymentApproach)
                 {
@@ -1660,7 +1733,8 @@ namespace ArknoNights.Battle.Core
                     continue;
                 }
 
-                if (!unit.Definition.CanAttack)
+                if (!unit.Definition.CanAttack
+                    || unit.RushesOpposingGate)
                 {
                     var gate = OpposingGatePosition(unit.Side);
                     var nextGatePosition = MoveTowards(unit, gate, 0);
@@ -1764,14 +1838,14 @@ namespace ArknoNights.Battle.Core
                 foreach (var otherId in unit.BlockedUnitIds.ToArray())
                 {
                     var other = FindUnit(otherId);
-                    if (!IsInBattle(unit) || other == null || !IsInBattle(other) || DistanceSquared(unit.Position, other.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) EndBlock(unit, other);
+                    if (!IsInBattle(unit) || other == null || !IsInBattle(other) || DistanceSquared(unit.Position, other.Position) >= BattlefieldRules.CombatContactRangeUnits * BattlefieldRules.CombatContactRangeUnits) EndBlock(unit, other);
                 }
             }
             ReleaseExcessBlockRelations();
 
             var proposals = runtimeUnits.Where(item => IsActive(item) && item.HasBlockingCapacity && HasLiveTarget(item))
                 .Select(item => new BlockProposal(item, FindUnit(item.TargetUnitId)))
-                .Where(item => item.Target != null && IsActive(item.Target) && item.Target.HasBlockingCapacity && DistanceSquared(item.Actor.Position, item.Target.Position) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre)
+                .Where(item => item.Target != null && IsActive(item.Target) && item.Target.HasBlockingCapacity && DistanceSquared(item.Actor.Position, item.Target.Position) < BattlefieldRules.CombatContactRangeUnits * BattlefieldRules.CombatContactRangeUnits)
                 .ToArray();
 
             foreach (var group in proposals.GroupBy(item => item.Target.UnitId, StringComparer.Ordinal).OrderBy(item => item.Key, StringComparer.Ordinal))
@@ -1802,7 +1876,7 @@ namespace ArknoNights.Battle.Core
                             .FirstOrDefault(IsActive)
                         : GetAttackTarget(unit);
                 if (target == null) continue;
-                if (DistanceSquared(unit.Position, target.Position) >= FixedPosition.QuarterMetre * FixedPosition.QuarterMetre) continue;
+                if (DistanceSquared(unit.Position, target.Position) >= BattlefieldRules.CombatContactRangeUnits * BattlefieldRules.CombatContactRangeUnits) continue;
                 var previousPresentationState =
                     unit.AttackCountPresentationStateTag;
                 var attack = unit.BeginAttackAndGetEffectiveAttack();
@@ -2143,8 +2217,9 @@ namespace ArknoNights.Battle.Core
                         StringComparison.Ordinal))
                 >= effect.MaxActiveSameType)
                 return;
-            var definition =
-                unitDefinitions[effect.SummonTypeId];
+            var definition = unitDefinitions[DefinitionKey(
+                effect.SummonTypeId,
+                owner.EliteLevel)];
             var offsetX = StableSpawnOffset(
                 Input.BattleId,
                 owner.UnitId,
@@ -2175,6 +2250,8 @@ namespace ArknoNights.Battle.Core
                 CreateAbilityStates(
                     definition,
                     abilityDefinitions));
+            summoned.SetBattleTimePowerStack(
+                CalculateBattleTimePowerStack(CurrentTick));
             runtimeUnits.Add(summoned);
             var snapshot = CreateSpawnSnapshot(summoned, true);
             unitSnapshots.Add(summoned.UnitId, snapshot);
@@ -2194,8 +2271,9 @@ namespace ArknoNights.Battle.Core
                 new[] { centre.X, centre.Y - 1 },
                 new[] { centre.X, centre.Y + 1 }
             };
-            var definition =
-                unitDefinitions[effect.SummonTypeId];
+            var definition = unitDefinitions[DefinitionKey(
+                effect.SummonTypeId,
+                owner.EliteLevel)];
             foreach (var candidate in candidates)
             {
                 if (!BattlefieldCoordinate.TryCreate(
@@ -2216,6 +2294,8 @@ namespace ArknoNights.Battle.Core
                     CreateAbilityStates(
                         definition,
                         abilityDefinitions));
+                summoned.SetBattleTimePowerStack(
+                    CalculateBattleTimePowerStack(CurrentTick));
                 runtimeUnits.Add(summoned);
                 var snapshot =
                     CreateSpawnSnapshot(summoned, true);
@@ -2351,7 +2431,9 @@ namespace ArknoNights.Battle.Core
                     var typeId = SelectDeathSpawnType(
                         pending,
                         spawnOrdinal);
-                    var definition = unitDefinitions[typeId];
+                    var definition = unitDefinitions[DefinitionKey(
+                        typeId,
+                        pending.EliteLevel)];
                     var offsetX = StableSpawnOffset(
                         Input.BattleId,
                         pending.OwnerUnitId,
@@ -2384,6 +2466,8 @@ namespace ArknoNights.Battle.Core
                             abilityDefinitions),
                         pending.Effect
                             .SummonedMoveSpeedMultiplierPermille);
+                    summoned.SetBattleTimePowerStack(
+                        CalculateBattleTimePowerStack(CurrentTick));
                     runtimeUnits.Add(summoned);
                     var snapshot =
                         CreateSpawnSnapshot(summoned, true);
@@ -3292,7 +3376,9 @@ namespace ArknoNights.Battle.Core
         private void CastSummonAbility(RuntimeUnitState caster, AbilityDefinition ability, int castOrdinal)
         {
             var summonEffect = ability.SummonEffect;
-            var summonDefinition = unitDefinitions[summonEffect.SummonTypeId];
+            var summonDefinition = unitDefinitions[DefinitionKey(
+                summonEffect.SummonTypeId,
+                caster.EliteLevel)];
             for (var spawnOrdinal = 1; spawnOrdinal <= summonEffect.Count; spawnOrdinal++)
             {
                 var offsetX = StableSpawnOffset(
@@ -3322,6 +3408,8 @@ namespace ArknoNights.Battle.Core
                     Array.Empty<BuffPlaceholder>(),
                     CurrentTick + 1,
                     CreateAbilityStates(summonDefinition, abilityDefinitions));
+                summoned.SetBattleTimePowerStack(
+                    CalculateBattleTimePowerStack(CurrentTick));
                 runtimeUnits.Add(summoned);
                 var snapshot = CreateSpawnSnapshot(summoned, true);
                 unitSnapshots.Add(summoned.UnitId, snapshot);
@@ -3576,7 +3664,7 @@ namespace ArknoNights.Battle.Core
                        <= OpposingGateHalfExtentUnits;
         }
         private static long DistanceSquared(FixedPosition first, FixedPosition second) { var x = (long)first.XUnits - second.XUnits; var y = (long)first.YUnits - second.YUnits; return x * x + y * y; }
-        private static bool IsInAttackRange(FixedPosition first, FixedPosition second) => DistanceSquared(first, second) < FixedPosition.QuarterMetre * FixedPosition.QuarterMetre;
+        private static bool IsInAttackRange(FixedPosition first, FixedPosition second) => DistanceSquared(first, second) < BattlefieldRules.CombatContactRangeUnits * BattlefieldRules.CombatContactRangeUnits;
         private int CalculateDamage(PendingAttack attack, RuntimeUnitState target)
         {
             if (IsAttackEvaded(attack, target))
@@ -3670,7 +3758,10 @@ namespace ArknoNights.Battle.Core
 
         private static FixedPosition MoveTowards(RuntimeUnitState unit, RuntimeUnitState targetUnit)
         {
-            return MoveTowards(unit, targetUnit.Position, FixedPosition.QuarterMetre - 1);
+            return MoveTowards(
+                unit,
+                targetUnit.Position,
+                BattlefieldRules.CombatContactRangeUnits - 1);
         }
 
         private static FixedPosition MoveTowards(RuntimeUnitState unit, FixedPosition target, int stopDistanceUnits)
@@ -3732,7 +3823,56 @@ namespace ArknoNights.Battle.Core
         private void EmitSpawn(RuntimeUnitState unit, BattleUnitInstanceSnapshot snapshot)
         {
             if (eventTick != CurrentTick) { eventTick = CurrentTick; eventSequence = 0; }
+            lastUnitAttributes[unit.UnitId] =
+                snapshot.Attributes;
             events.Add(new BattleEvent(BattleEventType.Spawn, CurrentTick, ++eventSequence, unit.UnitId, unit.TypeId, unit.Side, null, null, unit.Position, null, 0, unit.CurrentHitPoints, unit.CurrentHitPoints, 0, 0, 0, null, BattleStopReason.None, snapshot));
+        }
+
+        private void EmitAttributeChanges()
+        {
+            foreach (var unit in runtimeUnits
+                         .Where(IsInBattle)
+                         .OrderBy(
+                             item => item.UnitId,
+                             StringComparer.Ordinal))
+            {
+                var current =
+                    CreateAttributesSnapshot(unit);
+                if (lastUnitAttributes.TryGetValue(
+                        unit.UnitId,
+                        out var previous)
+                    && current.Equals(previous))
+                    continue;
+                if (eventTick != CurrentTick)
+                {
+                    eventTick = CurrentTick;
+                    eventSequence = 0;
+                }
+                events.Add(new BattleEvent(
+                    BattleEventType.AttributesChanged,
+                    CurrentTick,
+                    ++eventSequence,
+                    unit.UnitId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    null,
+                    BattleStopReason.None,
+                    null,
+                    null,
+                    current));
+                lastUnitAttributes[unit.UnitId] =
+                    current;
+            }
         }
 
         private readonly struct MoveIntent { public MoveIntent(RuntimeUnitState unit, FixedPosition from, FixedPosition to, string relatedUnitId) { Unit = unit; From = from; To = to; RelatedUnitId = relatedUnitId; } public RuntimeUnitState Unit { get; } public FixedPosition From { get; } public FixedPosition To { get; } public string RelatedUnitId { get; } }
@@ -3808,15 +3948,23 @@ namespace ArknoNights.Battle.Core
             foreach (var unit in player.Units)
             {
                 if (unit.Zone != UnitZone.Deployed) continue;
-                var coordinate = player.Side == BattleSide.Home ? BattlefieldRules.MapHome(unit.Formation.Value) : BattlefieldRules.MapAway(unit.Formation.Value);
-                var definition = definitions[unit.TypeId];
+                var position = player.Side == BattleSide.Home
+                    ? BattlefieldRules.MapHomePosition(
+                        unit.Formation.Value,
+                        unit.FormationOffset)
+                    : BattlefieldRules.MapAwayPosition(
+                        unit.Formation.Value,
+                        unit.FormationOffset);
+                var definition = definitions[DefinitionKey(
+                    unit.TypeId,
+                    unit.EliteLevel)];
                 result.Add(new RuntimeUnitState(
                     unit.UnitId,
                     player.PlayerId,
                     player.Side,
                     definition,
                     unit,
-                    coordinate,
+                    position,
                     CreateAbilityStates(definition, abilities)));
             }
             return result.OrderBy(item => item.UnitId, StringComparer.Ordinal).ToList();
@@ -3846,20 +3994,38 @@ namespace ArknoNights.Battle.Core
                 definition.MaxHitPoints,
                 unit.CurrentHitPoints,
                 0,
-                definition.Attack,
-                definition.Defense,
-                definition.MagicResistance,
+                unit.EffectiveAttack,
+                unit.EffectiveDefense,
+                unit.EffectiveMagicResistance,
                 unit.EffectiveMoveSpeedCentimetresPerSecond,
-                definition.AttackIntervalTicks,
+                unit.EffectiveAttackIntervalTicks,
                 definition.AttackAnimationDurationTicks,
                 definition.DamageType,
                 definition.AttackMethod,
-                definition.BlockCapacity,
+                unit.EffectiveBlockCapacity,
                 definition.TauntLevel,
                 unit.Buffs,
                 unit.ActivationTick,
                 definition.LifeDeduct);
         }
+
+        private static BattleUnitAttributesSnapshot
+            CreateAttributesSnapshot(RuntimeUnitState unit) =>
+            new BattleUnitAttributesSnapshot(
+                unit.EffectiveAttack,
+                unit.EffectiveDefense,
+                unit.EffectiveMagicResistance,
+                unit.EffectiveMoveSpeedCentimetresPerSecond,
+                unit.EffectiveAttackIntervalTicks,
+                unit.EffectiveBlockCapacity);
+
+        private static string DefinitionKey(
+            string typeId,
+            int eliteLevel) =>
+            (typeId ?? string.Empty)
+            + "\u001f"
+            + eliteLevel.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
 
         private string BuildStableSummary()
         {

@@ -84,7 +84,20 @@ public sealed class UnitWorldStatusBar : MonoBehaviour
     /// <summary>Explicit presentation input. Non-zero shield is display-only; it never affects Battle Core.</summary>
     public void SetState(string id, bool valueIsEnemy, int valueMaxHitPoints, int valueCurrentHitPoints, int valueCurrentShield)
     {
-        unitId = id ?? string.Empty;
+        var normalizedId = id ?? string.Empty;
+        if (hasState
+            && string.Equals(
+                unitId,
+                normalizedId,
+                System.StringComparison.Ordinal)
+            && isEnemy == valueIsEnemy
+            && maxHitPoints == valueMaxHitPoints
+            && currentHitPoints == valueCurrentHitPoints
+            && currentShield == valueCurrentShield)
+        {
+            return;
+        }
+        unitId = normalizedId;
         isEnemy = valueIsEnemy;
         maxHitPoints = valueMaxHitPoints;
         currentHitPoints = valueCurrentHitPoints;

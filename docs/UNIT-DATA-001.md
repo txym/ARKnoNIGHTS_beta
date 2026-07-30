@@ -193,7 +193,7 @@ deathAnimation
 - `attackIntervalSeconds` 是源数据提供的攻击间隔配置，单位为秒。正式单位的基础攻击间隔为该值的一半；目录生成器先计算 `attackIntervalSeconds × 0.5`，再按 `20 Tick/秒` 向上取整为 Core 的实际攻击间隔 Tick。
 - `attackAnimationDurationSeconds` 是攻击动画从开始到出伤的时长，单位为秒。
 - 目录生成继续使用 `20 Tick/秒`，完成字段各自规则换算后的秒数到 Tick 的非整数结果向上取整。攻击动画时长不参与折半。
-- 当前战斗中的共享攻击/阻挡半径仍以 SPEC 已确认的 `0.25 米` 规则为准。本任务只规范源字段，不得利用 `attackRadiusMetres` 或 `blockRadiusMetres` 改变现有战斗机制。
+- 当前战斗中的共享攻击/阻挡半径以 SPEC 已确认的严格 `< 0.4 米` 规则为准。本任务只规范源字段，不得利用 `attackRadiusMetres` 或 `blockRadiusMetres` 按单位改变这一全局战斗机制。
 - `lifeDeduct` 是目标价值；当前只用于数据与 UI 显示，不实现玩家生命扣除。
 - `innateAbilityIds` 可以是空数组；不得因为技能描述为空而删除已有固有能力 ID。
 

@@ -255,7 +255,8 @@ internal static class UnitEliteVariantResolver
         if (common == null
             || common.rarity < 1
             || common.rarity > 6
-            || common.deploymentCost != 2
+            || common.deploymentCost < 2
+            || common.deploymentCost > 40
             || common.attackMethod < 0
             || common.attackMethod > 1
             || common.actionMethod < 1
@@ -818,9 +819,14 @@ internal static class UnitEliteVariantResolver
         int eliteLevel)
     {
         var common = document.common;
+        var baseCombat = document.variants
+            .Single(item => item.minEliteLevel == 0)
+            .stats
+            .combat;
         var resolved = new ResolvedUnitVariant
         {
             typeId = document.typeId,
+            eliteLevel = eliteLevel,
             rarity = common.rarity,
             deploymentCost = common.deploymentCost,
             attackMethod = common.attackMethod,
@@ -830,7 +836,11 @@ internal static class UnitEliteVariantResolver
             canBlock = common.canBlock,
             blockCapacity = common.blockCapacity,
             tauntLevel = common.tauntLevel,
-            damageType = common.damageType
+            damageType = common.damageType,
+            maxHitPoints = baseCombat.maxHitPoints,
+            attack = baseCombat.attack,
+            defense = baseCombat.defense,
+            magicResistance = baseCombat.magicResistance
         };
 
         foreach (var variant in document.variants.Where(
@@ -851,14 +861,6 @@ internal static class UnitEliteVariantResolver
 
             if (variant.stats != null)
             {
-                if (variant.stats.combat != null)
-                {
-                    resolved.maxHitPoints = variant.stats.combat.maxHitPoints;
-                    resolved.attack = variant.stats.combat.attack;
-                    resolved.defense = variant.stats.combat.defense;
-                    resolved.magicResistance = variant.stats.combat.magicResistance;
-                }
-
                 if (variant.stats.shared != null)
                 {
                     resolved.moveSpeedMetresPerSecond =
@@ -886,11 +888,48 @@ internal static class UnitEliteVariantResolver
             }
         }
 
+        for (var level = 1; level <= eliteLevel; level++)
+        {
+            var dedicatedCombat = level >= 2
+                ? document.variants
+                    .Where(item => item.minEliteLevel == level)
+                    .Select(item => item.stats == null
+                        ? null
+                        : item.stats.combat)
+                    .SingleOrDefault()
+                : null;
+            if (dedicatedCombat != null)
+            {
+                resolved.maxHitPoints =
+                    dedicatedCombat.maxHitPoints;
+                resolved.attack = dedicatedCombat.attack;
+                resolved.defense = dedicatedCombat.defense;
+                resolved.magicResistance =
+                    dedicatedCombat.magicResistance;
+                continue;
+            }
+
+            resolved.maxHitPoints =
+                GrowPositive(resolved.maxHitPoints, 133);
+            resolved.attack =
+                GrowPositive(resolved.attack, 125);
+            resolved.defense =
+                GrowPositive(resolved.defense, 120);
+        }
+
         resolved.animations = CloneAnimations(resolved.animations);
         resolved.innateAbilityIds = resolved.innateAbilityIds == null
             ? new List<string>()
             : new List<string>(resolved.innateAbilityIds);
         return resolved;
+    }
+
+    private static int GrowPositive(int value, int percentage)
+    {
+        var rounded = ((long)value * percentage + 50L) / 100L;
+        return rounded >= int.MaxValue
+            ? int.MaxValue
+            : (int)rounded;
     }
 
     private static List<UnitAnimationBinding> CloneAnimations(
