@@ -121,19 +121,31 @@ public sealed class LanLobbyController : MonoBehaviour
                 pendingRuntimeExitStatus = "Match ended.";
                 return;
             }
-            var snapshot = client.Snapshot;
-            if (!gameplayStarted && snapshot != null)
-            {
-                view.BindRoom(snapshot, profile.PlayerId);
-                view.SetLocalLatency(client.LatencyMilliseconds);
-                if (snapshot.HasStarted) BeginGameplayTransition();
-            }
-            else if (client.IsReconnecting)
+            if (client.IsReconnecting)
             {
                 if (reconnectCredentialStore.TryLoad(
                     out var reconnectCredential))
                 {
                     BeginReconnect(reconnectCredential);
+                }
+                else
+                {
+                    EnterHome(
+                        "Connection lost before match initialization completed.");
+                }
+                return;
+            }
+            var snapshot = client.Snapshot;
+            if (!gameplayStarted && snapshot != null)
+            {
+                view.BindRoom(snapshot, profile.PlayerId);
+                view.SetLocalLatency(client.LatencyMilliseconds);
+                if (snapshot.HasStarted)
+                {
+                    if (HasGuestMatchInitialization())
+                        BeginGameplayTransition();
+                    else
+                        view.SetStatus("Waiting for match initialization...");
                 }
             }
         }
@@ -349,6 +361,13 @@ public sealed class LanLobbyController : MonoBehaviour
     private void CompleteGameplayTransition()
     {
         if (gameplayStarted) return;
+        if (host == null && client != null && !HasGuestMatchInitialization())
+        {
+            gameplayTransitionPending = false;
+            if (view != null)
+                view.SetStatus("Waiting for match initialization...");
+            return;
+        }
         gameplayStarted = true;
         StopDiscovery();
         EnsurePreparationLoopIsGated();
@@ -360,6 +379,13 @@ public sealed class LanLobbyController : MonoBehaviour
             reconnectCredentialStore.Clear();
             EnterHome("Match initialization failed: " + diagnosticCode);
         }
+    }
+
+    private bool HasGuestMatchInitialization()
+    {
+        return client != null
+            && (client.MatchInitialization != null
+                || client.MatchSnapshot != null);
     }
 
     private bool EnsureMatchRuntime(out string diagnosticCode)

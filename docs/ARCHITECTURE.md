@@ -82,7 +82,7 @@ UDP 发现 → 创建/加入 TCP 房间 → 成员准备 → 房主开始
                          MatchEnded → 有界 flush → Ended
 ```
 
-`LanLobbyController` 自动创建场景级入口。开始时只停止 UDP 发现并隐藏 Lobby View，不再关闭 TCP 或解除本地 `LocalMatchState` Demo 门控。`LanRoomHost` 保留 listener 与既有 guest socket，把连接原位提升为 Match；普通 Join 从此被拒绝，listener 仅服务当前 Session 的重连。
+`LanLobbyController` 自动创建场景级入口。房主在 Start 广播完成后进入正式运行时；客机把 Lobby `Start` 只视为开局已提交，继续保留连接与房间页，直至同一 TCP 上独立的 `MatchInitialized` 已在主线程应用后才隐藏 Lobby View 并创建正式运行时。两帧之间的调度间隙不是初始化失败。开始后停止 UDP 发现，但不关闭 TCP 或解除本地 `LocalMatchState` Demo 门控。`LanRoomHost` 保留 listener 与既有 guest socket，把连接原位提升为 Match；普通 Join 从此被拒绝，listener 仅服务当前 Session 的重连。
 
 `MatchSessionHostActor` 是 `MatchAuthority` 的唯一可变调用方。远端命令、房主本地命令、连接事件、时钟和 Battle transport 事件进入同一队列并获得全局 `HostAcceptSequence`；后台读循环只做有界帧读取、严格解码和连接元数据绑定。每个连接由一个容量为 64 的串行 writer 写 `NetworkStream`；普通运行期只排队结果和控制消息，不再生成可合并的周期完整快照。
 

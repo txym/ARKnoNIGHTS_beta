@@ -183,6 +183,144 @@ namespace ArknoNights.Lobby.Tests
             yield return WaitForTask(Task.WhenAll(localClientShutdownTasks));
         }
 
+        [UnityTest]
+        public IEnumerator GuestStartedLobbySnapshot_WaitsForMatchInitializationInsteadOfReturningHome()
+        {
+            SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+            yield return WaitForSceneBootstrap();
+
+            var controller = FindComponent("LanLobbyController");
+            var controllerType = controller.GetType();
+            var clientField = controllerType.GetField(
+                "client",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var gameplayStartedField = controllerType.GetField(
+                "gameplayStarted",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var matchRuntimeField = controllerType.GetField(
+                "matchRuntime",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var profileField = controllerType.GetField(
+                "profile",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var profile = (LobbyProfile)profileField.GetValue(controller);
+            var view = controller.GetComponentInChildren<global::LanLobbyView>(true);
+
+            var remoteHostProfile = new LobbyProfile(
+                "lan-cccccccccccccccccccccccccccccccc",
+                "Remote Host",
+                0);
+            var remoteHostTask = LanRoomHost.StartForTestsAsync(
+                remoteHostProfile,
+                0);
+            yield return WaitForTask(remoteHostTask);
+            var remoteHost = remoteHostTask.Result;
+            hostsToStop.Add(remoteHost);
+
+            var clientTask = LanRoomClient.JoinForTestsAsync(
+                remoteHost.LoopbackEndpoint,
+                profile);
+            yield return WaitForTask(clientTask);
+            var localClient = clientTask.Result;
+            clientsToStop.Add(localClient);
+            localClient.Tick();
+            remoteHost.Tick();
+
+            var lobbySnapshot = localClient.Snapshot;
+            var startedWithoutInitialization = new LobbyRoomSnapshot(
+                lobbySnapshot.RoomCode,
+                lobbySnapshot.HostPlayerId,
+                lobbySnapshot.Members,
+                true,
+                lobbySnapshot.Revision + 1);
+            var snapshotField = typeof(LanRoomClient).GetField(
+                "snapshot",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(snapshotField, Is.Not.Null);
+            snapshotField.SetValue(localClient, startedWithoutInitialization);
+            clientField.SetValue(controller, localClient);
+            view.ShowRoom(startedWithoutInitialization, profile.PlayerId);
+
+            yield return null;
+            yield return null;
+
+            Assert.That(
+                clientField.GetValue(controller),
+                Is.SameAs(localClient),
+                "Lobby Start and MatchInitialized are separate frames; the first frame must not dispose the guest connection.");
+            Assert.That(
+                (bool)gameplayStartedField.GetValue(controller),
+                Is.False);
+            Assert.That(matchRuntimeField.GetValue(controller), Is.Null);
+            Assert.That(view.gameObject.activeSelf, Is.True);
+            Assert.That(
+                view.transform.Find("LanLobbyRoot/Room").gameObject.activeSelf,
+                Is.True);
+            Assert.That(
+                view.transform.Find("LanLobbyRoot/Home").gameObject.activeSelf,
+                Is.False);
+
+            var readyTask = localClient.SetReadyAsync(true);
+            yield return WaitForTask(readyTask);
+            for (var frame = 0;
+                 frame < 120
+                 && !remoteHost.Snapshot.Members.Single(
+                         member => member.PlayerId == profile.PlayerId)
+                     .IsReady;
+                 frame++)
+            {
+                remoteHost.Tick();
+                yield return null;
+            }
+            remoteHost.Tick();
+            Assert.That(
+                remoteHost.Snapshot.Members.Single(
+                    member => member.PlayerId == profile.PlayerId).IsReady,
+                Is.True);
+            Assert.That(
+                remoteHost.TryStart(
+                    remoteHostProfile.PlayerId,
+                    out var startFailure),
+                Is.True,
+                startFailure.ToString());
+
+            var initializedTask = localClient.WaitForMatchInitializedAsync(
+                TimeSpan.FromSeconds(2));
+            var initializationDeadline = Time.realtimeSinceStartup + 3f;
+            while (!initializedTask.IsCompleted
+                   && Time.realtimeSinceStartup < initializationDeadline)
+            {
+                yield return null;
+            }
+            Assert.That(
+                initializedTask.IsCompleted,
+                Is.True,
+                "Timed out waiting for MatchInitialized.");
+            Assert.That(
+                initializedTask.IsFaulted,
+                Is.False,
+                initializedTask.Exception == null
+                    ? string.Empty
+                    : initializedTask.Exception.ToString());
+            for (var frame = 0;
+                 frame < 20
+                 && !(bool)gameplayStartedField.GetValue(controller);
+                 frame++)
+            {
+                yield return null;
+            }
+
+            Assert.That(
+                (bool)gameplayStartedField.GetValue(controller),
+                Is.True,
+                "The guest must transition after MatchInitialized is applied.");
+            Assert.That(
+                clientField.GetValue(controller),
+                Is.SameAs(localClient));
+            Assert.That(matchRuntimeField.GetValue(controller), Is.Not.Null);
+            Assert.That(view.gameObject.activeSelf, Is.False);
+        }
+
         [Test]
         public void RuntimeCatalogsAndIsolatedPlayerPrefsStores_AreValidAndFailClosed()
         {
@@ -393,9 +531,10 @@ namespace ArknoNights.Lobby.Tests
 
         private static IEnumerator WaitForTask(Task task)
         {
-            for (var frame = 0; frame < 300 && task != null && !task.IsCompleted; frame++)
-                yield return null;
             Assert.That(task, Is.Not.Null);
+            var deadline = Time.realtimeSinceStartup + 5f;
+            while (!task.IsCompleted && Time.realtimeSinceStartup < deadline)
+                yield return null;
             Assert.That(task.IsCompleted, Is.True, "Timed out waiting for LAN lifecycle task.");
             Assert.That(task.IsFaulted, Is.False, task.Exception == null ? string.Empty : task.Exception.ToString());
             Assert.That(task.IsCanceled, Is.False);
