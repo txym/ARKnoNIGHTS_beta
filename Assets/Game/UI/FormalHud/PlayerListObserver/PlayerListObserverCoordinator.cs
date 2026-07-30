@@ -114,13 +114,38 @@ namespace ArknoNights.UI.PlayerListObserver
         private const string ExitedAvatarResourcePath = "UI/Texture/player_list/equip_replace_avatart_bg";
 
         internal PlayerListEntryPresentation(LocalMatchPlayerSnapshot player, bool isLocalPlayer, bool isObservedPlayer)
+            : this(
+                player.PlayerId,
+                player.DisplayName,
+                player.HasExited
+                    ? ExitedAvatarResourcePath
+                    : player.AvatarResourcePath,
+                player.Life,
+                player.IsConnected,
+                player.HasExited,
+                isLocalPlayer,
+                isObservedPlayer)
         {
-            PlayerId = player.PlayerId;
-            DisplayName = player.DisplayName;
-            AvatarResourcePath = player.HasExited ? ExitedAvatarResourcePath : player.AvatarResourcePath;
-            Life = player.Life;
-            IsConnected = player.IsConnected;
-            HasExited = player.HasExited;
+        }
+
+        public PlayerListEntryPresentation(
+            string playerId,
+            string displayName,
+            string avatarResourcePath,
+            int life,
+            bool isConnected,
+            bool hasExited,
+            bool isLocalPlayer,
+            bool isObservedPlayer)
+        {
+            PlayerId = playerId ?? string.Empty;
+            DisplayName = displayName ?? string.Empty;
+            AvatarResourcePath = hasExited
+                ? ExitedAvatarResourcePath
+                : avatarResourcePath ?? string.Empty;
+            Life = life;
+            IsConnected = isConnected;
+            HasExited = hasExited;
             IsLocalPlayer = isLocalPlayer;
             IsObservedPlayer = isObservedPlayer;
         }

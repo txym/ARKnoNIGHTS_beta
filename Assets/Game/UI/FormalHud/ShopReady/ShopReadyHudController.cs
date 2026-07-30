@@ -29,8 +29,6 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private static readonly Color FreezeLabelColor = new Color(.03f, .16f, .19f, 1f);
         private static readonly Color RefreshLabelColor = new Color(.22f, .13f, .01f, 1f);
         private static readonly Color ReadyLabelColor = new Color(.02f, .18f, .17f, 1f);
-        private static readonly int[] UpgradeCosts = { 4, 6, 8, 10, 12, 14, 16, 18 };
-
         private sealed class InfoRow
         {
             public RectTransform Root;
@@ -63,6 +61,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private readonly HashSet<string> missingAffinityTypeIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> missingAffinityIconKeys = new HashSet<string>(StringComparer.Ordinal);
         private LocalMatchState match;
+        private LocalMatchState localMatchBeforeExternal;
         private ShopReadyHudState state;
         private UnitAffinityPresentationCatalog affinityCatalog;
         private RectTransform root;
@@ -96,24 +95,94 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private bool shopVisible;
         private bool refreshFreePresentation;
         private bool preparationPhase = true;
+        private bool externalMode;
+        private Action externalRefresh;
+        private Action externalUpgrade;
+        private Action<int> externalPurchase;
+        private Action externalToggleAllFrozen;
+        private Action externalToggleReady;
         private static Font shopChineseFont;
 
         public event Action<bool> FormationInteractionChanged;
         public event Action<LocalMatchOperationCode> CommandCompleted;
         public event Action<bool> ShopVisibilityChanged;
 
-        public bool IsInitialized => match != null;
+        public bool IsInitialized => match != null || externalMode;
         public ShopReadyHudState State => state;
         public bool IsPreparationPhase => preparationPhase;
+        public bool IsExternalMode => externalMode;
+        public bool IsShopVisible => shopVisible;
 
         public void Initialize(LocalMatchState source)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             if (match != null) match.Changed -= OnMatchChanged;
+            if (localMatchBeforeExternal != null)
+                localMatchBeforeExternal.Changed -= OnMatchChanged;
+            localMatchBeforeExternal = null;
+            externalMode = false;
+            externalRefresh = null;
+            externalUpgrade = null;
+            externalPurchase = null;
+            externalToggleAllFrozen = null;
+            externalToggleReady = null;
+            pendingCommand.Clear();
             match = source;
             match.Changed += OnMatchChanged;
             EnsureView();
             Refresh(match.Snapshot);
+        }
+
+        public void InitializeExternal(
+            Action refresh,
+            Action upgrade,
+            Action<int> purchase,
+            Action toggleAllFrozen,
+            Action toggleReady)
+        {
+            if (match != null) match.Changed -= OnMatchChanged;
+            if (!externalMode) localMatchBeforeExternal = match;
+            match = null;
+            externalMode = true;
+            externalRefresh = refresh;
+            externalUpgrade = upgrade;
+            externalPurchase = purchase;
+            externalToggleAllFrozen = toggleAllFrozen;
+            externalToggleReady = toggleReady;
+            pendingCommand.Clear();
+            EnsureView();
+        }
+
+        public void ApplyExternalState(
+            ShopReadyHudState projection,
+            bool resetPendingConfirmation)
+        {
+            if (!externalMode)
+                throw new InvalidOperationException(
+                    "External state requires external HUD mode.");
+            if (projection == null)
+                throw new ArgumentNullException(nameof(projection));
+            if (resetPendingConfirmation) pendingCommand.Clear();
+            state = projection.WithShopVisible(shopVisible);
+            RenderState();
+        }
+
+        public void ClearExternalMode()
+        {
+            externalMode = false;
+            externalRefresh = null;
+            externalUpgrade = null;
+            externalPurchase = null;
+            externalToggleAllFrozen = null;
+            externalToggleReady = null;
+            pendingCommand.Clear();
+            if (match == null && localMatchBeforeExternal != null)
+            {
+                match = localMatchBeforeExternal;
+                localMatchBeforeExternal = null;
+                match.Changed += OnMatchChanged;
+                Refresh(match.Snapshot);
+            }
         }
 
         public void SetShopVisible(bool visible)
@@ -122,6 +191,11 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             shopVisible = visible;
             if (!shopVisible) pendingCommand.Clear();
             if (match != null) Refresh(match.Snapshot);
+            else if (externalMode && state != null)
+            {
+                state = state.WithShopVisible(shopVisible);
+                RenderState();
+            }
             if (changed) ShopVisibilityChanged?.Invoke(shopVisible);
         }
 
@@ -150,65 +224,107 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             }
 
             if (match != null) Refresh(match.Snapshot);
+            else if (externalMode && state != null) RenderState();
             if (root != null) root.gameObject.SetActive(true);
             if (readyButtonRoot != null) readyButtonRoot.gameObject.SetActive(preparationPhase);
         }
 
         public void RequestRefresh()
         {
-            if (match == null || state == null || state.Gold < RefreshCost) return;
+            if (state == null
+                || !state.ShopCommandsEnabled
+                || state.Gold < RefreshCost) return;
+            if (externalMode)
+            {
+                pendingCommand.Clear();
+                externalRefresh?.Invoke();
+                RenderState();
+                return;
+            }
+            if (match == null) return;
             Complete(match.TryRefresh());
         }
 
         public void RequestUpgrade()
         {
-            if (match == null || state == null) return;
-            var upgradeCost = UpgradeCost(state.Level);
+            if (state == null || !state.ShopCommandsEnabled) return;
+            var upgradeCost = state.UpgradeCost;
             if (state.Level >= MaximumLevel || state.Gold < upgradeCost) return;
             if (!EnsureConfirmation(ShopReadyConfirmation.Upgrade)) return;
+            if (externalMode)
+            {
+                externalUpgrade?.Invoke();
+                RenderState();
+                return;
+            }
+            if (match == null) return;
             Complete(match.TryUpgrade());
         }
 
         public void Purchase(int shopSlotId)
         {
-            if (match == null || state == null) return;
+            if (state == null || !state.ShopCommandsEnabled) return;
             var slot = state.Slots.FirstOrDefault(item => item.ShopSlotId == shopSlotId);
             if (slot == null || !slot.CanPurchase) return;
             if (!pendingCommand.RequestPurchase(shopSlotId))
             {
-                Refresh(match.Snapshot);
+                RenderCurrent();
                 return;
             }
 
-            Refresh(match.Snapshot);
+            RenderCurrent();
             if (!state.Slots.Any(item => item.ShopSlotId == shopSlotId && item.CanPurchase)) return;
+            if (externalMode)
+            {
+                externalPurchase?.Invoke(shopSlotId);
+                RenderState();
+                return;
+            }
+            if (match == null) return;
             Complete(match.TryPurchase(shopSlotId));
         }
 
         public void ToggleFrozen(int shopSlotId)
         {
-            if (state == null) return;
+            if (externalMode) return;
+            if (match == null || state == null || !state.ShopCommandsEnabled) return;
             if (!state.Slots.Any(slot => slot.ShopSlotId == shopSlotId && slot.CanToggleFrozen)) return;
             Complete(match.TryToggleFrozen(shopSlotId));
         }
 
         public void ToggleAllFrozen()
         {
-            if (match == null || state == null) return;
+            if (state == null || !state.ShopCommandsEnabled) return;
             var occupied = state.Slots.Where(slot => !slot.IsEmpty).ToArray();
             if (occupied.Length == 0) return;
+            if (externalMode)
+            {
+                externalToggleAllFrozen?.Invoke();
+                return;
+            }
+            if (match == null) return;
             var freeze = occupied.Any(slot => !slot.IsFrozen);
             Complete(match.TrySetOccupiedShopSlotsFrozen(freeze));
         }
 
         public void ToggleReady()
         {
-            if (preparationPhase && match != null) Complete(match.TryToggleReady());
+            if (!preparationPhase
+                || state == null
+                || !state.ShopCommandsEnabled) return;
+            if (externalMode)
+            {
+                externalToggleReady?.Invoke();
+                return;
+            }
+            if (match != null) Complete(match.TryToggleReady());
         }
 
         private void OnDestroy()
         {
             if (match != null) match.Changed -= OnMatchChanged;
+            if (localMatchBeforeExternal != null)
+                localMatchBeforeExternal.Changed -= OnMatchChanged;
         }
 
         private void OnRectTransformDimensionsChange()
@@ -225,7 +341,7 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private bool EnsureConfirmation(ShopReadyConfirmation requested)
         {
             var confirmed = pendingCommand.RequestFixed(requested);
-            if (!confirmed) Refresh(match.Snapshot);
+            if (!confirmed) RenderCurrent();
             return confirmed;
         }
 
@@ -239,17 +355,30 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         private void Refresh(LocalMatchSnapshot snapshot)
         {
             if (snapshot == null) return;
-            EnsureView();
             state = ShopReadyHudState.Project(snapshot, shopVisible, pendingCommand.Kind);
+            RenderState();
+        }
 
+        private void RenderCurrent()
+        {
+            if (match != null) Refresh(match.Snapshot);
+            else if (state != null) RenderState();
+        }
+
+        private void RenderState()
+        {
+            if (state == null) return;
+            EnsureView();
             levelText.text = state.Level.ToString();
             readyText.text = state.IsReady ? "取消准备" : "准备就绪";
             readyIcon.sprite = FormalHudSpriteLoader.Load(
                 state.IsReady ? "UI/Texture/ready/icon_ready" : "UI/Texture/ready/ready_icon");
 
             shopPanel.gameObject.SetActive(state.ShopVisible);
-            var upgradeCost = UpgradeCost(state.Level);
-            var canUpgrade = state.Level < MaximumLevel && state.Gold >= upgradeCost;
+            var upgradeCost = state.UpgradeCost;
+            var canUpgrade = state.ShopCommandsEnabled
+                && state.Level < MaximumLevel
+                && state.Gold >= upgradeCost;
             upgradeButton.interactable = canUpgrade;
             upgradeBackground.sprite = FormalHudSpriteLoader.Load(
                 canUpgrade ? "UI/Texture/shop/upgrade_max" : "UI/Texture/shop/upgrade_disable");
@@ -262,7 +391,8 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             upgradeFrame.gameObject.SetActive(upgradePending);
             upgradeGradient.gameObject.SetActive(upgradePending);
 
-            refreshButton.interactable = state.Gold >= RefreshCost;
+            refreshButton.interactable =
+                state.ShopCommandsEnabled && state.Gold >= RefreshCost;
             refreshIcon.sprite = FormalHudSpriteLoader.Load(
                 refreshButton.interactable ? "UI/Texture/shop/refresh_icon" : "UI/Texture/shop/refresh_icon_lock");
             refreshCostText.text = RefreshCost.ToString();
@@ -273,13 +403,18 @@ namespace ArknoNights.UI.FormalHud.ShopReady
                 BindSlot(slotWidgets[index], state.Slots[index]);
 
             var occupiedSlots = state.Slots.Where(slot => !slot.IsEmpty).ToArray();
-            freezeButton.interactable = occupiedSlots.Length > 0;
+            freezeButton.interactable =
+                state.ShopCommandsEnabled && occupiedSlots.Length > 0;
             var unfreezing = occupiedSlots.Length > 0 && occupiedSlots.All(slot => slot.IsFrozen);
             freezeBackground.sprite = FormalHudSpriteLoader.Load(
                 unfreezing ? "UI/Texture/shop/frozen_bg_unselect" : "UI/Texture/shop/frozen_bg_normal");
             freezeIcon.sprite = FormalHudSpriteLoader.Load(
                 unfreezing ? "UI/Texture/shop/frozen_icon2" : "UI/Texture/shop/frozen_icon");
             freezeText.text = unfreezing ? "解除冻结" : "冻结";
+            levelButton.interactable = true;
+            readyButton.interactable =
+                preparationPhase && state.ShopCommandsEnabled;
+            readyButtonRoot.gameObject.SetActive(preparationPhase);
 
             ApplyLayout();
             FormationInteractionChanged?.Invoke(preparationPhase && state.FormationInteractionEnabled);
@@ -407,7 +542,8 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         private void BindSlot(SlotWidgets widget, ShopReadySlotViewState slot)
         {
-            widget.Purchase.interactable = !slot.IsEmpty;
+            widget.Purchase.interactable =
+                state.ShopCommandsEnabled && !slot.IsEmpty;
             widget.Background.sprite = FormalHudSpriteLoader.Load(
                 slot.IsEmpty ? "UI/Texture/shop/bg_empty" : "UI/Texture/shop/bg_black");
             widget.Portrait.sprite = slot.IsEmpty ? null : UnitPortraitLoader.Load(slot.PortraitResourcePath);
@@ -623,11 +759,6 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             var scaledSize = Mathf.RoundToInt(referenceSize * ShopVisualScale);
             text.fontSize = scaledSize;
             text.resizeTextMaxSize = scaledSize;
-        }
-
-        private static int UpgradeCost(int level)
-        {
-            return level >= 1 && level < MaximumLevel ? UpgradeCosts[level - 1] : 0;
         }
 
         private static int FrameLevel(int rarity)

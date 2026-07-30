@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using ArknoNights.Battle.Core;
 using ArknoNights.Battle.Infrastructure;
@@ -7,7 +8,10 @@ using ArknoNights.Battle.Presentation;
 using ArknoNights.Deployment;
 using ArknoNights.Lobby;
 using ArknoNights.Match;
+using ArknoNights.Player;
 using ArknoNights.UI;
+using ArknoNights.UI.FormalHud.ShopReady;
+using ArknoNights.UI.PlayerListObserver;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -15,22 +19,20 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public sealed class LanMatchHudController : MonoBehaviour
 {
-    private static readonly Color PanelColor = new Color(.06f, .08f, .1f, .92f);
-    private static readonly Color ButtonColor = new Color(.18f, .22f, .25f, .96f);
-    private static readonly Color AccentColor = new Color(.92f, .58f, .16f, 1f);
-
     private LanMatchRuntimeController runtime;
     private UnitCatalog unitCatalog;
     private MatchShopCatalog shopCatalog;
-    private Canvas offlineCanvas;
-    private Canvas canvas;
-    private RectTransform playerRows;
-    private RectTransform shopRows;
-    private RectTransform stagingRows;
-    private Text statusText;
-    private Text ownerText;
-    private Text commandText;
-    private Text observedText;
+    private StagingHudController stagingHud;
+    private StateDrivenDeploymentController deployment;
+    private BattleHudSceneCoordinator sceneCoordinator;
+    private FormalBattleHudController formalHud;
+    private ShopReadyHudController shopReady;
+    private PlayerListHudController playerList;
+    private Canvas formalCanvas;
+    private bool ownsShopReady;
+    private bool ownsPlayerList;
+    private bool formalHudBound;
+    private bool playerListVisible = true;
     private string observedPlayerId;
     private string selectedStagingUnitId;
     private string selectedDeployedUnitId;
@@ -44,6 +46,11 @@ public sealed class LanMatchHudController : MonoBehaviour
     private int renderedCountdown = -1;
     private readonly Dictionary<string, PreparationUnitView> formationViews =
         new Dictionary<string, PreparationUnitView>(StringComparer.Ordinal);
+    private IReadOnlyList<PlayerListEntryPresentation> playerEntries =
+        new ReadOnlyCollection<PlayerListEntryPresentation>(
+            Array.Empty<PlayerListEntryPresentation>());
+
+    public bool UsesFormalBattleHud => formalCanvas != null;
 
     public void Initialize(
         LanMatchRuntimeController source,
@@ -54,8 +61,7 @@ public sealed class LanMatchHudController : MonoBehaviour
         unitCatalog = units ?? throw new ArgumentNullException(nameof(units));
         shopCatalog = shop ?? throw new ArgumentNullException(nameof(shop));
         observedPlayerId = runtime.LocalPlayerId;
-        SuppressOfflineHud();
-        BuildCanvas();
+        BindFormalHud();
         Refresh();
     }
 
@@ -64,12 +70,17 @@ public sealed class LanMatchHudController : MonoBehaviour
         if (runtime?.Snapshot?.PublicState?.Seats == null
             || !runtime.Snapshot.PublicState.Seats.Any(item =>
                 item != null
-                && string.Equals(item.PlayerId, playerId, StringComparison.Ordinal)))
+                && string.Equals(
+                    item.PlayerId,
+                    playerId,
+                    StringComparison.Ordinal)))
         {
             return false;
         }
+
         observedPlayerId = playerId;
         ClearSelection();
+        formalHud?.ClearSelectionForSceneTransition();
         Refresh();
         return true;
     }
@@ -89,256 +100,265 @@ public sealed class LanMatchHudController : MonoBehaviour
 
     public void Refresh()
     {
-        if (runtime?.Snapshot?.PublicState == null
-            || playerRows == null)
-        {
-            return;
-        }
+        if (runtime?.Snapshot?.PublicState == null) return;
+        var snapshot = runtime.Snapshot;
+        var publicState = snapshot.PublicState;
         var revisionChanged =
-            renderedRevision != runtime.Snapshot.StateRevision;
-        renderedRevision = runtime.Snapshot.StateRevision;
+            renderedRevision != snapshot.StateRevision;
+        renderedRevision = snapshot.StateRevision;
         if (revisionChanged) ClearPendingConfirmations();
         renderedCountdown = Mathf.CeilToInt(
             runtime.PreparationRemainingMilliseconds / 1000f);
-        var publicState = runtime.Snapshot.PublicState;
-        var localSeat = publicState.Seats.FirstOrDefault(item =>
+
+        var localSeat = publicState.Seats?.FirstOrDefault(item =>
             item != null
-            && string.Equals(item.PlayerId, runtime.LocalPlayerId, StringComparison.Ordinal));
+            && string.Equals(
+                item.PlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal));
         if (localSeat == null) return;
         if (!publicState.Seats.Any(item =>
                 item != null
-                && string.Equals(item.PlayerId, observedPlayerId, StringComparison.Ordinal)))
+                && string.Equals(
+                    item.PlayerId,
+                    observedPlayerId,
+                    StringComparison.Ordinal)))
         {
             observedPlayerId = runtime.LocalPlayerId;
         }
+
         if (localSeat.Ready
             || localSeat.Eliminated
-            || !string.Equals(
-                publicState.Phase,
-                MatchPhase.Preparation.ToString(),
-                StringComparison.Ordinal))
+            || !IsPreparation(publicState))
         {
             ClearSelection();
         }
 
-        RebuildPlayers(publicState.Seats);
-        RebuildShop(runtime.Snapshot.OwnerPrivateState, localSeat);
-        RebuildStaging(publicState);
+        playerEntries = BuildPlayerEntries(publicState.Seats);
+        playerList?.Refresh();
+
+        var observed = publicState.Seats.First(item =>
+            string.Equals(
+                item.PlayerId,
+                observedPlayerId,
+                StringComparison.Ordinal));
+        if (stagingHud != null)
+        {
+            stagingHud.SetExternalDisplayedSnapshot(
+                BuildPlayerProjection(observed, snapshot.OwnerPrivateState),
+                !CanMutateFormation(publicState)
+                || !string.Equals(
+                    observedPlayerId,
+                    runtime.LocalPlayerId,
+                    StringComparison.Ordinal));
+        }
+
+        if (shopReady != null)
+        {
+            shopReady.SetPreparationPhase(IsPreparation(publicState));
+            shopReady.ApplyExternalState(
+                BuildShopProjection(
+                    snapshot.OwnerPrivateState,
+                    localSeat,
+                    publicState),
+                revisionChanged);
+        }
+
+        if (formalHud != null)
+        {
+            formalHud.SetSessionHudValues(
+                snapshot.OwnerPrivateState?.Gold ?? 0,
+                localSeat.Life,
+                ResolveOpponentName(publicState));
+        }
+
+        UpdateStatus();
         RebuildFormation(publicState);
-        UpdateStatus(publicState, localSeat);
     }
 
     public void ShowCommandResult(MatchCommandAckPayload ack)
     {
-        if (commandText == null || ack == null) return;
-        commandText.text = string.Equals(
+        if (ack == null) return;
+        var accepted = string.Equals(
             ack.ResultCode,
             MatchCommandCode.Accepted.ToString(),
-            StringComparison.Ordinal)
-            ? string.Empty
-            : "Rejected: " + ack.StableDetailCode;
+            StringComparison.Ordinal);
+        stagingHud?.ShowExternalStatus(
+            accepted ? string.Empty : "操作失败：" + ack.StableDetailCode);
     }
 
     public void ShowStatus(string value)
     {
-        if (commandText != null) commandText.text = value ?? string.Empty;
+        stagingHud?.ShowExternalStatus(value);
     }
 
-    private void SuppressOfflineHud()
+    private void BindFormalHud()
     {
-        var staging = FindObjectOfType<StagingHudController>();
-        if (staging == null) return;
-        offlineCanvas = staging.GetComponentInChildren<Canvas>(true);
-        if (offlineCanvas != null)
-            offlineCanvas.gameObject.SetActive(false);
-        var scene = staging.GetComponent<BattleHudSceneCoordinator>();
-        if (scene != null) scene.enabled = false;
-        var deployment = staging.GetComponent<StateDrivenDeploymentController>();
-        if (deployment != null) deployment.SetInteractionEnabled(false);
-        var formal = staging.GetComponent<FormalBattleHudController>();
-        if (formal != null) formal.enabled = false;
-    }
-
-    private void BuildCanvas()
-    {
-        if (EventSystem.current == null)
-            new GameObject(
-                "LanMatchEventSystem",
-                typeof(EventSystem),
-                typeof(StandaloneInputModule));
-        var canvasObject = new GameObject(
-            "LanMatchHudCanvas",
-            typeof(RectTransform),
-            typeof(Canvas),
-            typeof(CanvasScaler),
-            typeof(GraphicRaycaster));
-        canvasObject.transform.SetParent(transform, false);
-        canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 500;
-        var scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 1f;
-
-        var root = canvasObject.transform as RectTransform;
-        Stretch(root);
-        playerRows = Panel("Players", root, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(18f, -18f), new Vector2(250f, 650f), new Vector2(0f, 1f));
-        shopRows = Panel("OwnerShop", root, new Vector2(1f, 1f), new Vector2(1f, 1f),
-            new Vector2(-18f, -18f), new Vector2(360f, 720f), new Vector2(1f, 1f));
-        stagingRows = Panel("ObservedStaging", root, new Vector2(.5f, 0f), new Vector2(.5f, 0f),
-            new Vector2(0f, 18f), new Vector2(1160f, 170f), new Vector2(.5f, 0f));
-        stagingRows.GetComponent<VerticalLayoutGroup>().enabled = false;
-        statusText = Label("Status", root, 30, TextAnchor.UpperCenter, Color.white);
-        SetRect(statusText.rectTransform, new Vector2(.5f, 1f), new Vector2(.5f, 1f),
-            new Vector2(0f, -18f), new Vector2(900f, 92f), new Vector2(.5f, 1f));
-        commandText = Label("CommandStatus", root, 20, TextAnchor.MiddleCenter,
-            new Color(1f, .75f, .35f));
-        SetRect(commandText.rectTransform, new Vector2(.5f, 0f), new Vector2(.5f, 0f),
-            new Vector2(0f, 194f), new Vector2(900f, 40f), new Vector2(.5f, 0f));
-    }
-
-    private void RebuildPlayers(IEnumerable<PublicMatchSeatWire> seats)
-    {
-        ClearChildren(playerRows);
-        var title = Label("Title", playerRows, 22, TextAnchor.MiddleLeft, AccentColor);
-        title.text = "PLAYERS";
-        AddVertical(title.rectTransform, 44f);
-        foreach (var seat in seats.Where(item => item != null).OrderBy(item => item.SeatIndex))
+        stagingHud = FindObjectOfType<StagingHudController>();
+        if (stagingHud == null)
         {
-            var button = UiButton(
-                "Player_" + seat.PlayerId,
-                playerRows,
-                seat.DisplayName
-                + "\nLife "
-                + seat.Life
-                + "  " + seat.ConnectionState.ToUpperInvariant()
-                + (seat.Eliminated ? "  #" + seat.Placement : string.Empty)
-                + (seat.Ready ? "  READY" : string.Empty),
-                () => runtime.TryObservePlayer(seat.PlayerId));
-            AddVertical(button.GetComponent<RectTransform>(), 92f);
-            var image = button.GetComponent<Image>();
-            image.color = string.Equals(seat.PlayerId, observedPlayerId, StringComparison.Ordinal)
-                ? AccentColor
-                : ButtonColor;
-            var avatar = new GameObject(
-                "Avatar",
-                typeof(RectTransform),
-                typeof(CanvasRenderer),
-                typeof(Image)).GetComponent<Image>();
-            avatar.transform.SetParent(button.transform, false);
-            avatar.sprite = Resources.Load<Sprite>(
-                "Home/" + AvatarSpriteName(seat.AvatarId));
-            avatar.preserveAspect = true;
-            SetRect(avatar.rectTransform, new Vector2(0f, .5f), new Vector2(0f, .5f),
-                new Vector2(10f, 0f), new Vector2(68f, 68f), new Vector2(0f, .5f));
-            avatar.raycastTarget = false;
-            var label = button.GetComponentInChildren<Text>();
-            label.rectTransform.offsetMin = new Vector2(84f, 4f);
+            Debug.LogWarning(
+                "[LanMatch][hud.formal.missing] Running without a visual HUD.",
+                this);
+            return;
+        }
+
+        formalCanvas = stagingHud.GetComponentInChildren<Canvas>(true);
+        if (formalCanvas == null)
+        {
+            Debug.LogError("[LanMatch][hud.canvas.missing]", this);
+            return;
+        }
+        formalCanvas.gameObject.SetActive(true);
+
+        sceneCoordinator =
+            stagingHud.GetComponent<BattleHudSceneCoordinator>();
+        shopReady = sceneCoordinator?.ShopReady
+            ?? stagingHud.GetComponentInChildren<ShopReadyHudController>(true);
+        playerList = sceneCoordinator?.PlayerList
+            ?? stagingHud.GetComponentInChildren<PlayerListHudController>(true);
+        formalHud = stagingHud.GetComponent<FormalBattleHudController>();
+        deployment =
+            stagingHud.GetComponent<StateDrivenDeploymentController>();
+
+        if (shopReady == null)
+        {
+            var root = CreateFullCanvasRoot(
+                "ShopReadyHud",
+                formalCanvas.transform);
+            shopReady = root.gameObject.AddComponent<ShopReadyHudController>();
+            ownsShopReady = true;
+        }
+        if (playerList == null)
+        {
+            var root = CreateFullCanvasRoot(
+                "PlayerListPanel",
+                formalCanvas.transform);
+            playerList = root.gameObject.AddComponent<PlayerListHudController>();
+            ownsPlayerList = true;
+        }
+
+        sceneCoordinator?.SetExternalMatchMode(true);
+        deployment?.SuspendHudInputForExternalMatch();
+        stagingHud.SetStagingDragStartedHandler(HandleStagingSelected);
+        stagingHud.SetStagingSelectionChangedHandler(
+            HandleStagingSelected);
+
+        shopReady.InitializeExternal(
+            SendRefresh,
+            SubmitUpgradeFromFormalHud,
+            SubmitPurchaseFromFormalHud,
+            SendToggleFreeze,
+            SendReady);
+        shopReady.ShopVisibilityChanged += HandleShopVisibilityChanged;
+        playerList.SetExternalSource(
+            () => playerEntries,
+            () => playerListVisible,
+            playerId => runtime != null
+                && runtime.TryObservePlayer(playerId));
+
+        if (formalHud != null)
+        {
+            formalHud.SetExternalMatchRuntime(runtime);
+            formalHud.SelectionChanged += HandleFormalSelectionChanged;
+            formalHudBound = true;
         }
     }
 
-    private void RebuildShop(
-        OwnerMatchStateWire owner,
-        PublicMatchSeatWire localSeat)
+    private void HandleFormalSelectionChanged(bool selected)
     {
-        ClearChildren(shopRows);
-        ownerText = Label("OwnerSummary", shopRows, 22, TextAnchor.MiddleLeft, Color.white);
-        ownerText.text = owner == null
-            ? "SPECTATING"
-            : "Gold " + owner.Gold
-              + "   Lv." + owner.Level
-              + "\nCost " + owner.AvailableDeploymentCost
-              + "/" + owner.TotalDeploymentCost;
-        AddVertical(ownerText.rectTransform, 72f);
-        var preparation = string.Equals(
-            runtime.Snapshot.PublicState.Phase,
-            MatchPhase.Preparation.ToString(),
-            StringComparison.Ordinal);
-        var battle = string.Equals(
-            runtime.Snapshot.PublicState.Phase,
-            MatchPhase.Battle.ToString(),
-            StringComparison.Ordinal);
-        var canShop = runtime.CanSendCommands && (preparation || battle);
-        foreach (var offer in (owner?.ShopOffers ?? Array.Empty<MatchShopOfferWire>())
-                     .OrderBy(item => item.SlotIndex))
-        {
-            var captured = offer;
-            var display = string.IsNullOrEmpty(offer.UnitId)
-                ? "Empty"
-                : UnitName(offer.TypeId)
-                  + "  ★" + offer.Rarity
-                  + (offer.IsFrozen ? "  [Frozen]" : string.Empty);
-            var button = UiButton(
-                "Shop_" + offer.SlotIndex,
-                shopRows,
-                display,
-                () => ConfirmPurchase(captured));
-            button.interactable = canShop && !string.IsNullOrEmpty(offer.UnitId);
-            AddVertical(button.GetComponent<RectTransform>(), 62f);
-        }
-        var refresh = UiButton("Refresh", shopRows, "Refresh", () =>
-            runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind = MatchCommandKind.RefreshShop.ToString()
-            }));
-        refresh.interactable = canShop;
-        AddVertical(refresh.GetComponent<RectTransform>(), 50f);
-        var freeze = UiButton("Freeze", shopRows, "Toggle Freeze", () =>
-            runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind = MatchCommandKind.ToggleShopFreeze.ToString()
-            }));
-        freeze.interactable = canShop;
-        AddVertical(freeze.GetComponent<RectTransform>(), 50f);
-        var upgrade = UiButton(
-            "Upgrade",
-            shopRows,
-            owner == null ? "Upgrade" : "Upgrade (" + owner.CurrentUpgradePrice + ")",
-            () => ConfirmUpgrade(owner));
-        upgrade.interactable = canShop && owner != null;
-        AddVertical(upgrade.GetComponent<RectTransform>(), 50f);
-        var ready = UiButton(
-            "Ready",
-            shopRows,
-            localSeat.Ready ? "Cancel Ready" : "Ready",
-            () => runtime.SendCommand(new MatchCommandWirePayload
-            {
-                CommandKind = MatchCommandKind.SetPreparationReady.ToString(),
-                DesiredReady = !localSeat.Ready
-            }));
-        ready.gameObject.SetActive(preparation);
-        ready.interactable = runtime.CanSendCommands && preparation;
-        AddVertical(ready.GetComponent<RectTransform>(), 54f);
-        var quit = UiButton("Quit", shopRows, "Return to Main Menu",
-            runtime.RequestExplicitQuit);
-        AddVertical(quit.GetComponent<RectTransform>(), 48f);
+        playerListVisible = !selected;
+        if (selected) shopReady?.SetShopVisible(false);
+        playerList?.Refresh();
     }
 
-    private void RebuildStaging(PublicMatchStateWire publicState)
+    private void HandleShopVisibilityChanged(bool visible)
     {
-        ClearChildren(stagingRows);
-        var preparation = string.Equals(
-            publicState.Phase,
-            MatchPhase.Preparation.ToString(),
-            StringComparison.Ordinal);
-        stagingRows.gameObject.SetActive(preparation);
-        if (!preparation) return;
-        var observed = publicState.Seats.First(item =>
-            string.Equals(item.PlayerId, observedPlayerId, StringComparison.Ordinal));
-        observedText = Label("Observed", stagingRows, 20, TextAnchor.MiddleLeft, AccentColor);
-        observedText.text = "Observed: " + observed.DisplayName;
-        SetRect(observedText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(18f, -8f), new Vector2(320f, 34f), new Vector2(0f, 1f));
-        var staging = (observed.Units ?? Array.Empty<MatchUnitWire>())
-            .Where(item => string.Equals(
-                item.Zone,
-                MatchUnitZone.Staging.ToString(),
-                StringComparison.Ordinal))
+        if (visible) formalHud?.ClearSelectionForSceneTransition();
+    }
+
+    private IReadOnlyList<PlayerListEntryPresentation> BuildPlayerEntries(
+        IEnumerable<PublicMatchSeatWire> seats)
+    {
+        return new ReadOnlyCollection<PlayerListEntryPresentation>(
+            (seats ?? Array.Empty<PublicMatchSeatWire>())
+                .Where(item => item != null)
+                .OrderBy(item => item.SeatIndex)
+                .Select(item => new PlayerListEntryPresentation(
+                    item.PlayerId,
+                    item.DisplayName,
+                    "UI/Lobby/Home/" + AvatarSpriteName(item.AvatarId),
+                    item.Life,
+                    !string.Equals(
+                        item.ConnectionState,
+                        PublicConnectionState.LostConnection.ToString(),
+                        StringComparison.Ordinal),
+                    false,
+                    string.Equals(
+                        item.PlayerId,
+                        runtime.LocalPlayerId,
+                        StringComparison.Ordinal),
+                    string.Equals(
+                        item.PlayerId,
+                        observedPlayerId,
+                        StringComparison.Ordinal)))
+                .ToArray());
+    }
+
+    private PlayerStateSnapshot BuildPlayerProjection(
+        PublicMatchSeatWire observed,
+        OwnerMatchStateWire owner)
+    {
+        var units = (observed.Units ?? Array.Empty<MatchUnitWire>())
+            .Where(item => item != null)
+            .Select(item => PlayerUnitSnapshot.CreateProjection(
+                item.UnitId,
+                item.TypeId,
+                ParsePlayerZone(item.Zone),
+                item.EliteLevel,
+                ProjectBuffs(observed, item),
+                item.HasFormation
+                    ? new LocalFormationCoordinate(
+                        item.FormationX,
+                        item.FormationY)
+                    : (LocalFormationCoordinate?)null))
+            .ToArray();
+
+        var stacks = string.Equals(
+                observed.PlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal)
+            && owner?.StagingStacks != null
+                ? owner.StagingStacks
+                    .Select(item => BuildStackProjection(
+                        item.TypeId,
+                        item.EliteLevel,
+                        item.DeploymentCost,
+                        item.UnitIds,
+                        observed))
+                    .ToArray()
+                : BuildPublicStacks(observed);
+
+        return PlayerStateSnapshot.CreateProjection(
+            observed.PlayerId,
+            owner?.AvailableDeploymentCost ?? 0,
+            renderedRevision,
+            units,
+            stacks);
+    }
+
+    private IReadOnlyList<StagingStackSnapshot> BuildPublicStacks(
+        PublicMatchSeatWire seat)
+    {
+        var stacks = (seat.Units ?? Array.Empty<MatchUnitWire>())
+            .Where(item =>
+                item != null
+                && string.Equals(
+                    item.Zone,
+                    MatchUnitZone.Staging.ToString(),
+                    StringComparison.Ordinal))
             .GroupBy(
-                item => StagingBuffKey(observed, item),
+                item => StagingBuffKey(seat, item),
                 StringComparer.Ordinal)
             .Select(group =>
             {
@@ -350,8 +370,10 @@ public sealed class LanMatchHudController : MonoBehaviour
                     out var entry);
                 return new
                 {
-                    Units = group.ToArray(),
                     First = first,
+                    Units = group
+                        .OrderBy(item => item.UnitId, StringComparer.Ordinal)
+                        .ToArray(),
                     Cost = hasEntry
                         ? MatchEliteRules.GetDeploymentCost(
                             entry,
@@ -363,59 +385,144 @@ public sealed class LanMatchHudController : MonoBehaviour
                     BuffKey = group.Key
                 };
             })
-            .OrderBy(group => group.Cost)
-            .ThenBy(group => group.NumericTypeId)
-            .ThenBy(group => group.First.EliteLevel)
-            .ThenBy(group => group.BuffKey, StringComparer.Ordinal)
-            .ThenBy(group => group.First.UnitId, StringComparer.Ordinal)
+            .OrderBy(item => item.Cost)
+            .ThenBy(item => item.NumericTypeId)
+            .ThenBy(item => item.First.EliteLevel)
+            .ThenBy(item => item.BuffKey, StringComparer.Ordinal)
+            .ThenBy(item => item.First.UnitId, StringComparer.Ordinal)
+            .Select(item => BuildStackProjection(
+                item.First.TypeId,
+                item.First.EliteLevel,
+                item.Cost,
+                item.Units.Select(unit => unit.UnitId),
+                seat))
             .ToArray();
-        var x = 18f;
-        foreach (var stack in staging)
-        {
-            var chosen = stack.First;
-            var captured = chosen.UnitId;
-            var button = UiButton(
-                "Staging_" + captured,
-                stagingRows,
-                UnitName(chosen.TypeId)
-                + "\nE" + chosen.EliteLevel
-                + " ×" + stack.Units.Length,
-                () =>
-                {
-                    if (!CanMutateFormation(publicState)) return;
-                    selectedStagingUnitId = captured;
-                    selectedDeployedUnitId = null;
-                    pendingReplacePosition = null;
-                    commandText.text = "Select a deployment cell.";
-                });
-            button.interactable = CanMutateFormation(publicState)
-                && string.Equals(observedPlayerId, runtime.LocalPlayerId, StringComparison.Ordinal);
-            var rect = button.GetComponent<RectTransform>();
-            SetRect(rect, new Vector2(0f, 0f), new Vector2(0f, 0f),
-                new Vector2(x, 18f), new Vector2(150f, 96f), Vector2.zero);
-            x += 158f;
-        }
+        return new ReadOnlyCollection<StagingStackSnapshot>(stacks);
+    }
+
+    private StagingStackSnapshot BuildStackProjection(
+        string typeId,
+        int eliteLevel,
+        int deploymentCost,
+        IEnumerable<string> unitIds,
+        PublicMatchSeatWire seat)
+    {
+        var ids = (unitIds ?? Array.Empty<string>())
+            .OrderBy(item => item, StringComparer.Ordinal)
+            .ToArray();
+        var first = (seat.Units ?? Array.Empty<MatchUnitWire>())
+            .FirstOrDefault(item =>
+                item != null
+                && ids.Contains(item.UnitId));
+        shopCatalog.TryGet(typeId, out var shopEntry);
+        unitCatalog.TryGet(typeId, out var unitEntry);
+        return StagingStackSnapshot.CreateProjection(
+            typeId,
+            deploymentCost,
+            unitEntry?.PortraitResourcePath ?? string.Empty,
+            shopEntry?.Rarity ?? unitEntry?.Rarity ?? 1,
+            eliteLevel,
+            first == null
+                ? Array.Empty<PlayerBuffSnapshot>()
+                : ProjectBuffs(seat, first),
+            ids);
+    }
+
+    private static IEnumerable<PlayerBuffSnapshot> ProjectBuffs(
+        PublicMatchSeatWire seat,
+        MatchUnitWire unit)
+    {
+        var inline = (unit.Buffs ?? Array.Empty<MatchBuffWire>())
+            .OrderBy(item => item.BuffId, StringComparer.Ordinal)
+            .ThenBy(item => item.CanonicalPayload, StringComparer.Ordinal)
+            .Select(item => new PlayerBuffSnapshot(
+                item.BuffId,
+                item.CanonicalPayload));
+        var targeted =
+            (seat.TargetedUnitBuffs ?? Array.Empty<MatchTargetedBuffWire>())
+            .Where(item => string.Equals(
+                item.TargetUnitId,
+                unit.UnitId,
+                StringComparison.Ordinal))
+            .OrderBy(item => item.BuffInstanceId, StringComparer.Ordinal)
+            .Select(item => new PlayerBuffSnapshot(
+                item.BuffTypeId + "/" + item.BuffInstanceId,
+                item.CanonicalPayload));
+        return inline.Concat(targeted).ToArray();
+    }
+
+    private ShopReadyHudState BuildShopProjection(
+        OwnerMatchStateWire owner,
+        PublicMatchSeatWire localSeat,
+        PublicMatchStateWire publicState)
+    {
+        var preparation = IsPreparation(publicState);
+        var battle = string.Equals(
+            publicState.Phase,
+            MatchPhase.Battle.ToString(),
+            StringComparison.Ordinal);
+        var commandsEnabled =
+            runtime.CanSendCommands && (preparation || battle);
+        var offers = owner?.ShopOffers
+            ?? Array.Empty<MatchShopOfferWire>();
+        var slots = offers
+            .OrderBy(item => item.SlotIndex)
+            .Select(item =>
+            {
+                var isEmpty = string.IsNullOrEmpty(item.UnitId);
+                shopCatalog.TryGet(item.TypeId, out var shopEntry);
+                unitCatalog.TryGet(item.TypeId, out var unitEntry);
+                var rarity = item.HasRarity
+                    ? item.Rarity
+                    : shopEntry?.Rarity ?? unitEntry?.Rarity ?? 1;
+                return ShopReadySlotViewState.CreateProjection(
+                    item.SlotIndex,
+                    item.TypeId,
+                    rarity,
+                    shopEntry?.BaseDeploymentCost
+                    ?? unitEntry?.DeploymentCost
+                    ?? 0,
+                    rarity,
+                    unitEntry?.DisplayNameZhHans ?? item.TypeId,
+                    unitEntry?.PortraitResourcePath ?? string.Empty,
+                    isEmpty,
+                    item.IsFrozen,
+                    commandsEnabled
+                    && !isEmpty
+                    && owner != null
+                    && owner.Gold >= rarity,
+                    commandsEnabled && !isEmpty);
+            })
+            .ToArray();
+        return ShopReadyHudState.CreateProjection(
+            owner?.Level ?? 1,
+            owner?.Gold ?? 0,
+            owner?.CurrentUpgradePrice ?? 0,
+            localSeat.Ready,
+            shopReady != null && shopReady.IsShopVisible,
+            ShopReadyConfirmation.None,
+            CanMutateFormation(publicState),
+            commandsEnabled,
+            slots);
     }
 
     private void RebuildFormation(PublicMatchStateWire publicState)
     {
         ClearFormation();
-        if (!string.Equals(
-                publicState.Phase,
-                MatchPhase.Preparation.ToString(),
-                StringComparison.Ordinal))
-        {
-            return;
-        }
+        if (!IsPreparation(publicState)) return;
         var observed = publicState.Seats.First(item =>
-            string.Equals(item.PlayerId, observedPlayerId, StringComparison.Ordinal));
-        foreach (var unit in (observed.Units ?? Array.Empty<MatchUnitWire>())
-                     .Where(item =>
-                         string.Equals(
-                             item.Zone,
-                             MatchUnitZone.Deployed.ToString(),
-                             StringComparison.Ordinal)
-                         && item.HasFormation))
+            string.Equals(
+                item.PlayerId,
+                observedPlayerId,
+                StringComparison.Ordinal));
+        foreach (var unit in (observed.Units
+                     ?? Array.Empty<MatchUnitWire>())
+                 .Where(item =>
+                     string.Equals(
+                         item.Zone,
+                         MatchUnitZone.Deployed.ToString(),
+                         StringComparison.Ordinal)
+                     && item.HasFormation))
         {
             if (!PreparationUnitViewBuilder.TryCreate(
                     unit.UnitId,
@@ -431,59 +538,62 @@ public sealed class LanMatchHudController : MonoBehaviour
                 continue;
             }
             instance.name = "LanFormation_" + unit.UnitId;
-            instance.transform.position = BattlefieldWorldProjection.Default.ToWorld(
-                new FixedPosition(unit.FormationX * 100, unit.FormationY * 100),
-                BattleObserverView.Home);
+            instance.transform.position =
+                BattlefieldWorldProjection.Default.ToWorld(
+                    new FixedPosition(
+                        unit.FormationX * 100,
+                        unit.FormationY * 100),
+                    BattleObserverView.Home);
             formationViews.Add(
                 unit.UnitId,
                 instance.GetComponent<PreparationUnitView>());
         }
     }
 
-    private void UpdateStatus(
-        PublicMatchStateWire publicState,
-        PublicMatchSeatWire localSeat)
+    private void UpdateStatus()
     {
         if (runtime.IsReconnecting)
         {
-            statusText.text = "RECONNECTING — read only";
+            stagingHud?.ShowExternalStatus("正在重连，只读");
             return;
         }
-        if (string.Equals(
-                publicState.Phase,
-                MatchPhase.Preparation.ToString(),
+        if (runtime.HasBattleFailure)
+        {
+            stagingHud?.ShowExternalStatus(
+                "同步错误：" + runtime.BattleFailureDiagnostic);
+            return;
+        }
+        stagingHud?.ShowExternalStatus(string.Empty);
+    }
+
+    private void HandleStagingSelected(string slotId)
+    {
+        if (string.IsNullOrEmpty(slotId))
+        {
+            selectedStagingUnitId = null;
+            return;
+        }
+        var publicState = runtime?.Snapshot?.PublicState;
+        if (publicState == null
+            || !CanMutateFormation(publicState)
+            || !string.Equals(
+                observedPlayerId,
+                runtime.LocalPlayerId,
                 StringComparison.Ordinal))
         {
-            statusText.text = "ROUND "
-                + publicState.RoundNumber
-                + "  PREPARATION  "
-                + Mathf.Max(0, renderedCountdown)
-                + "s"
-                + (localSeat.Ready ? "  READY" : string.Empty);
+            stagingHud?.ClearStagingSelection();
             return;
         }
-        if (string.Equals(
-                publicState.Phase,
-                MatchPhase.Battle.ToString(),
-                StringComparison.Ordinal))
-        {
-            if (runtime.HasBattleFailure)
-            {
-                statusText.text = "ROUND "
-                    + publicState.RoundNumber
-                    + "  BATTLE  SYNCHRONIZATION ERROR";
-                return;
-            }
-            statusText.text = "ROUND "
-                + publicState.RoundNumber
-                + "  BATTLE  TICK "
-                + runtime.PresentationTick
-                + (runtime.BattleState == ArknoNights.Battle.Demo.MultiBattlePresentationState.Buffering
-                    ? "  SYNCING"
-                    : string.Empty);
-            return;
-        }
-        statusText.text = publicState.Phase;
+        var stack = stagingHud?.DisplayedSnapshot?.StagingSlots
+            .FirstOrDefault(item =>
+                string.Equals(
+                    StagingHudController.BuildSlotId(item),
+                    slotId,
+                    StringComparison.Ordinal));
+        selectedStagingUnitId = stack?.UnitIds.FirstOrDefault();
+        selectedDeployedUnitId = null;
+        pendingReplacePosition = null;
+        pendingReplaceUnitId = null;
     }
 
     private void HandleWorldInput()
@@ -491,7 +601,10 @@ public sealed class LanMatchHudController : MonoBehaviour
         var publicState = runtime?.Snapshot?.PublicState;
         if (publicState == null
             || !CanMutateFormation(publicState)
-            || !string.Equals(observedPlayerId, runtime.LocalPlayerId, StringComparison.Ordinal)
+            || !string.Equals(
+                observedPlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal)
             || EventSystem.current != null
             && EventSystem.current.IsPointerOverGameObject())
         {
@@ -527,7 +640,8 @@ public sealed class LanMatchHudController : MonoBehaviour
             selectedDeployedUnitId = clickedView.PlayerUnitId;
             selectedStagingUnitId = null;
             pendingReplacePosition = null;
-            commandText.text = "Select a destination; right-click retreats.";
+            formalHud?.SelectObservedPreparationUnitForHud(
+                clickedView.PlayerUnitId);
             return;
         }
         if (hits.Length == 0) return;
@@ -555,7 +669,8 @@ public sealed class LanMatchHudController : MonoBehaviour
         {
             runtime.SendCommand(new MatchCommandWirePayload
             {
-                CommandKind = MatchCommandKind.RelocateOrSwapUnit.ToString(),
+                CommandKind =
+                    MatchCommandKind.RelocateOrSwapUnit.ToString(),
                 UnitId = selectedDeployedUnitId,
                 TargetX = x,
                 TargetY = y
@@ -565,12 +680,19 @@ public sealed class LanMatchHudController : MonoBehaviour
         }
         if (string.IsNullOrEmpty(selectedStagingUnitId)) return;
         var local = publicState.Seats.First(item =>
-            string.Equals(item.PlayerId, runtime.LocalPlayerId, StringComparison.Ordinal));
-        var occupant = (local.Units ?? Array.Empty<MatchUnitWire>()).FirstOrDefault(item =>
-            item.HasFormation
-            && item.FormationX == x
-            && item.FormationY == y
-            && string.Equals(item.Zone, MatchUnitZone.Deployed.ToString(), StringComparison.Ordinal));
+            string.Equals(
+                item.PlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal));
+        var occupant = (local.Units ?? Array.Empty<MatchUnitWire>())
+            .FirstOrDefault(item =>
+                item.HasFormation
+                && item.FormationX == x
+                && item.FormationY == y
+                && string.Equals(
+                    item.Zone,
+                    MatchUnitZone.Deployed.ToString(),
+                    StringComparison.Ordinal));
         if (occupant != null)
         {
             if (!pendingReplacePosition.HasValue
@@ -583,12 +705,12 @@ public sealed class LanMatchHudController : MonoBehaviour
             {
                 pendingReplacePosition = target;
                 pendingReplaceUnitId = occupant.UnitId;
-                commandText.text = "Click the occupied cell again to replace.";
                 return;
             }
             runtime.SendCommand(new MatchCommandWirePayload
             {
-                CommandKind = MatchCommandKind.ReplaceDeployedUnit.ToString(),
+                CommandKind =
+                    MatchCommandKind.ReplaceDeployedUnit.ToString(),
                 StagingUnitId = selectedStagingUnitId,
                 ExpectedDeployedUnitId = occupant.UnitId,
                 TargetX = x,
@@ -604,7 +726,8 @@ public sealed class LanMatchHudController : MonoBehaviour
                 TargetX = x,
                 TargetY = y,
                 ExpectedAvailableCost =
-                    runtime.Snapshot.OwnerPrivateState.AvailableDeploymentCost
+                    runtime.Snapshot.OwnerPrivateState
+                        .AvailableDeploymentCost
             });
         }
         ClearSelection();
@@ -612,26 +735,59 @@ public sealed class LanMatchHudController : MonoBehaviour
 
     private bool CanMutateFormation(PublicMatchStateWire publicState)
     {
-        if (!runtime.CanSendCommands
-            || !string.Equals(
-                publicState.Phase,
-                MatchPhase.Preparation.ToString(),
-                StringComparison.Ordinal))
-        {
+        if (!runtime.CanSendCommands || !IsPreparation(publicState))
             return false;
-        }
         var local = publicState.Seats.FirstOrDefault(item =>
             item != null
-            && string.Equals(item.PlayerId, runtime.LocalPlayerId, StringComparison.Ordinal));
+            && string.Equals(
+                item.PlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal));
         return local != null && !local.Ready && !local.Eliminated;
     }
 
-    private string UnitName(string typeId)
+    private void SendRefresh()
     {
-        return unitCatalog.TryGet(typeId, out var entry)
-            && !string.IsNullOrWhiteSpace(entry.DisplayNameZhHans)
-            ? entry.DisplayNameZhHans
-            : typeId;
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind = MatchCommandKind.RefreshShop.ToString()
+        });
+    }
+
+    private void SendToggleFreeze()
+    {
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind = MatchCommandKind.ToggleShopFreeze.ToString()
+        });
+    }
+
+    private void SendReady()
+    {
+        var local = runtime.Snapshot.PublicState.Seats.First(item =>
+            string.Equals(
+                item.PlayerId,
+                runtime.LocalPlayerId,
+                StringComparison.Ordinal));
+        runtime.SendCommand(new MatchCommandWirePayload
+        {
+            CommandKind =
+                MatchCommandKind.SetPreparationReady.ToString(),
+            DesiredReady = !local.Ready
+        });
+    }
+
+    private void SubmitPurchaseFromFormalHud(int slotIndex)
+    {
+        var offer = runtime.Snapshot.OwnerPrivateState?.ShopOffers
+            ?.FirstOrDefault(item => item.SlotIndex == slotIndex);
+        if (offer == null || string.IsNullOrEmpty(offer.UnitId)) return;
+        SubmitPurchase(offer);
+    }
+
+    private void SubmitUpgradeFromFormalHud()
+    {
+        SubmitUpgrade(runtime.Snapshot.OwnerPrivateState);
     }
 
     private void ConfirmPurchase(MatchShopOfferWire offer)
@@ -646,13 +802,18 @@ public sealed class LanMatchHudController : MonoBehaviour
             ClearPendingConfirmations();
             pendingPurchaseSlot = offer.SlotIndex;
             pendingPurchaseUnitId = offer.UnitId;
-            commandText.text = "Click the same offer again to confirm purchase.";
             return;
         }
         ClearPendingConfirmations();
+        SubmitPurchase(offer);
+    }
+
+    private void SubmitPurchase(MatchShopOfferWire offer)
+    {
         runtime.SendCommand(new MatchCommandWirePayload
         {
-            CommandKind = MatchCommandKind.PurchaseShopOffer.ToString(),
+            CommandKind =
+                MatchCommandKind.PurchaseShopOffer.ToString(),
             SlotIndex = offer.SlotIndex,
             ExpectedUnitId = offer.UnitId
         });
@@ -667,16 +828,70 @@ public sealed class LanMatchHudController : MonoBehaviour
             ClearPendingConfirmations();
             pendingUpgradeLevel = owner.Level;
             pendingUpgradePrice = owner.CurrentUpgradePrice;
-            commandText.text = "Click Upgrade again to confirm.";
             return;
         }
         ClearPendingConfirmations();
+        SubmitUpgrade(owner);
+    }
+
+    private void SubmitUpgrade(OwnerMatchStateWire owner)
+    {
+        if (owner == null) return;
         runtime.SendCommand(new MatchCommandWirePayload
         {
-            CommandKind = MatchCommandKind.PurchaseLevelUpgrade.ToString(),
+            CommandKind =
+                MatchCommandKind.PurchaseLevelUpgrade.ToString(),
             ExpectedCurrentLevel = owner.Level,
             ExpectedCurrentPrice = owner.CurrentUpgradePrice
         });
+    }
+
+    private string ResolveOpponentName(PublicMatchStateWire publicState)
+    {
+        var pairing = (publicState.Pairings
+                ?? Array.Empty<PublicMatchPairingWire>())
+            .FirstOrDefault(item =>
+                string.Equals(
+                    item.HomePlayerId,
+                    observedPlayerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    item.AwayPlayerId,
+                    observedPlayerId,
+                    StringComparison.Ordinal));
+        if (pairing == null) return "待定";
+        var opponentId = string.Equals(
+                pairing.HomePlayerId,
+                observedPlayerId,
+                StringComparison.Ordinal)
+            ? pairing.AwayPlayerId
+            : pairing.HomePlayerId;
+        return publicState.Seats
+            .FirstOrDefault(item =>
+                string.Equals(
+                    item.PlayerId,
+                    opponentId,
+                    StringComparison.Ordinal))
+            ?.DisplayName ?? "待定";
+    }
+
+    private static PlayerUnitZone ParsePlayerZone(string value)
+    {
+        return string.Equals(
+            value,
+            MatchUnitZone.Deployed.ToString(),
+            StringComparison.Ordinal)
+            ? PlayerUnitZone.Deployed
+            : PlayerUnitZone.Staging;
+    }
+
+    private static bool IsPreparation(PublicMatchStateWire publicState)
+    {
+        return publicState != null
+            && string.Equals(
+                publicState.Phase,
+                MatchPhase.Preparation.ToString(),
+                StringComparison.Ordinal);
     }
 
     private static string StagingBuffKey(
@@ -687,27 +902,43 @@ public sealed class LanMatchHudController : MonoBehaviour
             "\u001e",
             (unit.Buffs ?? Array.Empty<MatchBuffWire>())
                 .OrderBy(item => item.BuffId, StringComparer.Ordinal)
-                .ThenBy(item => item.CanonicalPayload, StringComparer.Ordinal)
+                .ThenBy(
+                    item => item.CanonicalPayload,
+                    StringComparer.Ordinal)
                 .Select(item =>
                     item.BuffId + "\u001f" + item.CanonicalPayload));
         var targeted = string.Join(
             "\u001e",
-            (seat.TargetedUnitBuffs ?? Array.Empty<MatchTargetedBuffWire>())
-                .Where(item => string.Equals(
-                    item.TargetUnitId,
-                    unit.UnitId,
-                    StringComparison.Ordinal))
-                .OrderBy(item => item.BuffInstanceId, StringComparer.Ordinal)
-                .Select(item =>
-                    item.BuffInstanceId
-                    + "\u001f" + item.BuffTypeId
-                    + "\u001f" + item.TargetUnitId
-                    + "\u001f" + item.CanonicalPayload
-                    + "\u001f" + item.DiscardPolicy));
+            (seat.TargetedUnitBuffs
+                 ?? Array.Empty<MatchTargetedBuffWire>())
+            .Where(item => string.Equals(
+                item.TargetUnitId,
+                unit.UnitId,
+                StringComparison.Ordinal))
+            .OrderBy(
+                item => item.BuffInstanceId,
+                StringComparer.Ordinal)
+            .Select(item =>
+                item.BuffInstanceId
+                + "\u001f" + item.BuffTypeId
+                + "\u001f" + item.TargetUnitId
+                + "\u001f" + item.CanonicalPayload
+                + "\u001f" + item.DiscardPolicy));
         return unit.TypeId
             + "\u001d" + unit.EliteLevel
             + "\u001d" + inline
             + "\u001d" + targeted;
+    }
+
+    private static string AvatarSpriteName(string avatarId)
+    {
+        switch (avatarId)
+        {
+            case "avatar-0": return "icon_amiy";
+            case "avatar-1": return "icon_clementi";
+            case "avatar-2": return "icon_kirar";
+            default: return "icon_zumam";
+        }
     }
 
     private void ClearPendingConfirmations()
@@ -724,6 +955,7 @@ public sealed class LanMatchHudController : MonoBehaviour
         selectedDeployedUnitId = null;
         pendingReplaceUnitId = null;
         pendingReplacePosition = null;
+        stagingHud?.ClearStagingSelection();
     }
 
     private void ClearFormation()
@@ -736,139 +968,52 @@ public sealed class LanMatchHudController : MonoBehaviour
     public void DisposeHud()
     {
         ClearFormation();
-        if (offlineCanvas != null)
-            offlineCanvas.gameObject.SetActive(true);
-        if (canvas != null)
-            Destroy(canvas.gameObject);
+        if (shopReady != null)
+        {
+            shopReady.ShopVisibilityChanged -=
+                HandleShopVisibilityChanged;
+            shopReady.ClearExternalMode();
+        }
+        playerList?.ClearExternalSource();
+        if (formalHudBound && formalHud != null)
+        {
+            formalHud.SelectionChanged -=
+                HandleFormalSelectionChanged;
+            formalHud.ClearExternalMatchRuntime();
+        }
+        formalHudBound = false;
+        stagingHud?.RestoreLocalDisplay();
+        stagingHud?.ShowExternalStatus(string.Empty);
+        deployment?.RestoreHudInputAfterExternalMatch();
+        sceneCoordinator?.SetExternalMatchMode(false);
+        if (ownsShopReady && shopReady != null)
+            Destroy(shopReady.gameObject);
+        if (ownsPlayerList && playerList != null)
+            Destroy(playerList.gameObject);
         runtime = null;
         unitCatalog = null;
         shopCatalog = null;
+        stagingHud = null;
+        deployment = null;
+        sceneCoordinator = null;
+        formalHud = null;
+        shopReady = null;
+        playerList = null;
+        formalCanvas = null;
     }
 
-    private static string AvatarSpriteName(string avatarId)
-    {
-        switch (avatarId)
-        {
-            case "avatar-0": return "icon_amiy";
-            case "avatar-1": return "icon_clementi";
-            case "avatar-2": return "icon_kirar";
-            default: return "icon_zumam";
-        }
-    }
-
-    private static RectTransform Panel(
+    private static RectTransform CreateFullCanvasRoot(
         string name,
-        Transform parent,
-        Vector2 anchorMin,
-        Vector2 anchorMax,
-        Vector2 position,
-        Vector2 size,
-        Vector2 pivot)
+        Transform parent)
     {
-        var value = new GameObject(
-            name,
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(VerticalLayoutGroup));
+        var value = new GameObject(name, typeof(RectTransform))
+            .GetComponent<RectTransform>();
         value.transform.SetParent(parent, false);
-        var image = value.GetComponent<Image>();
-        image.color = PanelColor;
-        var layout = value.GetComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(12, 12, 12, 12);
-        layout.spacing = 8f;
-        layout.childControlHeight = false;
-        layout.childControlWidth = true;
-        layout.childForceExpandHeight = false;
-        layout.childForceExpandWidth = true;
-        var rect = value.GetComponent<RectTransform>();
-        SetRect(rect, anchorMin, anchorMax, position, size, pivot);
-        return rect;
-    }
-
-    private static Button UiButton(
-        string name,
-        Transform parent,
-        string label,
-        Action clicked)
-    {
-        var value = new GameObject(
-            name,
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(Button));
-        value.transform.SetParent(parent, false);
-        var image = value.GetComponent<Image>();
-        image.color = ButtonColor;
-        var button = value.GetComponent<Button>();
-        button.targetGraphic = image;
-        button.onClick.AddListener(() => clicked());
-        var text = Label("Label", value.transform, 19, TextAnchor.MiddleCenter, Color.white);
-        Stretch(text.rectTransform);
-        text.text = label;
-        return button;
-    }
-
-    private static Text Label(
-        string name,
-        Transform parent,
-        int fontSize,
-        TextAnchor anchor,
-        Color color)
-    {
-        var value = new GameObject(
-            name,
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Text));
-        value.transform.SetParent(parent, false);
-        var text = value.GetComponent<Text>();
-        text.font = StagingHudController.FormalUiFont;
-        text.fontSize = fontSize;
-        text.alignment = anchor;
-        text.color = color;
-        text.horizontalOverflow = HorizontalWrapMode.Wrap;
-        text.verticalOverflow = VerticalWrapMode.Overflow;
-        text.raycastTarget = false;
-        return text;
-    }
-
-    private static void AddVertical(RectTransform rect, float height)
-    {
-        var layout = rect.gameObject.AddComponent<LayoutElement>();
-        layout.preferredHeight = height;
-        layout.minHeight = height;
-    }
-
-    private static void ClearChildren(Transform root)
-    {
-        if (root == null) return;
-        foreach (Transform child in root)
-            Destroy(child.gameObject);
-    }
-
-    private static void Stretch(RectTransform target)
-    {
-        target.anchorMin = Vector2.zero;
-        target.anchorMax = Vector2.one;
-        target.pivot = new Vector2(.5f, .5f);
-        target.offsetMin = Vector2.zero;
-        target.offsetMax = Vector2.zero;
-    }
-
-    private static void SetRect(
-        RectTransform target,
-        Vector2 anchorMin,
-        Vector2 anchorMax,
-        Vector2 position,
-        Vector2 size,
-        Vector2 pivot)
-    {
-        target.anchorMin = anchorMin;
-        target.anchorMax = anchorMax;
-        target.pivot = pivot;
-        target.anchoredPosition = position;
-        target.sizeDelta = size;
+        value.anchorMin = Vector2.zero;
+        value.anchorMax = Vector2.one;
+        value.pivot = new Vector2(.5f, .5f);
+        value.offsetMin = Vector2.zero;
+        value.offsetMax = Vector2.zero;
+        return value;
     }
 }

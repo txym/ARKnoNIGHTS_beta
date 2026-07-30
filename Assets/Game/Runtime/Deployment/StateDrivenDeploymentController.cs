@@ -229,6 +229,28 @@ namespace ArknoNights.Deployment
             State = initialized ? PreparationInteractionState.Idle : PreparationInteractionState.Disabled;
         }
 
+        public void SuspendHudInputForExternalMatch()
+        {
+            SetInteractionEnabled(false);
+            SetPreparationViewsVisible(false);
+            if (hud != null)
+            {
+                hud.SetStagingDragStartedHandler(null);
+                hud.SetStagingSelectionChangedHandler(null);
+            }
+            enabled = false;
+        }
+
+        public void RestoreHudInputAfterExternalMatch()
+        {
+            enabled = true;
+            if (hud == null) return;
+            hud.SetStagingDragStartedHandler(slotId => BeginDragFromSlot(slotId));
+            hud.SetStagingSelectionChangedHandler(HandleStagingSelectionChanged);
+            SetPreparationViewsVisible(true);
+            SetInteractionEnabled(true);
+        }
+
         /// <summary>Public for UI events and PlayMode smoke tests. It selects the first stable unit ID in the stack.</summary>
         public bool BeginDragFromSlot(string slotId)
         {

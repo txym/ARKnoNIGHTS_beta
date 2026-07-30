@@ -252,6 +252,85 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void Controller_ExternalProjectionKeepsFormalConfirmationAndRestoresLocalSource()
+        {
+            var match = Load();
+            var root = new GameObject("ExternalShopProjectionTests", typeof(RectTransform));
+            try
+            {
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+                var localGold = match.Snapshot.LocalPlayer.Gold;
+                var refreshes = 0;
+                var upgrades = 0;
+                var purchases = 0;
+                var freezes = 0;
+                var readyChanges = 0;
+                controller.InitializeExternal(
+                    () => refreshes++,
+                    () => upgrades++,
+                    _ => purchases++,
+                    () => freezes++,
+                    () => readyChanges++);
+                controller.ApplyExternalState(
+                    ShopReadyHudState.CreateProjection(
+                        3,
+                        20,
+                        9,
+                        false,
+                        true,
+                        ShopReadyConfirmation.None,
+                        true,
+                        true,
+                        new[]
+                        {
+                            ShopReadySlotViewState.CreateProjection(
+                                0,
+                                "1000",
+                                2,
+                                2,
+                                1,
+                                "Test",
+                                string.Empty,
+                                false,
+                                false,
+                                true,
+                                true)
+                        }),
+                    true);
+
+                controller.Purchase(0);
+                Assert.AreEqual(0, purchases);
+                controller.Purchase(0);
+                Assert.AreEqual(1, purchases);
+                controller.RequestUpgrade();
+                Assert.AreEqual(0, upgrades);
+                controller.RequestUpgrade();
+                Assert.AreEqual(1, upgrades);
+                controller.RequestRefresh();
+                controller.ToggleAllFrozen();
+                controller.ToggleReady();
+
+                Assert.AreEqual(1, refreshes);
+                Assert.AreEqual(1, freezes);
+                Assert.AreEqual(1, readyChanges);
+                Assert.AreEqual(localGold, match.Snapshot.LocalPlayer.Gold);
+
+                controller.ClearExternalMode();
+
+                Assert.IsFalse(controller.IsExternalMode);
+                Assert.AreEqual(localGold, controller.State.Gold);
+                Assert.AreEqual(
+                    match.Snapshot.LocalPlayer.Level,
+                    controller.State.Level);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void Controller_AffinityRowsHideMissingRegionAndClearAfterSlotBecomesEmpty()
         {
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;

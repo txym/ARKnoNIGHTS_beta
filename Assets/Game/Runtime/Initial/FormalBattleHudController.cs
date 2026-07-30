@@ -74,11 +74,28 @@ public sealed class FormalBattleHudController : MonoBehaviour
     private string visualFixtureId;
     private bool selectedBattleEnemy;
     private bool initialized;
+    private LanMatchRuntimeController lanRuntime;
 
     public string SelectedUnitId => selectedUnitId;
     public bool SelectedBattleEnemy => selectedBattleEnemy;
     /// <summary>Raised when the single HUD selection becomes visible or is cleared; the scene coordinator uses it to hide/show the player list.</summary>
     public event Action<bool> SelectionChanged;
+    public bool IsExternalMatchMode => lanRuntime != null;
+
+    public void SetExternalMatchRuntime(LanMatchRuntimeController runtime)
+    {
+        lanRuntime = runtime
+            ?? throw new ArgumentNullException(nameof(runtime));
+        ClearSelection();
+        Refresh();
+    }
+
+    public void ClearExternalMatchRuntime()
+    {
+        lanRuntime = null;
+        ClearSelection();
+        Refresh();
+    }
 
     /// <summary>
     /// The scene coordinator supplies the locally owned session values. This presentation component stores only
@@ -137,7 +154,10 @@ public sealed class FormalBattleHudController : MonoBehaviour
     private void Update()
     {
         if (!initialized) return;
-        if (loop.Phase == LocalBattlePhase.Battle && Input.GetMouseButtonUp(0) && (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject()))
+        if (IsBattlePhase
+            && Input.GetMouseButtonUp(0)
+            && (EventSystem.current == null
+                || !EventSystem.current.IsPointerOverGameObject()))
         {
             var camera = Camera.main;
             if (camera != null)
@@ -163,7 +183,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
     /// <summary>Read-only battle selection entry also used by PlayMode tests; enemy selection never routes a command.</summary>
     public void SelectBattleUnitForHud(string unitId)
     {
-        if (loop == null || loop.Phase != LocalBattlePhase.Battle || string.IsNullOrEmpty(unitId)) return;
+        if (!IsBattlePhase || string.IsNullOrEmpty(unitId)) return;
         var state = CurrentBattleStates().FirstOrDefault(item => item.UnitId == unitId);
         if (state == null) return;
         // Staging and battlefield inspection share one selection. Clearing the former must not grant
@@ -178,7 +198,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
     /// <summary>Read-only preparation inspection for the player currently displayed by the observation coordinator.</summary>
     public void SelectObservedPreparationUnitForHud(string unitId)
     {
-        if (loop == null || loop.Phase != LocalBattlePhase.Preparation || string.IsNullOrWhiteSpace(unitId)) return;
+        if (IsBattlePhase || string.IsNullOrWhiteSpace(unitId)) return;
         var displayed = hud?.DisplayedSnapshot;
         if (displayed == null || !displayed.Units.Any(unit => string.Equals(unit.UnitId, unitId, StringComparison.Ordinal))) return;
         hud?.ClearStagingSelection();
@@ -307,7 +327,7 @@ public sealed class FormalBattleHudController : MonoBehaviour
     private void Refresh()
     {
         if (!initialized || root == null) return;
-        var battle = loop.Phase == LocalBattlePhase.Battle;
+        var battle = IsBattlePhase;
         statusEnemyIcon.gameObject.SetActive(battle);
         if (battle)
         {
@@ -319,7 +339,11 @@ public sealed class FormalBattleHudController : MonoBehaviour
             statusLeft.text = defeated + "/" + initialEnemies.Length;
             statusClockIcon.gameObject.SetActive(false);
             statusMiddle.font = StagingHudController.FormalUiFont;
-            statusMiddle.text = loop.MultiBattle == null ? demo.State.ToString() : loop.MultiBattle.State.ToString();
+            statusMiddle.text = lanRuntime != null
+                ? lanRuntime.BattleState.ToString()
+                : loop.MultiBattle == null
+                    ? demo.State.ToString()
+                    : loop.MultiBattle.State.ToString();
         }
         else
         {
@@ -327,7 +351,12 @@ public sealed class FormalBattleHudController : MonoBehaviour
             statusLeft.text = hud.PlayerState.PlayerId == "" ? "对手" : "对手: " + preparationOpponent;
             statusClockIcon.gameObject.SetActive(true);
             statusMiddle.font = StagingHudController.FormalNumericFont;
-            statusMiddle.text = Mathf.CeilToInt(loop.RemainingPreparationSeconds).ToString();
+            statusMiddle.text = lanRuntime != null
+                ? Mathf.CeilToInt(
+                    lanRuntime.PreparationRemainingMilliseconds / 1000f)
+                    .ToString()
+                : Mathf.CeilToInt(loop.RemainingPreparationSeconds)
+                    .ToString();
         }
         statusRight.text = sessionLife.ToString();
         if (goldValue != null) goldValue.text = sessionGold.ToString();
@@ -442,7 +471,10 @@ public sealed class FormalBattleHudController : MonoBehaviour
         detail = null;
         if (string.IsNullOrEmpty(selectedUnitId)) return false;
         var displayedUnit = hud?.DisplayedSnapshot?.Units.FirstOrDefault(item => item.UnitId == selectedUnitId);
-        if (loop.Phase == LocalBattlePhase.Battle && (selectedBattleEnemy || displayedUnit == null || displayedUnit.Zone != PlayerUnitZone.Staging))
+        if (IsBattlePhase
+            && (selectedBattleEnemy
+                || displayedUnit == null
+                || displayedUnit.Zone != PlayerUnitZone.Staging))
         {
             var input = CurrentBattleInput();
             return input != null && UnitDetailResolver.TryResolveBattle(input, CurrentBattleStates(), catalog, selectedUnitId, out detail);
@@ -452,6 +484,8 @@ public sealed class FormalBattleHudController : MonoBehaviour
 
     private IReadOnlyList<BattlePresentationViewState> CurrentBattleStates()
     {
+        if (lanRuntime != null)
+            return lanRuntime.CurrentBattleViewStates;
         return loop != null && loop.MultiBattle != null
             ? loop.MultiBattle.PresentationViewStates
             : demo?.Coordinator?.PresentationViewStates ?? Array.Empty<BattlePresentationViewState>();
@@ -459,6 +493,8 @@ public sealed class FormalBattleHudController : MonoBehaviour
 
     private BattleInput CurrentBattleInput()
     {
+        if (lanRuntime != null)
+            return lanRuntime.CurrentBattleInput;
         var multi = loop?.MultiBattle;
         if (multi != null)
         {
@@ -470,8 +506,19 @@ public sealed class FormalBattleHudController : MonoBehaviour
 
     private BattleSide CurrentObserverSide()
     {
+        if (lanRuntime != null)
+            return lanRuntime.CurrentObserverSide;
         return loop?.MultiBattle?.Observer == BattleObserverView.Away ? BattleSide.Away : BattleSide.Home;
     }
+
+    private bool IsBattlePhase =>
+        lanRuntime != null
+            ? lanRuntime.Snapshot?.PublicState != null
+              && string.Equals(
+                  lanRuntime.Snapshot.PublicState.Phase,
+                  ArknoNights.Match.MatchPhase.Battle.ToString(),
+                  StringComparison.Ordinal)
+            : loop != null && loop.Phase == LocalBattlePhase.Battle;
 
     private void AddStat(string key, string label, UnitInformationPanelLayout.Placement placement, UnitInformationPanelLayout layout)
     {

@@ -168,6 +168,7 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 - socket 回环必须覆盖原连接提升、命令/快照、强制断线保留四席位、较高 generation 重连、当前 revision 恢复包、MatchEnded 清理、heartbeat 跨过漏回阈值仍连接，以及最终端口释放；
 - M6 自身的 Battle 测试只验证 Session/Round/BattleSet/BattleId/input hash 路由、旧轮丢弃和重连时 `snapshot → clock → seal → playback baseline/tick` 顺序；M7 chunk/checkpoint/hash 由 Battle 程序集测试，M8 再验证两者的正式适配与生命周期。
 - M8 必须同时覆盖：Bot 正式调度、M4→M7 输入/结果映射、每端独立 producer、首块屏障、统一房主 Tick、scoped HUD、直接回主界面和重连恢复；不能把“收到 Lobby Start”或仅通过本地 Demo 记为通过。
+- 正式 HUD 回归必须加载真实 `SampleScene`，先等待离线 `BattleHudSceneCoordinator` 完成初始化，再启动 LAN runtime；断言复用同一个 `FormalBattleHudCanvas`、`ShopReadyHudController` 和 `PlayerListHudController`，运行期不存在 `LanMatchHudCanvas`，释放后原商店数据源与玩家列表选择回调恢复。`LanMatchBattleAdapterPlayModeTests` 覆盖场景生命周期，`ShopReadyHudStateEditModeTests` 覆盖外部投影仍使用旧控件的二次确认和回调门禁。
 - 自动化 loopback host+guest 证明真实 socket 与双运行时闭环；独立 Player 进程、跨物理设备、分辨率和人工视觉仍须分别记录，未执行时不得记为通过。
 
 ## 6. 证据记录

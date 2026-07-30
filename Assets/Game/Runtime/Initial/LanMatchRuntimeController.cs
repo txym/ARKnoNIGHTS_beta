@@ -61,6 +61,24 @@ public sealed class LanMatchRuntimeController : MonoBehaviour
         battles == null ? MultiBattlePresentationState.Idle : battles.State;
     public int PresentationTick =>
         battles == null ? 0 : Mathf.FloorToInt((float)battles.PresentationTick);
+    public IReadOnlyList<BattlePresentationViewState> CurrentBattleViewStates =>
+        battles == null
+            ? Array.Empty<BattlePresentationViewState>()
+            : battles.PresentationViewStates;
+    public BattleInput CurrentBattleInput =>
+        battles == null
+            ? null
+            : battles.Matches
+                .FirstOrDefault(item =>
+                    string.Equals(
+                        item.MatchId,
+                        battles.SelectedMatchId,
+                        StringComparison.Ordinal))
+                ?.Input;
+    public BattleSide CurrentObserverSide =>
+        battles != null && battles.Observer == BattleObserverView.Away
+            ? BattleSide.Away
+            : BattleSide.Home;
     public long PreparationRemainingMilliseconds
     {
         get

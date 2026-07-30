@@ -1351,3 +1351,36 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
   长时间观察缓冲提示与最终秒 hash 诊断。
 - 上述人工项不影响本次进入开发主线 `txym` 的自动化合并门槛，但在发布或把
   `txym` 提升到远端默认 `main` 前仍应执行。
+
+## 58. 正式 LAN HUD 恢复既有战斗 UI（2026-07-30）
+
+- 根因是 M8 的 `LanMatchHudController` 在运行时停用
+  `FormalBattleHudCanvas`、禁用既有正式 HUD 驱动，并创建通用
+  `LanMatchHudCanvas`，因此 `SampleScene` 本身虽未被改写，进入 LAN 后看到的
+  UI 仍被整体替换。
+- 修复后 `LanMatchHudController` 只充当适配层：保持原
+  `FormalBattleHudCanvas` 激活，把 scoped Public/Owner snapshot 投影到既有
+  待部署区、商店、玩家列表和单位信息面板，并复用旧商店的二次确认视觉与交互。
+  LAN 接管只暂停离线数据/输入驱动；释放后恢复本地商店订阅、玩家列表选择回调、
+  部署门禁和场景协调器。没有修改 Scene、Prefab、`.meta`、Package 或
+  ProjectSettings。
+- 商店外部投影定向 EditMode：
+  `ArknoNights.Battle.Tests.ShopReadyHudStateEditModeTests` 为
+  `14 total / 14 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；证据为
+  `Logs/Emergency-Hud-Restore-EditMode-Projection`。
+- 正式场景与 LAN 回环定向 PlayMode：
+  `ArknoNights.Lobby.Tests.LanMatchBattleAdapterPlayModeTests` 为
+  `4 total / 4 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；用例加载真实 `SampleScene`，先完成旧 HUD
+  初始化，再启动真实 host runtime，断言复用同一画布和商店、不存在
+  `LanMatchHudCanvas`，并在释放后验证商店数据源与玩家列表点击回调恢复。证据为
+  `Logs/Emergency-Hud-Restore-Final-PlayMode-3`。
+- Battle PlayMode 回归为
+  `28 total / 28 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；证据为
+  `Logs/Emergency-Hud-Restore-Battle-PlayMode`。
+- 用户明确要求不运行全量测试；已经启动但尚未形成结果的全量 EditMode 被立即
+  终止，确认没有 Unity 进程残留，因此不得把该尝试记为通过或失败。本修复也未
+  重新运行 Windows/Android 构建、双 Player 物理 LAN 或人工分辨率视觉验收；
+  这些项目保持未验证。

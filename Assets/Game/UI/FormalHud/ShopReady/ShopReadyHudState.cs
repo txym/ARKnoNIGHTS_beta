@@ -128,18 +128,45 @@ namespace ArknoNights.UI.FormalHud.ShopReady
     public sealed class ShopReadySlotViewState
     {
         internal ShopReadySlotViewState(LocalMatchShopSlotSnapshot source, int gold)
+            : this(
+                source.ShopSlotId,
+                source.UnitTypeId,
+                source.Price,
+                source.DeploymentCost,
+                source.Rarity,
+                source.DisplayName,
+                source.PortraitResourcePath,
+                source.IsEmpty,
+                source.IsFrozen,
+                !source.IsEmpty && gold >= source.Price,
+                !source.IsEmpty)
         {
-            ShopSlotId = source.ShopSlotId;
-            UnitTypeId = source.UnitTypeId;
-            Price = source.Price;
-            DeploymentCost = source.DeploymentCost;
-            Rarity = source.Rarity;
-            DisplayName = source.DisplayName;
-            PortraitResourcePath = source.PortraitResourcePath;
-            IsEmpty = source.IsEmpty;
-            IsFrozen = source.IsFrozen;
-            CanPurchase = !IsEmpty && gold >= Price;
-            CanToggleFrozen = !IsEmpty;
+        }
+
+        private ShopReadySlotViewState(
+            int shopSlotId,
+            string unitTypeId,
+            int price,
+            int deploymentCost,
+            int rarity,
+            string displayName,
+            string portraitResourcePath,
+            bool isEmpty,
+            bool isFrozen,
+            bool canPurchase,
+            bool canToggleFrozen)
+        {
+            ShopSlotId = shopSlotId;
+            UnitTypeId = unitTypeId ?? string.Empty;
+            Price = price;
+            DeploymentCost = deploymentCost;
+            Rarity = rarity;
+            DisplayName = displayName ?? string.Empty;
+            PortraitResourcePath = portraitResourcePath ?? string.Empty;
+            IsEmpty = isEmpty;
+            IsFrozen = isFrozen;
+            CanPurchase = canPurchase;
+            CanToggleFrozen = canToggleFrozen;
         }
 
         public int ShopSlotId { get; }
@@ -153,25 +180,66 @@ namespace ArknoNights.UI.FormalHud.ShopReady
         public bool IsFrozen { get; }
         public bool CanPurchase { get; }
         public bool CanToggleFrozen { get; }
+
+        public static ShopReadySlotViewState CreateProjection(
+            int shopSlotId,
+            string unitTypeId,
+            int price,
+            int deploymentCost,
+            int rarity,
+            string displayName,
+            string portraitResourcePath,
+            bool isEmpty,
+            bool isFrozen,
+            bool canPurchase,
+            bool canToggleFrozen)
+        {
+            return new ShopReadySlotViewState(
+                shopSlotId,
+                unitTypeId,
+                price,
+                deploymentCost,
+                rarity,
+                displayName,
+                portraitResourcePath,
+                isEmpty,
+                isFrozen,
+                canPurchase,
+                canToggleFrozen);
+        }
     }
 
     /// <summary>Read-only HUD projection. Economy, shop contents, readiness and commands stay owned by LocalMatchState.</summary>
     public sealed class ShopReadyHudState
     {
-        private ShopReadyHudState(LocalMatchPlayerSnapshot player, bool shopVisible, ShopReadyConfirmation confirmation, IEnumerable<ShopReadySlotViewState> slots)
+        private static readonly int[] LocalUpgradeCosts =
+            { 4, 6, 8, 10, 12, 14, 16, 18 };
+
+        private ShopReadyHudState(
+            int level,
+            int gold,
+            int upgradeCost,
+            bool isReady,
+            bool shopVisible,
+            ShopReadyConfirmation confirmation,
+            bool formationInteractionEnabled,
+            bool shopCommandsEnabled,
+            IEnumerable<ShopReadySlotViewState> slots)
         {
-            Level = player.Level;
-            Gold = player.Gold;
-            IsReady = player.IsReady;
+            Level = level;
+            Gold = gold;
+            UpgradeCost = upgradeCost;
+            IsReady = isReady;
             ShopVisible = shopVisible;
             PendingConfirmation = confirmation;
-            FormationInteractionEnabled = !player.IsReady;
-            ShopCommandsEnabled = true;
+            FormationInteractionEnabled = formationInteractionEnabled;
+            ShopCommandsEnabled = shopCommandsEnabled;
             Slots = new ReadOnlyCollection<ShopReadySlotViewState>((slots ?? Enumerable.Empty<ShopReadySlotViewState>()).OrderBy(slot => slot.ShopSlotId).ToArray());
         }
 
         public int Level { get; }
         public int Gold { get; }
+        public int UpgradeCost { get; }
         public bool IsReady { get; }
         public bool ShopVisible { get; }
         public ShopReadyConfirmation PendingConfirmation { get; }
@@ -184,7 +252,55 @@ namespace ArknoNights.UI.FormalHud.ShopReady
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
             var player = snapshot.LocalPlayer;
             if (player == null) throw new ArgumentException("Local player snapshot is required.", nameof(snapshot));
-            return new ShopReadyHudState(player, shopVisible, confirmation, player.ShopSlots.Select(slot => new ShopReadySlotViewState(slot, player.Gold)));
+            return new ShopReadyHudState(
+                player.Level,
+                player.Gold,
+                player.Level >= 1 && player.Level <= LocalUpgradeCosts.Length
+                    ? LocalUpgradeCosts[player.Level - 1]
+                    : 0,
+                player.IsReady,
+                shopVisible,
+                confirmation,
+                !player.IsReady,
+                true,
+                player.ShopSlots.Select(slot => new ShopReadySlotViewState(slot, player.Gold)));
+        }
+
+        public static ShopReadyHudState CreateProjection(
+            int level,
+            int gold,
+            int upgradeCost,
+            bool isReady,
+            bool shopVisible,
+            ShopReadyConfirmation confirmation,
+            bool formationInteractionEnabled,
+            bool shopCommandsEnabled,
+            IEnumerable<ShopReadySlotViewState> slots)
+        {
+            return new ShopReadyHudState(
+                level,
+                gold,
+                upgradeCost,
+                isReady,
+                shopVisible,
+                confirmation,
+                formationInteractionEnabled,
+                shopCommandsEnabled,
+                slots);
+        }
+
+        public ShopReadyHudState WithShopVisible(bool visible)
+        {
+            return new ShopReadyHudState(
+                Level,
+                Gold,
+                UpgradeCost,
+                IsReady,
+                visible,
+                PendingConfirmation,
+                FormationInteractionEnabled,
+                ShopCommandsEnabled,
+                Slots);
         }
 
         public static ShopReadyConfirmation RequestConfirmation(ShopReadyConfirmation current, ShopReadyConfirmation requested)

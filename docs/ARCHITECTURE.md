@@ -110,6 +110,8 @@ LanMatchRuntimeController
 
 `LanMatchRuntimeController` 是正式 LAN 路径的唯一场景组合根。Host 自身也只把按 Host 玩家裁剪的 `ScopedSnapshotPayload` 交给 HUD；房主本地命令与 guest 命令都进入 M6 actor 队列。Guest 从不创建可写 `MatchAuthority`。旧 `PreparationBattleLoopController` 与固定四玩家 Demo 继续用于离线测试，但 LAN handoff 会显式冻结这些入口。
 
+`LanMatchHudController` 是正式 HUD 的 LAN 适配层，不是第二套 View。它查找并保持既有 `FormalBattleHudCanvas` 激活，把 Public/Owner scoped snapshot 投影为 `StagingHudController`、`ShopReadyHudController`、`PlayerListHudController` 和 `FormalBattleHudController` 已有的只读模型，并把旧控件的交互回调路由到 `LanMatchRuntimeController`。LAN 接管期间，离线场景协调器只暂停数据和输入驱动，不销毁或隐藏既有视觉层级；释放后恢复离线订阅、选择回调和部署门禁。禁止再创建平行的 `LanMatchHudCanvas`、停用正式画布或复制商店/玩家列表几何。
+
 运行时目录配置从真实 Unit/Ability Resources 加载器创建，并对模拟字段生成规范 SHA-256。`LanMatchBattleAdapter` 把 M4 的公开封存阵型、公开 Buff/SourceEffect 与每场 `SealedInputHash` 转换为 M7 `BattleInput`；精英 0/1/2/3 分别派生 1/2/3/5 个局部战斗实体，持久 UnitId 只用于稳定派生 EntityId 和结果映射。M4 的规范 hash 使用小写 hex，M7 输入验证对 SHA-256 hex 大小写等价，以避免跨模块格式差异改变语义。
 
 BattleSeal 携带本轮 M4 规范摘要和每场 M7 输入 hash。每台在线机器独立、轮转地计算全部 Official/Shadow 战斗，不接收房主 BattleChunk。全体本地首块完成后发送 FirstChunkReady；房主冻结当时在线 Human 集合，等待全部就绪或 10 秒，且绝不绕过房主本地首块，然后广播未来 1000ms 的统一播放起点。表现 Tick 只由估算的房主单调时钟按 20 TPS 推导；本地计算不足只暂停本机画面，不暂停权威时钟。
@@ -152,7 +154,7 @@ M5 新增单向依赖的 `ARKnoNIGHTS.MatchAI`。`MatchAuthority` 只通过 `IMa
 
 - `LanLobbyController`：LAN 主界面与房间会话；
 - `LanMatchRuntimeController`：正式 LAN Match 生命周期、房主/客机角色、AI、Battle 与重连组合；
-- `LanMatchHudController`：按 scoped snapshot 投影的正式 LAN 准备/战斗 HUD 与命令映射；
+- `LanMatchHudController`：把 scoped snapshot 与 LAN 命令映射到既有 `FormalBattleHudCanvas` 的适配层，不拥有平行 HUD；
 - `StateDrivenDeploymentController`：状态驱动部署交互；
 - `PreparationBattleLoopController`：本地准备/战斗循环；
 - `FormalBattleHudController`、`BattleHudSceneCoordinator`：正式 HUD、商店、玩家列表和观察协调；

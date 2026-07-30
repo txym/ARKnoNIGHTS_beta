@@ -12,6 +12,7 @@ using ArknoNights.Lobby;
 using ArknoNights.Match;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
@@ -112,6 +113,145 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
+        public IEnumerator HostRuntime_ReusesFormalBattleCanvas_AndRestoresItOnDispose()
+        {
+            const string hostId =
+                "lan-33333333333333333333333333333333";
+            var hostProfile = new LobbyProfile(hostId, "Host", 0);
+            CreateRuntimeConfiguration(
+                out var configuration,
+                out var runtimeAssets);
+            var hostTask = LanRoomHost.StartAsync(
+                hostProfile,
+                configuration);
+            yield return WaitForTask(hostTask, 5f);
+            var host = hostTask.Result;
+            GameObject formalHudObject = null;
+            GameObject runtimeObject = null;
+            try
+            {
+                Assert.That(
+                    host.TryStart(hostId, out var startFailure),
+                    Is.True,
+                    startFailure.ToString());
+                SceneManager.LoadScene(
+                    "SampleScene",
+                    LoadSceneMode.Single);
+                for (var frame = 0; frame < 20; frame++)
+                    yield return null;
+                var stagingHud = UnityEngine.Object.FindObjectOfType(
+                    RuntimeType("ArknoNights.UI.StagingHudController"))
+                    as Component;
+                Assert.That(stagingHud, Is.Not.Null);
+                formalHudObject = stagingHud.gameObject;
+                var originalCanvas = FindDescendant(
+                    formalHudObject.transform,
+                    "FormalBattleHudCanvas");
+                Assert.That(originalCanvas.activeSelf, Is.True);
+                var sceneCoordinator = formalHudObject.GetComponent(
+                    RuntimeType("BattleHudSceneCoordinator"));
+                Assert.That(sceneCoordinator, Is.Not.Null);
+                var existingShop = sceneCoordinator.GetType()
+                    .GetProperty("ShopReady")
+                    ?.GetValue(sceneCoordinator);
+                Assert.That(existingShop, Is.Not.Null);
+
+                runtimeObject = new GameObject(
+                    "HostFormalHudRuntimeTest");
+                var runtime = runtimeObject.AddComponent(
+                    RuntimeType("LanMatchRuntimeController"));
+                InitializeRuntime(
+                    runtime,
+                    "InitializeHost",
+                    host,
+                    hostProfile,
+                    runtimeAssets);
+                yield return null;
+
+                var lanHud = runtimeObject.GetComponentInChildren(
+                    RuntimeType("LanMatchHudController"));
+                Assert.That(
+                    Property<bool>(lanHud, "UsesFormalBattleHud"),
+                    Is.True);
+                Assert.That(originalCanvas.activeSelf, Is.True);
+                Assert.That(
+                    FindDescendantOrNull(
+                        runtimeObject.transform,
+                        "LanMatchHudCanvas"),
+                    Is.Null,
+                    "LAN integration must not create a replacement canvas.");
+                Assert.That(
+                    originalCanvas.transform.Find("ShopReadyHud"),
+                    Is.Not.Null);
+                Assert.That(
+                    originalCanvas.transform.Find("PlayerListPanel"),
+                    Is.Not.Null);
+                Assert.That(
+                    originalCanvas.transform
+                        .Find(
+                            "PlayerListPanel/Player_"
+                            + hostId
+                            + "/Avatar")
+                        .GetComponent<Image>()
+                        .sprite
+                        .name,
+                    Is.EqualTo("icon_amiy"));
+                Assert.That(
+                    Property<bool>(existingShop, "IsExternalMode"),
+                    Is.True);
+
+                UnityEngine.Object.DestroyImmediate(runtimeObject);
+                runtimeObject = null;
+                yield return null;
+                Assert.That(
+                    originalCanvas.activeSelf,
+                    Is.True,
+                    "Disposal must leave the original formal canvas active.");
+                Assert.That(
+                    Property<bool>(existingShop, "IsExternalMode"),
+                    Is.False,
+                    "Disposal must restore the original shop data source.");
+
+                var observer = sceneCoordinator.GetType()
+                    .GetProperty("Observer")
+                    ?.GetValue(sceneCoordinator);
+                Assert.That(observer, Is.Not.Null);
+                var playerList = originalCanvas.transform.Find(
+                    "PlayerListPanel");
+                var localPlayer = Property<object>(
+                    observer,
+                    "DisplayedPlayerState");
+                var localPlayerId = Property<string>(
+                    localPlayer,
+                    "PlayerId");
+                var remoteRow = playerList.Cast<Transform>()
+                    .First(item =>
+                        item.name.StartsWith(
+                            "Player_",
+                            StringComparison.Ordinal)
+                        && !string.Equals(
+                            item.name,
+                            "Player_" + localPlayerId,
+                            StringComparison.Ordinal));
+                remoteRow.GetComponent<Button>().onClick.Invoke();
+                Assert.That(
+                    Property<bool>(
+                        observer,
+                        "IsObservingAnotherPlayer"),
+                    Is.True,
+                    "Disposal must restore the original player-list callback.");
+            }
+            finally
+            {
+                if (runtimeObject != null)
+                    UnityEngine.Object.DestroyImmediate(runtimeObject);
+                if (formalHudObject != null)
+                    UnityEngine.Object.DestroyImmediate(formalHudObject);
+                host.Dispose();
+            }
+        }
+
+        [UnityTest]
         public IEnumerator HostAndGuestRuntime_UseRealSocketAndReachSharedPlayback()
         {
             const string hostId = "lan-11111111111111111111111111111111";
@@ -206,17 +346,14 @@ namespace ArknoNights.Lobby.Tests
 
                 var hostHud = hostObject.GetComponentInChildren(
                     RuntimeType("LanMatchHudController"));
-                var readyObject = FindDescendant(
-                    hostHud.transform,
-                    "Ready");
-                Assert.That(readyObject.activeSelf, Is.False);
+                Assert.That(
+                    FindDescendantOrNull(
+                        hostHud.transform,
+                        "LanMatchHudCanvas"),
+                    Is.Null,
+                    "Headless loopback runtimes must not synthesize a replacement HUD.");
                 var offer = hostSnapshot.OwnerPrivateState.ShopOffers
                     .First(item => !string.IsNullOrEmpty(item.UnitId));
-                var shopButton = FindDescendant(
-                        hostHud.transform,
-                        "Shop_" + offer.SlotIndex)
-                    .GetComponent<Button>();
-                Assert.That(shopButton.interactable, Is.True);
                 var beforePurchaseRevision =
                     host.SessionActor.ProjectHostState().StateRevision;
                 InvokePrivate(hostHud, "ConfirmPurchase", offer);

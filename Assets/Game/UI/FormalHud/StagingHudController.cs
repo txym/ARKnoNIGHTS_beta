@@ -40,6 +40,7 @@ namespace ArknoNights.UI
         private PlayerStateSnapshot snapshot;
         private PlayerStateSnapshot displayedSnapshot;
         private bool displayedReadOnly;
+        private bool externalDisplay;
         private Canvas canvas;
         private RectTransform hudRoot;
         private RectTransform stagingArea;
@@ -178,7 +179,7 @@ namespace ArknoNights.UI
         private void HandlePlayerStateChanged(PlayerStateSnapshot next)
         {
             snapshot = next;
-            if (!displayedReadOnly) displayedSnapshot = next;
+            if (!displayedReadOnly && !externalDisplay) displayedSnapshot = next;
             var availableIds = new HashSet<string>(DisplayedSnapshot.StagingSlots.Select(BuildSlotId), StringComparer.Ordinal);
             if (!string.IsNullOrEmpty(selectedSlotId) && !availableIds.Contains(selectedSlotId))
             {
@@ -187,7 +188,10 @@ namespace ArknoNights.UI
                 StagingSelectionChanged?.Invoke(null);
             }
             RebuildSlots();
-            if (costText) costText.text = next.DeploymentCost.ToString();
+            if (costText)
+                costText.text = (externalDisplay
+                    ? DisplayedSnapshot
+                    : next).DeploymentCost.ToString();
             if (statusText) statusText.gameObject.SetActive(false);
         }
 
@@ -197,6 +201,7 @@ namespace ArknoNights.UI
         /// </summary>
         public void SetDisplayedSnapshot(PlayerStateSnapshot source, bool readOnly)
         {
+            externalDisplay = false;
             if (source == null || !readOnly || (snapshot != null && string.Equals(source.PlayerId, snapshot.PlayerId, StringComparison.Ordinal)))
             {
                 RestoreLocalDisplay();
@@ -209,15 +214,39 @@ namespace ArknoNights.UI
             RebuildSlots();
         }
 
+        /// <summary>
+        /// Reuses the frozen formal HUD geometry for an externally authoritative, immutable
+        /// projection. The local fixture PlayerState remains untouched and cannot receive commands
+        /// while this projection is active.
+        /// </summary>
+        public void SetExternalDisplayedSnapshot(
+            PlayerStateSnapshot source,
+            bool readOnly)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            externalDisplay = true;
+            displayedSnapshot = source;
+            displayedReadOnly = readOnly;
+            ClearStagingSelection();
+            RebuildSlots();
+            if (costText) costText.text = source.DeploymentCost.ToString();
+        }
+
         /// <summary>Restores the local command owner's staging projection after observation ends.</summary>
         public void RestoreLocalDisplay()
         {
-            var changed = displayedReadOnly || !ReferenceEquals(displayedSnapshot, snapshot);
+            var changed = externalDisplay
+                || displayedReadOnly
+                || !ReferenceEquals(displayedSnapshot, snapshot);
+            externalDisplay = false;
             displayedReadOnly = false;
             displayedSnapshot = snapshot;
             if (!changed) return;
             ClearStagingSelection();
             RebuildSlots();
+            if (costText && snapshot != null)
+                costText.text = snapshot.DeploymentCost.ToString();
         }
 
         private void RebuildSlots()
@@ -294,6 +323,14 @@ namespace ArknoNights.UI
             ApplyLayout();
             stagingSelectionChanged?.Invoke(null);
             StagingSelectionChanged?.Invoke(null);
+        }
+
+        public void ShowExternalStatus(string message)
+        {
+            if (!statusText) return;
+            statusText.text = message ?? string.Empty;
+            statusText.gameObject.SetActive(
+                !string.IsNullOrWhiteSpace(message));
         }
 
         private void ApplyLayout()

@@ -88,6 +88,23 @@ namespace ArknoNights.Player
         public int EliteLevel { get; }
         public IReadOnlyList<PlayerBuffSnapshot> Buffs { get; }
         public LocalFormationCoordinate? Formation { get; }
+
+        public static PlayerUnitSnapshot CreateProjection(
+            string unitId,
+            string typeId,
+            PlayerUnitZone zone,
+            int eliteLevel,
+            IEnumerable<PlayerBuffSnapshot> buffs,
+            LocalFormationCoordinate? formation)
+        {
+            return new PlayerUnitSnapshot(
+                unitId,
+                typeId,
+                zone,
+                eliteLevel,
+                buffs,
+                formation);
+        }
     }
 
     public sealed class StagingStackSnapshot
@@ -113,6 +130,25 @@ namespace ArknoNights.Player
         public IReadOnlyList<PlayerBuffSnapshot> Buffs { get; }
         public IReadOnlyList<string> UnitIds { get; }
         public int Count => UnitIds.Count;
+
+        public static StagingStackSnapshot CreateProjection(
+            string typeId,
+            int deploymentCost,
+            string portraitResourcePath,
+            int rarity,
+            int eliteLevel,
+            IEnumerable<PlayerBuffSnapshot> buffs,
+            IEnumerable<string> unitIds)
+        {
+            return new StagingStackSnapshot(
+                typeId,
+                deploymentCost,
+                portraitResourcePath,
+                rarity,
+                eliteLevel,
+                buffs,
+                unitIds);
+        }
     }
 
     public sealed class PlayerStateSnapshot
@@ -133,6 +169,21 @@ namespace ArknoNights.Player
         public IReadOnlyList<PlayerUnitSnapshot> Units { get; }
         public IReadOnlyList<StagingStackSnapshot> StagingSlots { get; }
         public string CanonicalSummary { get; }
+
+        public static PlayerStateSnapshot CreateProjection(
+            string playerId,
+            int deploymentCost,
+            long version,
+            IEnumerable<PlayerUnitSnapshot> units,
+            IEnumerable<StagingStackSnapshot> stagingSlots)
+        {
+            return new PlayerStateSnapshot(
+                playerId,
+                deploymentCost,
+                version,
+                units,
+                stagingSlots);
+        }
 
         private string BuildCanonicalSummary()
         {

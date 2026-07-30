@@ -34,6 +34,7 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
     private LocalBattlePhase observedPhase = LocalBattlePhase.Loading;
     private bool initialized;
     private bool formalSelectionBound;
+    private bool externalMatchMode;
 
     /// <summary>The existing UI-007 controller, supplied with the loop-owned LocalMatchState.</summary>
     public ShopReadyHudController ShopReady => shopReady;
@@ -42,6 +43,29 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
     /// <summary>Scene-owned player-list projection; it has no match data of its own.</summary>
     public PlayerListHudController PlayerList => playerList;
     public bool IsInitialized => initialized;
+
+    public void SetExternalMatchMode(bool active)
+    {
+        externalMatchMode = active;
+        enabled = !active;
+        if (active)
+        {
+            observedFormation?.Hide();
+            formalHud?.ClearSelectionForSceneTransition();
+            return;
+        }
+
+        if (!initialized
+            && hud != null
+            && hud.InitializationSucceeded
+            && deployment != null
+            && loop != null
+            && loop.MatchState != null)
+        {
+            Initialize(loop.MatchState);
+        }
+        if (initialized) RefreshPresentation();
+    }
 
     private IEnumerator Start()
     {
@@ -64,6 +88,7 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
             yield break;
         }
 
+        if (externalMatchMode) yield break;
         Initialize(loop.MatchState);
     }
 
@@ -94,7 +119,12 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
     /// </summary>
     public bool TryObservePlayer(string playerId)
     {
-        if (!initialized || string.IsNullOrWhiteSpace(playerId)) return false;
+        if (externalMatchMode
+            || !initialized
+            || string.IsNullOrWhiteSpace(playerId))
+        {
+            return false;
+        }
         var success = loop.Phase == LocalBattlePhase.Battle
             ? loop.TryObserveBattlePlayer(playerId)
             : observer.TrySelectDisplayedPlayer(playerId).Success;
@@ -157,12 +187,14 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
 
     private void HandleFormalSelectionChanged(bool selected)
     {
+        if (externalMatchMode) return;
         observer?.SetUnitSelected(selected);
         if (selected) shopReady?.SetShopVisible(false);
     }
 
     private void HandleShopVisibilityChanged(bool visible)
     {
+        if (externalMatchMode) return;
         if (visible) formalHud?.ClearSelectionForSceneTransition();
     }
 
@@ -185,6 +217,7 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
 
     private void HandleShopFormationInteractionChanged(bool ignored)
     {
+        if (externalMatchMode) return;
         // Ready is only one term of the unified gate.  Observation and phase stay authoritative
         // here so a shop refresh cannot accidentally re-enable another player's formation.
         ApplyFormationGate();
@@ -192,7 +225,13 @@ public sealed class BattleHudSceneCoordinator : MonoBehaviour
 
     private void RefreshPresentation()
     {
-        if (!initialized || observer == null || loop == null) return;
+        if (externalMatchMode
+            || !initialized
+            || observer == null
+            || loop == null)
+        {
+            return;
+        }
         var preparation = loop.Phase == LocalBattlePhase.Preparation;
         shopReady?.SetPreparationPhase(preparation);
 
@@ -275,32 +314,72 @@ public sealed class PlayerListHudController : MonoBehaviour
 
     private PlayerListObserverCoordinator coordinator;
     private Func<string, bool> selectPlayer;
+    private Func<string, bool> localSelectPlayer;
+    private Func<IReadOnlyList<PlayerListEntryPresentation>> externalEntries;
+    private Func<bool> externalVisibility;
     private RectTransform root;
 
-    public bool IsInitialized => coordinator != null;
+    public bool IsInitialized => coordinator != null || externalEntries != null;
+    public bool IsExternalMode => externalEntries != null;
 
     public void Initialize(PlayerListObserverCoordinator source, Func<string, bool> select)
     {
         coordinator = source ?? throw new ArgumentNullException(nameof(source));
-        selectPlayer = select ?? throw new ArgumentNullException(nameof(select));
+        externalEntries = null;
+        externalVisibility = null;
+        localSelectPlayer =
+            select ?? throw new ArgumentNullException(nameof(select));
+        selectPlayer = localSelectPlayer;
         root = GetComponent<RectTransform>();
         coordinator.Changed += Refresh;
         Refresh();
     }
 
+    public void SetExternalSource(
+        Func<IReadOnlyList<PlayerListEntryPresentation>> entries,
+        Func<bool> isVisible,
+        Func<string, bool> select)
+    {
+        externalEntries = entries
+            ?? throw new ArgumentNullException(nameof(entries));
+        externalVisibility = isVisible
+            ?? throw new ArgumentNullException(nameof(isVisible));
+        selectPlayer = select
+            ?? throw new ArgumentNullException(nameof(select));
+        if (root == null) root = GetComponent<RectTransform>();
+        Refresh();
+    }
+
+    public void ClearExternalSource()
+    {
+        externalEntries = null;
+        externalVisibility = null;
+        selectPlayer = localSelectPlayer;
+        Refresh();
+    }
+
     public void Refresh()
     {
-        if (coordinator == null) return;
+        if (coordinator == null && externalEntries == null) return;
         if (root == null) root = GetComponent<RectTransform>();
         if (root == null) return;
-        root.gameObject.SetActive(coordinator.IsPlayerListVisible);
+        var visible = externalEntries != null
+            ? externalVisibility()
+            : coordinator.IsPlayerListVisible;
+        root.gameObject.SetActive(visible);
         if (!root.gameObject.activeSelf) return;
         foreach (Transform child in root) Destroy(child.gameObject);
 
-        var entries = PlayerListPresentation.Build(coordinator);
+        var entries = externalEntries != null
+            ? externalEntries()
+            : PlayerListPresentation.Build(coordinator);
         var width = root.rect.width > 0f ? root.rect.width : Screen.width;
         var height = root.rect.height > 0f ? root.rect.height : Screen.height;
-        var layout = PlayerListLayout.Calculate(width, height, entries.Count, coordinator.IsPlayerListVisible);
+        var layout = PlayerListLayout.Calculate(
+            width,
+            height,
+            entries.Count,
+            visible);
         var background = Image("Background", root, FormalHudSpriteLoader.Load("UI/Texture/player_list/bg_player_list"));
         PositionFromTopLeft(background.rectTransform, layout.Background);
         background.preserveAspect = false;
@@ -365,7 +444,7 @@ public sealed class PlayerListHudController : MonoBehaviour
         value.font = StagingHudController.FormalNumericFont;
         value.text = entry.Life.ToString();
         PositionScaled(value.rectTransform, 55f, 12f, 60f, 20f, contentScale);
-        if (entry.IsLocalPlayer && coordinator.IsObservingAnotherPlayer)
+        if (entry.IsLocalPlayer && entry.IsObservedPlayer == false)
         {
             var returnButton = Image("ReturnLocal", row.transform, FormalHudSpriteLoader.Load("UI/Texture/player_list/btn_return_self"));
             PositionScaled(returnButton.rectTransform, 58f, 70f, 110f, 110f, contentScale);
