@@ -591,7 +591,10 @@ namespace ArknoNights.Battle.Tests
                 source.FinalUnits,
                 new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
                     snapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)),
-                source.StableSummary);
+                source.StableSummary,
+                source.HomeLifeDamage,
+                source.AwayLifeDamage,
+                source.FinalCheckpoint);
         }
 
         private static BattleEvent CloneEvent(BattleEvent source, int sequence, BattleUnitInstanceSnapshot spawnSnapshot)

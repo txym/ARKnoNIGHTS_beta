@@ -376,14 +376,22 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void Runner_ReachingMaxTicksIsUnresolvedAndHasNoWinner()
+        public void Runner_ReachingMaxTicksIsTerminalAndUsesLifeDamageOutcome()
         {
             var input = BattleFixtureLoader.LoadFromResources(FixturePath).Input;
             var result = new BattleRunner(input).RunToCompletion();
             Assert.AreEqual(input.MaxTicks, result.CompletedTicks);
             Assert.AreEqual(BattleStopReason.MaxTicksReached, result.StopReason);
-            Assert.IsFalse(result.IsResolved);
-            Assert.IsNull(result.Winner);
+            Assert.IsTrue(result.IsTerminal);
+            Assert.IsTrue(result.IsResolved);
+            Assert.AreEqual(
+                BattleOutcomeResolver.FromLifeDamage(
+                    result.HomeLifeDamage,
+                    result.AwayLifeDamage),
+                result.Outcome);
+            Assert.AreEqual(
+                BattleOutcomeResolver.ToWinner(result.Outcome),
+                result.Winner);
         }
 
         [Test]
@@ -649,12 +657,14 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void SimultaneousLethalDamage_ProducesUnresolvedMutualAnnihilation()
+        public void SimultaneousLethalDamage_ProducesResolvedDraw()
         {
             var input = CreateInput(20, new[] { Definition("glass", 100, 100, 100, 1, 1) },
                 new[] { Unit("home", "glass", 4, 4) }, new[] { Unit("away", "glass", 6, 4) });
             var result = new BattleRunner(input).RunToCompletion();
-            Assert.IsFalse(result.IsResolved);
+            Assert.IsTrue(result.IsResolved);
+            Assert.IsTrue(result.IsTerminal);
+            Assert.AreEqual(BattleOutcome.Draw, result.Outcome);
             Assert.IsNull(result.Winner);
             Assert.AreEqual(BattleStopReason.MutualAnnihilation, result.StopReason);
             Assert.AreEqual(2, result.Events.Count(item => item.Type == BattleEventType.Death));

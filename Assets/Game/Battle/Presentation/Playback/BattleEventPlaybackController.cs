@@ -379,12 +379,6 @@ namespace ArknoNights.Battle.Presentation
                     return;
                 }
             }
-
-            if (!result.Winner.HasValue) return;
-            var winner = result.Winner.Value;
-            var winnerAlive = views.Values.Any(item => item.IsAlive && item.Side == winner);
-            var losingAlive = views.Values.Any(item => item.IsAlive && item.Side != winner);
-            if (!winnerAlive || losingAlive) AddDiagnostic("result.winner.mismatch", "Event-derived alive states do not match BattleRunResult winner.");
         }
 
         private void AddDiagnostic(string code, string message, int tick = -1, int sequence = -1) => diagnostics.Add(new BattlePresentationDiagnostic(code, message, tick, sequence));

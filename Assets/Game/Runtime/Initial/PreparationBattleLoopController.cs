@@ -22,7 +22,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
 {
     private const string CatalogPath = "BattleData/unit-catalog-v1";
     private const string LocalMatchPath = "PlayerData/local-match-state-v1";
-    private const int BattleMaxTicks = 12000;
+    private const int BattleMaxTicks = 1800;
 
     private readonly PreparationBattlePhaseMachine machine = new PreparationBattlePhaseMachine();
     private StagingHudController hud;
@@ -143,6 +143,25 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
             Fail("round.presentation.error:" + multiBattle.LastError);
             return;
         }
+        if (multiBattle.State
+            == MultiBattlePresentationState.Preparing)
+        {
+            var firstChunkBudget =
+                BattleSimulationProducer
+                    .AuthoritativeTicksPerFullChunk
+                * Math.Max(1, multiBattle.Matches.Count);
+            if (!multiBattle.PumpComputation(firstChunkBudget))
+            {
+                Fail("round.presentation.error:" + multiBattle.LastError);
+                return;
+            }
+        }
+        if (multiBattle.State == MultiBattlePresentationState.Ready
+            && !multiBattle.Play())
+        {
+            Fail("round.presentation.play.failed:" + multiBattle.LastError);
+            return;
+        }
         multiBattle.Advance(unscaledSeconds);
         if (multiBattle.State == MultiBattlePresentationState.Error)
         {
@@ -171,7 +190,7 @@ public sealed class PreparationBattleLoopController : MonoBehaviour
         }
         var requests = activeSeal.Matches.Select(match => new BattleMatchRequest(match.MatchId, match.Input)).ToArray();
         var observations = BuildObservations(activeSeal).ToArray();
-        if (!multiBattle.Prepare(requests, observations, factory, matchState.ObservedPlayerId) || !multiBattle.Play())
+        if (!multiBattle.Prepare(requests, observations, factory, matchState.ObservedPlayerId))
         {
             Fail("round.multiBattle.start.failed:" + multiBattle.LastError);
             return;

@@ -39,7 +39,11 @@ namespace ArknoNights.Battle.Demo
         public string InputDigest => input == null ? string.Empty : Fingerprint(input.CanonicalSummary);
         public string EventDigest => result == null ? string.Empty : Fingerprint(BuildEventSummary(result.Events));
         public string ResultDigest => result == null ? string.Empty : Fingerprint(result.StableSummary + "|" + BuildEventSummary(result.Events));
-        public string WinnerOrReason => result == null ? string.Empty : result.Winner.HasValue ? result.Winner.Value.ToString() : "Unresolved: " + result.StopReason;
+        public string WinnerOrReason => result == null
+            ? string.Empty
+            : result.Outcome == BattleOutcome.Draw
+                ? BattleOutcome.Draw.ToString()
+                : result.Winner.Value.ToString();
         public string PlayersSummary => input == null
             ? string.Empty
             : string.Join("; ", input.Players.Select(player => player.PlayerId + "/" + player.Side + "=[" + string.Join(",", player.Units.Select(unit => unit.UnitId + ":" + unit.TypeId)) + "]"));

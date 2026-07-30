@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -8,6 +9,7 @@ namespace ArknoNights.Battle.Core
 {
     public enum BattleRunnerStatus { Ready, Running, Stopped }
     public enum BattleStopReason { None, Victory, MutualAnnihilation, MaxTicksReached, UnsupportedBlockingContention }
+    public enum BattleOutcome { HomeWin = 0, AwayWin = 1, Draw = 2 }
 
     public sealed class RuntimeAbilityState
     {
@@ -368,6 +370,49 @@ namespace ArknoNights.Battle.Core
                             .OrderBy(
                                 item => item,
                                 StringComparer.Ordinal)));
+        }
+
+        internal IReadOnlyList<string>
+            BuildCanonicalExecutionStateFields()
+        {
+            var fields = new List<string>
+            {
+                Definition.AbilityId,
+                currentSkillPoints.ToString(
+                    CultureInfo.InvariantCulture),
+                castCount.ToString(CultureInfo.InvariantCulture),
+                healthThresholdTriggered ? "1" : "0",
+                healthThresholdActive ? "1" : "0",
+                healthThresholdActiveUntilTick.ToString(
+                    CultureInfo.InvariantCulture),
+                healthThresholdTransitionQueued ? "1" : "0",
+                healthThresholdTransitionAnimationStarted
+                    ? "1"
+                    : "0",
+                healthThresholdTransitionCompleted ? "1" : "0",
+                healthThresholdTransitionDueTick.ToString(
+                    CultureInfo.InvariantCulture),
+                unblockedAttackChargeStacks.ToString(
+                    CultureInfo.InvariantCulture),
+                attackCountStateForceUnlocked ? "1" : "0",
+                damageReceivedCount.ToString(
+                    CultureInfo.InvariantCulture),
+                healthThresholdAdjacentSpawnTriggered ? "1" : "0",
+                healthThresholdFullHealQueued ? "1" : "0",
+                healthThresholdFullHealAnimationStarted ? "1" : "0",
+                healthThresholdFullHealCompleted ? "1" : "0",
+                healthThresholdFullHealDueTick.ToString(
+                    CultureInfo.InvariantCulture)
+            };
+            var proximityTargets =
+                proximityEntryInsideTargetIds
+                    .OrderBy(item => item, StringComparer.Ordinal)
+                    .ToArray();
+            fields.Add(proximityTargets.Length.ToString(
+                CultureInfo.InvariantCulture));
+            fields.AddRange(proximityTargets);
+            return new ReadOnlyCollection<string>(
+                fields.ToArray());
         }
     }
 
@@ -1049,6 +1094,165 @@ namespace ArknoNights.Battle.Core
                     .Append(item.DamagePerSecond).Append(':')
                     .Append(item.ExpiresAtTick);
         }
+
+        internal IReadOnlyList<string>
+            BuildCanonicalExecutionStateFields()
+        {
+            var fields = new List<string>
+            {
+                CurrentHitPoints.ToString(
+                    CultureInfo.InvariantCulture),
+                Position.XUnits.ToString(
+                    CultureInfo.InvariantCulture),
+                Position.YUnits.ToString(
+                    CultureInfo.InvariantCulture),
+                IsAlive ? "1" : "0",
+                HasExitedBattle ? "1" : "0",
+                TargetUnitId,
+                NextAttackAllowedTick.ToString(
+                    CultureInfo.InvariantCulture),
+                AttackAnimationLockUntilTick.ToString(
+                    CultureInfo.InvariantCulture),
+                SkillAnimationLockUntilTick.ToString(
+                    CultureInfo.InvariantCulture),
+                MoveRemainder.ToString(
+                    CultureInfo.InvariantCulture),
+                MoveXNumeratorRemainder.ToString(
+                    CultureInfo.InvariantCulture),
+                MoveYNumeratorRemainder.ToString(
+                    CultureInfo.InvariantCulture),
+                PassiveHealthRemainder.ToString(
+                    CultureInfo.InvariantCulture),
+                StartedAttackCount.ToString(
+                    CultureInfo.InvariantCulture),
+                ReleasedAlliesOnLastAttack ? "1" : "0",
+                accumulatedDefenseReduction.ToString(
+                    CultureInfo.InvariantCulture),
+                temporaryUnblockable ? "1" : "0",
+                temporaryUnblockableUntilTick.ToString(
+                    CultureInfo.InvariantCulture),
+                InstanceMoveSpeedMultiplierPermille.ToString(
+                    CultureInfo.InvariantCulture),
+                ActivationTick.ToString(
+                    CultureInfo.InvariantCulture),
+                DeploymentApproachDestination.HasValue ? "1" : "0",
+                DeploymentApproachDestination.HasValue
+                    ? DeploymentApproachDestination.Value.XUnits.ToString(
+                        CultureInfo.InvariantCulture)
+                    : null,
+                DeploymentApproachDestination.HasValue
+                    ? DeploymentApproachDestination.Value.YUnits.ToString(
+                        CultureInfo.InvariantCulture)
+                    : null
+            };
+
+            var blockedIds = blockedUnitIds
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .ToArray();
+            fields.Add(blockedIds.Length.ToString(
+                CultureInfo.InvariantCulture));
+            fields.AddRange(blockedIds);
+
+            var statusTags = externalStatusTags
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .ToArray();
+            fields.Add(statusTags.Length.ToString(
+                CultureInfo.InvariantCulture));
+            fields.AddRange(statusTags);
+
+            var externalModifiers = auraCombatModifiers
+                .Select(item => new
+                {
+                    TypeName = item.GetType().FullName
+                        ?? item.GetType().Name,
+                    item.NonStackingByAbilityId,
+                    item.AttackMultiplierPermille,
+                    item.DefenseAdditive,
+                    item.MagicResistanceAdditive,
+                    item.AttackSpeedMultiplierPermille,
+                    item.MoveSpeedMultiplierPermille,
+                    item.HitPointsPerSecond,
+                    GrantedStatusTag =
+                        (item as AuraCombatModifierDefinition)
+                            ?.GrantedStatusTag
+                        ?? string.Empty
+                })
+                .OrderBy(item =>
+                    item.TypeName,
+                    StringComparer.Ordinal)
+                .ThenBy(item =>
+                    item.NonStackingByAbilityId)
+                .ThenBy(item =>
+                    item.AttackMultiplierPermille)
+                .ThenBy(item => item.DefenseAdditive)
+                .ThenBy(item =>
+                    item.MagicResistanceAdditive)
+                .ThenBy(item =>
+                    item.AttackSpeedMultiplierPermille)
+                .ThenBy(item =>
+                    item.MoveSpeedMultiplierPermille)
+                .ThenBy(item =>
+                    item.HitPointsPerSecond)
+                .ThenBy(item =>
+                    item.GrantedStatusTag,
+                    StringComparer.Ordinal)
+                .ToArray();
+            fields.Add(externalModifiers.Length.ToString(
+                CultureInfo.InvariantCulture));
+            foreach (var item in externalModifiers)
+            {
+                fields.Add(item.TypeName);
+                fields.Add(item.NonStackingByAbilityId ? "1" : "0");
+                fields.Add(item.AttackMultiplierPermille.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.DefenseAdditive.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.MagicResistanceAdditive.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.AttackSpeedMultiplierPermille.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.MoveSpeedMultiplierPermille.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.HitPointsPerSecond.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.GrantedStatusTag);
+            }
+
+            var orderedAbilities = abilityStates
+                .OrderBy(
+                    item => item.Definition.AbilityId,
+                    StringComparer.Ordinal)
+                .ToArray();
+            fields.Add(orderedAbilities.Length.ToString(
+                CultureInfo.InvariantCulture));
+            foreach (var ability in orderedAbilities)
+            {
+                var abilityFields =
+                    ability.BuildCanonicalExecutionStateFields();
+                fields.Add(abilityFields.Count.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.AddRange(abilityFields);
+            }
+
+            var damageOverTime = damageOverTimeStates
+                .OrderBy(
+                    item => item.AbilityId,
+                    StringComparer.Ordinal)
+                .ToArray();
+            fields.Add(damageOverTime.Length.ToString(
+                CultureInfo.InvariantCulture));
+            foreach (var item in damageOverTime)
+            {
+                fields.Add(item.AbilityId);
+                fields.Add(item.DamagePerSecond.ToString(
+                    CultureInfo.InvariantCulture));
+                fields.Add(item.ExpiresAtTick.ToString(
+                    CultureInfo.InvariantCulture));
+            }
+
+            return new ReadOnlyCollection<string>(
+                fields.ToArray());
+        }
         internal void SetAuraCombatModifiers(
             IEnumerable<IExternalCombatModifierDefinition> modifiers)
         {
@@ -1171,7 +1375,7 @@ namespace ArknoNights.Battle.Core
         {
         }
 
-        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> unitSnapshots, string stableSummary, int homeLifeLoss = 0, int awayLifeLoss = 0)
+        internal BattleRunResult(string battleId, string homePlayerId, string awayPlayerId, string inputCanonicalSummary, IReadOnlyList<string> knownUnitTypeIds, int completedTicks, BattleStopReason stopReason, BattleSide? winner, IReadOnlyList<BattleStepTrace> trace, IReadOnlyList<BattleEvent> events, IReadOnlyList<BattleUnitFinalState> finalUnits, IReadOnlyDictionary<string, BattleUnitInstanceSnapshot> unitSnapshots, string stableSummary, int homeLifeLoss = 0, int awayLifeLoss = 0, BattlePresentationCheckpoint finalCheckpoint = null)
         {
             BattleId = battleId;
             HomePlayerId = homePlayerId;
@@ -1180,7 +1384,10 @@ namespace ArknoNights.Battle.Core
             KnownUnitTypeIds = knownUnitTypeIds;
             CompletedTicks = completedTicks;
             StopReason = stopReason;
-            Winner = winner;
+            Outcome = BattleOutcomeResolver.FromLifeDamage(
+                homeLifeLoss,
+                awayLifeLoss);
+            Winner = BattleOutcomeResolver.ToWinner(Outcome);
             Trace = trace;
             Events = events;
             FinalUnits = finalUnits;
@@ -1188,6 +1395,7 @@ namespace ArknoNights.Battle.Core
             StableSummary = stableSummary;
             HomeLifeLoss = homeLifeLoss;
             AwayLifeLoss = awayLifeLoss;
+            FinalCheckpoint = finalCheckpoint;
         }
 
         public int CompletedTicks { get; }
@@ -1197,8 +1405,10 @@ namespace ArknoNights.Battle.Core
         public string InputCanonicalSummary { get; }
         public IReadOnlyList<string> KnownUnitTypeIds { get; }
         public BattleStopReason StopReason { get; }
+        public BattleOutcome Outcome { get; }
         public BattleSide? Winner { get; }
-        public bool IsResolved => Winner.HasValue;
+        public bool IsTerminal => true;
+        public bool IsResolved => true;
         public IReadOnlyList<BattleStepTrace> Trace { get; }
         public IReadOnlyList<BattleEvent> Events { get; }
         public IReadOnlyList<BattleUnitFinalState> FinalUnits { get; }
@@ -1206,6 +1416,9 @@ namespace ArknoNights.Battle.Core
         public string StableSummary { get; }
         public int HomeLifeLoss { get; }
         public int AwayLifeLoss { get; }
+        public int HomeLifeDamage => HomeLifeLoss;
+        public int AwayLifeDamage => AwayLifeLoss;
+        public BattlePresentationCheckpoint FinalCheckpoint { get; }
 
         public bool TryGetUnitSnapshot(string unitId, out BattleUnitInstanceSnapshot snapshot)
         {
@@ -1242,6 +1455,7 @@ namespace ArknoNights.Battle.Core
         private int eventSequence;
         private int homeGateLifeLoss;
         private int awayGateLifeLoss;
+        private BattleRunResult terminalResult;
 
         public BattleRunner(BattleInput input)
         {
@@ -1288,6 +1502,15 @@ namespace ArknoNights.Battle.Core
         public BattleRunResult RunToCompletion()
         {
             while (Status != BattleRunnerStatus.Stopped) Step();
+            return CreateTerminalResult();
+        }
+
+        internal BattleRunResult CreateTerminalResult()
+        {
+            if (Status != BattleRunnerStatus.Stopped)
+                throw new InvalidOperationException("The battle has not reached a terminal state.");
+            if (terminalResult != null)
+                return terminalResult;
             var immutableTrace = new ReadOnlyCollection<BattleStepTrace>(trace.ToArray());
             var finalUnits = new ReadOnlyCollection<BattleUnitFinalState>(runtimeUnits.OrderBy(item => item.UnitId, StringComparer.Ordinal).Select(item => new BattleUnitFinalState(item)).ToArray());
             var homePlayerId = Input.Players.Single(player => player.Side == BattleSide.Home).PlayerId;
@@ -1299,12 +1522,44 @@ namespace ArknoNights.Battle.Core
             var immutableUnitSnapshots = new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
                 unitSnapshots.OrderBy(item => item.Key, StringComparer.Ordinal)
                     .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal));
-            return new BattleRunResult(Input.BattleId, homePlayerId, awayPlayerId, Input.CanonicalSummary, knownUnitTypeIds,
+            var checkpoint = BattlePresentationCheckpoint.Create(
+                CurrentTick,
+                runtimeUnits,
+                events,
+                unitSnapshots,
+                HomeLifeLoss,
+                AwayLifeLoss,
+                Outcome,
+                StopReason);
+            terminalResult = new BattleRunResult(Input.BattleId, homePlayerId, awayPlayerId, Input.CanonicalSummary, knownUnitTypeIds,
                 CurrentTick, StopReason, Winner, immutableTrace, new ReadOnlyCollection<BattleEvent>(events.ToArray()), finalUnits,
-                immutableUnitSnapshots, BuildStableSummary(), HomeLifeLoss, AwayLifeLoss);
+                immutableUnitSnapshots, BuildStableSummary(), HomeLifeLoss, AwayLifeLoss, checkpoint);
+            return terminalResult;
+        }
+
+        internal BattlePresentationCheckpoint CreatePresentationCheckpoint()
+        {
+            return BattlePresentationCheckpoint.Create(
+                CurrentTick,
+                runtimeUnits,
+                events,
+                unitSnapshots,
+                Status == BattleRunnerStatus.Stopped
+                    ? (int?)HomeLifeLoss
+                    : null,
+                Status == BattleRunnerStatus.Stopped
+                    ? (int?)AwayLifeLoss
+                    : null,
+                Status == BattleRunnerStatus.Stopped
+                    ? (BattleOutcome?)Outcome
+                    : null,
+                Status == BattleRunnerStatus.Stopped
+                    ? (BattleStopReason?)StopReason
+                    : null);
         }
 
         public BattleSide? Winner { get; private set; }
+        public BattleOutcome Outcome { get; private set; }
         public int HomeLifeLoss { get; private set; }
         public int AwayLifeLoss { get; private set; }
 
@@ -3182,10 +3437,13 @@ namespace ArknoNights.Battle.Core
             if (Status == BattleRunnerStatus.Stopped) return;
             HomeLifeLoss = CalculateLifeLoss(BattleSide.Home);
             AwayLifeLoss = CalculateLifeLoss(BattleSide.Away);
-            Winner = winner;
+            Outcome = BattleOutcomeResolver.FromLifeDamage(
+                HomeLifeLoss,
+                AwayLifeLoss);
+            Winner = BattleOutcomeResolver.ToWinner(Outcome);
             StopReason = reason;
             Status = BattleRunnerStatus.Stopped;
-            Emit(BattleEventType.BattleEnded, null, null, null, null, null, null, 0, 0, 0, 0, 0, 0, winner, reason);
+            Emit(BattleEventType.BattleEnded, null, null, null, null, null, null, 0, 0, 0, 0, 0, 0, Winner, reason);
         }
 
         private int CalculateLifeLoss(BattleSide damagedSide)

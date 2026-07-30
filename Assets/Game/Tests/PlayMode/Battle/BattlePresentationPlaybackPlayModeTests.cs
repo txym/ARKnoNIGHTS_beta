@@ -76,6 +76,11 @@ namespace ArknoNights.Battle.Tests
                 .Select(item => item.UnitId)
                 .ToArray();
             Assert.That(dynamicIds, Is.EqualTo(new[] { "-1", "-2", "-3" }));
+            var dynamicSpawnTick = result.Events
+                .Where(item => item.Type == BattleEventType.Spawn && item.UnitTypeId == "5504")
+                .Select(item => item.Tick)
+                .Distinct()
+                .Single();
 
             var factoryType = Type.GetType("MappedBattlePresentationViewFactory, Assembly-CSharp");
             var unitSkelType2 = Type.GetType("UnitSkelType2, Assembly-CSharp");
@@ -98,13 +103,13 @@ namespace ArknoNights.Battle.Tests
             {
                 Assert.That(playback.Load(result, factory, out var diagnostics), Is.True, string.Join(";", diagnostics));
                 playback.Play();
-                playback.Advance(100f / BattleInput.TicksPerSecond);
+                playback.Advance((dynamicSpawnTick + 0.01f) / BattleInput.TicksPerSecond);
                 yield return null;
 
                 foreach (var unitId in dynamicIds)
                 {
                     var viewObject = FindChild(factoryObject.transform, "BattleView_" + unitId);
-                    Assert.IsNotNull(viewObject, unitId + " must be created at Spawn Tick 100.");
+                    Assert.IsNotNull(viewObject, unitId + " must be created at its authoritative Spawn Tick.");
                     Assert.IsNotNull(viewObject.GetComponent(unitSkelType2), unitId + " must use UnitSkelType2.");
                     var skeleton = viewObject.GetComponent("SkeletonAnimation");
                     Assert.IsNotNull(skeleton);
@@ -124,7 +129,7 @@ namespace ArknoNights.Battle.Tests
                     "Replay must dispose dynamic views before their Spawn Tick.");
 
                 playback.Play();
-                playback.Advance(100f / BattleInput.TicksPerSecond);
+                playback.Advance((dynamicSpawnTick + 0.01f) / BattleInput.TicksPerSecond);
                 yield return null;
                 foreach (var unitId in dynamicIds)
                 {
@@ -452,7 +457,7 @@ namespace ArknoNights.Battle.Tests
             var specification = new BattleInputSpecification(
                 BattleInput.SupportedSchemaVersion,
                 "presentation-playmode-single-caster",
-                101,
+                200,
                 definitions,
                 abilities.Catalog.Abilities,
                 new[]
@@ -509,7 +514,10 @@ namespace ArknoNights.Battle.Tests
                 source.FinalUnits,
                 new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
                     source.UnitSnapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)),
-                source.StableSummary);
+                source.StableSummary,
+                source.HomeLifeDamage,
+                source.AwayLifeDamage,
+                source.FinalCheckpoint);
         }
 
         private static BattleEvent CloneEvent(BattleEvent source, BattleUnitInstanceSnapshot spawnSnapshot)

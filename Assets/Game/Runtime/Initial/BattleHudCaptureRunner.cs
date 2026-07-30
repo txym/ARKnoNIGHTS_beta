@@ -182,7 +182,11 @@ public sealed class BattleHudCaptureRunner : MonoBehaviour
             selectedMatchId = multi == null ? string.Empty : multi.SelectedMatchId,
             battleObserver = multi == null ? string.Empty : multi.Observer.ToString(),
             presentationTick = multi == null ? 0d : multi.PresentationTick,
-            trackSummaries = multi == null ? Array.Empty<string>() : multi.Matches.Select(item => item.MatchId + ":" + item.Track.StableSummary + ":moves=" + item.Track.CompressionMetrics.OriginalMoveCount + ":keys=" + item.Track.CompressionMetrics.PositionKeyCount + ":ratio=" + item.Track.CompressionMetrics.CompressionRatio.ToString("R")).ToArray(),
+            trackSummaries = multi == null
+                ? Array.Empty<string>()
+                : multi.Matches.Select(item => item.Track == null
+                    ? item.MatchId + ":streaming:through=" + item.ProducedThroughTick + ":chunks=" + item.Stream.Chunks.Count
+                    : item.MatchId + ":" + item.Track.StableSummary + ":moves=" + item.Track.CompressionMetrics.OriginalMoveCount + ":keys=" + item.Track.CompressionMetrics.PositionKeyCount + ":ratio=" + item.Track.CompressionMetrics.CompressionRatio.ToString("R")).ToArray(),
             rects = new[]
             {
                 Rect("levelButton", hud.transform.Find("FormalBattleHudCanvas/ShopReadyHud/ShopLevelButton") as RectTransform),

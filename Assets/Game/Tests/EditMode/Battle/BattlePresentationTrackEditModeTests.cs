@@ -278,7 +278,9 @@ namespace ArknoNights.Battle.Tests
                 new ReadOnlyCollection<BattleStepTrace>(Array.Empty<BattleStepTrace>()),
                 new ReadOnlyCollection<BattleEvent>(events),
                 new ReadOnlyCollection<BattleUnitFinalState>(new[] { new BattleUnitFinalState(state) }),
-                "result-summary");
+                "result-summary",
+                0,
+                1);
         }
 
         private static BattleRunResult CloneWithSnapshots(
@@ -288,7 +290,8 @@ namespace ArknoNights.Battle.Tests
             return new BattleRunResult(source.BattleId, source.HomePlayerId, source.AwayPlayerId, source.InputCanonicalSummary,
                 source.KnownUnitTypeIds, source.CompletedTicks, source.StopReason, source.Winner, source.Trace, source.Events,
                 source.FinalUnits, new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(
-                    snapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)), source.StableSummary);
+                    snapshots.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)), source.StableSummary,
+                source.HomeLifeDamage, source.AwayLifeDamage, source.FinalCheckpoint);
         }
 
         private static BattleRunResult CreateResult(IEnumerable<BattleEvent> events, IEnumerable<BattleUnitFinalState> finalUnits, BattleSide? winner, BattleStopReason reason)
@@ -302,7 +305,9 @@ namespace ArknoNights.Battle.Tests
             return new BattleRunResult("track-test", "home", "away", "input-summary", new ReadOnlyCollection<string>(new[] { "unit" }), 7,
                 reason, winner, new ReadOnlyCollection<BattleStepTrace>(Array.Empty<BattleStepTrace>()),
                 new ReadOnlyCollection<BattleEvent>(eventArray), new ReadOnlyCollection<BattleUnitFinalState>(finalUnits.ToArray()),
-                new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(snapshots), "result-summary");
+                new ReadOnlyDictionary<string, BattleUnitInstanceSnapshot>(snapshots), "result-summary",
+                winner == BattleSide.Away ? 1 : 0,
+                winner == BattleSide.Home ? 1 : 0);
         }
 
         private static BattleUnitInstanceSnapshot Snapshot(string unitId, string typeId, int spawnTick, bool isDynamicallyGenerated = true)

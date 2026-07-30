@@ -21,6 +21,7 @@ namespace ArknoNights.Battle.Presentation
         }
 
         public BattlePresentationTrack Track { get; private set; }
+        public IBattlePresentationTimeline Timeline { get; private set; }
         public BattleObserverView Observer { get; private set; } = BattleObserverView.Home;
         public double PresentationTick { get; private set; }
         public IReadOnlyList<BattlePresentationDiagnostic> Diagnostics => new ReadOnlyCollection<BattlePresentationDiagnostic>(diagnostics);
@@ -29,17 +30,54 @@ namespace ArknoNights.Battle.Presentation
 
         public bool Bind(BattlePresentationTrack track, IBattlePresentationViewFactory viewFactory, BattleObserverView observer, double presentationTick, out IReadOnlyList<BattlePresentationDiagnostic> bindDiagnostics)
         {
+            return BindTimeline(
+                track,
+                track,
+                viewFactory,
+                observer,
+                presentationTick,
+                out bindDiagnostics);
+        }
+
+        public bool Bind(
+            BattlePresentationStreamBuffer stream,
+            IBattlePresentationViewFactory viewFactory,
+            BattleObserverView observer,
+            double presentationTick,
+            out IReadOnlyList<BattlePresentationDiagnostic>
+                bindDiagnostics)
+        {
+            return BindTimeline(
+                stream,
+                null,
+                viewFactory,
+                observer,
+                presentationTick,
+                out bindDiagnostics);
+        }
+
+        private bool BindTimeline(
+            IBattlePresentationTimeline timeline,
+            BattlePresentationTrack track,
+            IBattlePresentationViewFactory viewFactory,
+            BattleObserverView observer,
+            double presentationTick,
+            out IReadOnlyList<BattlePresentationDiagnostic>
+                bindDiagnostics)
+        {
             Clear();
             Track = track;
+            Timeline = timeline;
             factory = viewFactory;
             Observer = observer;
-            if (track == null) AddDiagnostic("track.missing", "A presentation track is required.");
+            if (timeline == null) AddDiagnostic("track.missing", "A presentation timeline is required.");
             if (viewFactory == null) AddDiagnostic("viewFactory.missing", "A presentation view factory is required.");
             if (diagnostics.Count == 0) RenderAt(presentationTick, out _);
             bindDiagnostics = Diagnostics;
             if (diagnostics.Count == 0) return true;
             DisposeViews();
             Track = null;
+            Timeline = null;
             factory = null;
             return false;
         }
@@ -52,15 +90,15 @@ namespace ArknoNights.Battle.Presentation
                 renderDiagnostics = Diagnostics;
                 return false;
             }
-            if (Track == null || factory == null)
+            if (Timeline == null || factory == null)
             {
                 AddDiagnostic("track.playback.unbound", "A track and factory must be bound before rendering.");
                 renderDiagnostics = Diagnostics;
                 return false;
             }
             if (presentationTick < PresentationTick) DisposeViews();
-            PresentationTick = Math.Min(presentationTick, Track.EndTick);
-            foreach (var unit in Track.Units)
+            PresentationTick = Math.Min(presentationTick, Timeline.EndTick);
+            foreach (var unit in Timeline.TimelineUnits)
             {
                 var sample = unit.Sample(PresentationTick);
                 if (!sample.HasSpawned) continue;
@@ -78,13 +116,17 @@ namespace ArknoNights.Battle.Presentation
                     if (!sample.ShouldDisplay) continue;
                     if (!factory.TryCreate(unit.UnitId, unit.TypeId, out var view, out var diagnostic) || view == null)
                     {
-                        AddDiagnostic(diagnostic ?? new BattlePresentationDiagnostic("view.create.failed", "A view could not be created.", Track.BattleId, unit.UnitId));
+                        AddDiagnostic(diagnostic ?? new BattlePresentationDiagnostic("view.create.failed", "A view could not be created.", Timeline.BattleId, unit.UnitId));
                         renderDiagnostics = Diagnostics;
                         return false;
                     }
                     record = new ViewRecord(unit, view);
                     views.Add(unit.UnitId, record);
                     view.SetPlaybackSpeed(playbackSpeed);
+                }
+                else
+                {
+                    record.Unit = unit;
                 }
                 Apply(record, sample);
             }
@@ -111,6 +153,7 @@ namespace ArknoNights.Battle.Presentation
             DisposeViews();
             diagnostics.Clear();
             Track = null;
+            Timeline = null;
             factory = null;
             PresentationTick = 0d;
         }
@@ -161,8 +204,8 @@ namespace ArknoNights.Battle.Presentation
 
         private sealed class ViewRecord
         {
-            internal ViewRecord(UnitPresentationTrack unit, IBattlePresentationView view) { Unit = unit; View = view; }
-            internal UnitPresentationTrack Unit { get; }
+            internal ViewRecord(IBattleUnitPresentationTimeline unit, IBattlePresentationView view) { Unit = unit; View = view; }
+            internal IBattleUnitPresentationTimeline Unit { get; set; }
             internal IBattlePresentationView View { get; }
             internal int LastFacing { get; set; } = int.MinValue;
             internal UnitPresentationAction Action { get; set; } = (UnitPresentationAction)(-1);
