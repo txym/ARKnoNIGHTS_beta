@@ -133,6 +133,9 @@ namespace ArknoNights.Lobby
         RoomStarted,
         UnknownPlayer,
         NotHost,
-        NotReady
+        NotReady,
+        CompatibilityMismatch,
+        SessionInitializationFailed,
+        AvatarCapacityInsufficient
     }
 }

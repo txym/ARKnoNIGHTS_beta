@@ -52,7 +52,7 @@ namespace ArknoNights.Lobby.Tests
         }
 
         [UnityTest]
-        public IEnumerator LobbyGate_FreezesPreparationUntilHostStart()
+        public IEnumerator LobbyGate_RemainsFrozenWhenSessionOwnsMatchAfterHostStart()
         {
             SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
             yield return WaitForSceneBootstrap();
@@ -74,8 +74,8 @@ namespace ArknoNights.Lobby.Tests
             controllerType.GetMethod("ReceiveStartForTests", BindingFlags.Instance | BindingFlags.Public).Invoke(controller, null);
             yield return null;
 
-            Assert.That((bool)loopType.GetProperty("IsLobbyGateActive").GetValue(loop), Is.False);
-            Assert.That((float)loopType.GetProperty("RemainingPreparationSeconds").GetValue(loop), Is.EqualTo(30f).Within(.05f));
+            Assert.That((bool)loopType.GetProperty("IsLobbyGateActive").GetValue(loop), Is.True);
+            Assert.That((float)loopType.GetProperty("RemainingPreparationSeconds").GetValue(loop), Is.EqualTo(before).Within(.05f));
             Assert.That(lobbyRoot.GetComponentInChildren<global::LanLobbyView>(true).gameObject.activeSelf, Is.False);
         }
 
@@ -183,6 +183,195 @@ namespace ArknoNights.Lobby.Tests
             yield return WaitForTask(Task.WhenAll(localClientShutdownTasks));
         }
 
+        [Test]
+        public void RuntimeCatalogsAndIsolatedPlayerPrefsStores_AreValidAndFailClosed()
+        {
+            var runtimeType = FindRuntimeType(
+                "LanMatchRuntimeConfiguration");
+            var tryCreate = runtimeType.GetMethod(
+                "TryCreate",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(tryCreate, Is.Not.Null);
+            var arguments = new object[] { null, null };
+            Assert.That(
+                (bool)tryCreate.Invoke(null, arguments),
+                Is.True,
+                arguments[1] as string);
+            var configuration =
+                arguments[0] as LanMatchSessionConfiguration;
+            Assert.That(configuration, Is.Not.Null);
+            Assert.That(configuration.IsValid, Is.True);
+            Assert.That(
+                configuration.CompatibilityManifest.UnitCatalogSha256,
+                Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(
+                configuration.CompatibilityManifest.AbilityCatalogSha256,
+                Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(
+                configuration.ShopCatalog.Entries,
+                Is.Not.Empty);
+
+            var hashInputType = FindRuntimeType("CatalogHashInput");
+            var hashInputConstructor = hashInputType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string), typeof(byte[]) },
+                null);
+            var hashMethod = runtimeType.GetMethod(
+                "ComputeCanonicalHashForTests",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(hashInputConstructor, Is.Not.Null);
+            Assert.That(hashMethod, Is.Not.Null);
+            var first = hashInputConstructor.Invoke(
+                new object[] { "a", new byte[] { 1 } });
+            var second = hashInputConstructor.Invoke(
+                new object[] { "b", new byte[] { 2 } });
+            var forward = Array.CreateInstance(hashInputType, 2);
+            forward.SetValue(first, 0);
+            forward.SetValue(second, 1);
+            var reverse = Array.CreateInstance(hashInputType, 2);
+            reverse.SetValue(second, 0);
+            reverse.SetValue(first, 1);
+            Assert.That(
+                hashMethod.Invoke(null, new object[] { forward }),
+                Is.EqualTo(
+                    hashMethod.Invoke(
+                        null,
+                        new object[] { reverse })));
+
+            var identityKey =
+                "LanMatch.Tests.Identity." + Guid.NewGuid().ToString("N");
+            var credentialKey =
+                "LanMatch.Tests.Credential."
+                + Guid.NewGuid().ToString("N");
+            try
+            {
+                var identityStoreType = FindRuntimeType(
+                    "PlayerPrefsLocalProfileIdentityStore");
+                var identityStore =
+                    (ILocalProfileIdentityStore)Activator.CreateInstance(
+                        identityStoreType,
+                        new object[] { identityKey });
+                var playerId =
+                    LocalProfileIdentity.GetOrCreate(identityStore);
+                var secondIdentityStore =
+                    (ILocalProfileIdentityStore)Activator.CreateInstance(
+                        identityStoreType,
+                        new object[] { identityKey });
+                Assert.That(
+                    LocalProfileIdentity.GetOrCreate(
+                        secondIdentityStore),
+                    Is.EqualTo(playerId));
+
+                var credentialStoreType = FindRuntimeType(
+                    "PlayerPrefsReconnectCredentialStore");
+                var store =
+                    (IReconnectCredentialStore)Activator.CreateInstance(
+                        credentialStoreType,
+                        new object[] { credentialKey });
+                var credential = new ReconnectCredential(
+                    "match-test",
+                    IPAddress.Loopback.ToString(),
+                    12345,
+                    playerId,
+                    ReconnectTokenIssuer.Issue().RawToken,
+                    configuration.CompatibilityManifest);
+                store.Save(credential);
+                var reloaded =
+                    (IReconnectCredentialStore)Activator.CreateInstance(
+                        credentialStoreType,
+                        new object[] { credentialKey });
+                Assert.That(
+                    reloaded.TryLoad(out var loaded),
+                    Is.True);
+                Assert.That(loaded.SessionId, Is.EqualTo("match-test"));
+                Assert.That(
+                    ReconnectTokenIssuer.IsValidRawToken(
+                        loaded.Token),
+                    Is.True);
+
+                PlayerPrefs.SetString(
+                    credentialKey,
+                    "corrupt-record");
+                PlayerPrefs.Save();
+                Assert.That(
+                    reloaded.TryLoad(out _),
+                    Is.False);
+                Assert.That(
+                    PlayerPrefs.HasKey(credentialKey),
+                    Is.False);
+            }
+            finally
+            {
+                PlayerPrefs.DeleteKey(identityKey);
+                PlayerPrefs.DeleteKey(credentialKey);
+                PlayerPrefs.Save();
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator HostStart_PersistsLocalCredentialAndAuthoritativeEndReturnsHome()
+        {
+            SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+            yield return WaitForSceneBootstrap();
+
+            var controller = FindComponent("LanLobbyController");
+            var controllerType = controller.GetType();
+            var hostField = controllerType.GetField(
+                "host",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var profileField = controllerType.GetField(
+                "profile",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var credentialStoreField = controllerType.GetField(
+                "reconnectCredentialStore",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var profile = (LobbyProfile)profileField.GetValue(controller);
+            var store = new MemoryCredentialStore();
+            credentialStoreField.SetValue(controller, store);
+            var hostTask = LanRoomHost.StartForTestsAsync(profile, 0);
+            yield return WaitForTask(hostTask);
+            var localHost = hostTask.Result;
+            hostsToStop.Add(localHost);
+            hostField.SetValue(controller, localHost);
+
+            controllerType.GetMethod(
+                    "StartRoom",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, null);
+            yield return null;
+            yield return null;
+
+            Assert.That(
+                localHost.Lifecycle,
+                Is.EqualTo(MatchSessionLifecycle.Match));
+            Assert.That(store.Credential, Is.Not.Null);
+            Assert.That(
+                store.Credential.SessionId,
+                Is.EqualTo(localHost.SessionActor.SessionId));
+            Assert.That(
+                store.Credential.PlayerId,
+                Is.EqualTo(profile.PlayerId));
+
+            localHost.AbortMatch("match.test.authoritativeEnd");
+            for (var frame = 0;
+                 frame < 120 && hostField.GetValue(controller) != null;
+                 frame++)
+            {
+                yield return null;
+            }
+
+            Assert.That(hostField.GetValue(controller), Is.Null);
+            Assert.That(store.Credential, Is.Null);
+            var view = controller.GetComponentInChildren<
+                global::LanLobbyView>(true);
+            Assert.That(view.gameObject.activeSelf, Is.True);
+            Assert.That(
+                view.transform.Find("LanLobbyRoot/Home")
+                    .gameObject.activeSelf,
+                Is.True);
+        }
+
         private static void AssertHome(global::LanLobbyView view)
         {
             Assert.That(view.transform.Find("LanLobbyRoot/Home").gameObject.activeSelf, Is.True);
@@ -244,6 +433,15 @@ namespace ArknoNights.Lobby.Tests
             return null;
         }
 
+        private static Type FindRuntimeType(string typeName)
+        {
+            var type = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType(typeName))
+                .FirstOrDefault(candidate => candidate != null);
+            Assert.That(type, Is.Not.Null, typeName);
+            return type;
+        }
+
         private static string[] ListenerKeys()
         {
             return IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
@@ -251,6 +449,28 @@ namespace ArknoNights.Lobby.Tests
                 .Select(endpoint => endpoint.Address + ":" + endpoint.Port)
                 .OrderBy(value => value, StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        private sealed class MemoryCredentialStore :
+            IReconnectCredentialStore
+        {
+            public ReconnectCredential Credential { get; private set; }
+
+            public bool TryLoad(out ReconnectCredential credential)
+            {
+                credential = Credential;
+                return credential != null;
+            }
+
+            public void Save(ReconnectCredential credential)
+            {
+                Credential = credential;
+            }
+
+            public void Clear()
+            {
+                Credential = null;
+            }
         }
     }
 }

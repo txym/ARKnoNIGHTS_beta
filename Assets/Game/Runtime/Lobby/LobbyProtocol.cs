@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using ArknoNights.Match;
 
 namespace ArknoNights.Lobby
 {
@@ -31,6 +32,7 @@ namespace ArknoNights.Lobby
         MissingRequiredField,
         InvalidRoomCode,
         InvalidProfile,
+        InvalidCompatibilityManifest,
         SnapshotTooLarge
     }
 
@@ -57,6 +59,24 @@ namespace ArknoNights.Lobby
         public string snapshotJson;
         [DataMember(Name = "rejectionCode")]
         public string rejectionCode;
+        [DataMember(Name = "matchProtocolVersion")]
+        public string matchProtocolVersion;
+        [DataMember(Name = "matchRulesVersion")]
+        public string matchRulesVersion;
+        [DataMember(Name = "battleCoreVersion")]
+        public string battleCoreVersion;
+        [DataMember(Name = "unitCatalogSha256")]
+        public string unitCatalogSha256;
+        [DataMember(Name = "abilityCatalogSha256")]
+        public string abilityCatalogSha256;
+
+        public MatchCompatibilityManifest CompatibilityManifest =>
+            new MatchCompatibilityManifest(
+                matchProtocolVersion,
+                matchRulesVersion,
+                battleCoreVersion,
+                unitCatalogSha256,
+                abilityCatalogSha256);
     }
 
     public static class LobbyProtocol
@@ -177,6 +197,11 @@ namespace ArknoNights.Lobby
                     error = LobbyProtocolError.InvalidProfile;
                     return false;
                 }
+                if (!message.CompatibilityManifest.IsValid)
+                {
+                    error = LobbyProtocolError.InvalidCompatibilityManifest;
+                    return false;
+                }
             }
 
             if (kind == LobbyMessageKind.RoomSnapshot || kind == LobbyMessageKind.JoinAccepted)
@@ -219,6 +244,7 @@ namespace ArknoNights.Lobby
                 | (frame[2] << 8)
                 | frame[3];
         }
+
     }
 
     internal static class LobbyJson

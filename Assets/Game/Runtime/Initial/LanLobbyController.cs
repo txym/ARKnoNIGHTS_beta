@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using ArknoNights.Lobby;
 using UnityEngine;
@@ -23,6 +24,10 @@ public sealed class LanLobbyController : MonoBehaviour
     private LanRoomClient client;
     private IMulticastLock multicastLock;
     private LobbyProfile profile;
+    private LanMatchSessionConfiguration matchConfiguration;
+    private IReconnectCredentialStore reconnectCredentialStore;
+    private CancellationTokenSource reconnectCancellation;
+    private Task<LanRoomClient> reconnectTask;
     private int operationVersion;
     private bool initialized;
     private bool gameplayStarted;
@@ -40,13 +45,31 @@ public sealed class LanLobbyController : MonoBehaviour
             view = viewObject.AddComponent<LanLobbyView>();
         }
         multicastLock = AndroidMulticastLockFactory.Create();
+        reconnectCredentialStore = new PlayerPrefsReconnectCredentialStore();
         profile = LoadProfile();
+        LanMatchRuntimeConfiguration.TryCreate(
+            out matchConfiguration,
+            out _);
         SubscribeView();
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     private void Start()
     {
+        if (matchConfiguration == null)
+        {
+            EnterHome("Match catalogs are unavailable.");
+            initialized = true;
+            return;
+        }
+        if (reconnectCredentialStore.TryLoad(out var reconnectCredential))
+        {
+            view.ShowHome(profile);
+            view.SetStatus("Reconnecting to match...");
+            BeginReconnect(reconnectCredential);
+            initialized = true;
+            return;
+        }
         EnterHome(string.Empty);
         StartCoroutine(FindAndGatePreparationLoop());
         initialized = true;
@@ -54,9 +77,9 @@ public sealed class LanLobbyController : MonoBehaviour
 
     private void Update()
     {
-        if (!initialized || gameplayStarted) return;
+        if (!initialized) return;
         EnsurePreparationLoopIsGated();
-        if (discovery != null)
+        if (!gameplayStarted && discovery != null)
         {
             discovery.Tick(DateTimeOffset.UtcNow);
             view.BindDiscoveredRooms(discovery.DiscoveredRooms);
@@ -65,23 +88,42 @@ public sealed class LanLobbyController : MonoBehaviour
         if (host != null)
         {
             host.Tick();
+            if (host.Lifecycle == MatchSessionLifecycle.Ended)
+            {
+                reconnectCredentialStore.Clear();
+                EnterHome("Match ended.");
+                return;
+            }
             var snapshot = host.Snapshot;
-            view.BindRoom(snapshot, profile.PlayerId);
-            if (snapshot != null && snapshot.HasStarted) BeginGameplayTransition();
+            if (!gameplayStarted)
+            {
+                view.BindRoom(snapshot, profile.PlayerId);
+                if (snapshot != null && snapshot.HasStarted)
+                    BeginGameplayTransition();
+            }
         }
         else if (client != null)
         {
             client.Tick();
+            if (client.HasEnded)
+            {
+                EnterHome("Match ended.");
+                return;
+            }
             var snapshot = client.Snapshot;
-            if (snapshot != null)
+            if (!gameplayStarted && snapshot != null)
             {
                 view.BindRoom(snapshot, profile.PlayerId);
                 view.SetLocalLatency(client.LatencyMilliseconds);
                 if (snapshot.HasStarted) BeginGameplayTransition();
             }
-            else if (!client.IsConnected)
+            else if (client.IsReconnecting)
             {
-                EnterHome("Connection lost.");
+                if (reconnectCredentialStore.TryLoad(
+                    out var reconnectCredential))
+                {
+                    BeginReconnect(reconnectCredential);
+                }
             }
         }
     }
@@ -157,7 +199,9 @@ public sealed class LanLobbyController : MonoBehaviour
     {
         view.SetStatus("Creating LAN room...");
         StopDiscovery();
-        var task = LanRoomHost.StartAsync(profile);
+        var task = LanRoomHost.StartAsync(
+            profile,
+            matchConfiguration);
         yield return WaitForTask(task);
         if (version != operationVersion)
         {
@@ -193,7 +237,12 @@ public sealed class LanLobbyController : MonoBehaviour
     private IEnumerator JoinRoomRoutine(int version, IPEndPoint endpoint, string roomCode)
     {
         view.SetStatus("Joining room " + roomCode + "...");
-        var task = LanRoomClient.JoinAsync(endpoint, roomCode, profile);
+        var task = LanRoomClient.JoinAsync(
+            endpoint,
+            roomCode,
+            profile,
+            matchConfiguration,
+            reconnectCredentialStore);
         yield return WaitForTask(task);
         if (version != operationVersion)
         {
@@ -239,6 +288,24 @@ public sealed class LanLobbyController : MonoBehaviour
             view.SetStatus("Cannot start: " + failure + ".");
             return;
         }
+        var initialization = host.HostInitialization;
+        try
+        {
+            reconnectCredentialStore.Save(new ReconnectCredential(
+                initialization.Snapshot.SessionId,
+                IPAddress.Loopback.ToString(),
+                host.TcpPort,
+                profile.PlayerId,
+                initialization.ReconnectToken,
+                initialization.Manifest.ToDomain()));
+        }
+        catch (Exception)
+        {
+            host.AbortMatch("match.host.credential.persistFailed");
+            reconnectCredentialStore.Clear();
+            view.SetStatus("Cannot start: reconnect credential could not be saved.");
+            return;
+        }
 
         BeginGameplayTransition(host.StartBroadcastTask);
     }
@@ -262,20 +329,29 @@ public sealed class LanLobbyController : MonoBehaviour
     {
         if (gameplayStarted) return;
         gameplayStarted = true;
-        StopServices(false);
-        if (preparationLoop == null) preparationLoop = FindObjectOfType<PreparationBattleLoopController>();
-        if (preparationLoop != null) preparationLoop.SetLobbyGate(false);
+        StopDiscovery();
+        EnsurePreparationLoopIsGated();
         if (view != null) view.gameObject.SetActive(false);
     }
 
     private void LeaveRoom()
     {
+        reconnectCredentialStore.Clear();
+        CancelReconnect();
+        if (host != null && gameplayStarted)
+        {
+            host.AbortMatch("match.host.explicitQuit");
+            reconnectCredentialStore.Clear();
+        }
+        gameplayStarted = false;
+        gameplayTransitionPending = false;
         EnterHome("Left room.", true);
     }
 
     private void EnterHome(string status, bool notifyGuest = false)
     {
-        if (gameplayStarted) return;
+        gameplayStarted = false;
+        gameplayTransitionPending = false;
         StopServices(notifyGuest);
         if (view == null) return;
         view.gameObject.SetActive(true);
@@ -335,6 +411,7 @@ public sealed class LanLobbyController : MonoBehaviour
     private void StopServices(bool notifyGuest)
     {
         operationVersion++;
+        CancelReconnect();
         StopDiscovery();
         var oldClient = client;
         client = null;
@@ -370,15 +447,101 @@ public sealed class LanLobbyController : MonoBehaviour
     {
         var avatar = Mathf.Clamp(PlayerPrefs.GetInt(ProfileAvatarKey, 0), LobbyProfile.MinimumAvatarIndex, LobbyProfile.MaximumAvatarIndex);
         return new LobbyProfile(
-            "lan-" + Guid.NewGuid().ToString("N"),
+            LocalProfileIdentity.GetOrCreate(
+                new PlayerPrefsLocalProfileIdentityStore()),
             LobbyProfile.DisplayNameForAvatar(avatar),
             avatar);
+    }
+
+    private void BeginReconnect(ReconnectCredential credential)
+    {
+        if (credential == null
+            || !credential.IsValid
+            || reconnectTask != null)
+        {
+            return;
+        }
+        StopDiscovery();
+        var oldClient = client;
+        var retainedSnapshot = oldClient == null
+            ? null
+            : oldClient.MatchSnapshot;
+        client = null;
+        if (oldClient != null) ObserveStop(oldClient, false);
+        reconnectCancellation = new CancellationTokenSource();
+        reconnectTask = LanMatchReconnectCoordinator
+            .ReconnectUntilAcceptedAsync(
+                credential,
+                reconnectCredentialStore,
+                reconnectCancellation.Token,
+                null,
+                retainedSnapshot);
+        StartCoroutine(ReconnectRoutine(reconnectTask));
+    }
+
+    private IEnumerator ReconnectRoutine(Task<LanRoomClient> task)
+    {
+        yield return WaitForTask(task);
+        if (task != reconnectTask) yield break;
+        reconnectTask = null;
+        reconnectCancellation?.Dispose();
+        reconnectCancellation = null;
+        if (task.Status == TaskStatus.RanToCompletion)
+        {
+            client = task.Result;
+            client.Tick();
+            gameplayStarted = true;
+            gameplayTransitionPending = false;
+            EnsurePreparationLoopIsGated();
+            if (view != null) view.gameObject.SetActive(false);
+            yield break;
+        }
+        var incompatible = task.Exception != null
+            && task.Exception.GetBaseException()
+                is MatchReconnectRejectedException rejected
+            && rejected.Code
+                == MatchReconnectRejectCode.CompatibilityMismatch;
+        if (task.Exception != null
+            && task.Exception.GetBaseException()
+                is MatchReconnectRejectedException terminal
+            && ReconnectCredentialPolicy
+                .ShouldClearOnAuthoritativeRejection(
+                    terminal.Code))
+        {
+            reconnectCredentialStore.Clear();
+        }
+        gameplayStarted = false;
+        if (view != null)
+        {
+            view.gameObject.SetActive(true);
+            view.ShowHome(profile);
+            view.SetStatus(incompatible
+                ? "Version incompatible. Update before reconnecting."
+                : "Match recovery was rejected.");
+        }
+        if (!incompatible) StartHomeDiscovery();
+    }
+
+    private void CancelReconnect()
+    {
+        if (reconnectCancellation == null) return;
+        reconnectCancellation.Cancel();
+        reconnectCancellation.Dispose();
+        reconnectCancellation = null;
+        reconnectTask = null;
     }
 
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
         UnsubscribeView();
+        if (host != null
+            && host.Lifecycle != MatchSessionLifecycle.Lobby
+            && host.Lifecycle != MatchSessionLifecycle.Ended)
+        {
+            host.AbortMatch("match.host.applicationQuit");
+            reconnectCredentialStore.Clear();
+        }
         StopServices(false);
     }
 

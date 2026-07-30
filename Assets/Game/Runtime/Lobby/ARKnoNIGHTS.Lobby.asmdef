@@ -1,7 +1,9 @@
 {
   "name": "ARKnoNIGHTS.Lobby",
   "rootNamespace": "ArknoNights.Lobby",
-  "references": [],
+  "references": [
+    "ARKnoNIGHTS.Match"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

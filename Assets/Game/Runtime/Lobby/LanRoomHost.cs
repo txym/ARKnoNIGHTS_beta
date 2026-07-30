@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using ArknoNights.Match;
 
 namespace ArknoNights.Lobby
 {
@@ -12,132 +15,331 @@ namespace ArknoNights.Lobby
     {
         private const int HeartbeatMilliseconds = 1000;
         private const int MaximumMissedPongs = 3;
+        private static readonly Stopwatch MonotonicClock = Stopwatch.StartNew();
 
         private readonly object gate = new object();
-        private LobbyRoomState room;
         private readonly TcpListener listener;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly Dictionary<string, GuestConnection> guestsByPlayerId = new Dictionary<string, GuestConnection>();
+        private readonly Dictionary<string, GuestConnection> guestsByPlayerId =
+            new Dictionary<string, GuestConnection>(StringComparer.Ordinal);
+        private readonly Dictionary<string, GuestConnection> connectionsById =
+            new Dictionary<string, GuestConnection>(StringComparer.Ordinal);
         private readonly List<GuestConnection> connections = new List<GuestConnection>();
+        private readonly List<LanDiscoveryService> discoveryServices = new List<LanDiscoveryService>();
+        private readonly Dictionary<string, MatchCompatibilityManifest> joinedManifests =
+            new Dictionary<string, MatchCompatibilityManifest>(StringComparer.Ordinal);
         private readonly bool acceptsAnyRoomCode;
+        private readonly LanMatchSessionConfiguration matchConfiguration;
         private readonly Task acceptTask;
         private readonly Task heartbeatTask;
-        private readonly ConcurrentQueue<LobbyRoomSnapshot> pendingSnapshots = new ConcurrentQueue<LobbyRoomSnapshot>();
+        private readonly ConcurrentQueue<LobbyRoomSnapshot> pendingSnapshots =
+            new ConcurrentQueue<LobbyRoomSnapshot>();
+        private LobbyRoomState room;
         private LobbyRoomSnapshot publishedSnapshot;
+        private volatile MatchSessionHostActor sessionActor;
+        private long connectionIdCounter;
+        private long messageIdCounter;
         private Task startBroadcastTask = Task.CompletedTask;
-        private bool stopped;
+        private Task endedFlushTask = Task.CompletedTask;
+        private volatile bool stopped;
+        private volatile bool endedShutdownStarted;
+        private volatile MatchSessionLifecycle lifecycle;
 
-        private LanRoomHost(LobbyProfile hostProfile, int tcpPort, bool acceptsAnyRoomCode)
+        private LanRoomHost(
+            LobbyProfile hostProfile,
+            int tcpPort,
+            bool acceptsAnyRoomCode,
+            LanMatchSessionConfiguration matchConfiguration)
         {
+            if (hostProfile == null || !hostProfile.IsValid())
+                throw new ArgumentException("The host profile is invalid.", nameof(hostProfile));
+            this.matchConfiguration = matchConfiguration
+                ?? throw new ArgumentNullException(nameof(matchConfiguration));
+            if (!matchConfiguration.IsValid)
+                throw new ArgumentException("The Match session configuration is invalid.", nameof(matchConfiguration));
+            if (!matchConfiguration.AllowSyntheticPlayerIdsForTests
+                && !LocalProfileIdentity.IsValid(hostProfile.PlayerId))
+            {
+                throw new ArgumentException(
+                    "The host PlayerId is not an installation identity.",
+                    nameof(hostProfile));
+            }
             room = LobbyRoomState.CreateHost(hostProfile, CreateRoomCode());
             publishedSnapshot = room.Snapshot;
             this.acceptsAnyRoomCode = acceptsAnyRoomCode;
+            joinedManifests.Add(hostProfile.PlayerId, matchConfiguration.CompatibilityManifest);
+            Lifecycle = MatchSessionLifecycle.Lobby;
             listener = new TcpListener(IPAddress.Any, tcpPort);
             listener.Start();
             acceptTask = Task.Run(AcceptLoopAsync);
             heartbeatTask = Task.Run(HeartbeatLoopAsync);
         }
 
-        public LobbyRoomSnapshot Snapshot
-        {
-            get { return publishedSnapshot; }
-        }
-
+        public LobbyRoomSnapshot Snapshot => publishedSnapshot;
         public string RoomCode => Snapshot.RoomCode;
         public int TcpPort => ((IPEndPoint)listener.LocalEndpoint).Port;
         public IPEndPoint LoopbackEndpoint => new IPEndPoint(IPAddress.Loopback, TcpPort);
         public Task StartBroadcastTask => startBroadcastTask;
+        public MatchSessionLifecycle Lifecycle
+        {
+            get => lifecycle;
+            private set => lifecycle = value;
+        }
+        public MatchSessionHostActor SessionActor => sessionActor;
+        public MatchInitializedPayload HostInitialization { get; private set; }
+        public string EndedSessionId { get; private set; }
+
+        public event Action<MatchSessionDispatch> HostDispatchReceived;
 
         public void Tick()
         {
-            while (pendingSnapshots.TryDequeue(out var snapshot)) publishedSnapshot = snapshot;
+            while (pendingSnapshots.TryDequeue(out var snapshot))
+                publishedSnapshot = snapshot;
+            if (sessionActor == null
+                || (Lifecycle != MatchSessionLifecycle.Match
+                    && Lifecycle != MatchSessionLifecycle.StartCommitted))
+            {
+                return;
+            }
+            var dispatches = sessionActor.Tick(MonotonicClock.ElapsedMilliseconds);
+            for (var index = 0; index < dispatches.Count; index++)
+                ProcessDispatch(dispatches[index]);
+            if (sessionActor.Lifecycle == MatchSessionLifecycle.Ended)
+            {
+                EndedSessionId = sessionActor.SessionId;
+                Lifecycle = MatchSessionLifecycle.Ended;
+                BeginEndedShutdown();
+            }
         }
 
         public static Task<LanRoomHost> StartAsync(LobbyProfile hostProfile)
         {
-            return StartAsync(hostProfile, CancellationToken.None);
+            return StartAsync(
+                hostProfile,
+                LanMatchSessionConfiguration.CreateForTests(),
+                CancellationToken.None);
         }
 
-        public static Task<LanRoomHost> StartAsync(LobbyProfile hostProfile, CancellationToken cancellationToken)
+        public static Task<LanRoomHost> StartAsync(
+            LobbyProfile hostProfile,
+            CancellationToken cancellationToken)
+        {
+            return StartAsync(
+                hostProfile,
+                LanMatchSessionConfiguration.CreateForTests(),
+                cancellationToken);
+        }
+
+        public static Task<LanRoomHost> StartAsync(
+            LobbyProfile hostProfile,
+            LanMatchSessionConfiguration matchConfiguration,
+            CancellationToken cancellationToken = default(CancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(new LanRoomHost(hostProfile, 0, false));
+            return Task.FromResult(new LanRoomHost(
+                hostProfile,
+                0,
+                false,
+                matchConfiguration));
         }
 
-        public static Task<LanRoomHost> StartForTestsAsync(LobbyProfile hostProfile, int tcpPort)
+        public static Task<LanRoomHost> StartForTestsAsync(
+            LobbyProfile hostProfile,
+            int tcpPort)
         {
-            return Task.FromResult(new LanRoomHost(hostProfile, tcpPort, true));
+            return Task.FromResult(new LanRoomHost(
+                hostProfile,
+                tcpPort,
+                true,
+                LanMatchSessionConfiguration.CreateForTests()));
         }
 
         public LanDiscoveryService CreateDiscoveryService()
         {
             lock (gate)
             {
+                if (Lifecycle != MatchSessionLifecycle.Lobby)
+                    throw new InvalidOperationException("LAN discovery is unavailable after Match start.");
                 var snapshot = CreateSnapshotWithLatency();
-                return new LanDiscoveryService(
-                    new LobbyDiscoveryEntry(snapshot.RoomCode, snapshot.Members[0].Profile.DisplayName, snapshot.Members.Count, LobbyRoomSnapshot.MaximumMembers, !snapshot.HasStarted && snapshot.Members.Count < LobbyRoomSnapshot.MaximumMembers, TcpPort, snapshot.Revision),
+                var discovery = new LanDiscoveryService(
+                    new LobbyDiscoveryEntry(
+                        snapshot.RoomCode,
+                        snapshot.Members[0].Profile.DisplayName,
+                        snapshot.Members.Count,
+                        LobbyRoomSnapshot.MaximumMembers,
+                        snapshot.Members.Count < LobbyRoomSnapshot.MaximumMembers,
+                        TcpPort,
+                        snapshot.Revision),
                     RegenerateAuthoritativeRoomCode);
+                discoveryServices.Add(discovery);
+                return discovery;
             }
         }
 
         public bool TryStart(string playerId, out LobbyJoinFailure failure)
         {
-            bool started;
-            LobbyRoomSnapshot snapshot;
+            Dictionary<string, MatchInitializedPayload> initializations;
+            LobbyRoomSnapshot startedSnapshot;
+            List<LanDiscoveryService> discoveries;
             lock (gate)
             {
-                started = room.TryStart(playerId, out failure);
-                snapshot = started ? CreateSnapshotWithLatency() : null;
+                if (Lifecycle != MatchSessionLifecycle.Lobby)
+                {
+                    failure = LobbyJoinFailure.RoomStarted;
+                    return false;
+                }
+                var frozen = room.Snapshot;
+                var built = MatchSessionBuilder.Create(
+                    frozen,
+                    matchConfiguration,
+                    joinedManifests,
+                    MonotonicClock.ElapsedMilliseconds);
+                if (!built.Success)
+                {
+                    failure = built.Failure == MatchSessionStartFailure.AvatarCapacityInsufficient
+                        ? LobbyJoinFailure.AvatarCapacityInsufficient
+                        : built.Failure == MatchSessionStartFailure.CompatibilityMismatch
+                            ? LobbyJoinFailure.CompatibilityMismatch
+                            : LobbyJoinFailure.SessionInitializationFailed;
+                    return false;
+                }
+                if (!room.TryStart(playerId, out failure)) return false;
+
+                sessionActor = built.Actor;
+                sessionActor.BindFrozenConnection(playerId, "host-local", 1);
+                foreach (var guest in guestsByPlayerId.Values)
+                    sessionActor.BindFrozenConnection(
+                        guest.PlayerId,
+                        guest.ConnectionId,
+                        1);
+                initializations = new Dictionary<string, MatchInitializedPayload>(
+                    StringComparer.Ordinal);
+                foreach (var participant in sessionActor.Participants.Where(value => value.IsHuman))
+                    initializations[participant.PlayerId] =
+                        sessionActor.TakeInitialization(participant.PlayerId);
+                HostInitialization = initializations[playerId];
+                startedSnapshot = CreateSnapshotWithLatency();
+                PublishSnapshot(startedSnapshot);
+                Lifecycle = MatchSessionLifecycle.StartCommitted;
+                discoveries = discoveryServices.ToList();
+                discoveryServices.Clear();
             }
 
-            if (started)
-            {
-                PublishSnapshot(snapshot);
-                startBroadcastTask = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.Start));
-            }
-
-            return started;
+            for (var index = 0; index < discoveries.Count; index++)
+                discoveries[index].Stop();
+            startBroadcastTask = PromoteConnectionsAsync(
+                startedSnapshot,
+                initializations);
+            return true;
         }
 
-        public bool TrySetReady(string playerId, bool isReady, out LobbyJoinFailure failure)
+        public bool TrySetReady(
+            string playerId,
+            bool isReady,
+            out LobbyJoinFailure failure)
         {
             bool changed;
             LobbyRoomSnapshot snapshot;
             lock (gate)
             {
-                changed = room.TrySetReady(playerId, playerId, isReady, out failure);
+                if (Lifecycle != MatchSessionLifecycle.Lobby)
+                {
+                    failure = LobbyJoinFailure.RoomStarted;
+                    return false;
+                }
+                changed = room.TrySetReady(
+                    playerId,
+                    playerId,
+                    isReady,
+                    out failure);
                 snapshot = changed ? CreateSnapshotWithLatency() : null;
             }
-
             if (changed)
             {
                 PublishSnapshot(snapshot);
-                _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
+                BroadcastLobby(LobbyMessageKind.RoomSnapshot, snapshot);
             }
-
             return changed;
+        }
+
+        public void EnqueueHostCommand(MatchCommandWirePayload command)
+        {
+            if (sessionActor == null || Lifecycle != MatchSessionLifecycle.Match)
+                throw new InvalidOperationException("The Match session is not running.");
+            sessionActor.EnqueueHostCommand(command);
+        }
+
+        public void EnqueueHostBattleContract(
+            MatchWireKind kind,
+            object payload)
+        {
+            if (sessionActor == null
+                || Lifecycle != MatchSessionLifecycle.Match)
+            {
+                throw new InvalidOperationException(
+                    "The Match session is not running.");
+            }
+            sessionActor.EnqueueHostBattleContract(kind, payload);
+        }
+
+        public bool PublishBattleSeal(MatchBattleSealPayload seal)
+        {
+            return ProcessActorDispatches(
+                sessionActor?.PublishBattleSeal(seal));
+        }
+
+        public bool PublishPlaybackStart(MatchPlaybackStartPayload start)
+        {
+            return ProcessActorDispatches(
+                sessionActor?.PublishPlaybackStart(start));
+        }
+
+        public bool PublishPlaybackClock(MatchPlaybackClockPayload clock)
+        {
+            return ProcessActorDispatches(
+                sessionActor?.PublishPlaybackClock(clock));
+        }
+
+        public void AbortMatch(string stableReason = "match.host.explicitQuit")
+        {
+            if (sessionActor == null || Lifecycle == MatchSessionLifecycle.Ended) return;
+            var dispatches = sessionActor.AbortByHost(stableReason);
+            for (var index = 0; index < dispatches.Count; index++)
+                ProcessDispatch(dispatches[index]);
+            EndedSessionId = sessionActor.SessionId;
+            Lifecycle = MatchSessionLifecycle.Ended;
+            BeginEndedShutdown();
         }
 
         public async Task StopAsync()
         {
-            List<GuestConnection> connections;
+            List<GuestConnection> active;
+            List<LanDiscoveryService> discoveries;
             lock (gate)
             {
                 if (stopped) return;
                 stopped = true;
-                connections = new List<GuestConnection>(this.connections);
+                active = connections.ToList();
+                discoveries = discoveryServices.ToList();
+                discoveryServices.Clear();
             }
-
-            cancellation.Cancel();
-            listener.Stop();
-            for (var index = 0; index < connections.Count; index++) connections[index].Close();
-            try { await acceptTask.ConfigureAwait(false); } catch (Exception) { }
-            try { await heartbeatTask.ConfigureAwait(false); } catch (Exception) { }
-            for (var index = 0; index < connections.Count; index++)
+            for (var index = 0; index < discoveries.Count; index++)
+                discoveries[index].Stop();
+            if (endedShutdownStarted)
             {
-                try { await connections[index].ReadTask.ConfigureAwait(false); } catch (Exception) { }
+                try { await endedFlushTask.ConfigureAwait(false); }
+                catch (Exception) { }
             }
-
+            cancellation.Cancel();
+            try { listener.Stop(); } catch (Exception) { }
+            for (var index = 0; index < active.Count; index++)
+                active[index].Close();
+            try { await acceptTask.ConfigureAwait(false); }
+            catch (Exception) { }
+            try { await heartbeatTask.ConfigureAwait(false); }
+            catch (Exception) { }
+            for (var index = 0; index < active.Count; index++)
+                await active[index].StopAsync().ConfigureAwait(false);
             cancellation.Dispose();
         }
 
@@ -149,22 +351,40 @@ namespace ArknoNights.Lobby
         public void SetReadyForTests(string playerId, bool isReady)
         {
             if (!TrySetReady(playerId, isReady, out var failure))
-                throw new InvalidOperationException("Could not update readiness: " + failure + ".");
+                throw new InvalidOperationException(
+                    "Could not update readiness: " + failure + ".");
         }
 
         private async Task AcceptLoopAsync()
         {
-            while (!cancellation.IsCancellationRequested)
+            while (!cancellation.IsCancellationRequested && !endedShutdownStarted)
             {
                 try
                 {
-                    var client = await listener.AcceptTcpClientAsync();
-                    var connection = new GuestConnection(client);
-                    lock (gate) connections.Add(connection);
-                    connection.ReadTask = Task.Run(() => ReadGuestLoopAsync(connection));
+                    var tcpClient = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                    var connection = new GuestConnection(
+                        tcpClient,
+                        "connection-" + Interlocked.Increment(ref connectionIdCounter));
+                    connection.Writer.Faulted += () => RemoveConnection(connection);
+                    lock (gate)
+                    {
+                        if (stopped || endedShutdownStarted)
+                        {
+                            connection.Close();
+                            continue;
+                        }
+                        connections.Add(connection);
+                        connectionsById[connection.ConnectionId] = connection;
+                    }
+                    connection.ReadTask = Task.Run(
+                        () => ReadGuestLoopAsync(connection));
                 }
                 catch (ObjectDisposedException) { return; }
-                catch (SocketException) { if (cancellation.IsCancellationRequested) return; }
+                catch (SocketException)
+                {
+                    if (cancellation.IsCancellationRequested || endedShutdownStarted)
+                        return;
+                }
             }
         }
 
@@ -172,13 +392,73 @@ namespace ArknoNights.Lobby
         {
             try
             {
-                while (!cancellation.IsCancellationRequested)
+                while (!cancellation.IsCancellationRequested && !connection.Closed)
                 {
-                    var message = await LanRoomTransport.ReadMessageAsync(connection.Stream);
-                    if (message == null) break;
-                    await HandleGuestMessageAsync(connection, message);
+                    var readLifecycle = Lifecycle;
+                    var frame = await LanFrameTransport.ReadFrameAsync(
+                        connection.Stream,
+                        cancellation.Token,
+                        readLifecycle == MatchSessionLifecycle.Lobby
+                            ? LobbyProtocol.MaximumMessageBytes
+                            : MatchProtocol.AbsoluteMaximumFrameBytes)
+                        .ConfigureAwait(false);
+                    if (frame == null) break;
+                    var lifecycle = Lifecycle;
+                    if (lifecycle == MatchSessionLifecycle.Lobby)
+                    {
+                        if (!LobbyProtocol.TryDecode(frame, out var lobby, out _))
+                            break;
+                        await HandleGuestLobbyMessageAsync(connection, lobby)
+                            .ConfigureAwait(false);
+                        continue;
+                    }
+                    if (MatchProtocol.TryDecode(
+                        frame,
+                        MatchWireDirection.ClientToHost,
+                        out var match,
+                        out _))
+                    {
+                        if (TryHandleMatchPong(
+                            connection,
+                            match))
+                        {
+                            continue;
+                        }
+                        sessionActor?.EnqueueRemote(
+                            connection.ConnectionId,
+                            connection.ConnectionGeneration,
+                            connection.PlayerId,
+                            match);
+                        continue;
+                    }
+                    if (LobbyProtocol.TryDecode(frame, out var lateLobby, out _))
+                    {
+                        if (Enum.TryParse(
+                            lateLobby.kind,
+                            false,
+                            out LobbyMessageKind lateKind)
+                            && (lateKind == LobbyMessageKind.Ping
+                                || lateKind == LobbyMessageKind.Pong)
+                            && !string.IsNullOrWhiteSpace(connection.PlayerId))
+                        {
+                            await HandleGuestLobbyMessageAsync(connection, lateLobby)
+                                .ConfigureAwait(false);
+                            continue;
+                        }
+                        if (lateKind == LobbyMessageKind.JoinRequest)
+                            await SendLateJoinRejectAsync(connection, lateLobby.playerId)
+                                .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await SendMatchProtocolRejectAsync(connection)
+                            .ConfigureAwait(false);
+                    }
+                    break;
                 }
             }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
             catch (Exception) { }
             finally
             {
@@ -186,27 +466,82 @@ namespace ArknoNights.Lobby
             }
         }
 
-        private async Task HandleGuestMessageAsync(GuestConnection connection, LobbyWireMessage message)
+        private bool TryHandleMatchPong(
+            GuestConnection connection,
+            MatchWireEnvelope envelope)
         {
-            if (!Enum.TryParse(message.kind, false, out LobbyMessageKind kind)) return;
+            if (envelope == null
+                || !string.Equals(
+                    envelope.Kind,
+                    MatchWireKind.Pong.ToString(),
+                    StringComparison.Ordinal)
+                || !MatchProtocol.TryDeserializePayload(
+                    envelope,
+                    out MatchHeartbeatPayload pong)
+                || pong.ConnectionGeneration
+                    != connection.ConnectionGeneration)
+            {
+                return false;
+            }
+            lock (gate)
+            {
+                if (connection.Removed
+                    || string.IsNullOrWhiteSpace(
+                        connection.PlayerId)
+                    || !guestsByPlayerId.TryGetValue(
+                        connection.PlayerId,
+                        out var active)
+                    || active != connection)
+                {
+                    return true;
+                }
+                connection.MissedPongs = 0;
+                connection.LatencyMilliseconds = Math.Max(
+                    0,
+                    DateTimeOffset.UtcNow
+                        .ToUnixTimeMilliseconds()
+                        - pong.SentUnixMilliseconds);
+            }
+            return true;
+        }
+
+        private async Task HandleGuestLobbyMessageAsync(
+            GuestConnection connection,
+            LobbyWireMessage message)
+        {
+            if (!Enum.TryParse(message.kind, false, out LobbyMessageKind kind))
+                return;
             if (kind == LobbyMessageKind.JoinRequest)
             {
-                await HandleJoinAsync(connection, message);
+                await HandleJoinAsync(connection, message).ConfigureAwait(false);
                 return;
             }
-
-            if (!string.Equals(connection.PlayerId, message.playerId, StringComparison.Ordinal)) return;
+            if (!string.Equals(
+                connection.PlayerId,
+                message.playerId,
+                StringComparison.Ordinal))
+            {
+                return;
+            }
             if (kind == LobbyMessageKind.SetReady)
             {
                 bool changed;
                 LobbyRoomSnapshot snapshot;
                 lock (gate)
                 {
-                    changed = room.TrySetReady(message.playerId, message.playerId, message.isReady, out _);
+                    if (Lifecycle != MatchSessionLifecycle.Lobby) return;
+                    changed = room.TrySetReady(
+                        message.playerId,
+                        message.playerId,
+                        message.isReady,
+                        out _);
                     snapshot = changed ? CreateSnapshotWithLatency() : null;
                 }
-                if (changed) PublishSnapshot(snapshot);
-                if (changed) await BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot);
+                if (changed)
+                {
+                    PublishSnapshot(snapshot);
+                    BroadcastLobby(LobbyMessageKind.RoomSnapshot, snapshot);
+                }
             }
             else if (kind == LobbyMessageKind.Leave)
             {
@@ -214,129 +549,390 @@ namespace ArknoNights.Lobby
             }
             else if (kind == LobbyMessageKind.Ping)
             {
-                await connection.SendAsync(CreateMessage(LobbyMessageKind.Pong, connection.PlayerId, message.sentUnixMilliseconds));
+                SendLobby(connection, CreateLobbyMessage(
+                    LobbyMessageKind.Pong,
+                    connection.PlayerId,
+                    message.sentUnixMilliseconds));
             }
             else if (kind == LobbyMessageKind.Pong)
             {
                 lock (gate)
                 {
                     connection.MissedPongs = 0;
-                    connection.LatencyMilliseconds = Math.Max(0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.sentUnixMilliseconds);
-                    PublishSnapshot(CreateSnapshotWithLatency());
+                    connection.LatencyMilliseconds = Math.Max(
+                        0,
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                            - message.sentUnixMilliseconds);
+                    if (Lifecycle == MatchSessionLifecycle.Lobby)
+                        PublishSnapshot(CreateSnapshotWithLatency());
                 }
             }
+            await Task.CompletedTask;
         }
 
-        private async Task HandleJoinAsync(GuestConnection connection, LobbyWireMessage message)
+        private async Task HandleJoinAsync(
+            GuestConnection connection,
+            LobbyWireMessage message)
         {
-            if ((!acceptsAnyRoomCode && !string.Equals(message.roomCode, CurrentRoomCode, StringComparison.Ordinal))
-                || connection.PlayerId != null)
-            {
-                await connection.SendAsync(CreateMessage(LobbyMessageKind.Reject, message.playerId, 0, null, LobbyJoinFailure.InvalidRoomCode.ToString()));
-                return;
-            }
-
-            var profile = new LobbyProfile(message.playerId, message.displayName, message.avatarIndex);
             LobbyJoinFailure failure;
-            LobbyRoomSnapshot snapshot;
+            LobbyRoomSnapshot snapshot = null;
             lock (gate)
             {
-                if (!room.TryJoin(profile, out failure)) snapshot = null;
+                if (Lifecycle != MatchSessionLifecycle.Lobby)
+                {
+                    failure = LobbyJoinFailure.RoomStarted;
+                }
+                else if ((!acceptsAnyRoomCode
+                    && !string.Equals(
+                        message.roomCode,
+                        room.Snapshot.RoomCode,
+                        StringComparison.Ordinal))
+                    || connection.PlayerId != null)
+                {
+                    failure = LobbyJoinFailure.InvalidRoomCode;
+                }
+                else if (!message.CompatibilityManifest.IsValid
+                    || !MatchSessionBuilder.ManifestEquals(
+                        matchConfiguration.CompatibilityManifest,
+                        message.CompatibilityManifest))
+                {
+                    failure = LobbyJoinFailure.CompatibilityMismatch;
+                }
+                else if (!matchConfiguration.AllowSyntheticPlayerIdsForTests
+                    && !LocalProfileIdentity.IsValid(message.playerId))
+                {
+                    failure = LobbyJoinFailure.InvalidProfile;
+                }
                 else
                 {
-                    connection.PlayerId = profile.PlayerId;
-                    guestsByPlayerId[profile.PlayerId] = connection;
-                    snapshot = CreateSnapshotWithLatency();
-                    PublishSnapshot(snapshot);
+                    var profile = new LobbyProfile(
+                        message.playerId,
+                        message.displayName,
+                        message.avatarIndex);
+                    if (room.TryJoin(profile, out failure))
+                    {
+                        connection.PlayerId = profile.PlayerId;
+                        connection.ConnectionGeneration = 1;
+                        guestsByPlayerId[profile.PlayerId] = connection;
+                        joinedManifests[profile.PlayerId] =
+                            message.CompatibilityManifest;
+                        snapshot = CreateSnapshotWithLatency();
+                        PublishSnapshot(snapshot);
+                    }
                 }
             }
-
             if (snapshot == null)
             {
-                await connection.SendAsync(CreateMessage(LobbyMessageKind.Reject, message.playerId, 0, null, failure.ToString()));
+                SendLobby(connection, CreateLobbyMessage(
+                    LobbyMessageKind.Reject,
+                    message.playerId,
+                    0,
+                    null,
+                    failure.ToString()));
                 return;
             }
-
-            await connection.SendAsync(CreateMessage(LobbyMessageKind.JoinAccepted, profile.PlayerId, 0, snapshot));
-            await BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot);
+            SendLobby(connection, CreateLobbyMessage(
+                LobbyMessageKind.JoinAccepted,
+                connection.PlayerId,
+                0,
+                snapshot));
+            BroadcastLobby(LobbyMessageKind.RoomSnapshot, snapshot);
+            await Task.CompletedTask;
         }
 
         private async Task HeartbeatLoopAsync()
         {
-            while (!cancellation.IsCancellationRequested)
+            while (!cancellation.IsCancellationRequested
+                && !endedShutdownStarted)
             {
-                try { await Task.Delay(HeartbeatMilliseconds, cancellation.Token); }
-                catch (TaskCanceledException) { return; }
+                try
+                {
+                    await Task.Delay(
+                        HeartbeatMilliseconds,
+                        cancellation.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { return; }
 
-                List<GuestConnection> expired = null;
                 List<GuestConnection> active;
+                List<GuestConnection> expired = null;
                 lock (gate)
                 {
-                    active = new List<GuestConnection>(guestsByPlayerId.Values);
-                    for (var index = 0; index < active.Count; index++)
+                    active = guestsByPlayerId.Values.Distinct().ToList();
+                    foreach (var connection in active)
                     {
-                        active[index].MissedPongs++;
-                        if (active[index].MissedPongs >= MaximumMissedPongs)
+                        connection.MissedPongs++;
+                        if (connection.MissedPongs >= MaximumMissedPongs)
                         {
                             if (expired == null) expired = new List<GuestConnection>();
-                            expired.Add(active[index]);
+                            expired.Add(connection);
                         }
                     }
                 }
-
                 if (expired != null)
-                {
-                    for (var index = 0; index < expired.Count; index++) RemoveConnection(expired[index]);
-                }
+                    foreach (var connection in expired) RemoveConnection(connection);
 
-                for (var index = 0; index < active.Count; index++)
+                foreach (var connection in active)
                 {
-                    if (expired == null || !expired.Contains(active[index]))
+                    if (expired != null && expired.Contains(connection)) continue;
+                    if (Lifecycle == MatchSessionLifecycle.Lobby)
                     {
-                        try { await active[index].SendAsync(CreateMessage(LobbyMessageKind.Ping, active[index].PlayerId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())); }
-                        catch (Exception) { RemoveConnection(active[index]); }
+                        if (!SendLobby(connection, CreateLobbyMessage(
+                            LobbyMessageKind.Ping,
+                            connection.PlayerId,
+                            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())))
+                        {
+                            RemoveConnection(connection);
+                        }
+                    }
+                    else if (sessionActor != null
+                        && Lifecycle != MatchSessionLifecycle.Ended)
+                    {
+                        var heartbeat = new MatchHeartbeatPayload
+                        {
+                            ConnectionGeneration =
+                                connection.ConnectionGeneration,
+                            SentUnixMilliseconds =
+                                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                        };
+                        if (!SendMatch(
+                            connection,
+                            MatchWireKind.Ping,
+                            heartbeat))
+                        {
+                            RemoveConnection(connection);
+                        }
                     }
                 }
             }
         }
 
-        private async Task BroadcastSnapshotAsync(LobbyMessageKind kind)
+        private Task PromoteConnectionsAsync(
+            LobbyRoomSnapshot startedSnapshot,
+            IReadOnlyDictionary<string, MatchInitializedPayload> initializations)
         {
             List<GuestConnection> recipients;
-            LobbyRoomSnapshot snapshot;
-            lock (gate)
+            lock (gate) recipients = guestsByPlayerId.Values.ToList();
+            foreach (var recipient in recipients)
             {
-                if (stopped) return;
-                recipients = new List<GuestConnection>(guestsByPlayerId.Values);
-                snapshot = CreateSnapshotWithLatency();
+                if (!SendLobby(recipient, CreateLobbyMessage(
+                    LobbyMessageKind.Start,
+                    recipient.PlayerId,
+                    0,
+                    startedSnapshot))
+                    || !initializations.TryGetValue(
+                        recipient.PlayerId,
+                        out var initialization)
+                    || !SendMatch(
+                        recipient,
+                        MatchWireKind.MatchInitialized,
+                        initialization))
+                {
+                    RemoveConnection(recipient);
+                }
             }
+            sessionActor.MarkMatchRunning();
+            Lifecycle = MatchSessionLifecycle.Match;
+            return Task.CompletedTask;
+        }
 
-            for (var index = 0; index < recipients.Count; index++)
+        private void ProcessDispatch(MatchSessionDispatch dispatch)
+        {
+            if (dispatch == null) return;
+            if (string.Equals(
+                dispatch.ConnectionId,
+                "host-local",
+                StringComparison.Ordinal))
             {
-                try { await recipients[index].SendAsync(CreateMessage(kind, recipients[index].PlayerId, 0, snapshot)); }
-                catch (Exception) { RemoveConnection(recipients[index]); }
+                HostDispatchReceived?.Invoke(dispatch);
+                return;
             }
+            GuestConnection connection;
+            lock (gate)
+                connectionsById.TryGetValue(dispatch.ConnectionId, out connection);
+            if (connection == null) return;
+            if (dispatch.Kind == MatchWireKind.ReconnectAccepted
+                && dispatch.Payload is MatchReconnectAcceptedPayload accepted)
+            {
+                GuestConnection previous = null;
+                lock (gate)
+                {
+                    connection.PlayerId = accepted.PlayerId;
+                    connection.ConnectionGeneration =
+                        accepted.ConnectionGeneration;
+                    if (guestsByPlayerId.TryGetValue(
+                        accepted.PlayerId,
+                        out var existing)
+                        && existing != connection)
+                    {
+                        previous = existing;
+                    }
+                    guestsByPlayerId[accepted.PlayerId] = connection;
+                }
+                if (previous != null) previous.Close();
+            }
+            if (!string.IsNullOrWhiteSpace(dispatch.CloseConnectionId))
+            {
+                GuestConnection old;
+                lock (gate)
+                    connectionsById.TryGetValue(
+                        dispatch.CloseConnectionId,
+                        out old);
+                old?.Close();
+            }
+            if (!SendMatch(
+                connection,
+                dispatch.Kind,
+                dispatch.Payload,
+                dispatch.Kind == MatchWireKind.ScopedSnapshot))
+            {
+                RemoveConnection(connection);
+            }
+        }
+
+        private bool ProcessActorDispatches(
+            IReadOnlyList<MatchSessionDispatch> items)
+        {
+            if (items == null || items.Count == 0) return false;
+            for (var index = 0; index < items.Count; index++)
+                ProcessDispatch(items[index]);
+            return true;
+        }
+
+        private void BroadcastLobby(
+            LobbyMessageKind kind,
+            LobbyRoomSnapshot snapshot)
+        {
+            List<GuestConnection> recipients;
+            lock (gate) recipients = guestsByPlayerId.Values.ToList();
+            foreach (var recipient in recipients)
+            {
+                if (!SendLobby(recipient, CreateLobbyMessage(
+                    kind,
+                    recipient.PlayerId,
+                    0,
+                    snapshot)))
+                {
+                    RemoveConnection(recipient);
+                }
+            }
+        }
+
+        private bool SendLobby(
+            GuestConnection connection,
+            LobbyWireMessage message)
+        {
+            try
+            {
+                return connection.Writer.TryEnqueue(
+                    LobbyProtocol.Encode(message));
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private bool SendMatch(
+            GuestConnection connection,
+            MatchWireKind kind,
+            object payload,
+            bool replacePendingSnapshot = false)
+        {
+            try
+            {
+                var sessionId = sessionActor == null
+                    ? EndedSessionId
+                    : sessionActor.SessionId;
+                var frame = MatchProtocol.Encode(
+                    kind,
+                    sessionId,
+                    "host-" + Interlocked.Increment(ref messageIdCounter),
+                    payload,
+                    MatchWireDirection.HostToClient);
+                return connection.Writer.TryEnqueue(
+                    frame,
+                    replacePendingSnapshot);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private async Task SendLateJoinRejectAsync(
+            GuestConnection connection,
+            string playerId)
+        {
+            SendLobby(connection, CreateLobbyMessage(
+                LobbyMessageKind.Reject,
+                string.IsNullOrWhiteSpace(playerId) ? "unknown" : playerId,
+                0,
+                null,
+                LobbyJoinFailure.RoomStarted.ToString()));
+            await connection.Writer.CompleteAsync(
+                TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
+        }
+
+        private async Task SendMatchProtocolRejectAsync(
+            GuestConnection connection)
+        {
+            SendMatch(connection, MatchWireKind.Reject, new MatchRejectPayload
+            {
+                Code = "ProtocolError",
+                StableDetailCode = "match.protocol.invalid"
+            });
+            await connection.Writer.CompleteAsync(
+                TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
         }
 
         private void RemoveConnection(GuestConnection connection)
         {
-            bool changed = false;
-            LobbyRoomSnapshot snapshot = null;
+            bool publishLobby = false;
+            LobbyRoomSnapshot lobbySnapshot = null;
+            string playerId;
+            long generation;
             lock (gate)
             {
+                if (connection == null || connection.Removed) return;
+                connection.Removed = true;
                 connections.Remove(connection);
-                if (!string.IsNullOrWhiteSpace(connection.PlayerId))
+                connectionsById.Remove(connection.ConnectionId);
+                playerId = connection.PlayerId;
+                generation = connection.ConnectionGeneration;
+                if (!string.IsNullOrWhiteSpace(playerId)
+                    && guestsByPlayerId.TryGetValue(
+                        playerId,
+                        out var active)
+                    && active == connection)
                 {
-                    guestsByPlayerId.Remove(connection.PlayerId);
-                    changed = room.RemovePlayer(connection.PlayerId);
-                    if (changed) snapshot = CreateSnapshotWithLatency();
-                    connection.PlayerId = null;
+                    guestsByPlayerId.Remove(playerId);
+                    if (Lifecycle == MatchSessionLifecycle.Lobby)
+                    {
+                        joinedManifests.Remove(playerId);
+                        publishLobby = room.RemovePlayer(playerId);
+                        if (publishLobby)
+                            lobbySnapshot = CreateSnapshotWithLatency();
+                    }
                 }
             }
-
             connection.Close();
-            if (changed) PublishSnapshot(snapshot);
-            if (changed && !stopped) _ = BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot);
+            if (Lifecycle != MatchSessionLifecycle.Lobby
+                && Lifecycle != MatchSessionLifecycle.Ended
+                && !string.IsNullOrWhiteSpace(playerId))
+            {
+                sessionActor?.EnqueueConnectionLost(
+                    connection.ConnectionId,
+                    generation,
+                    playerId);
+            }
+            if (publishLobby)
+            {
+                PublishSnapshot(lobbySnapshot);
+                if (!stopped)
+                    BroadcastLobby(
+                        LobbyMessageKind.RoomSnapshot,
+                        lobbySnapshot);
+            }
         }
 
         private LobbyRoomSnapshot CreateSnapshotWithLatency()
@@ -346,12 +942,22 @@ namespace ArknoNights.Lobby
             for (var index = 0; index < members.Length; index++)
             {
                 var member = source.Members[index];
-                var latency = 0L;
-                if (guestsByPlayerId.TryGetValue(member.PlayerId, out var connection)) latency = connection.LatencyMilliseconds;
-                members[index] = new LobbyMemberSnapshot(member.Profile, member.IsReady, latency);
+                var latency = guestsByPlayerId.TryGetValue(
+                    member.PlayerId,
+                    out var connection)
+                    ? connection.LatencyMilliseconds
+                    : 0;
+                members[index] = new LobbyMemberSnapshot(
+                    member.Profile,
+                    member.IsReady,
+                    latency);
             }
-
-            return new LobbyRoomSnapshot(source.RoomCode, source.HostPlayerId, members, source.HasStarted, source.Revision);
+            return new LobbyRoomSnapshot(
+                source.RoomCode,
+                source.HostPlayerId,
+                members,
+                source.HasStarted,
+                source.Revision);
         }
 
         private string RegenerateAuthoritativeRoomCode()
@@ -361,45 +967,63 @@ namespace ArknoNights.Lobby
             lock (gate)
             {
                 before = room.Snapshot;
-                if (before.HasStarted || before.Members.Count == 0) return before.RoomCode;
+                if (Lifecycle != MatchSessionLifecycle.Lobby
+                    || before.Members.Count == 0)
+                {
+                    return before.RoomCode;
+                }
                 do { replacement = CreateRoomCode(); }
-                while (string.Equals(replacement, before.RoomCode, StringComparison.Ordinal));
+                while (string.Equals(
+                    replacement,
+                    before.RoomCode,
+                    StringComparison.Ordinal));
                 room = RecreateRoomWithCode(before, replacement);
                 PublishSnapshot(CreateSnapshotWithLatency());
             }
-
-            _ = Task.Run(() => BroadcastSnapshotAsync(LobbyMessageKind.RoomSnapshot));
+            BroadcastLobby(
+                LobbyMessageKind.RoomSnapshot,
+                CreateSnapshotWithLatency());
             return replacement;
         }
 
-        private static LobbyRoomState RecreateRoomWithCode(LobbyRoomSnapshot snapshot, string roomCode)
+        private static LobbyRoomState RecreateRoomWithCode(
+            LobbyRoomSnapshot snapshot,
+            string roomCode)
         {
-            var replacement = LobbyRoomState.CreateHost(snapshot.Members[0].Profile, roomCode);
+            var replacement = LobbyRoomState.CreateHost(
+                snapshot.Members[0].Profile,
+                roomCode);
             for (var index = 1; index < snapshot.Members.Count; index++)
-            {
-                replacement.TryJoin(snapshot.Members[index].Profile, out _);
-            }
-
-            for (var index = 0; index < snapshot.Members.Count; index++)
-            {
-                var member = snapshot.Members[index];
-                if (member.IsReady) replacement.TrySetReady(member.PlayerId, member.PlayerId, true, out _);
-            }
-
-            if (snapshot.HasStarted) replacement.TryStart(snapshot.HostPlayerId, out _);
+                replacement.TryJoin(
+                    snapshot.Members[index].Profile,
+                    out _);
+            foreach (var member in snapshot.Members)
+                if (member.IsReady)
+                    replacement.TrySetReady(
+                        member.PlayerId,
+                        member.PlayerId,
+                        true,
+                        out _);
             return replacement;
         }
 
-        private LobbyWireMessage CreateMessage(LobbyMessageKind kind, string playerId, long sentUnixMilliseconds, LobbyRoomSnapshot snapshot = null, string rejection = null)
+        private LobbyWireMessage CreateLobbyMessage(
+            LobbyMessageKind kind,
+            string playerId,
+            long sentUnixMilliseconds,
+            LobbyRoomSnapshot snapshot = null,
+            string rejection = null)
         {
             return new LobbyWireMessage
             {
                 protocolVersion = LobbyProtocol.ProtocolVersion,
                 kind = kind.ToString(),
-                roomCode = CurrentRoomCode,
+                roomCode = room.Snapshot.RoomCode,
                 playerId = playerId,
                 sentUnixMilliseconds = sentUnixMilliseconds,
-                snapshotJson = snapshot == null ? null : LanRoomTransport.SerializeSnapshot(snapshot),
+                snapshotJson = snapshot == null
+                    ? null
+                    : LanRoomSnapshotWire.Serialize(snapshot),
                 rejectionCode = rejection
             };
         }
@@ -409,9 +1033,25 @@ namespace ArknoNights.Lobby
             if (snapshot != null) pendingSnapshots.Enqueue(snapshot);
         }
 
-        private string CurrentRoomCode
+        private void BeginEndedShutdown()
         {
-            get { lock (gate) return room.Snapshot.RoomCode; }
+            lock (gate)
+            {
+                if (endedShutdownStarted) return;
+                endedShutdownStarted = true;
+            }
+            try { listener.Stop(); } catch (Exception) { }
+            List<GuestConnection> active;
+            lock (gate) active = connections.ToList();
+            endedFlushTask = Task.Run(async () =>
+            {
+                foreach (var connection in active)
+                {
+                    await connection.Writer.CompleteAsync(
+                        TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                    connection.Close();
+                }
+            });
         }
 
         private static string CreateRoomCode()
@@ -421,26 +1061,41 @@ namespace ArknoNights.Lobby
 
         private sealed class GuestConnection
         {
-            private readonly SemaphoreSlim sendGate = new SemaphoreSlim(1, 1);
+            public GuestConnection(TcpClient client, string connectionId)
+            {
+                Client = client;
+                Stream = client.GetStream();
+                ConnectionId = connectionId;
+                Writer = new LanConnectionWriter(Stream);
+                ReadTask = Task.CompletedTask;
+            }
 
-            public GuestConnection(TcpClient client) { Client = client; Stream = client.GetStream(); ReadTask = Task.CompletedTask; }
             public TcpClient Client { get; }
             public NetworkStream Stream { get; }
+            public LanConnectionWriter Writer { get; }
+            public string ConnectionId { get; }
             public string PlayerId { get; set; }
+            public long ConnectionGeneration { get; set; }
             public long LatencyMilliseconds { get; set; }
             public int MissedPongs { get; set; }
             public Task ReadTask { get; set; }
-
-            public async Task SendAsync(LobbyWireMessage message)
-            {
-                await sendGate.WaitAsync();
-                try { await LanRoomTransport.WriteMessageAsync(Stream, message); }
-                finally { sendGate.Release(); }
-            }
+            public bool Removed { get; set; }
+            public bool Closed { get; private set; }
 
             public void Close()
             {
+                if (Closed) return;
+                Closed = true;
+                Writer.Cancel();
                 try { Client.Close(); } catch (Exception) { }
+            }
+
+            public async Task StopAsync()
+            {
+                Close();
+                try { await ReadTask.ConfigureAwait(false); }
+                catch (Exception) { }
+                Writer.Dispose();
             }
         }
     }

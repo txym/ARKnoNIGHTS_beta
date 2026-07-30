@@ -81,6 +81,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试；
 - Match M1–M4 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、商店经济、自动合成、Buff 重映射、部署 Cost、严格备战席栈、Overflow、准备时钟、阵型命令、封印安全规则、2/3/4 人配对、结果校验、影子映射、结算收入/连续、淘汰/排名、终局和权限裁剪；只需聚焦 M4 时可使用 `ArknoNights.Match.Tests.MatchFlowEditModeTests`；
 - Match M5 AI：`ArknoNights.MatchAI.Tests`，覆盖观察权限、确定性决策表、ActionId 幂等、购买后 FinalSurvivor 单次部署、0–29000ms 固定 Tick、时间跳跃、立即封存、掉线/退出接管与恢复控制。
+- LAN Match Session：`MatchSessionProtocolEditModeTests`、`MatchSessionActorEditModeTests`、`LanSocketIntegrationEditModeTests`，覆盖 22 种 wire kind、长度/UTF-8/方向/范围、固定席位、命令顺序、权限快照、token、断线/重连、Battle transport、heartbeat 和端口释放；
 
 规则或公共基础设施变化后再运行完整 EditMode。
 
@@ -100,6 +101,7 @@ PlayMode 重点覆盖：
 - 真实目录、Prefab、Spine 和动态视图生命周期；
 - HUD/详情/状态条场景集成；
 - Lobby Controller、View、Capture Suite 与平台适配。
+- `LanLobbyControllerPlayModeTests` 还覆盖真实运行时 Unit/Ability 目录兼容 hash、隔离 PlayerPrefs credential 的原子记录/损坏删除、开局后本地 credential 保存、权威终局回主页，以及本地 Demo 门控在 Session 接管后保持冻结。
 
 场景、Prefab、资源引用、自动 Bootstrap 或 Unity 生命周期发生变化时，不能只跑 EditMode。
 
@@ -148,16 +150,23 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 
 ### Lobby 与 Match
 
-- 当前 Lobby 覆盖发现、创建、加入、准备、开始、离开和房主解散；
+- Lobby 覆盖发现、创建、加入、准备、开始、离开和房主解散；Match 开始后必须停止 UDP 发现但保留 listener 与既有 TCP，普通 Join 被拒绝；
 - socket、消息长度、主线程派发和生命周期必须有结构化失败路径；
 - Match M1–M4 focused EditMode 必须验证固定四席位、初始化拒绝路径、单调 revision、重复 CommandId、稳定摘要、连接内部事务、共享实体唯一占位、失败事务不推进随机状态、自然刷新统一返池后按槽交错抽取，以及 Public/Owner/Host 权限隔离；
 - M2 还必须精确断言池副本数、具体 UnitId、概率/排序、刷新游标、槽位冻结、价格、余额、升级折扣、AcquisitionOrdinal 和结构化结果码，不能只断言非空或数量近似正确；
 - M3 还必须精确断言 `0..3` 精英上限与 `1/2/4/8` 副本等价、`1/2/3/5` 战斗实体派生、确定性幸存 ID、单 revision 合成诊断、tombstone/池守恒、Buff 引用、Cost 退场、严格堆叠排序、Overflow 非阻塞提升与封存删除；
 - M4 还必须精确断言 `30000ms` 时钟边界、最后 Ready 原子封印、Ready 阵型锁、首回合安全购买/部署、Overflow 删除顺序、四/三/两人黄金表、人数切换确定性、每名存活玩家恰好一个 AppliedResult、影子 owner 忽略规则、结果 hash/Outcome 复核、回放门控、六档收入/连续奖励、负生命/共享名次、结算幂等、NoContest 与外部效果 outbox；
 - M5 必须精确断言 AI 观察不含对手 Gold/Shop/Cost、池/seed/token，Cost 可部署候选与最右槽排序，`G=U+P+1/+2` 边界，满 13 槽仍可升级，部署坐标 35 格顺序，ActionId 重放/冲突/generation，0/1000…29000/30000 边界，跳帧补处理，真人全 Ready 后无末次动作，以及 Preparation/Battle 掉线宽限、主动退出与重连不回滚；
-- M1–M5 没有 PlayMode、Socket、场景、Battle adapter 或 UI 接入，不能用纯领域测试推断局域网流程可玩；
-- 后续 Match 里程碑必须逐步新增版本握手传输、命令排序、快照同步、token 身份验证、BattleInput adapter、流式回放和跨端摘要一致性验证；
-- 不得把“收到 Lobby Start”记为正式联网对局通过。
+- M6 必须逐字段验证 Protocol/MatchRules/BattleCore/Unit/Ability 清单；真实目录 hash 必须稳定、为 64 位 SHA-256，且不把本地化文本或美术路径作为模拟兼容输入；
+- Match wire 必须验证大端前缀、严格 UTF-8、0/负数/截断/尾随/超限帧、schema/kind/direction、kind-specific DTO 和 64 KiB/1 MiB/4 MiB 分级上限；
+- host 本地与远端命令必须进入同一 actor 队列并获得唯一递增 `HostAcceptSequence`；Ack 必须先于同 revision 快照，重复 CommandId 不得再次推进状态；
+- 每个 scoped snapshot 只能包含 Public 与接收者本人的 OwnerPrivate；淘汰旁观者只能收到 Public，wire 不得出现 Pool、ControllerKind、token 或其他玩家 Gold/Shop/Overflow；
+- 客户端只接受更高 `StateRevision` 的完整替换；同 revision、旧 revision 和乱序到达不得触发重复通知或局部 merge；
+- reconnect token 必须是 32-byte CSPRNG 的 43 字符 base64url；房主只保留 verifier。EOF、timeout、端点不可达和 CompatibilityMismatch 保留 credential；ExplicitQuit、MatchEnded、SessionEnded、InvalidToken 等权威终止清除；
+- socket 回环必须覆盖原连接提升、命令/快照、强制断线保留四席位、较高 generation 重连、当前 revision 恢复包、MatchEnded 清理、heartbeat 跨过漏回阈值仍连接，以及最终端口释放；
+- Battle 测试在 M6 只验证 Session/Round/BattleSet/BattleId/input hash 路由、旧轮丢弃和重连时 `snapshot → clock → seal → playback baseline/tick` 顺序；不能据此声称 M7 chunk、checkpoint 或 hash 算法已经实现；
+- M6 已有 EditMode、Socket 和 Controller PlayMode 接入，但仍不能把“收到 Lobby Start”或仅通过本地 Demo 记为完整跨设备联网对局通过；
+- 后续里程碑仍需接入 M5 AI 实现、M7 本地 Battle producer/回放协调和 M8 正式 HUD，并增加至少 2 Player 进程级 LAN 冒烟与跨端摘要一致性验证。
 
 ## 6. 证据记录
 

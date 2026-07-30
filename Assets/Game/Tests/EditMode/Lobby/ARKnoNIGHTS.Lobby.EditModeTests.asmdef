@@ -2,7 +2,8 @@
   "name": "ARKnoNIGHTS.Lobby.EditModeTests",
   "rootNamespace": "ArknoNights.Lobby.Tests",
   "references": [
-    "ARKnoNIGHTS.Lobby"
+    "ARKnoNIGHTS.Lobby",
+    "ARKnoNIGHTS.Match"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

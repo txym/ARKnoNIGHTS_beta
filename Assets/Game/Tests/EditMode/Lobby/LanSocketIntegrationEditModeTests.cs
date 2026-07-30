@@ -7,45 +7,249 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
 using ArknoNights.Lobby;
+using ArknoNights.Match;
 using NUnit.Framework;
 
 namespace ArknoNights.Lobby.Tests
 {
     public sealed class LanSocketIntegrationEditModeTests
     {
+        private const string HostMatchId = "lan-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        private const string GuestMatchId = "lan-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
         private static readonly Dictionary<short, OpCode> OpCodes = CreateOpCodes();
 
         [Test]
-        public void HostAndClient_JoinReadyStartAndReleaseTcpPort()
+        public void HostAndClient_PromoteCommandDisconnectReconnectEndAndReleaseTcpPort()
         {
-            var host = Run(() => LanRoomHost.StartForTestsAsync(Profile("host"), 0));
-            var client = Run(() => LanRoomClient.JoinForTestsAsync(host.LoopbackEndpoint, Profile("guest")));
+            var configuration = LanMatchSessionConfiguration.CreateForTests();
+            var credentialStore = new MemoryCredentialStore();
+            var host = Run(() => LanRoomHost.StartForTestsAsync(Profile(HostMatchId), 0));
+            var client = Run(() => LanRoomClient.JoinAsync(
+                host.LoopbackEndpoint,
+                "000000",
+                Profile(GuestMatchId),
+                configuration,
+                credentialStore));
+            LanRoomClient reconnected = null;
             try
             {
-                Assert.That(host.Snapshot.Members.Single(member => member.PlayerId == "host").IsReady, Is.True);
+                Assert.That(host.Snapshot.Members.Single(member => member.PlayerId == HostMatchId).IsReady, Is.True);
                 client.Tick();
-                Assert.That(client.Snapshot.Members.Select(member => member.PlayerId), Is.EquivalentTo(new[] { "host", "guest" }));
+                Assert.That(client.Snapshot.Members.Select(member => member.PlayerId), Is.EquivalentTo(new[] { HostMatchId, GuestMatchId }));
 
                 Run(() => client.SetReadyAsync(true));
-                WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Single(member => member.PlayerId == "guest").IsReady; }, TimeSpan.FromSeconds(2));
-                Assert.That(host.TryStart("host", out var failure), Is.True, failure.ToString());
+                WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Single(member => member.PlayerId == GuestMatchId).IsReady; }, TimeSpan.FromSeconds(2));
+                Assert.That(host.TryStart(HostMatchId, out var failure), Is.True, failure.ToString());
 
                 Run(() => client.WaitForStartAsync(TimeSpan.FromSeconds(2)));
+                Run(() => client.WaitForMatchInitializedAsync(TimeSpan.FromSeconds(2)));
                 client.Tick();
                 Assert.That(client.Snapshot.HasStarted, Is.True);
-                WaitUntil(() => { client.Tick(); return client.LatencyMilliseconds >= 0; }, TimeSpan.FromSeconds(2));
+                Assert.That(host.Lifecycle, Is.EqualTo(MatchSessionLifecycle.Match));
+                Assert.That(client.IsConnected, Is.True);
+                Assert.That(client.MatchSnapshot.OwnerPrivateState.PlayerId, Is.EqualTo(GuestMatchId));
+                Assert.That(credentialStore.Credential, Is.Not.Null);
 
-                Run(() => client.LeaveAsync());
-                WaitUntil(() => { host.Tick(); return host.Snapshot.Members.Count == 1; }, TimeSpan.FromSeconds(2));
+                Run(() => client.SendCommandAsync(new MatchCommandWirePayload
+                {
+                    CommandId = "guest-ready",
+                    KnownStateRevision = client.MatchSnapshot.StateRevision,
+                    CommandKind = MatchCommandKind.SetPreparationReady.ToString(),
+                    DesiredReady = true
+                }));
+                WaitUntil(() =>
+                {
+                    host.Tick();
+                    client.Tick();
+                    return client.LastCommandAck != null;
+                }, TimeSpan.FromSeconds(2));
+                Assert.That(client.LastCommandAck.ResultCode, Is.EqualTo(MatchCommandCode.Accepted.ToString()));
+
+                Run(() => client.StopAsync());
+                WaitUntil(() =>
+                {
+                    host.Tick();
+                    return host.SessionActor.ProjectHostState().Seats
+                        .Single(seat => seat.PlayerId == GuestMatchId)
+                        .ConnectionState == MatchConnectionState.DisconnectedGrace;
+                }, TimeSpan.FromSeconds(2));
+                Assert.That(host.Snapshot.Members, Has.Count.EqualTo(2));
+
+                var reconnectTask = System.Threading.Tasks.Task.Run(() =>
+                    LanRoomClient.ReconnectAsync(
+                        credentialStore.Credential,
+                        credentialStore));
+                WaitUntil(() =>
+                {
+                    host.Tick();
+                    return reconnectTask.IsCompleted;
+                }, TimeSpan.FromSeconds(2));
+                reconnected = reconnectTask.GetAwaiter().GetResult();
+                WaitUntil(() =>
+                {
+                    reconnected.Tick();
+                    return reconnected.MatchSnapshot != null;
+                }, TimeSpan.FromSeconds(2));
+                Assert.That(reconnected.ConnectionGeneration, Is.EqualTo(2));
+                Assert.That(reconnected.MatchSnapshot.OwnerPrivateState.PlayerId, Is.EqualTo(GuestMatchId));
+
+                host.AbortMatch();
+                WaitUntil(() =>
+                {
+                    reconnected.Tick();
+                    return credentialStore.Credential == null;
+                }, TimeSpan.FromSeconds(2));
             }
             finally
             {
                 Run(() => client.StopAsync());
+                if (reconnected != null) Run(() => reconnected.StopAsync());
             }
 
             var port = host.TcpPort;
             host.Dispose();
             Assert.That(CanBindLoopback(port), Is.True);
+        }
+
+        [Test]
+        public void Join_RejectsCompatibilityMismatchBeforeOccupyingSeat()
+        {
+            var host = Run(() => LanRoomHost.StartForTestsAsync(
+                Profile(HostMatchId),
+                0));
+            try
+            {
+                var baseline =
+                    LanMatchSessionConfiguration.CreateForTests();
+                var mismatchManifest =
+                    new MatchCompatibilityManifest(
+                        baseline.CompatibilityManifest.ProtocolVersion,
+                        baseline.CompatibilityManifest.MatchRulesVersion,
+                        baseline.CompatibilityManifest.BattleCoreVersion
+                            + "-different",
+                        baseline.CompatibilityManifest.UnitCatalogSha256,
+                        baseline.CompatibilityManifest.AbilityCatalogSha256);
+                var mismatch =
+                    new LanMatchSessionConfiguration(
+                        mismatchManifest,
+                        baseline.ShopCatalog,
+                        allowSyntheticPlayerIdsForTests: true);
+
+                Assert.That(mismatch.IsValid, Is.True);
+                Assert.Throws<InvalidOperationException>(() =>
+                    Run(() => LanRoomClient.JoinAsync(
+                        host.LoopbackEndpoint,
+                        "000000",
+                        Profile(GuestMatchId),
+                        mismatch,
+                        new MemoryCredentialStore())));
+                host.Tick();
+                Assert.That(host.Snapshot.Members, Has.Count.EqualTo(1));
+                Assert.That(
+                    host.Snapshot.Members[0].PlayerId,
+                    Is.EqualTo(HostMatchId));
+            }
+            finally
+            {
+                Run(() => host.StopAsync());
+            }
+        }
+
+        [Test]
+        public void MatchListener_RejectsPlainJoinAndKeepsFrozenSeats()
+        {
+            var host = Run(() => LanRoomHost.StartForTestsAsync(
+                Profile(HostMatchId),
+                0));
+            try
+            {
+                Assert.That(
+                    host.TryStart(HostMatchId, out var failure),
+                    Is.True,
+                    failure.ToString());
+                Run(() => host.StartBroadcastTask);
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    Run(() => LanRoomClient.JoinAsync(
+                        host.LoopbackEndpoint,
+                        "000000",
+                        Profile(GuestMatchId),
+                        LanMatchSessionConfiguration.CreateForTests(),
+                        new MemoryCredentialStore())));
+                host.Tick();
+
+                Assert.That(
+                    host.Lifecycle,
+                    Is.EqualTo(MatchSessionLifecycle.Match));
+                Assert.That(
+                    host.SessionActor.Participants,
+                    Has.Count.EqualTo(4));
+                Assert.That(
+                    host.SessionActor.Participants.Count(item =>
+                        item.IsHuman),
+                    Is.EqualTo(1));
+            }
+            finally
+            {
+                Run(() => host.StopAsync());
+            }
+        }
+
+        [Test]
+        public void MatchHeartbeat_PongKeepsCurrentGenerationConnectedPastExpiryThreshold()
+        {
+            var configuration =
+                LanMatchSessionConfiguration.CreateForTests();
+            var host = Run(() => LanRoomHost.StartForTestsAsync(
+                Profile(HostMatchId),
+                0));
+            var client = Run(() => LanRoomClient.JoinAsync(
+                host.LoopbackEndpoint,
+                "000000",
+                Profile(GuestMatchId),
+                configuration,
+                new MemoryCredentialStore()));
+            try
+            {
+                Run(() => client.SetReadyAsync(true));
+                WaitUntil(() =>
+                {
+                    host.Tick();
+                    return host.Snapshot.Members.Single(
+                        member =>
+                            member.PlayerId == GuestMatchId)
+                        .IsReady;
+                }, TimeSpan.FromSeconds(2));
+                Assert.That(
+                    host.TryStart(HostMatchId, out var failure),
+                    Is.True,
+                    failure.ToString());
+                Run(() => client.WaitForMatchInitializedAsync(
+                    TimeSpan.FromSeconds(2)));
+                client.Tick();
+
+                var deadline = DateTime.UtcNow
+                    + TimeSpan.FromMilliseconds(4200);
+                while (DateTime.UtcNow < deadline)
+                {
+                    host.Tick();
+                    client.Tick();
+                    Thread.Sleep(20);
+                }
+
+                Assert.That(client.IsConnected, Is.True);
+                Assert.That(
+                    host.SessionActor.ProjectHostState().Seats
+                        .Single(seat =>
+                            seat.PlayerId == GuestMatchId)
+                        .ConnectionState,
+                    Is.EqualTo(MatchConnectionState.Connected));
+            }
+            finally
+            {
+                Run(() => client.StopAsync());
+                Run(() => host.StopAsync());
+            }
         }
 
         [Test]
@@ -356,7 +560,25 @@ namespace ArknoNights.Lobby.Tests
 
         private static LobbyProfile Profile(string playerId)
         {
-            return new LobbyProfile(playerId, "Doctor " + playerId, 0);
+            return new LobbyProfile(playerId, "Doctor", 0);
+        }
+
+        private sealed class MemoryCredentialStore : IReconnectCredentialStore
+        {
+            public ReconnectCredential Credential { get; private set; }
+            public bool TryLoad(out ReconnectCredential credential)
+            {
+                credential = Credential;
+                return credential != null;
+            }
+            public void Save(ReconnectCredential credential)
+            {
+                Credential = credential;
+            }
+            public void Clear()
+            {
+                Credential = null;
+            }
         }
     }
 }

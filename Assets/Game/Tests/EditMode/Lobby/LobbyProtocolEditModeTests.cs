@@ -56,7 +56,12 @@ namespace ArknoNights.Lobby.Tests
                 displayName = kind == LobbyMessageKind.JoinRequest ? "Doctor" : string.Empty,
                 avatarIndex = 2,
                 sentUnixMilliseconds = 123456789,
-                snapshotJson = kind == LobbyMessageKind.RoomSnapshot ? "{\"members\":[]}" : string.Empty
+                snapshotJson = kind == LobbyMessageKind.RoomSnapshot ? "{\"members\":[]}" : string.Empty,
+                matchProtocolVersion = kind == LobbyMessageKind.JoinRequest ? "lan-match-test-1" : null,
+                matchRulesVersion = kind == LobbyMessageKind.JoinRequest ? "rules-test-1" : null,
+                battleCoreVersion = kind == LobbyMessageKind.JoinRequest ? "battle-test-1" : null,
+                unitCatalogSha256 = kind == LobbyMessageKind.JoinRequest ? new string('a', 64) : null,
+                abilityCatalogSha256 = kind == LobbyMessageKind.JoinRequest ? new string('b', 64) : null
             };
 
             var frame = LobbyProtocol.Encode(message);
@@ -66,6 +71,22 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(decoded.kind, Is.EqualTo(kind.ToString()));
             Assert.That(decoded.roomCode, Is.EqualTo("123456"));
             Assert.That(decoded.playerId, Is.EqualTo("player-1"));
+        }
+
+        [Test]
+        public void Decode_RejectsJoinWithoutCompleteCompatibilityManifest()
+        {
+            var frame = CreateFrame(
+                "{\"protocolVersion\":1,\"kind\":\"JoinRequest\",\"roomCode\":\"123456\","
+                + "\"playerId\":\"player-1\",\"displayName\":\"Doctor\",\"avatarIndex\":2}");
+
+            Assert.That(
+                LobbyProtocol.TryDecode(frame, out _, out var error),
+                Is.False);
+            Assert.That(
+                error,
+                Is.EqualTo(
+                    LobbyProtocolError.InvalidCompatibilityManifest));
         }
 
         [Test]
