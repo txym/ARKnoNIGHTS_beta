@@ -1,6 +1,6 @@
 # 局域网同步对局实施计划
 
-> 状态：M1–M3 已形成集成基线；M4 已在 `codex/lan-match-flow` 完成纯领域实现，M5—M8 尚未执行。
+> 状态：M1—M8 已完成并形成统一线性集成链；M8 提交为 `b3bfb44`，Battle 基线修复已移植为 `9807472`，最终验证记录见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)。
 >
 > 玩家可见规则见 [LAN-MATCH-DESIGN.md](LAN-MATCH-DESIGN.md)。战斗分块计算的独立 Agent 提示词见 [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md)；M1 暴露出的既有 Battle 基线漂移由 [TASK-BATTLE-BASELINE-CLEANUP.md](TASK-BATTLE-BASELINE-CLEANUP.md) 单独处理。
 
@@ -17,9 +17,9 @@
 | M7 战斗分块与增量播放 | [TASK-BATTLE-STREAMING.md](TASK-BATTLE-STREAMING.md) |
 | M8 正式运行时与端到端集成 | [TASK-LAN-MATCH-INTEGRATION.md](TASK-LAN-MATCH-INTEGRATION.md) |
 
-## 1. 当前基线结论
+## 1. 实施前基线结论（历史）
 
-当前代码已经具备可复用部分：
+M1 开始前的代码已经具备以下可复用部分：
 
 - UDP 房间发现；
 - TCP 四字节大端长度前缀 + JSON 消息；
@@ -28,7 +28,7 @@
 - 纯 C# 的 `BattleRunner.Step()`；
 - 本地 PlayerState、商店 UI、部署 UI、回合封存和多战斗演示。
 
-但当前“开始游戏”不是联网对局：
+当时“开始游戏”不是联网对局：
 
 1. `LanLobbyController.CompleteGameplayTransition()` 调用 `StopServices(false)`，主动关闭 `LanRoomHost/LanRoomClient`。
 2. 关闭连接后只解除 `PreparationBattleLoopController` 的 Lobby Gate。
@@ -39,7 +39,7 @@
 7. 当前 Profile PlayerId 每次启动都用新 GUID，应用重开后无法作为稳定重连身份。
 8. 当前 Lobby 消息上限 `4096` 字节、Snapshot 上限 `2048` 字节，不足以承载 Match 快照。
 
-所以不能直接给现有 LobbySnapshot 添加几项字段；需要建立独立 Match 领域层，并把已有 TCP 从 Lobby 生命周期升级到 Match 生命周期。
+因此 M1—M8 没有直接给旧 LobbySnapshot 添加字段，而是建立独立 Match 领域层，并把已有 TCP 从 Lobby 生命周期升级到 Match 生命周期。上述历史缺口现已由统一集成链闭环；当前边界以 [`ARCHITECTURE.md`](ARCHITECTURE.md) 为准。
 
 ## 2. 目标架构
 
@@ -106,9 +106,9 @@ Assembly-CSharp 场景接线与 HUD
 - Match focused EditMode 为 `21/21`，LocalMatch、PreparationPhase、Lobby 回归分别为 `18/18`、`6/6`、`94/94`；
 - 集成后在 `txym` 新目录重跑 Match focused EditMode，仍为 `21/21`，0 failed/skipped/inconclusive/not-run/not-runnable；
 - 全量 EditMode 重跑为 `419/424`，全量 PlayMode 为 `70/72`；失败均位于既有 Battle 数据或测试期望，详见 [`history/TEST_RECORDS.md`](history/TEST_RECORDS.md)；
-- 未执行 Windows/Android 构建、LAN 或场景人工流程；M2—M8 未实现。
+- 当时未执行 Windows/Android 构建、LAN 或场景人工流程，且 M2—M8 尚未实现；这是 M1 收口时的历史基线，不代表当前集成状态。
 
-M2 已具备领域基线，必须从包含 `c615a75` 的当前 `txym` 创建独立 worktree；不得从旧分支实现第二套权威状态。Battle 基线修复不属于 M2，按 [`TASK-BATTLE-BASELINE-CLEANUP.md`](TASK-BATTLE-BASELINE-CLEANUP.md) 独立处理。
+M2 后续实现已遵守该领域基线，并继续扩展同一个 `MatchAuthority`，没有建立第二套权威状态。Battle 基线修复保持为独立任务，最终移植记录见 [`TASK-BATTLE-BASELINE-CLEANUP.md`](TASK-BATTLE-BASELINE-CLEANUP.md)。
 
 建议新建：
 
@@ -165,7 +165,7 @@ M1 暴露出的 Battle 基线漂移必须按 [`TASK-BATTLE-BASELINE-CLEANUP.md`]
 - `5503` 精英 0 技能描述测试期望为空，但 authored 源和 BONDS 规范已明确为“每隔一段时间，分裂出三个<果冻丁>。”，应同步测试事实；
 - 三项 `UnitSourceConsumerEditModeTests` 的常量 `359C...` 仍正确：当前检出文件含 `107` 个 CRLF，原始字节哈希为 `BE09...`，规范化为 LF 后仍精确得到 `359C...`。应让测试按规范换行计算哈希或用 `.gitattributes` 固定 LF，不得把常量改成机器相关的 `BE09...`。
 
-修复必须重跑对应 focused 测试以及全量 EditMode/PlayMode；不得用批量替换当前实际值的方式消除断言。
+上述基线问题已由 `992e934` 诊断并修复测试事实，在 M8 集成链上移植为 `9807472`：真实时间线证明两个 Away 5503 分别在 `100/250/400` 施法，Home 5503 在 `100/279` 施法并于 `390` 死亡，因此总计 `24` 个动态果冻符合既有攻击/技能锁与死亡规则；未修改 Battle Core 或玩家可见规则。对应 focused 与全量结果见测试记录。
 
 ### M2：共享牌库、商店、UnitId 与经济
 

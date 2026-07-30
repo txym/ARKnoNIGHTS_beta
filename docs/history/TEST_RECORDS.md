@@ -1290,3 +1290,64 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
 - 上述设备/视觉项必须明确保持“未验证”；发布前建议以两个独立 Player
   完成一轮准备、战斗、结算、下一准备回合，并逐项检查隐私投影、重连只读和
   退出清理。
+
+## 57. M1—M8 与 Battle 基线修复主 Planner 合并门槛（2026-07-30）
+
+### 组合提交与冲突处理
+
+- M8 统一集成提交为 `b3bfb44`，其父链按 M2—M7 顺序包含
+  `5e46e86/4b8c2a4/63ffe1f/8311a2d/ea8712a/6d67624`，并以已包含 M1 的
+  `19a4f62` 为起点。
+- Battle cleanup 来源提交为 `992e934`，同样从 `19a4f62` 分叉；主 Planner
+  没有把两个分支直接合并，而是把该提交移植到 M8 tip，形成 `9807472`。
+- 两个文本冲突均按双方语义合并：
+  `UnitSourceConsumerEditModeTests` 保留 M8 的 LF 规范哈希并增加
+  LF/CRLF/孤立 CR 等价测试；
+  `BattlePresentationPlaybackPlayModeTests` 保留 cleanup 的无普通攻击真实
+  5503 夹具和规范动态 ID，同时保留 M7 播放器需要的 Spawn Tick 微小越界推进。
+- cleanup 没有修改 Battle Core。真实 Demo 时间线的两个 Away 5503 分别在
+  Tick `100/250/400` 施法，Home 5503 在 `100/279` 施法并于 Tick `390`
+  死亡；四个生成 Tick 的数量依次为 `9/6/3/6`，总计 `24`。因此旧期望
+  `27` 与既有攻击动画锁、实际施法后恢复周期和死亡终止规则不一致；更新测试
+  期望没有改变玩家可见规则。
+
+### 新执行的自动化与构建
+
+工作树为 `G:\ARKnoNIGHTS_beta\.worktrees\lan-match-integration`，Unity 为
+`2022.3.62f1c1`。所有 Unity 命令严格串行；结束后无残留 Unity 进程，也没有
+测试导入造成的未暂存资源改动。
+
+- `scripts/TestInvokeUnityTestsSmoke.ps1`：退出码 `0`，
+  `PASS (6 fixtures)`；新增分阶段写入 fixture 证明 wrapper 不会把空、截断或
+  缺少必要属性的 XML 当成完成结果。
+- Battle EditMode，过滤器 `ArknoNights.Battle.Tests`：
+  `325 total / 325 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；证据为
+  `Logs/Planner-Merge-20260730-160249/01-Battle-EditMode`。
+- Battle PlayMode，同一过滤器：
+  `28 total / 28 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；证据为
+  `Logs/Planner-Merge-20260730-160249/02-Battle-PlayMode`。
+- 完整 EditMode，无过滤器：
+  `607 total / 607 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；证据为
+  `Logs/Planner-Merge-20260730-160249/03-Full-EditMode`。
+- 完整 PlayMode，无过滤器：
+  `78 total / 78 passed / 0 failed / 0 skipped / 0 inconclusive /
+  0 not-run / 0 not-runnable`；证据为
+  `Logs/Planner-Merge-20260730-160249/04-Full-PlayMode`。
+- Windows x64 增量复核使用隐藏 Unity 进程同步等待，数字退出码为 `0`。
+  `Logs/Planner-Merge-20260730-160249/06-Windows-Build-Verified/Build.log`
+  记录 `result=Succeeded`、`platform=StandaloneWindows64`、`errors=0`、
+  `warnings=0`、`totalSize=337198654`；产物为
+  `Builds/Planner-Merge-20260730-160249-Verified/ARKnoNIGHTS.exe`。
+
+### 仍未验证
+
+- 没有执行两台独立 Windows Player 或 Windows+Android 真机在物理 LAN 上的
+  发现/直连、完整准备—战斗—结算—下一准备回合、网络中断/恢复、房主退出和
+  客机退出。
+- 没有完成不同分辨率下 LAN Match HUD 的人工视觉验收，也没有用真实网络抖动
+  长时间观察缓冲提示与最终秒 hash 诊断。
+- 上述人工项不影响本次进入开发主线 `txym` 的自动化合并门槛，但在发布或把
+  `txym` 提升到远端默认 `main` 前仍应执行。

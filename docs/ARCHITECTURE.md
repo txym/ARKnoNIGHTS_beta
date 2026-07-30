@@ -2,7 +2,7 @@
 
 > 状态：截至 2026-07-30 的当前实现摘要。
 >
-> 本文只描述仓库中已经存在的结构和能力。LAN Match Session 已接入 M1–M4 权威状态；Battle 流式内容和正式 HUD 仍未闭环。游戏规则以 [`SPEC.md`](SPEC.md) 为准；历史演进见 [`history/ARCHITECTURE_EVOLUTION.md`](history/ARCHITECTURE_EVOLUTION.md)。
+> 本文只描述仓库中已经存在的结构和能力。LAN Match M1—M8 已在统一集成链中闭环；物理双机 LAN、真实网络中断恢复和多分辨率 HUD 仍待人工验收。游戏规则以 [`SPEC.md`](SPEC.md) 为准；历史演进见 [`history/ARCHITECTURE_EVOLUTION.md`](history/ARCHITECTURE_EVOLUTION.md)。
 
 ## 1. 项目基线
 
@@ -11,7 +11,7 @@
 - UI：uGUI、TextMesh Pro；角色表现使用仓库内的 Spine Unity 3.8 源码与资源。
 - 输入：Project Settings 使用旧 Input Manager；第一方交互主要读取 `UnityEngine.Input`。
 - 场景：Build Settings 只启用 `Assets/Scenes/SampleScene.unity`。
-- 当前产品形态：单场景本地四玩家自走棋 Demo、持续整个对局的 LAN Match Session，以及 Match M1–M5 权威状态、经济、自动合成、Overflow、阶段、配对、结算与确定性 AI。Session 已驱动 M1–M4；M5 AI 尚待正式运行时组合根接线，M7 Battle 流式内容和 M8 正式 HUD 也尚未接入。
+- 当前产品形态：单场景本地四玩家自走棋 Demo，以及持续整个正式对局的 LAN Match Session。正式路径已接入 M1—M5 权威状态/AI、M6 会话与重连、M7 Battle 流式计算和 M8 场景组合根/HUD。
 
 ## 2. 模块边界
 
@@ -66,7 +66,7 @@ local-match-state-v1 + 四份 PlayerState
 返回准备阶段并刷新商店
 ```
 
-`PreparationBattleLoopController` 当前负责 `Preparation → Battle → Preparation` 的场景副作用。战斗中的单位受伤和死亡不直接写回持久玩家单位；完整玩家扣血、淘汰与正式经济结算仍属于后续 Match 层。
+`PreparationBattleLoopController` 当前负责离线 Demo 的 `Preparation → Battle → Preparation` 场景副作用。离线战斗中的单位受伤和死亡不直接写回持久玩家单位；正式 LAN 路径由 `LanMatchRuntimeController` 把 M7 结果映射回 M4，并由 Match 层原子完成玩家扣血、淘汰与经济结算。
 
 ### 3.3 LAN Match Session
 

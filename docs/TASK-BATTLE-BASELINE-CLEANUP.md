@@ -1,6 +1,6 @@
 # Battle 基线漂移修复 Agent 提示词
 
-> 状态：待在独立 worktree 中实施。
+> 状态：已完成。来源提交为 `992e934`，在 M8 集成链上解决测试重叠后移植为 `9807472`；未修改 Battle Core 或玩家可见规则。
 >
 > 本任务只处理 LAN Match M1 全量回归暴露出的四组既有 Battle 测试失败；不得修改 `ARKnoNIGHTS.Match`，不得把 Battle 修复混入 M2。
 
