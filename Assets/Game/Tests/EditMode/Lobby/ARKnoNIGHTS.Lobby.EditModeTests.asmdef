@@ -3,7 +3,8 @@
   "rootNamespace": "ArknoNights.Lobby.Tests",
   "references": [
     "ARKnoNIGHTS.Lobby",
-    "ARKnoNIGHTS.Match"
+    "ARKnoNIGHTS.Match",
+    "ARKnoNIGHTS.MatchAI"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

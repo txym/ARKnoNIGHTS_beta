@@ -36,6 +36,11 @@ namespace ArknoNights.Lobby
         void ExplicitQuit(string playerId, MatchPhase phase, int roundNumber);
     }
 
+    public interface IMatchConnectionControlBinding
+    {
+        void Bind(IMatchBotHost host);
+    }
+
     public sealed class NoOpMatchConnectionControlSink : IMatchConnectionControlSink
     {
         public void ConnectionLost(string playerId, MatchPhase phase, int roundNumber) { }
@@ -50,19 +55,22 @@ namespace ArknoNights.Lobby
             MatchShopCatalog shopCatalog,
             int availableAvatarCount = 4,
             IMatchConnectionControlSink connectionControlSink = null,
-            bool allowSyntheticPlayerIdsForTests = false)
+            bool allowSyntheticPlayerIdsForTests = false,
+            IMatchPreparationEntryParticipant preparationEntryParticipant = null)
         {
             CompatibilityManifest = compatibilityManifest;
             ShopCatalog = shopCatalog;
             AvailableAvatarCount = availableAvatarCount;
             ConnectionControlSink = connectionControlSink ?? new NoOpMatchConnectionControlSink();
             AllowSyntheticPlayerIdsForTests = allowSyntheticPlayerIdsForTests;
+            PreparationEntryParticipant = preparationEntryParticipant;
         }
 
         public MatchCompatibilityManifest CompatibilityManifest { get; }
         public MatchShopCatalog ShopCatalog { get; }
         public int AvailableAvatarCount { get; }
         public IMatchConnectionControlSink ConnectionControlSink { get; }
+        public IMatchPreparationEntryParticipant PreparationEntryParticipant { get; }
         internal bool AllowSyntheticPlayerIdsForTests { get; }
 
         public bool IsValid =>
@@ -198,13 +206,19 @@ namespace ArknoNights.Lobby
                     MatchControllerKind.NativeBot));
             }
 
-            var initialized = MatchSessionFactory.Create(new MatchInitializationRequest(
+            var request = new MatchInitializationRequest(
                 sessionId,
                 matchSeed,
                 lobby.HostPlayerId,
                 configuration.CompatibilityManifest,
                 configuration.ShopCatalog,
-                seats));
+                seats);
+            var initialized = configuration.PreparationEntryParticipant == null
+                ? MatchSessionFactory.Create(request)
+                : MatchSessionFactory.Create(
+                    request,
+                    new StrictStagingSlotPolicy(),
+                    configuration.PreparationEntryParticipant);
             if (!initialized.Success)
             {
                 return Rejected(
@@ -383,6 +397,8 @@ namespace ArknoNights.Lobby
             this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             connectionControlSink = configuration.ConnectionControlSink;
             actorThreadId = Environment.CurrentManagedThreadId;
+            if (connectionControlSink is IMatchConnectionControlBinding binding)
+                binding.Bind(authority);
             lastClockAdvanceMs = hostMonotonicNowMs;
             var hostState = authority.ProjectForHostAuthority();
             sessionId = hostState.SessionId;
@@ -426,6 +442,15 @@ namespace ArknoNights.Lobby
         {
             AssertActorThread();
             return authority.ProjectForHostAuthority();
+        }
+
+        public IMatchBotHost BotHost
+        {
+            get
+            {
+                AssertActorThread();
+                return authority;
+            }
         }
 
         public bool BindFrozenConnection(
@@ -634,7 +659,16 @@ namespace ArknoNights.Lobby
                 RoundNumber = seal.RoundNumber,
                 BattleSetId = seal.BattleSetId,
                 CanonicalInputHash = seal.CanonicalInputHash,
-                SealedPayload = seal.SealedPayload
+                SealedPayload = seal.SealedPayload,
+                BattleInputs = seal.BattleInputs == null
+                    ? null
+                    : seal.BattleInputs.Select(item =>
+                        new MatchBattleInputHashWire
+                        {
+                            BattleId = item.BattleId,
+                            InputSha256 = item.InputSha256,
+                            SealedInputHash = item.SealedInputHash
+                        }).ToArray()
             };
             var sequence = checked(++hostAcceptSequence);
             foreach (var participant in ActiveHumans())
@@ -717,6 +751,82 @@ namespace ArknoNights.Lobby
                     : stableReason);
             PublishSnapshots(sequence);
             PublishEndIfNeeded();
+            return dispatches.ToArray();
+        }
+
+        public IReadOnlyList<MatchSessionDispatch> CompleteBattleRound(
+            IReadOnlyList<MatchBattleResolution> resolutions,
+            long hostMonotonicNowMs,
+            out string diagnosticCode)
+        {
+            AssertActorThread();
+            dispatches.Clear();
+            var snapshot = authority.ProjectForHostAuthority();
+            var plan = snapshot.Flow.SealedRoundPlan;
+            if (Lifecycle != MatchSessionLifecycle.Match
+                || snapshot.Phase != MatchPhase.Battle
+                || plan == null
+                || resolutions == null
+                || resolutions.Count != plan.Pairings.Count
+                || resolutions.Any(item => item == null)
+                || resolutions.Any(item =>
+                    string.IsNullOrWhiteSpace(item.BattleId)
+                    || item.HomeLifeDamage < 0
+                    || item.AwayLifeDamage < 0
+                    || item.EndTick < 0
+                    || !Enum.IsDefined(
+                        typeof(MatchBattleOutcome),
+                        item.Outcome)
+                    || !Enum.IsDefined(
+                        typeof(MatchBattleTerminalReason),
+                        item.TerminalReason)
+                    || item.Outcome != MatchBattleResolution.DeriveOutcome(
+                        item.HomeLifeDamage,
+                        item.AwayLifeDamage))
+                || resolutions.GroupBy(item => item.BattleId, StringComparer.Ordinal)
+                    .Any(group => group.Count() != 1)
+                || plan.Pairings.Any(pairing =>
+                    !resolutions.Any(item =>
+                        string.Equals(item.BattleId, pairing.BattleId, StringComparison.Ordinal)
+                        && string.Equals(
+                            item.SealedInputHash,
+                            pairing.SealedInputHash,
+                            StringComparison.Ordinal))))
+            {
+                diagnosticCode = "match.session.battleCompletion.invalid";
+                return Array.Empty<MatchSessionDispatch>();
+            }
+
+            foreach (var resolution in resolutions.OrderBy(item => item.BattleId, StringComparer.Ordinal))
+            {
+                var submitted = authority.TrySubmitBattleResolution(resolution);
+                if (!submitted.Accepted)
+                {
+                    diagnosticCode = submitted.DiagnosticCode;
+                    return Array.Empty<MatchSessionDispatch>();
+                }
+            }
+            var playback = authority.TryMarkBattlePlaybackCompleted();
+            if (!playback.Accepted)
+            {
+                diagnosticCode = playback.DiagnosticCode;
+                return Array.Empty<MatchSessionDispatch>();
+            }
+            var settlement = authority.TryCommitRoundSettlement(hostMonotonicNowMs);
+            if (!settlement.Accepted)
+            {
+                diagnosticCode = settlement.DiagnosticCode;
+                return Array.Empty<MatchSessionDispatch>();
+            }
+
+            var sequence = checked(++hostAcceptSequence);
+            currentBattleSeal = null;
+            currentPlaybackStart = null;
+            currentPlaybackClock = null;
+            PublishSnapshots(sequence);
+            PublishClock(sequence);
+            PublishEndIfNeeded();
+            diagnosticCode = string.Empty;
             return dispatches.ToArray();
         }
 

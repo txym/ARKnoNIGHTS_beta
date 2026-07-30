@@ -82,6 +82,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - Match M1–M4 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、商店经济、自动合成、Buff 重映射、部署 Cost、严格备战席栈、Overflow、准备时钟、阵型命令、封印安全规则、2/3/4 人配对、结果校验、影子映射、结算收入/连续、淘汰/排名、终局和权限裁剪；只需聚焦 M4 时可使用 `ArknoNights.Match.Tests.MatchFlowEditModeTests`；
 - Match M5 AI：`ArknoNights.MatchAI.Tests`，覆盖观察权限、确定性决策表、ActionId 幂等、购买后 FinalSurvivor 单次部署、0–29000ms 固定 Tick、时间跳跃、立即封存、掉线/退出接管与恢复控制。
 - LAN Match Session：`MatchSessionProtocolEditModeTests`、`MatchSessionActorEditModeTests`、`LanSocketIntegrationEditModeTests`，覆盖 22 种 wire kind、长度/UTF-8/方向/范围、固定席位、命令顺序、权限快照、token、断线/重连、Battle transport、heartbeat 和端口释放；
+- LAN Match 回合整合：`LanMatchRoundIntegrationEditModeTests`，覆盖 1 Human + 3 NativeBot 的准备调度、到时封存、全部 BattleResolution 原子提交、Round 2 结算状态与 Bot 下一轮调度；
 
 规则或公共基础设施变化后再运行完整 EditMode。
 
@@ -102,6 +103,7 @@ PlayMode 重点覆盖：
 - HUD/详情/状态条场景集成；
 - Lobby Controller、View、Capture Suite 与平台适配。
 - `LanLobbyControllerPlayModeTests` 还覆盖真实运行时 Unit/Ability 目录兼容 hash、隔离 PlayerPrefs credential 的原子记录/损坏删除、开局后本地 credential 保存、权威终局回主页，以及本地 Demo 门控在 Session 接管后保持冻结。
+- `LanMatchBattleAdapterPlayModeTests` 覆盖真实目录下的 Official/Shadow 观察映射、精英 `1/2/3/5` 实体展开、重复输入 hash 稳定、房主时钟离群样本/单调性，以及真实 loopback TCP 上 host+guest 双运行时进入同一 Battle 播放。
 
 场景、Prefab、资源引用、自动 Bootstrap 或 Unity 生命周期发生变化时，不能只跑 EditMode。
 
@@ -164,9 +166,9 @@ $env:ARKNIGHTS_BUILD_OUTPUT = 'G:\ARKnoNIGHTS_beta\Temp\Build\ARKnoNIGHTS.exe'
 - 客户端只接受更高 `StateRevision` 的完整替换；同 revision、旧 revision 和乱序到达不得触发重复通知或局部 merge；
 - reconnect token 必须是 32-byte CSPRNG 的 43 字符 base64url；房主只保留 verifier。EOF、timeout、端点不可达和 CompatibilityMismatch 保留 credential；ExplicitQuit、MatchEnded、SessionEnded、InvalidToken 等权威终止清除；
 - socket 回环必须覆盖原连接提升、命令/快照、强制断线保留四席位、较高 generation 重连、当前 revision 恢复包、MatchEnded 清理、heartbeat 跨过漏回阈值仍连接，以及最终端口释放；
-- Battle 测试在 M6 只验证 Session/Round/BattleSet/BattleId/input hash 路由、旧轮丢弃和重连时 `snapshot → clock → seal → playback baseline/tick` 顺序；不能据此声称 M7 chunk、checkpoint 或 hash 算法已经实现；
-- M6 已有 EditMode、Socket 和 Controller PlayMode 接入，但仍不能把“收到 Lobby Start”或仅通过本地 Demo 记为完整跨设备联网对局通过；
-- 后续里程碑仍需接入 M5 AI 实现、M7 本地 Battle producer/回放协调和 M8 正式 HUD，并增加至少 2 Player 进程级 LAN 冒烟与跨端摘要一致性验证。
+- M6 自身的 Battle 测试只验证 Session/Round/BattleSet/BattleId/input hash 路由、旧轮丢弃和重连时 `snapshot → clock → seal → playback baseline/tick` 顺序；M7 chunk/checkpoint/hash 由 Battle 程序集测试，M8 再验证两者的正式适配与生命周期。
+- M8 必须同时覆盖：Bot 正式调度、M4→M7 输入/结果映射、每端独立 producer、首块屏障、统一房主 Tick、scoped HUD、直接回主界面和重连恢复；不能把“收到 Lobby Start”或仅通过本地 Demo 记为通过。
+- 自动化 loopback host+guest 证明真实 socket 与双运行时闭环；独立 Player 进程、跨物理设备、分辨率和人工视觉仍须分别记录，未执行时不得记为通过。
 
 ## 6. 证据记录
 

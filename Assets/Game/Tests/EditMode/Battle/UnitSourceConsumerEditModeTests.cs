@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text;
 using ArknoNights.Battle.Infrastructure;
 using NUnit.Framework;
 using UnityEngine;
@@ -1444,10 +1445,13 @@ namespace ArknoNights.Battle.Tests
             var path = Path.Combine(
                 Application.dataPath,
                 "Resources/BattleData/unit-catalog-v1.json");
+            var normalized = File.ReadAllText(path)
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n");
+            var bytes = Encoding.UTF8.GetBytes(normalized);
             using (var sha256 = SHA256.Create())
-            using (var stream = File.OpenRead(path))
             {
-                return BitConverter.ToString(sha256.ComputeHash(stream))
+                return BitConverter.ToString(sha256.ComputeHash(bytes))
                     .Replace("-", string.Empty);
             }
         }

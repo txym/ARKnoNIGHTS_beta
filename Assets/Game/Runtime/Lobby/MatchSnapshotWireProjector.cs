@@ -80,7 +80,30 @@ namespace ArknoNights.Lobby
                     FormationY = unit.Formation.HasValue ? unit.Formation.Value.Y : 0,
                     AcquisitionOrdinal = 0,
                     Buffs = unit.Buffs.Select(ProjectBuff).ToArray()
-                }).ToArray()
+                }).ToArray(),
+                TargetedUnitBuffs = seat.TargetedUnitBuffs.Select(buff =>
+                    new MatchTargetedBuffWire
+                    {
+                        BuffInstanceId = buff.BuffInstanceId,
+                        BuffTypeId = buff.BuffTypeId,
+                        TargetUnitId = buff.TargetUnitId,
+                        CanonicalPayload = buff.CanonicalPayload,
+                        DiscardPolicy = buff.DiscardPolicy.ToString()
+                    }).ToArray(),
+                GlobalBuffs = seat.GlobalBuffs.Select(buff =>
+                    new MatchGlobalBuffWire
+                    {
+                        BuffInstanceId = buff.BuffInstanceId,
+                        BuffTypeId = buff.BuffTypeId,
+                        CanonicalPayload = buff.CanonicalPayload
+                    }).ToArray(),
+                SourceEffects = seat.SourceEffects.Select(effect =>
+                    new MatchSourceEffectWire
+                    {
+                        EffectInstanceId = effect.EffectInstanceId,
+                        EffectTypeId = effect.EffectTypeId,
+                        CanonicalPayload = effect.CanonicalPayload
+                    }).ToArray()
             };
         }
 

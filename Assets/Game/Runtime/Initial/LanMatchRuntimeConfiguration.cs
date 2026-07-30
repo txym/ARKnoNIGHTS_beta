@@ -8,11 +8,12 @@ using System.Text;
 using ArknoNights.Battle.Infrastructure;
 using ArknoNights.Lobby;
 using ArknoNights.Match;
+using ArknoNights.MatchAI;
 using UnityEngine;
 
 internal static class LanMatchRuntimeConfiguration
 {
-    internal const string ProtocolVersion = "lan-match-v1";
+    internal const string ProtocolVersion = "lan-match-v2";
     internal const string MatchRulesVersion = "match-rules-v1";
     internal const string BattleCoreVersion = "battle-core-v1";
     private const string UnitCatalogResource = "BattleData/unit-catalog-v1";
@@ -22,7 +23,19 @@ internal static class LanMatchRuntimeConfiguration
         out LanMatchSessionConfiguration configuration,
         out string diagnosticCode)
     {
+        return TryCreateWithRuntimeAssets(
+            out configuration,
+            out _,
+            out diagnosticCode);
+    }
+
+    internal static bool TryCreateWithRuntimeAssets(
+        out LanMatchSessionConfiguration configuration,
+        out LanMatchRuntimeAssets runtimeAssets,
+        out string diagnosticCode)
+    {
         configuration = null;
+        runtimeAssets = null;
         var units = UnitCatalogLoader.LoadFromResources(UnitCatalogResource);
         if (!units.Success)
         {
@@ -70,12 +83,24 @@ internal static class LanMatchRuntimeConfiguration
                     entry.LegacyUnitTypeId)));
         if (!shopCatalog.TryValidate(out _, out diagnosticCode))
             return false;
+        var botController = new BotController();
+        var connectionControl = new LanMatchBotConnectionControl(
+            botController);
         configuration = new LanMatchSessionConfiguration(
             manifest,
             shopCatalog,
             LobbyProfile.MaximumAvatarIndex
                 - LobbyProfile.MinimumAvatarIndex
-                + 1);
+                + 1,
+            connectionControl,
+            false,
+            botController);
+        runtimeAssets = new LanMatchRuntimeAssets(
+            units.Catalog,
+            abilities.Catalog,
+            shopCatalog,
+            botController,
+            connectionControl);
         diagnosticCode = string.Empty;
         return true;
     }
@@ -279,6 +304,83 @@ internal static class LanMatchRuntimeConfiguration
                 builder.Append(hash[index].ToString("x2"));
             return builder.ToString();
         }
+    }
+}
+
+internal sealed class LanMatchRuntimeAssets
+{
+    internal LanMatchRuntimeAssets(
+        UnitCatalog units,
+        AbilityCatalog abilities,
+        MatchShopCatalog shop,
+        BotController bots,
+        LanMatchBotConnectionControl connectionControl)
+    {
+        Units = units ?? throw new ArgumentNullException(nameof(units));
+        Abilities = abilities ?? throw new ArgumentNullException(nameof(abilities));
+        Shop = shop ?? throw new ArgumentNullException(nameof(shop));
+        Bots = bots ?? throw new ArgumentNullException(nameof(bots));
+        ConnectionControl = connectionControl
+            ?? throw new ArgumentNullException(nameof(connectionControl));
+    }
+
+    internal UnitCatalog Units { get; }
+    internal AbilityCatalog Abilities { get; }
+    internal MatchShopCatalog Shop { get; }
+    internal BotController Bots { get; }
+    internal LanMatchBotConnectionControl ConnectionControl { get; }
+}
+
+internal sealed class LanMatchBotConnectionControl :
+    IMatchConnectionControlSink,
+    IMatchConnectionControlBinding
+{
+    private readonly BotController bots;
+    private IMatchBotHost host;
+
+    internal LanMatchBotConnectionControl(BotController bots)
+    {
+        this.bots = bots ?? throw new ArgumentNullException(nameof(bots));
+    }
+
+    internal string LastDiagnosticCode { get; private set; } = string.Empty;
+
+    public void Bind(IMatchBotHost value)
+    {
+        host = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public void ConnectionLost(
+        string playerId,
+        MatchPhase phase,
+        int roundNumber)
+    {
+        if (host == null) return;
+        LastDiagnosticCode = bots.NotifyDisconnected(
+            host,
+            playerId).DiagnosticCode;
+    }
+
+    public void RestoreHumanControl(
+        string playerId,
+        MatchPhase phase,
+        int roundNumber)
+    {
+        if (host == null) return;
+        LastDiagnosticCode = bots.RestoreHumanControl(
+            host,
+            playerId).DiagnosticCode;
+    }
+
+    public void ExplicitQuit(
+        string playerId,
+        MatchPhase phase,
+        int roundNumber)
+    {
+        if (host == null) return;
+        LastDiagnosticCode = bots.NotifyVoluntaryQuit(
+            host,
+            playerId).DiagnosticCode;
     }
 }
 

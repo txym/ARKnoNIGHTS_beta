@@ -67,6 +67,22 @@ namespace ArknoNights.Match
                 units.Where(unit => unit.Zone == MatchUnitZone.Deployed).ToArray());
             StagingUnits = new ReadOnlyCollection<PublicMatchUnitSnapshot>(
                 units.Where(unit => unit.Zone == MatchUnitZone.Staging).ToArray());
+            var publicUnitIds = new HashSet<string>(
+                units.Select(unit => unit.UnitId),
+                StringComparer.Ordinal);
+            TargetedUnitBuffs = new ReadOnlyCollection<PlayerTargetedUnitBuffState>(
+                state.TargetedUnitBuffs
+                    .Where(item => publicUnitIds.Contains(item.TargetUnitId))
+                    .OrderBy(item => item.BuffInstanceId, StringComparer.Ordinal)
+                    .ToArray());
+            GlobalBuffs = new ReadOnlyCollection<PlayerGlobalBuffState>(
+                state.GlobalBuffs
+                    .OrderBy(item => item.BuffInstanceId, StringComparer.Ordinal)
+                    .ToArray());
+            SourceEffects = new ReadOnlyCollection<PlayerSourceEffectState>(
+                state.SourceEffects
+                    .OrderBy(item => item.EffectInstanceId, StringComparer.Ordinal)
+                    .ToArray());
 
             var writer = new CanonicalSummaryWriter(nameof(PublicMatchSeatSnapshot));
             writer.Integer("seatIndex", SeatIndex);
@@ -82,6 +98,12 @@ namespace ArknoNights.Match
             {
                 writer.Summary("unit", unit.CanonicalSummary);
             }
+            foreach (var buff in TargetedUnitBuffs)
+                writer.Summary("targetedUnitBuff", buff.CanonicalSummary);
+            foreach (var buff in GlobalBuffs)
+                writer.Summary("globalBuff", buff.CanonicalSummary);
+            foreach (var effect in SourceEffects)
+                writer.Summary("sourceEffect", effect.CanonicalSummary);
             CanonicalSummary = writer.ToString();
         }
 
@@ -97,6 +119,9 @@ namespace ArknoNights.Match
         public IReadOnlyList<PublicMatchUnitSnapshot> Units { get; }
         public IReadOnlyList<PublicMatchUnitSnapshot> DeployedUnits { get; }
         public IReadOnlyList<PublicMatchUnitSnapshot> StagingUnits { get; }
+        public IReadOnlyList<PlayerTargetedUnitBuffState> TargetedUnitBuffs { get; }
+        public IReadOnlyList<PlayerGlobalBuffState> GlobalBuffs { get; }
+        public IReadOnlyList<PlayerSourceEffectState> SourceEffects { get; }
         public string CanonicalSummary { get; }
     }
 

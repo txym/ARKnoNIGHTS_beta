@@ -94,11 +94,18 @@ namespace ArknoNights.Match.Tests
         }
 
         [Test]
-        public void ScopedProjectionsExposeOnlyAuthorizedBuffOverflowAndTombstoneData()
+        public void ScopedProjectionsExposePublicCombatBuffsWithoutPrivateOverflowData()
         {
             var catalog = MatchTestData.Catalog(MatchTestData.Entry("1001", 1));
             var authority = MatchFusionTestData.CreateAuthority(catalog);
             authority.TryEnterPreparation(1);
+            var deployed = MatchFusionTestData.Unit(
+                "public-deployed",
+                "1001",
+                MatchUnitZone.Deployed,
+                0,
+                1,
+                new MatchFormationPosition(1, 1));
             var overflow = MatchFusionTestData.Unit(
                 "external-overflow",
                 "1001",
@@ -107,9 +114,15 @@ namespace ArknoNights.Match.Tests
                 0);
             authority = MatchFusionTestData.WithPlayerOneState(
                 authority,
-                new[] { overflow },
+                new[] { deployed, overflow },
                 targetedBuffs: new[]
                 {
+                    new PlayerTargetedUnitBuffState(
+                        "public-buff",
+                        "public-type",
+                        deployed.UnitId,
+                        "public-payload",
+                        MatchTargetedBuffDiscardPolicy.RemoveWithTarget),
                     new PlayerTargetedUnitBuffState(
                         "private-buff",
                         "private-type",
@@ -123,15 +136,28 @@ namespace ArknoNights.Match.Tests
             var other = authority.ProjectForPlayer("player-2").Owner;
             var host = authority.ProjectForHostAuthority();
 
-            Assert.That(publicSnapshot.Seats.Single(seat => seat.PlayerId == "player-1").Units,
-                Is.Empty);
+            var publicSeat = publicSnapshot.Seats.Single(
+                seat => seat.PlayerId == "player-1");
+            Assert.That(publicSeat.Units.Single().UnitId, Is.EqualTo(deployed.UnitId));
+            Assert.That(
+                publicSeat.TargetedUnitBuffs.Single().CanonicalPayload,
+                Is.EqualTo("public-payload"));
+            Assert.That(
+                publicSeat.TargetedUnitBuffs.Any(buff =>
+                    buff.TargetUnitId == overflow.UnitId),
+                Is.False);
             Assert.That(owner.OverflowUnits.Single().UnitId, Is.EqualTo(overflow.UnitId));
-            Assert.That(owner.TargetedUnitBuffs.Single().CanonicalPayload, Is.EqualTo("secret-payload"));
+            Assert.That(owner.TargetedUnitBuffs, Has.Count.EqualTo(2));
+            Assert.That(
+                owner.TargetedUnitBuffs.Single(buff =>
+                    buff.TargetUnitId == overflow.UnitId).CanonicalPayload,
+                Is.EqualTo("secret-payload"));
             Assert.That(other.TargetedUnitBuffs, Is.Empty);
-            Assert.That(typeof(PublicMatchSeatSnapshot).GetProperty("TargetedUnitBuffs"), Is.Null);
             Assert.That(typeof(PublicMatchSnapshot).GetProperty("RetiredUnits"), Is.Null);
-            Assert.That(host.Seats.Single(seat => seat.PlayerId == "player-1")
-                .TargetedUnitBuffs.Single().BuffInstanceId, Is.EqualTo("private-buff"));
+            Assert.That(
+                host.Seats.Single(seat => seat.PlayerId == "player-1")
+                    .TargetedUnitBuffs.Select(buff => buff.BuffInstanceId),
+                Is.EquivalentTo(new[] { "public-buff", "private-buff" }));
         }
     }
 }

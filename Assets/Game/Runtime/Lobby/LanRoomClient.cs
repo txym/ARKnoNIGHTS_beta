@@ -59,6 +59,10 @@ namespace ArknoNights.Lobby
         private LobbyRoomSnapshot snapshot;
         private MatchInitializedPayload matchInitialization;
         private MatchCommandAckPayload lastCommandAck;
+        private MatchClockSyncPayload currentClock;
+        private MatchBattleSealPayload currentBattleSeal;
+        private MatchPlaybackStartPayload currentPlaybackStart;
+        private MatchPlaybackClockPayload currentPlaybackClock;
         private long latencyMilliseconds = -1;
         private long messageId;
         private volatile bool matchMode;
@@ -108,6 +112,10 @@ namespace ArknoNights.Lobby
         public MatchInitializedPayload MatchInitialization => matchInitialization;
         public ScopedSnapshotPayload MatchSnapshot => matchSnapshotState.Current;
         public MatchCommandAckPayload LastCommandAck => lastCommandAck;
+        public MatchClockSyncPayload CurrentClock => currentClock;
+        public MatchBattleSealPayload CurrentBattleSeal => currentBattleSeal;
+        public MatchPlaybackStartPayload CurrentPlaybackStart => currentPlaybackStart;
+        public MatchPlaybackClockPayload CurrentPlaybackClock => currentPlaybackClock;
         public long ConnectionGeneration { get; private set; }
         public string SessionId { get; private set; }
 
@@ -168,13 +176,25 @@ namespace ArknoNights.Lobby
                     }
                 }
                 if (received.Clock != null)
+                {
+                    currentClock = received.Clock;
                     ClockSynchronized?.Invoke(received.Clock);
+                }
                 if (received.BattleSeal != null)
+                {
+                    currentBattleSeal = received.BattleSeal;
                     BattleSealReceived?.Invoke(received.BattleSeal);
+                }
                 if (received.PlaybackStart != null)
+                {
+                    currentPlaybackStart = received.PlaybackStart;
                     PlaybackStarted?.Invoke(received.PlaybackStart);
+                }
                 if (received.PlaybackClock != null)
+                {
+                    currentPlaybackClock = received.PlaybackClock;
                     PlaybackClockReceived?.Invoke(received.PlaybackClock);
+                }
                 if (received.Disconnected && !ended)
                     Reconnecting?.Invoke();
             }

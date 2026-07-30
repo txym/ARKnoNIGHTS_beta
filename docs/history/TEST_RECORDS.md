@@ -1208,3 +1208,85 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
 - 最终全量 EditMode 不传 `TestFilter`。第一次输出目录 `Temp/UnityTests/M4-Final-Full-EditMode-20260730-2` 在 NUnit XML 写入完成前触发 wrapper 读取竞态，被标记为 `unverified / forced-stop-before-valid-results`，不计为通过或失败；确认无残留 Unity 进程后使用新目录重跑。最终有效结果为 `516 total / 511 passed / 5 failed / 0 skipped / 0 inconclusive / 0 not-run / 0 not-runnable`，Unity 在结果写出后正常退出，证据位于 `Temp/UnityTests/M4-Final-Full-EditMode-20260730-4`。五项失败与 M3 的 `490/485` 基线逐项相同：真实 Battle 动态果冻数量期望 `27`、实际 `24`；`5503` 精英 0 旧技能描述期望为空、实际源为“每隔一段时间，分裂出三个<果冻丁>。”；三项 `UnitSourceConsumerEditModeTests` 因 Windows CRLF 得到 `BE09...` 而不等于 LF 冻结哈希 `359C...`。失败列表没有 `ArknoNights.Match.Tests`，日志也没有编译错误或未处理异常；因此全量不能记为通过，但没有 M4 新增失败。
 - Unity 导入噪声仍局限于 `Assets/Resources/Characters` 的序列化空值/换行和 code-coverage 设置；每次均在确认测试前工作树状态后按精确路径恢复。最终 diff 不包含这些资源或 ProjectSettings。
 - 本轮没有运行 PlayMode、Windows/Android 构建、Socket、场景、UI、设备或真实 LAN 验证。M4 保持 `ARKnoNIGHTS.Match` 为 `noEngineReferences=true`、零程序集引用的纯 C# 领域扩展；M5 AI、M6 LAN Session、M7 Battle Streaming adapter 实现、M8 场景/UI 集成均未实现。
+
+## 56. LAN Match M8 最终集成（2026-07-30）
+
+### 分支、基线与里程碑提交
+
+- 最终集成分支为 `codex/lan-match-integration`，独立 worktree 为
+  `G:\ARKnoNIGHTS_beta\.worktrees\lan-match-integration`，起点为 `txym` 的
+  `19a4f62d124ef79823a169bc604998352e123588`。
+- M1 已包含在起点中：实现提交 `861f198`，收口文档提交 `c615a75`。
+- 按顺序集成的来源提交为 M2 `1d62ee7`、M3 `a1e3f12`、M4 `5238a15`、
+  M5 `d350049`、M6 `d9c4e3a`、M7 `c900375`；对应当前集成分支提交为
+  `5e46e86`、`4b8c2a4`、`63ffe1f`、`8311a2d`、`ea8712a`、`6d67624`。
+- 修改前 M1 Match EditMode 为 `21/21`，最小 PlayMode 基线为 `1/1`；
+  证据分别位于 `Temp/UnityTests/M8-Baseline-M1` 与
+  `Temp/UnityTests/M8-Baseline-PlayMode`。
+- 顺序里程碑回归分别为：M2 Match `60/60`；M3 Match `87/87`；M4 Match
+  `113/113`；M5 AI `32/32` 且 Match `113/113`；M6 Lobby `49/49`、
+  Match+AI `145/145`、Controller PlayMode `6/6`；M7 EditMode `87/87`、
+  PlayMode `11/11`。每一步均在同一路径串行执行，没有同时打开两个 Unity
+  Editor/batchmode 进程。
+
+### M8 运行时边界
+
+- `LanMatchRuntimeController` 是房主和客机共用的场景组合根。只有房主持有
+  `MatchSessionActor/MatchAuthority`；客户端只提交命令并消费 Public/Owner
+  投影，不保留可修改权威状态。
+- `LanMatchBattleAdapter` 使用封存的 M4 权威快照、真实 Unit/Ability 目录和
+  每场配对生成 M7 输入；所有机器本地运行确定性战斗流。协议升级为
+  `lan-match-v2`，封印帧携带逐战斗输入 SHA-256，版本不兼容在入座前拒绝。
+- 房主等待已连接真人的首块结果（掉线成员从屏障移除，最长等待 10 秒，但
+  绝不跳过房主本地结果），再按房主单调时钟发布统一回放起点；客户端用
+  中位数校时、20 TPS 和一块前瞻缓冲推进，不允许本地时钟倒退。
+- 最终秒哈希只用于同步诊断；输入、流或最终结果不一致时，房主按
+  `NoContest` 中止，客机停止本地回放并显示同步错误，均不得据此修改权威
+  结果。M7 结果由房主转换为 M4 结算输入并进入下一准备回合。
+- LAN HUD 只读取权限化快照：对局中商店仍可用，购买和升级需要二次确认；
+  Ready 只锁定阵型；观战者看不到 Owner 经济；重连期间为只读。公开战斗
+  Buff 仅投影已部署/候选区单位，Overflow 定向 Buff、商店、金币和候选区
+  私有事实不进入 Public 投影。
+- `LanLobbyController` 在每次创建/加入时重建会话级运行资源，成功握手后
+  启动运行时；重连成功重新绑定，重连失败先释放旧运行时再回首页。传输仍为
+  M6 的真实 TCP；没有引入新 Package、第三方依赖、后台服务或外部上传。
+
+### 最终自动化证据
+
+- M8 权威/协议 EditMode：`140/140`，
+  `Logs/M8-Authority-Protocol-Final/EditModeResults.xml`。
+- M8 真实资源适配、校时和真实 TCP 回环 PlayMode：`3/3`，
+  `Logs/M8-Hud-Loopback-Final/PlayModeResults.xml`。回环用例在同一测试
+  中创建真实 host/guest TCP 连接、两套独立运行时并进入同步回放，同时证明
+  Battle 阶段 Ready 隐藏、商店可用且首次购买点击不会修改权威 revision，
+  第二次确认才提交命令。
+- 受行尾影响的资源哈希测试改为先规范化 CRLF/LF 再计算既有 LF 冻结哈希；
+  定向 fixture 为 `17/17`，`Logs/M8-LineEnding-Fix/EditModeResults.xml`。
+  资源内容和冻结期望没有改变。
+- 最终全量 EditMode：
+  `605 total / 603 passed / 2 failed / 0 skipped / 0 inconclusive / 0 not-run`，
+  证据为 `Logs/M8-Final2-EditMode/EditModeResults.xml`。两项失败均可在
+  `19a4f62` 原始基线上单独复现：真实 Battle 动态果冻生命期望 `27`、实际
+  `24`；`5503` Elite 0 描述旧测试期望为空、真实 authored 数据为非空。
+  因此全量 EditMode 不记为通过，但不存在 M8/M1–M7 新增失败。
+- 最终全量 PlayMode：
+  `78 total / 77 passed / 1 failed / 0 skipped / 0 inconclusive / 0 not-run`，
+  证据为 `Logs/M8-Final3-PlayMode/PlayModeResults.xml`。唯一失败为上述同一
+  BattleDemo `27/24` 基线失败；全量 PlayMode 不记为通过。
+- Windows x64 StrictMode 构建成功：
+  `Logs/M8-Final3-Build/Build.log` 记录 `result=Succeeded`、
+  `platform=StandaloneWindows64`、`errors=0`、`warnings=1`、
+  `totalSize=337198654`；产物为
+  `Builds/M8-LanMatch-Final/ARKnoNIGHTS.exe`。唯一警告是既有
+  `TagRegistry.freezeAppend` 未使用字段。
+
+### 尚未验证与人工检查
+
+- 未执行两台独立 Windows Player 或 Windows+Android 真机在物理 LAN 上的
+  发现/直连、四真人完整回合、网络中断/恢复、房主退出和客机退出人工流程；
+  单进程真实 TCP 回环不能代替该设备级证据。
+- 未完成不同分辨率下 LAN Match HUD 的人工视觉验收，也未用真实网络抖动
+  观察长战斗的缓冲提示与最终秒诊断。
+- 上述设备/视觉项必须明确保持“未验证”；发布前建议以两个独立 Player
+  完成一轮准备、战斗、结算、下一准备回合，并逐项检查隐私投影、重连只读和
+  退出清理。

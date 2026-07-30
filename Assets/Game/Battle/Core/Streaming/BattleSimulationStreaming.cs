@@ -68,13 +68,14 @@ namespace ArknoNights.Battle.Core
             return builder.ToString();
         }
 
-        internal static bool IsCanonicalHash(string value)
+        public static bool IsCanonicalHash(string value)
         {
             return value != null
                 && value.Length == 64
                 && value.All(item =>
                     item >= '0' && item <= '9'
-                    || item >= 'A' && item <= 'F');
+                    || item >= 'A' && item <= 'F'
+                    || item >= 'a' && item <= 'f');
         }
     }
 
@@ -437,7 +438,7 @@ namespace ArknoNights.Battle.Core
                 throw new ArgumentNullException(nameof(input));
             if (!BattleInputSha256.IsCanonicalHash(sealedInputHash))
                 throw new ArgumentException(
-                    "The sealed input hash must be an uppercase 64-character SHA-256 value.",
+                    "The sealed input hash must be a 64-character hexadecimal SHA-256 value.",
                     nameof(sealedInputHash));
             Input = input;
             SealedInputHash = sealedInputHash;

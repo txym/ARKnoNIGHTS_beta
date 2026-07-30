@@ -306,6 +306,15 @@ namespace ArknoNights.Lobby
         [DataMember(Name = "battleSetId")] public string BattleSetId;
         [DataMember(Name = "canonicalInputHash")] public string CanonicalInputHash;
         [DataMember(Name = "sealedPayload")] public string SealedPayload;
+        [DataMember(Name = "battleInputs")] public MatchBattleInputHashWire[] BattleInputs;
+    }
+
+    [DataContract]
+    public sealed class MatchBattleInputHashWire
+    {
+        [DataMember(Name = "battleId")] public string BattleId;
+        [DataMember(Name = "inputSha256")] public string InputSha256;
+        [DataMember(Name = "sealedInputHash")] public string SealedInputHash;
     }
 
     [DataContract]
@@ -343,6 +352,7 @@ namespace ArknoNights.Lobby
         [DataMember(Name = "roundNumber")] public int RoundNumber;
         [DataMember(Name = "battleId")] public string BattleId;
         [DataMember(Name = "canonicalInputHash")] public string CanonicalInputHash;
+        [DataMember(Name = "battleInputSha256")] public string BattleInputSha256;
         [DataMember(Name = "finalSecondSha256")] public string FinalSecondSha256;
     }
 
@@ -460,6 +470,9 @@ namespace ArknoNights.Lobby
         [DataMember(Name = "placement")] public int Placement;
         [DataMember(Name = "hasPlacement")] public bool HasPlacement;
         [DataMember(Name = "units")] public MatchUnitWire[] Units;
+        [DataMember(Name = "targetedUnitBuffs")] public MatchTargetedBuffWire[] TargetedUnitBuffs;
+        [DataMember(Name = "globalBuffs")] public MatchGlobalBuffWire[] GlobalBuffs;
+        [DataMember(Name = "sourceEffects")] public MatchSourceEffectWire[] SourceEffects;
     }
 
     [DataContract]
@@ -838,7 +851,18 @@ namespace ArknoNights.Lobby
                         value.RoundNumber > 0
                         && ValidToken(value.BattleSetId, 128)
                         && IsSha256(value.CanonicalInputHash)
-                        && value.SealedPayload != null);
+                        && value.SealedPayload != null
+                        && (value.BattleInputs == null
+                            || value.BattleInputs.Length <= 2
+                            && value.BattleInputs.All(item =>
+                                item != null
+                                && ValidToken(item.BattleId, 128)
+                                && IsSha256(item.InputSha256)
+                                && (string.IsNullOrEmpty(item.SealedInputHash)
+                                    || IsSha256(item.SealedInputHash)))
+                            && value.BattleInputs
+                                .GroupBy(item => item.BattleId, StringComparer.Ordinal)
+                                .All(group => group.Count() == 1)));
                 case MatchWireKind.FirstChunkReady:
                     return DeserializeAnd(json, (MatchFirstChunkReadyPayload value) =>
                         value.RoundNumber > 0
@@ -864,6 +888,8 @@ namespace ArknoNights.Lobby
                         value.RoundNumber > 0
                         && ValidToken(value.BattleId, 128)
                         && IsSha256(value.CanonicalInputHash)
+                        && (string.IsNullOrEmpty(value.BattleInputSha256)
+                            || IsSha256(value.BattleInputSha256))
                         && IsSha256(value.FinalSecondSha256));
                 case MatchWireKind.ClientBattleFailure:
                     return DeserializeAnd(json, (MatchClientBattleFailurePayload value) =>
@@ -995,7 +1021,13 @@ namespace ArknoNights.Lobby
                     && (!seat.HasPlacement || seat.Placement >= 1)
                     && EnumToken<PublicConnectionState>(seat.ConnectionState)
                     && seat.Units != null
-                    && seat.Units.All(ValidateUnit))
+                    && seat.Units.All(ValidateUnit)
+                    && (seat.TargetedUnitBuffs == null
+                        || seat.TargetedUnitBuffs.All(ValidateTargetedBuff))
+                    && (seat.GlobalBuffs == null
+                        || seat.GlobalBuffs.All(ValidateGlobalBuff))
+                    && (seat.SourceEffects == null
+                        || seat.SourceEffects.All(ValidateSourceEffect)))
                 && (value.OwnerPrivateState == null
                     || ValidateOwner(value.OwnerPrivateState));
         }
@@ -1117,6 +1149,36 @@ namespace ArknoNights.Lobby
                     && ValidToken(effect.EffectTypeId, 128)
                     && ValidCanonicalPayload(
                         effect.CanonicalPayload));
+        }
+
+        private static bool ValidateTargetedBuff(
+            MatchTargetedBuffWire buff)
+        {
+            return buff != null
+                && ValidToken(buff.BuffInstanceId, 128)
+                && ValidToken(buff.BuffTypeId, 128)
+                && ValidToken(buff.TargetUnitId, 128)
+                && ValidCanonicalPayload(buff.CanonicalPayload)
+                && EnumToken<MatchTargetedBuffDiscardPolicy>(
+                    buff.DiscardPolicy);
+        }
+
+        private static bool ValidateGlobalBuff(
+            MatchGlobalBuffWire buff)
+        {
+            return buff != null
+                && ValidToken(buff.BuffInstanceId, 128)
+                && ValidToken(buff.BuffTypeId, 128)
+                && ValidCanonicalPayload(buff.CanonicalPayload);
+        }
+
+        private static bool ValidateSourceEffect(
+            MatchSourceEffectWire effect)
+        {
+            return effect != null
+                && ValidToken(effect.EffectInstanceId, 128)
+                && ValidToken(effect.EffectTypeId, 128)
+                && ValidCanonicalPayload(effect.CanonicalPayload);
         }
 
         private static bool ValidateShopOffer(

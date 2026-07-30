@@ -3,7 +3,11 @@
   "rootNamespace": "ArknoNights.Lobby.Tests",
   "references": [
     "ARKnoNIGHTS.Lobby",
-    "ARKnoNIGHTS.Match"
+    "ARKnoNIGHTS.Match",
+    "ARKnoNIGHTS.Battle.Core",
+    "ARKnoNIGHTS.Battle.Infrastructure",
+    "ARKnoNIGHTS.Battle.Demo",
+    "ARKnoNIGHTS.Battle.Presentation"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

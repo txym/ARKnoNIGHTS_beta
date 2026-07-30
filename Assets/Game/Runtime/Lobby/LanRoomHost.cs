@@ -88,6 +88,7 @@ namespace ArknoNights.Lobby
         public MatchSessionHostActor SessionActor => sessionActor;
         public MatchInitializedPayload HostInitialization { get; private set; }
         public string EndedSessionId { get; private set; }
+        public static long HostMonotonicNowMs => MonotonicClock.ElapsedMilliseconds;
 
         public event Action<MatchSessionDispatch> HostDispatchReceived;
 
@@ -298,6 +299,22 @@ namespace ArknoNights.Lobby
         {
             return ProcessActorDispatches(
                 sessionActor?.PublishPlaybackClock(clock));
+        }
+
+        public bool CompleteBattleRound(
+            IReadOnlyList<MatchBattleResolution> resolutions,
+            out string diagnosticCode)
+        {
+            if (sessionActor == null || Lifecycle != MatchSessionLifecycle.Match)
+            {
+                diagnosticCode = "match.session.notRunning";
+                return false;
+            }
+            return ProcessActorDispatches(
+                sessionActor.CompleteBattleRound(
+                    resolutions,
+                    MonotonicClock.ElapsedMilliseconds,
+                    out diagnosticCode));
         }
 
         public void AbortMatch(string stableReason = "match.host.explicitQuit")

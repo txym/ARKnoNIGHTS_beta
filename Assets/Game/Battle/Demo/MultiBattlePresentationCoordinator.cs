@@ -99,6 +99,22 @@ namespace ArknoNights.Battle.Demo
             }
         }
 
+        public BattleResolution GetBattleResolution()
+        {
+            if (!IsTerminal)
+                throw new InvalidOperationException(
+                    "The battle has not reached a terminal state.");
+            return Producer.GetBattleResolution();
+        }
+
+        public FinalSecondHashPayload GetFinalSecondHashPayload()
+        {
+            if (!IsTerminal)
+                throw new InvalidOperationException(
+                    "The battle has not reached a terminal state.");
+            return Producer.GetFinalSecondHashPayload();
+        }
+
         internal BattleSimulationProducer Producer { get; }
         internal bool ProducerHasFirstChunk =>
             Producer.HasFirstChunk;
@@ -252,6 +268,12 @@ namespace ArknoNights.Battle.Demo
                         item.Stream.AvailableThroughTick);
             }
         }
+
+        public int GlobalRoundEndTick => AllBattlesTerminal
+            ? MaximumEndTick()
+            : matches.Count == 0
+                ? 0
+                : matches.Max(item => item.Input.MaxTicks);
 
         public string StableSummary
         {
@@ -642,6 +664,60 @@ namespace ArknoNights.Battle.Demo
                 State = MultiBattlePresentationState.Completed;
                 CompletionTransitionCount++;
             }
+        }
+
+        public bool AdvanceToAuthoritativeTick(
+            int authoritativeTick,
+            int computationTickBudget)
+        {
+            if (authoritativeTick < 0 || computationTickBudget < 0)
+                return false;
+            if (State == MultiBattlePresentationState.Preparing
+                || State == MultiBattlePresentationState.Ready
+                || State == MultiBattlePresentationState.Playing
+                || State == MultiBattlePresentationState.Buffering)
+            {
+                if (!PumpComputation(computationTickBudget))
+                    return false;
+            }
+            if (State == MultiBattlePresentationState.Ready)
+            {
+                if (!Play())
+                    return false;
+            }
+            if (State != MultiBattlePresentationState.Playing
+                && State != MultiBattlePresentationState.Buffering)
+                return State == MultiBattlePresentationState.Completed;
+
+            var target = AllBattlesTerminal
+                ? Math.Min(authoritativeTick, MaximumEndTick())
+                : authoritativeTick;
+            var available = CommonAvailableThroughTick;
+            presentationTick = Math.Min(target, available);
+            if (!playback.RenderAt(presentationTick, out var diagnostics))
+            {
+                return Fail(
+                    "multi.playback.render.failed",
+                    string.Join(
+                        ";",
+                        diagnostics.Select(item => item.ToString()).ToArray()));
+            }
+            if (target > available && !AllBattlesTerminal)
+            {
+                playback.SetPlaybackSpeed(0f);
+                State = MultiBattlePresentationState.Buffering;
+                return true;
+            }
+            playback.SetPlaybackSpeed(speed);
+            State = MultiBattlePresentationState.Playing;
+            if (AllBattlesTerminal
+                && presentationTick >= MaximumEndTick()
+                && !playback.HasPendingTerminalPresentation)
+            {
+                State = MultiBattlePresentationState.Completed;
+                CompletionTransitionCount++;
+            }
+            return true;
         }
 
         public void Reset()

@@ -8,8 +8,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Main-thread bridge between the independent LAN lobby assembly and the existing local battle demo.
-/// The room session only synchronizes lobby state; it deliberately never accesses PlayerState.
+/// Main-thread composition root for LAN lobby, persistent Match session, scoped HUD,
+/// local Battle streaming, reconnect recovery and direct return to the home view.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LanLobbyController : MonoBehaviour
@@ -25,6 +25,8 @@ public sealed class LanLobbyController : MonoBehaviour
     private IMulticastLock multicastLock;
     private LobbyProfile profile;
     private LanMatchSessionConfiguration matchConfiguration;
+    private LanMatchRuntimeAssets runtimeAssets;
+    private LanMatchRuntimeController matchRuntime;
     private IReconnectCredentialStore reconnectCredentialStore;
     private CancellationTokenSource reconnectCancellation;
     private Task<LanRoomClient> reconnectTask;
@@ -32,6 +34,7 @@ public sealed class LanLobbyController : MonoBehaviour
     private bool initialized;
     private bool gameplayStarted;
     private bool gameplayTransitionPending;
+    private string pendingRuntimeExitStatus;
 
     private void Awake()
     {
@@ -47,8 +50,9 @@ public sealed class LanLobbyController : MonoBehaviour
         multicastLock = AndroidMulticastLockFactory.Create();
         reconnectCredentialStore = new PlayerPrefsReconnectCredentialStore();
         profile = LoadProfile();
-        LanMatchRuntimeConfiguration.TryCreate(
+        LanMatchRuntimeConfiguration.TryCreateWithRuntimeAssets(
             out matchConfiguration,
+            out runtimeAssets,
             out _);
         SubscribeView();
         SceneManager.sceneLoaded += OnSceneLoaded;
@@ -78,6 +82,14 @@ public sealed class LanLobbyController : MonoBehaviour
     private void Update()
     {
         if (!initialized) return;
+        if (pendingRuntimeExitStatus != null)
+        {
+            var status = pendingRuntimeExitStatus;
+            pendingRuntimeExitStatus = null;
+            reconnectCredentialStore.Clear();
+            EnterHome(status);
+            return;
+        }
         EnsurePreparationLoopIsGated();
         if (!gameplayStarted && discovery != null)
         {
@@ -90,8 +102,7 @@ public sealed class LanLobbyController : MonoBehaviour
             host.Tick();
             if (host.Lifecycle == MatchSessionLifecycle.Ended)
             {
-                reconnectCredentialStore.Clear();
-                EnterHome("Match ended.");
+                pendingRuntimeExitStatus = "Match ended.";
                 return;
             }
             var snapshot = host.Snapshot;
@@ -107,7 +118,7 @@ public sealed class LanLobbyController : MonoBehaviour
             client.Tick();
             if (client.HasEnded)
             {
-                EnterHome("Match ended.");
+                pendingRuntimeExitStatus = "Match ended.";
                 return;
             }
             var snapshot = client.Snapshot;
@@ -191,6 +202,11 @@ public sealed class LanLobbyController : MonoBehaviour
     private void CreateRoom()
     {
         if (host != null || client != null) return;
+        if (!RefreshRuntimeConfiguration(out var diagnosticCode))
+        {
+            view.SetStatus("Match catalogs are unavailable: " + diagnosticCode);
+            return;
+        }
         var version = ++operationVersion;
         StartCoroutine(CreateRoomRoutine(version));
     }
@@ -224,6 +240,11 @@ public sealed class LanLobbyController : MonoBehaviour
     private void JoinRoom(string roomCode)
     {
         if (host != null || client != null || discovery == null) return;
+        if (!RefreshRuntimeConfiguration(out var diagnosticCode))
+        {
+            view.SetStatus("Match catalogs are unavailable: " + diagnosticCode);
+            return;
+        }
         if (!discovery.TryGetEndpoint(roomCode, out var endpoint))
         {
             view.SetStatus("Room is no longer available.");
@@ -332,6 +353,54 @@ public sealed class LanLobbyController : MonoBehaviour
         StopDiscovery();
         EnsurePreparationLoopIsGated();
         if (view != null) view.gameObject.SetActive(false);
+        if ((host != null || client != null)
+            && !EnsureMatchRuntime(out var diagnosticCode))
+        {
+            gameplayStarted = false;
+            reconnectCredentialStore.Clear();
+            EnterHome("Match initialization failed: " + diagnosticCode);
+        }
+    }
+
+    private bool EnsureMatchRuntime(out string diagnosticCode)
+    {
+        if (matchRuntime != null)
+        {
+            diagnosticCode = string.Empty;
+            return true;
+        }
+        if (runtimeAssets == null)
+        {
+            diagnosticCode = "match.runtime.assets.missing";
+            return false;
+        }
+        matchRuntime = gameObject.AddComponent<LanMatchRuntimeController>();
+        matchRuntime.ExitRequested += HandleRuntimeExitRequested;
+        var initializedRuntime = host != null
+            ? matchRuntime.InitializeHost(
+                host,
+                profile,
+                runtimeAssets,
+                out diagnosticCode)
+            : matchRuntime.InitializeGuest(
+                client,
+                profile,
+                runtimeAssets,
+                out diagnosticCode);
+        if (initializedRuntime) return true;
+        matchRuntime.ExitRequested -= HandleRuntimeExitRequested;
+        matchRuntime.DisposeRuntime();
+        Destroy(matchRuntime);
+        matchRuntime = null;
+        return false;
+    }
+
+    private void HandleRuntimeExitRequested(string status)
+    {
+        if (pendingRuntimeExitStatus == null)
+            pendingRuntimeExitStatus = string.IsNullOrWhiteSpace(status)
+                ? "Match ended."
+                : status;
     }
 
     private void LeaveRoom()
@@ -350,8 +419,10 @@ public sealed class LanLobbyController : MonoBehaviour
 
     private void EnterHome(string status, bool notifyGuest = false)
     {
+        pendingRuntimeExitStatus = null;
         gameplayStarted = false;
         gameplayTransitionPending = false;
+        DisposeMatchRuntime();
         StopServices(notifyGuest);
         if (view == null) return;
         view.gameObject.SetActive(true);
@@ -462,6 +533,7 @@ public sealed class LanLobbyController : MonoBehaviour
             return;
         }
         StopDiscovery();
+        matchRuntime?.SetReconnecting(true);
         var oldClient = client;
         var retainedSnapshot = oldClient == null
             ? null
@@ -494,8 +566,22 @@ public sealed class LanLobbyController : MonoBehaviour
             gameplayTransitionPending = false;
             EnsurePreparationLoopIsGated();
             if (view != null) view.gameObject.SetActive(false);
+            if (matchRuntime != null)
+            {
+                if (!matchRuntime.RebindClient(client, out var rebindDiagnostic))
+                {
+                    reconnectCredentialStore.Clear();
+                    EnterHome("Match recovery failed: " + rebindDiagnostic);
+                }
+            }
+            else if (!EnsureMatchRuntime(out var runtimeDiagnostic))
+            {
+                reconnectCredentialStore.Clear();
+                EnterHome("Match recovery failed: " + runtimeDiagnostic);
+            }
             yield break;
         }
+        DisposeMatchRuntime();
         var incompatible = task.Exception != null
             && task.Exception.GetBaseException()
                 is MatchReconnectRejectedException rejected
@@ -522,6 +608,14 @@ public sealed class LanLobbyController : MonoBehaviour
         if (!incompatible) StartHomeDiscovery();
     }
 
+    private bool RefreshRuntimeConfiguration(out string diagnosticCode)
+    {
+        return LanMatchRuntimeConfiguration.TryCreateWithRuntimeAssets(
+            out matchConfiguration,
+            out runtimeAssets,
+            out diagnosticCode);
+    }
+
     private void CancelReconnect()
     {
         if (reconnectCancellation == null) return;
@@ -529,6 +623,15 @@ public sealed class LanLobbyController : MonoBehaviour
         reconnectCancellation.Dispose();
         reconnectCancellation = null;
         reconnectTask = null;
+    }
+
+    private void DisposeMatchRuntime()
+    {
+        if (matchRuntime == null) return;
+        matchRuntime.ExitRequested -= HandleRuntimeExitRequested;
+        matchRuntime.DisposeRuntime();
+        Destroy(matchRuntime);
+        matchRuntime = null;
     }
 
     private void OnDestroy()
@@ -542,6 +645,7 @@ public sealed class LanLobbyController : MonoBehaviour
             host.AbortMatch("match.host.applicationQuit");
             reconnectCredentialStore.Clear();
         }
+        DisposeMatchRuntime();
         StopServices(false);
     }
 
