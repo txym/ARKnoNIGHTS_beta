@@ -331,6 +331,66 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
+        public void Controller_SwitchingFromLocalZeroBasedSlotsRebindsExternalOneBasedButtons()
+        {
+            var match = Load();
+            var root = new GameObject(
+                "ExternalShopSlotIdentityTests",
+                typeof(RectTransform));
+            try
+            {
+                var purchasedSlot = -1;
+                var controller = root.AddComponent<ShopReadyHudController>();
+                controller.Initialize(match);
+                controller.InitializeExternal(
+                    () => { },
+                    () => { },
+                    slotId => purchasedSlot = slotId,
+                    () => { },
+                    () => { });
+                controller.ApplyExternalState(
+                    ShopReadyHudState.CreateProjection(
+                        1,
+                        7,
+                        4,
+                        false,
+                        true,
+                        ShopReadyConfirmation.None,
+                        true,
+                        true,
+                        Enumerable.Range(1, 6).Select(slotId =>
+                            ShopReadySlotViewState.CreateProjection(
+                                slotId,
+                                "1000",
+                                1,
+                                2,
+                                1,
+                                "Test",
+                                string.Empty,
+                                false,
+                                false,
+                                true,
+                                true))),
+                    true);
+
+                var button = root.transform
+                    .Find("ShopPanel/ShopSlot_2")
+                    .GetComponent<Button>();
+                button.onClick.Invoke();
+                button.onClick.Invoke();
+
+                Assert.That(purchasedSlot, Is.EqualTo(2));
+                Assert.That(
+                    root.transform.Find("ShopPanel/ShopSlot_0"),
+                    Is.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void Controller_AffinityRowsHideMissingRegionAndClearAfterSlotBecomesEmpty()
         {
             var catalog = UnitCatalogLoader.LoadFromResources(CatalogPath).Catalog;

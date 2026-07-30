@@ -112,6 +112,25 @@ namespace ArknoNights.Lobby.Tests
             Assert.That(second, Is.EqualTo(first));
         }
 
+        [Test]
+        public void FormationPointerProjection_UsesBoardPlaneWithoutPhysicsCollider()
+        {
+            var method = RuntimeType("LanMatchHudController").GetMethod(
+                "TryProjectFormationRay",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            var arguments = new object[]
+            {
+                new Ray(new Vector3(200f, 100f, 200f), Vector3.down),
+                null
+            };
+
+            Assert.That((bool)method.Invoke(null, arguments), Is.True);
+            var target = (MatchFormationPosition)arguments[1];
+            Assert.That(target.X, Is.EqualTo(2));
+            Assert.That(target.Y, Is.EqualTo(2));
+        }
+
         [UnityTest]
         public IEnumerator HostRuntime_ReusesFormalBattleCanvas_AndRestoresItOnDispose()
         {
@@ -199,6 +218,77 @@ namespace ArknoNights.Lobby.Tests
                 Assert.That(
                     Property<bool>(existingShop, "IsExternalMode"),
                     Is.True);
+
+                var beforePurchase = Snapshot(runtime);
+                var offer = beforePurchase.OwnerPrivateState.ShopOffers
+                    .First(item => !string.IsNullOrEmpty(item.UnitId));
+                Assert.That(offer.TypeId, Is.Not.EqualTo("1000"));
+                var runtimeUnits = UnitCatalogLoader.LoadFromResources(
+                    "BattleData/unit-catalog-v1");
+                Assert.That(runtimeUnits.Success, Is.True);
+                Assert.That(
+                    runtimeUnits.Catalog.TryGet(
+                        offer.TypeId,
+                        out var offeredCatalogEntry),
+                    Is.True);
+                var portrait = ((Component)existingShop).transform
+                    .Find(
+                        "ShopPanel/ShopSlot_"
+                        + offer.SlotIndex
+                        + "/PortraitClip/Portrait")
+                    .GetComponent<Image>();
+                Assert.That(portrait.sprite, Is.Not.Null);
+                Assert.That(
+                    portrait.sprite.name,
+                    Is.EqualTo(
+                        Resources.Load<Texture2D>(
+                            offeredCatalogEntry.PortraitResourcePath).name));
+                InvokePrivate(lanHud, "ConfirmPurchase", offer);
+                InvokePrivate(lanHud, "ConfirmPurchase", offer);
+                host.Tick();
+                yield return null;
+                var afterPurchase = Snapshot(runtime);
+                var displayedSnapshot = stagingHud.GetType()
+                    .GetProperty("DisplayedSnapshot")
+                    .GetValue(stagingHud);
+                var stagingSlots = (IEnumerable)displayedSnapshot.GetType()
+                    .GetProperty("StagingSlots")
+                    .GetValue(displayedSnapshot);
+                var stagingSlot = stagingSlots.Cast<object>().Single(item =>
+                    ((IEnumerable)item.GetType()
+                            .GetProperty("UnitIds")
+                            .GetValue(item))
+                        .Cast<object>()
+                        .Any(unitId => string.Equals(
+                            unitId as string,
+                            offer.UnitId,
+                            StringComparison.Ordinal)));
+                var buildSlotId = stagingHud.GetType().GetMethod(
+                    "BuildSlotId",
+                    BindingFlags.Static | BindingFlags.Public);
+                Assert.That(buildSlotId, Is.Not.Null);
+                InvokePrivate(
+                    lanHud,
+                    "HandleStagingSelected",
+                    (string)buildSlotId.Invoke(null, new[] { stagingSlot }));
+                var submitFormation = lanHud.GetType().GetMethod(
+                    "TrySubmitSelectedAt",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(submitFormation, Is.Not.Null);
+                Assert.That(
+                    (bool)submitFormation.Invoke(
+                        lanHud,
+                        new object[] { afterPurchase.PublicState, 2, 2 }),
+                    Is.True);
+                host.Tick();
+                yield return null;
+                var afterDeployment = Snapshot(runtime);
+                var deployed = afterDeployment.PublicState.Seats
+                    .Single(item => item.PlayerId == hostId)
+                    .Units.Single(item => item.UnitId == offer.UnitId);
+                Assert.That(deployed.Zone, Is.EqualTo(MatchUnitZone.Deployed.ToString()));
+                Assert.That(deployed.FormationX, Is.EqualTo(2));
+                Assert.That(deployed.FormationY, Is.EqualTo(2));
 
                 UnityEngine.Object.DestroyImmediate(runtimeObject);
                 runtimeObject = null;

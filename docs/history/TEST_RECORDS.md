@@ -1384,3 +1384,54 @@ Cycle 3 的 runtime/layout/capture 构建状态是 `a8314dc`，保留五张可�
   终止，确认没有 Unity 进程残留，因此不得把该尝试记为通过或失败。本修复也未
   重新运行 Windows/Android 构建、双 Player 物理 LAN 或人工分辨率视觉验收；
   这些项目保持未验证。
+
+## 59. LAN 商店槽位、部署输入与完整单位目录修复（2026-07-30）
+
+- 商店错位根因是正式 HUD 先以本地 `0..5` 槽创建按钮，LAN 外部投影改用
+  权威 `1..6` 槽时仅按数量复用旧按钮，导致旧点击闭包比画面数据小一位。修复后
+  同时比较槽数量与 SlotId 序列；身份变化时停用并重建按钮。
+- 部署失效根因是 LAN 世界输入要求 `Physics.RaycastAll` 命中场景碰撞体，而
+  本地部署使用 `y=0` 棋盘平面。LAN 现复用相同平面与一基坐标投影；物理射线只
+  用于识别已经部署的单位。倒计时刷新若权威 Player 投影未变化，不再重建待部署
+  槽或清空选择。
+- 商店全部为 `1000_gopro` 的根因是运行时 Unit/Ability 目录仍冻结为
+  `3/1` 项，一级稀有度条件抽取后只有 `1000` 可选。通过 Unity 生成器重新生成
+  Unit/Ability/SkillAnimation 目录，结果分别为 `100/67/13` 项；扁平单位目录
+  增加 `actionMethod` 并支持不攻击单位。正式 Match 仅将 `94` 个当前商店单位
+  标记为可抽取，排除 `1000/1137/1138/2033/5504/10002`，但这些类型仍保留给
+  旧 Demo 与召唤链。
+- 目录生成命令分别执行 `UnitCatalogGenerator.Generate`、
+  `AbilityCatalogGenerator.Generate` 与 `SkillAnimationCatalogGenerator.Generate`，
+  三个 Unity 进程退出码均为 `0`；日志位于 `Temp/LanHudHotfix/`。生成结果的
+  SHA-256 分别为
+  `C9BD2C82100AA8905A48D3C1B3A9E67E8562AE83EFCFFB613160E24DADA8FB14`、
+  `3D314CE44918A32B40471F6C0A0B8CC412CF1DD1AF7ABBF01A3057D673A50F94`、
+  `304754FB8CF0845EDB605400569244BBFC2773DC76B00935826EDB42453F66B4`。
+- 定向 EditMode：`ShopReadyHudStateEditModeTests` 为 `15/15`，
+  `StagingHudLayoutEditModeTests` 为 `11/11`；完整目录加载、legacy 三类型隔离
+  生成和不攻击单位投影三个精确过滤用例均为 `1/1`。最终证据目录分别为
+  `Temp/LanHudHotfix/ShopReady-EditMode-Final`、
+  `StagingHud-EditMode-Final2`、`CatalogLoad-EditMode-Final`、
+  `CatalogGenerator-EditMode-Final` 与 `NonAttacker-EditMode`。
+- 定向 PlayMode：运行时目录与 `94` 人商店资格精确用例为 `1/1`；
+  无 Collider 棋盘投影用例为 `1/1`；真实 `SampleScene` 正式 HUD 用例为
+  `1/1`，实际断言商店 offer 不是 `1000`、头像资源与该 TypeId 目录条目一致，
+  随后购买该权威 UnitId 并成功部署至 `(2,2)`。证据目录为
+  `Temp/LanHudHotfix/RuntimeCatalog-PlayMode`、
+  `FormationProjection-PlayMode` 与 `HostHudDeployment-PlayMode-Final`。
+- 完成前复核将上述相关 EditMode 过滤器合并执行，结果为
+  `29 total / 29 passed / 0 failed / 0 skipped / 0 inconclusive`，证据为
+  `Temp/LanHudHotfix/FinalEdit-20260730-174957`；将运行时目录资格、无
+  Collider 投影及真实 HUD 购买部署三项 PlayMode 合并执行，结果为
+  `3 total / 3 passed / 0 failed / 0 skipped / 0 inconclusive`，证据为
+  `Logs/LanHudHotfix-FinalPlay-20260730-175400`。第一次完成前 PlayMode
+  复核把结果 XML 写入 `Temp`，Unity 退出清理后 XML 不再存在，因此该次不计为
+  通过；改写到忽略的 `Logs` 目录后按相同过滤器重跑并取得上述完整结果。
+- 两次目录加载测试的中间失败来自新增测试断言先误用数值排序、再误用 NUnit
+  `Has.Count` 约束，均在不改生产行为的情况下修正并于最终精确用例通过。一次
+  Staging 中间失败暴露 EditMode 不能调用延迟 `Destroy`，实现已按
+  `Application.isPlaying` 区分 `Destroy/DestroyImmediate`；另一次编译诊断来自
+  Lobby 测试程序集无 UI 引用，测试改用反射后通过。
+- 用户明确要求不运行全量测试，因此本轮没有运行无过滤器 EditMode/PlayMode、
+  Windows/Android 构建、双 Player 物理 LAN 或人工输入/视觉验收；这些项目均
+  保持未验证。

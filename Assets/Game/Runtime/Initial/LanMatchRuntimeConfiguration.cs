@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -18,6 +19,10 @@ internal static class LanMatchRuntimeConfiguration
     internal const string BattleCoreVersion = "battle-core-v1";
     private const string UnitCatalogResource = "BattleData/unit-catalog-v1";
     private const string AbilityCatalogResource = "BattleData/ability-catalog-v1";
+    private static readonly HashSet<string> ShopExcludedTypeIds =
+        new HashSet<string>(
+            new[] { "1000", "1137", "1138", "2033", "5504", "10002" },
+            StringComparer.Ordinal);
 
     internal static bool TryCreate(
         out LanMatchSessionConfiguration configuration,
@@ -77,7 +82,7 @@ internal static class LanMatchRuntimeConfiguration
                 new MatchShopCatalogEntry(
                     entry.Definition.TypeId,
                     entry.Rarity,
-                    true,
+                    !ShopExcludedTypeIds.Contains(entry.Definition.TypeId),
                     3,
                     entry.DeploymentCost,
                     entry.LegacyUnitTypeId)));

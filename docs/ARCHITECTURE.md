@@ -154,7 +154,7 @@ M5 新增单向依赖的 `ARKnoNIGHTS.MatchAI`。`MatchAuthority` 只通过 `IMa
 
 - `LanLobbyController`：LAN 主界面与房间会话；
 - `LanMatchRuntimeController`：正式 LAN Match 生命周期、房主/客机角色、AI、Battle 与重连组合；
-- `LanMatchHudController`：把 scoped snapshot 与 LAN 命令映射到既有 `FormalBattleHudCanvas` 的适配层，不拥有平行 HUD；
+- `LanMatchHudController`：把 scoped snapshot 与 LAN 命令映射到既有 `FormalBattleHudCanvas` 的适配层，不拥有平行 HUD；商店按钮按权威 `SlotIndex` 身份重绑，棋盘点击通过与本地部署相同的 `y=0` 平面投影到一基坐标，不依赖场景碰撞体；
 - `StateDrivenDeploymentController`：状态驱动部署交互；
 - `PreparationBattleLoopController`：本地准备/战斗循环；
 - `FormalBattleHudController`、`BattleHudSceneCoordinator`：正式 HUD、商店、玩家列表和观察协调；
@@ -173,7 +173,7 @@ M5 新增单向依赖的 `ARKnoNIGHTS.MatchAI`。`MatchAuthority` 只通过 `IMa
 - LAN 房间发现、创建、加入、准备、开始和房间 UI；
 - 纯 C# 房主权威 Match M1–M5 领域状态、共享牌库、确定性商店经济、自动合成、Overflow、权威阵型、准备/封印、2/3/4 人配对、战斗结果校验、结算/淘汰/排名、终局效果、分权限快照和确定性 Bot/接管调度；
 - Lobby→Match 原连接提升、固定四席位 NativeBot 补位、五字段兼容清单、严格 Match wire、单 actor 命令排序、完整 scoped snapshot、安装级身份、持久 credential、自动重连、终局清理与 Battle transport 契约；
-- 正式 LAN 组合根：M5 Bot 调度/接管、真实目录兼容 hash、scoped HUD、M4→M7 Battle adapter、每端全部战斗本地流式计算、首块屏障、统一房主播放时钟、hash 诊断、权威结算和重连恢复；
+- 正式 LAN 组合根：M5 Bot 调度/接管、包含全部 `100` 个精英 0 类型的真实 Unit/Ability 目录兼容 hash、由目录筛选的 `94` 人商店池、scoped HUD、M4→M7 Battle adapter、每端全部战斗本地流式计算、首块屏障、统一房主播放时钟、hash 诊断、权威结算和重连恢复；
 - EditMode/PlayMode 自动测试、Windows x86_64 构建入口和多种截图证据入口。
 
 ## 6. 当前未实现或未闭环

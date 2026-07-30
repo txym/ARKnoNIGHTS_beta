@@ -14,7 +14,7 @@ namespace ArknoNights.Battle.Tests
     public sealed class UnitSourceConsumerEditModeTests
     {
         private const string ExpectedRuntimeCatalogHash =
-            "359C81D56AB89EA735FAFCD0F2A6CA243076DE7C72A9086B7E4097B6B728B0AA";
+            "C9BD2C82100AA8905A48D3C1B3A9E67E8562AE83EFCFFB613160E24DADA8FB14";
         private static readonly string[] LegacyProjectionFileNames =
         {
             "1000_gopro.json",
@@ -93,15 +93,27 @@ namespace ArknoNights.Battle.Tests
         }
 
         [Test]
-        public void Generate_RejectsUnrepresentableV2SourceWithoutTouchingOutput()
+        public void Generate_ProjectsNonAttackerWithZeroAttackTimings()
         {
             var sourceDirectory = CopyRealSources(
                 "unrepresentable",
                 "5504_arcslmi.json",
                 MakeNonAttacker);
-            AssertAtomicFailure(
-                sourceDirectory,
-                "UNIT_CATALOG_V1_SOURCE_UNREPRESENTABLE");
+            var outputPath = NewIsolatedPath(
+                "nonattacker-output",
+                "unit-catalog-v1.json");
+
+            InvokeGenerator(sourceDirectory, outputPath);
+
+            var document = JsonUtility.FromJson<CatalogProjectionDocument>(
+                File.ReadAllText(outputPath));
+            var nonAttacker = document.units.Single(item =>
+                item.typeId == "5504");
+            Assert.That(nonAttacker.attackMethod, Is.EqualTo("None"));
+            Assert.That(nonAttacker.damageType, Is.EqualTo("None"));
+            Assert.That(nonAttacker.attackAnimationDurationTicks, Is.Zero);
+            Assert.That(nonAttacker.attackAnimation, Is.Empty);
+            Assert.That(nonAttacker.actionMethod, Is.EqualTo(1));
         }
 
         [Test]
@@ -1499,8 +1511,12 @@ namespace ArknoNights.Battle.Tests
             public int deploymentCost;
             public int rarity;
             public int attackAnimationDurationTicks;
+            public string damageType;
+            public string attackMethod;
+            public int actionMethod;
             public int unitSkelType;
             public string moveAnimation;
+            public string attackAnimation;
             public string hitAnimation;
         }
 

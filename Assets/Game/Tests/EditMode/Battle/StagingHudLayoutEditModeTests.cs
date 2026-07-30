@@ -94,5 +94,41 @@ namespace ArknoNights.Battle.Tests
             Assert.That(first.texture, Is.SameAs(texture));
             Assert.That(second, Is.SameAs(first));
         }
+
+        [Test]
+        public void ExternalSnapshotRefresh_WithUnchangedProjectionPreservesSelection()
+        {
+            var root = new GameObject("ExternalStagingSelectionTests");
+            try
+            {
+                var hud = root.AddComponent<StagingHudController>();
+                if (!hud.InitializationSucceeded)
+                {
+                    typeof(StagingHudController)
+                        .GetMethod(
+                            "Awake",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(hud, null);
+                }
+                Assert.That(hud.InitializationSucceeded, Is.True);
+                var snapshot = hud.Snapshot;
+                var slotId = StagingHudController.BuildSlotId(
+                    snapshot.StagingSlots[0]);
+                hud.SetExternalDisplayedSnapshot(snapshot, false);
+                hud.ToggleSelection(slotId);
+                Assert.That(hud.SelectedSlotId, Is.EqualTo(slotId));
+
+                hud.SetExternalDisplayedSnapshot(snapshot, false);
+
+                Assert.That(
+                    hud.SelectedSlotId,
+                    Is.EqualTo(slotId),
+                    "Countdown-only LAN HUD refreshes must not clear staging selection.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
     }
 }

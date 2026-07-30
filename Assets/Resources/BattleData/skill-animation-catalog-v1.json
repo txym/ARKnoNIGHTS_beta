@@ -3,11 +3,194 @@
     "catalogId": "mainline-skill-animations",
     "bindings": [
         {
+            "typeId": "10004",
+            "abilityId": "BERRY_CRAB_HALF_HEALTH_FULL_HEAL",
+            "animationKey": "skill",
+            "animationName": "Skill_A",
+            "originalAnimationTicks": 80,
+            "segmentOriginalAnimationTicks": [
+                80
+            ],
+            "presentationStateTag": "b",
+            "stateIdleAnimation": "Idle_B",
+            "stateMoveAnimation": "Move_B",
+            "stateAttackAnimation": "Attack_B",
+            "stateDeathAnimation": "Die_B"
+        },
+        {
+            "typeId": "1502",
+            "abilityId": "BLOCKED_BLINK_FORWARD",
+            "animationKey": "blink.disappear|blink.appear",
+            "animationName": "Disappear|Appear",
+            "originalAnimationTicks": 20,
+            "segmentOriginalAnimationTicks": [
+                10,
+                10
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
+        },
+        {
+            "typeId": "10039",
+            "abilityId": "CHARGED_DRINK_AREA_ATTACK",
+            "animationKey": "skill",
+            "animationName": "Skill",
+            "originalAnimationTicks": 57,
+            "segmentOriginalAnimationTicks": [
+                57
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
+        },
+        {
+            "typeId": "10001",
+            "abilityId": "FEED_ORIGINIUM_BUG_HALF_HEALTH_TRANSFORM",
+            "animationKey": "skill.begin",
+            "animationName": "Skill_Begin",
+            "originalAnimationTicks": 20,
+            "segmentOriginalAnimationTicks": [
+                20
+            ],
+            "presentationStateTag": "b",
+            "stateIdleAnimation": "Idle_B",
+            "stateMoveAnimation": "Move_B",
+            "stateAttackAnimation": "Attack_B",
+            "stateDeathAnimation": "Die_B"
+        },
+        {
+            "typeId": "1322",
+            "abilityId": "GREY_HAT_THIRD_ATTACK_DASH",
+            "animationKey": "skill.begin|skill.loop|skill.end",
+            "animationName": "Skill_Begin|Skill_Loop|Skill_End",
+            "originalAnimationTicks": 40,
+            "segmentOriginalAnimationTicks": [
+                7,
+                4,
+                30
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
+        },
+        {
+            "typeId": "1118",
+            "abilityId": "PRISONER_RELEASE_BOXER",
+            "animationKey": "",
+            "animationName": "",
+            "originalAnimationTicks": 0,
+            "segmentOriginalAnimationTicks": [],
+            "presentationStateTag": "red",
+            "stateIdleAnimation": "Idle_red",
+            "stateMoveAnimation": "Move_red",
+            "stateAttackAnimation": "Attack_red",
+            "stateDeathAnimation": "Die_red"
+        },
+        {
+            "typeId": "1121",
+            "abilityId": "PRISONER_RELEASE_LEADER",
+            "animationKey": "",
+            "animationName": "",
+            "originalAnimationTicks": 0,
+            "segmentOriginalAnimationTicks": [],
+            "presentationStateTag": "red",
+            "stateIdleAnimation": "Idle_red",
+            "stateMoveAnimation": "Move_red",
+            "stateAttackAnimation": "Attack_red",
+            "stateDeathAnimation": "Die_red"
+        },
+        {
+            "typeId": "1116",
+            "abilityId": "PRISONER_RELEASE_STANDARD",
+            "animationKey": "",
+            "animationName": "",
+            "originalAnimationTicks": 0,
+            "segmentOriginalAnimationTicks": [],
+            "presentationStateTag": "released",
+            "stateIdleAnimation": "Idle",
+            "stateMoveAnimation": "Move",
+            "stateAttackAnimation": "Attack",
+            "stateDeathAnimation": "Die"
+        },
+        {
+            "typeId": "1119",
+            "abilityId": "PRISONER_RELEASE_STRONG",
+            "animationKey": "",
+            "animationName": "",
+            "originalAnimationTicks": 0,
+            "segmentOriginalAnimationTicks": [],
+            "presentationStateTag": "released",
+            "stateIdleAnimation": "Idle",
+            "stateMoveAnimation": "Move",
+            "stateAttackAnimation": "Attack",
+            "stateDeathAnimation": "Die"
+        },
+        {
+            "typeId": "2033",
+            "abilityId": "ROADBUILDER_FRAGMENT_THIRD_ATTACK_SPAWN",
+            "animationKey": "attack.skill",
+            "animationName": "Skill",
+            "originalAnimationTicks": 40,
+            "segmentOriginalAnimationTicks": [
+                40
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
+        },
+        {
+            "typeId": "2031",
+            "abilityId": "ROADBUILDER_THIRD_ATTACK_SPAWN",
+            "animationKey": "attack.skill",
+            "animationName": "Skill",
+            "originalAnimationTicks": 40,
+            "segmentOriginalAnimationTicks": [
+                40
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
+        },
+        {
             "typeId": "5503",
             "abilityId": "SUMMON_JELLY_MINIONS",
             "animationKey": "skill",
             "animationName": "Skill",
-            "originalAnimationTicks": 30
+            "originalAnimationTicks": 30,
+            "segmentOriginalAnimationTicks": [
+                30
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
+        },
+        {
+            "typeId": "10077",
+            "abilityId": "SUMMON_REPAIR_HELPER",
+            "animationKey": "skill",
+            "animationName": "Skill",
+            "originalAnimationTicks": 50,
+            "segmentOriginalAnimationTicks": [
+                50
+            ],
+            "presentationStateTag": "",
+            "stateIdleAnimation": "",
+            "stateMoveAnimation": "",
+            "stateAttackAnimation": "",
+            "stateDeathAnimation": ""
         }
     ]
 }

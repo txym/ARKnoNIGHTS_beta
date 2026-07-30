@@ -490,10 +490,20 @@ namespace ArknoNights.UI.FormalHud.ShopReady
 
         private void EnsureSlots()
         {
-            if (slotWidgets.Count == state.Slots.Count) return;
+            if (slotWidgets.Count == state.Slots.Count
+                && slotWidgets.Select(widget => widget.SlotId)
+                    .SequenceEqual(state.Slots.Select(slot => slot.ShopSlotId)))
+            {
+                return;
+            }
+
             foreach (var widget in slotWidgets)
             {
-                if (Application.isPlaying) Destroy(widget.Root.gameObject);
+                if (Application.isPlaying)
+                {
+                    widget.Root.gameObject.SetActive(false);
+                    Destroy(widget.Root.gameObject);
+                }
                 else DestroyImmediate(widget.Root.gameObject);
             }
 

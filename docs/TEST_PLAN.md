@@ -77,7 +77,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - 数据源和目录：`UnitSourceConsumerEditModeTests`、`UnitEliteVariantSourceEditModeTests`；
 - 回放与 Track：`BattlePresentation*EditModeTests`；
 - 玩家与回合：`LocalMatchStateEditModeTests`、`FourPlayerBattleRoundSealerEditModeTests`；
-- HUD：`ShopReadyHudStateEditModeTests`、`PlayerListObserverEditModeTests`；
+- HUD：`ShopReadyHudStateEditModeTests`、`PlayerListObserverEditModeTests`；商店用例必须覆盖本地 `0..5` 槽切换到联机 `1..6` 槽后按钮仍提交自身权威 SlotIndex；
 - Lobby：`LobbyProtocolEditModeTests`、`LobbyRoomStateEditModeTests`、布局和 socket 集成测试；
 - Match M1–M4 领域：`ArknoNights.Match.Tests`，覆盖初始化、revision、幂等、连接状态、兼容清单、商品目录、共享池守恒、版本化 PRNG、商店经济、自动合成、Buff 重映射、部署 Cost、严格备战席栈、Overflow、准备时钟、阵型命令、封印安全规则、2/3/4 人配对、结果校验、影子映射、结算收入/连续、淘汰/排名、终局和权限裁剪；只需聚焦 M4 时可使用 `ArknoNights.Match.Tests.MatchFlowEditModeTests`；
 - Match M5 AI：`ArknoNights.MatchAI.Tests`，覆盖观察权限、确定性决策表、ActionId 幂等、购买后 FinalSurvivor 单次部署、0–29000ms 固定 Tick、时间跳跃、立即封存、掉线/退出接管与恢复控制。
@@ -102,8 +102,8 @@ PlayMode 重点覆盖：
 - 真实目录、Prefab、Spine 和动态视图生命周期；
 - HUD/详情/状态条场景集成；
 - Lobby Controller、View、Capture Suite 与平台适配。
-- `LanLobbyControllerPlayModeTests` 还覆盖真实运行时 Unit/Ability 目录兼容 hash、隔离 PlayerPrefs credential 的原子记录/损坏删除、开局后本地 credential 保存、权威终局回主页，以及本地 Demo 门控在 Session 接管后保持冻结。
-- `LanMatchBattleAdapterPlayModeTests` 覆盖真实目录下的 Official/Shadow 观察映射、精英 `1/2/3/5` 实体展开、重复输入 hash 稳定、房主时钟离群样本/单调性，以及真实 loopback TCP 上 host+guest 双运行时进入同一 Battle 播放。
+- `LanLobbyControllerPlayModeTests` 还覆盖真实运行时 `100` 项 Unit/`67` 项 Ability 目录兼容 hash、`94` 人商店资格及六个明确排除类型、隔离 PlayerPrefs credential 的原子记录/损坏删除、开局后本地 credential 保存、权威终局回主页，以及本地 Demo 门控在 Session 接管后保持冻结。
+- `LanMatchBattleAdapterPlayModeTests` 覆盖真实目录下的 Official/Shadow 观察映射、精英 `1/2/3/5` 实体展开、重复输入 hash 稳定、房主时钟离群样本/单调性、无需 Physics Collider 的棋盘平面部署投影，以及真实 loopback TCP 上 host+guest 双运行时进入同一 Battle 播放。
 
 场景、Prefab、资源引用、自动 Bootstrap 或 Unity 生命周期发生变化时，不能只跑 EditMode。
 

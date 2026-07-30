@@ -155,7 +155,7 @@ Match Session 创建后，普通网络中断和应用重开都使用本地持久
 - 当前导入单位的精英 0 基础部署费用统一为 `2`。`actionMethod=1` 表示普通路线，`2` 表示部署位置到敌方门，`3` 表示己方门到部署位置，`4` 表示原地不动；当前 `2` 用于 `1008/1017/1026/1042/1355`，`3` 用于 `1146`，`4` 用于 `10002`，其余单位使用 `1`；
 - 当前不攻击单位为 `1008/1017/1026/1042/1146/1333/1355/10002`，其 `attackMethod=0`、攻击力和攻击间隔为 `0`、伤害类型为 `None`，且不声明 attack 动画；`1008/1017/1026/1042/1146/1333/1355` 不可阻挡；
 - 当前 Editor 目录生成器只把精英 0 投影进扁平 `unit-catalog-v1`。精英 2/3 的运行时选择、合成系数和局内升阶仍未实现，因此现有“`eliteLevel` 不参与战斗数值或胜负”的规则继续成立；
-- v2 允许合法表达不攻击且不阻挡的单位；由于旧扁平目录不能表示该组合，投影时必须显式失败，不能强制改写为可攻击或可阻挡单位。
+- v2 允许合法表达不攻击且不阻挡的单位；`unit-catalog-v1` 对这类单位保留 `AttackMethod=None`、`DamageType=None`、零攻击/攻击时序、空 attack 动画和非负阻挡容量，不得强制改写为可攻击或可阻挡单位。
 
 ### 5.2 准备阶段可执行操作
 
@@ -171,7 +171,7 @@ Match Session 创建后，普通网络中断和应用重开都使用本地持久
 
 准备阶段未准备玩家的自动合成可以保留一个已部署实例。该实例升阶后若新增部署费用超过当前可用 Cost，合成仍成功并自动退出部署区、清除位置、完整释放原部署占用的 Cost；若此时待部署区无法容纳该实例，则同一 UnitId 的幸存实例进入 Overflow。
 
-单位类型源 JSON 和 Player-safe catalog 均不保存独立的商店价格字段。商品价格直接等于运行时目录稀有度 `rarity`；领域层或 UI 只读快照可以暴露派生的 `Price` 便于显示，但该值必须每次由 `Rarity` 计算，不得保存第二份可能与稀有度漂移的配置。人工维护 v2 源的 BONDS 单位稀有度来自 `docs/bonds/BONDS_SPEC.md`，保留的 `1000=1`；其中 `5503=6`、`5504=3`。Player-safe 目录在本轮批量导入期间保持冻结并继续暴露迁移前的三个类型和值（包括 `5503=4`），所以当前 Demo 中 `gopro` 商品价格为 `1`、`arcslma` 商品价格仍为 `4`。在后续目录迁移前，源稀有度不得被误述为当前玩家可见价格。
+单位类型源 JSON 和 Player-safe catalog 均不保存独立的商店价格字段。商品价格直接等于运行时目录稀有度 `rarity`；领域层或 UI 只读快照可以暴露派生的 `Price` 便于显示，但该值必须每次由 `Rarity` 计算，不得保存第二份可能与稀有度漂移的配置。人工维护 v2 源的 BONDS 单位稀有度来自 `docs/bonds/BONDS_SPEC.md`，保留的 legacy/demo `1000=1`；其中 `5503=6`、`5504=3`。Player-safe 目录现包含全部 `100` 个精英 0 类型；正式 Match 商店只从其中 `94` 个当前商店单位抽取，明确排除 legacy/demo `1000` 与五个非商店召唤/衍生单位 `1137/1138/2033/5504/10002`。这些排除类型仍保留在战斗目录中，以支持旧 Demo 或召唤链。
 
 正式 HUD 同时显示单位归属信息，但不据此计算羁绊：待部署槽位左侧顶部只显示一个图标，优先使用地区，单位无地区时回退到种类；商店头像左下角从下到上固定显示单位部署费用、地区、种类三行。商店上方原有商品价格仍表示购买所需赤金，头像内的费用则读取该单位的 `DeploymentCost`，两者不得混用。地区或种类尚未归属时隐藏对应行；“其他”种类保留文字但当前不显示图标。归属事实以 `docs/bonds/BONDS_SPEC.md` 为准，Player 只读取由该文档导出的 UI 表现镜像。
 
@@ -666,7 +666,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 
 第一阶段在保留 `battle-fixture-v1` 作为合成算法回归数据的同时，新增两份 Player-safe 的 Resources 文本资源：
 
-- `BattleData/unit-catalog-v1`：正式 Player 当前读取的冻结扁平单位目录；`UnitCatalogGenerator` 的人工维护输入已经迁移为 `Assets/GameData/Units/EliteVariants/Json/*.json` 中的 v2 文档，解析目标固定为精英 0，但本轮扩展至 100 份 authored 文档时不重新生成现有目录。目录条目继续包含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
+- `BattleData/unit-catalog-v1`：正式 Player 当前读取的生成式扁平单位目录；`UnitCatalogGenerator` 的人工维护输入为 `Assets/GameData/Units/EliteVariants/Json/*.json` 中的 v2 文档，解析目标固定为精英 0，当前确定性生成全部 `100` 份 authored 文档。目录条目包含 Core 所需的十进制 `typeId`、数值、整数 Tick、伤害/攻击方式、行动方式、阻挡容量、嘲讽等级，以及同一条目中的 `DefaultUnit`、SkeletonDataAsset Resources 路径、legacy ID、`unitskeltype` 与动画名称。
 - `BattleData/task004a-real-1v1`：`local-battle-v1` 对战快照，只含 `schemaVersion`、`battleId`、`maxTicks`、两个带 Home/Away 的玩家和各自单位实例（`unitId`、`typeId`、`zone`、`formationX`、`formationY`、`buffs`）；当前固定回归样本为 Home 3 对 Away 4，双方均混用 `gopro`（`1000`）与 `arcslma`（`5503`），采用打乱且互不重叠的部署坐标。不得重复类型数值或表现资源。
 
 `local-battle-v1` 通过 `typeId` 连接目录后才构造不可变 `BattleInput`；Core 仅接收 Core 值，不能接收 Resources、Spine 或表现对象。未知 schema、未知类型、重复或无效 ID、无效数值、空/不存在的表现资源路径均必须返回结构化诊断，其中包含 schema、battleId、playerId（如适用）和 typeId（如适用）。
@@ -684,7 +684,7 @@ Track 编译器必须支持战斗中临时生成单位。每个合法 Spawn 都�
 - 当前权威链为 `Assets/GameData/Units/EliteVariants/Json/*.json → UnitEliteVariantResolver(target elite 0) → UnitCatalogGenerator → frozen flat unit-catalog-v1 → existing Player loaders`。正式 Player 只读生成的 Resources 目录，不能直接读取 Editor 源 JSON。
 - v2 是唯一人工维护的单位源；当前 authored 范围为 BONDS 的 `99` 个 TypeId 加 legacy/demo `1000`，共 `100` 份文档和 `185` 个模型变体。每个文档的精英 0 完整，高阶条目按最近较低条目继承原子块，`sourceVariant` 决定物理资源文件夹。
 - `animations[]` 只保存稳定 key、真实 Spine 名称和必需的源时长；`Default`、Hit、Skeleton 类型、动画行为与播放倍速均不属于 v2 源契约。
-- BONDS 单位的 authored v2 稀有度来自 BONDS 规范，保留的 `1000=1`；冻结目录仍只暴露迁移前的 `1000/5503/5504`。合法但旧目录无法表达的不攻击/不阻挡 v2 单位必须投影失败。
+- BONDS 单位的 authored v2 稀有度来自 BONDS 规范，保留的 legacy/demo `1000=1`；生成目录暴露全部 `100` 个精英 0 类型并保留不攻击单位的零攻击语义。Match 商店池在目录之上显式筛选 `94` 个商店单位，不把 `1000/1137/1138/2033/5504/10002` 放入共享牌库。
 - 源直读 `UnitFactory` 是 legacy/debug 适配器，正式运行时不依赖它，并在后续正式数据路径不再需要时销毁。旧 Hit/presentation 链的完整销毁范围由 `docs/bonds/UnitAnimation.md` 维护。
 
 ## 14. UI-INFO-001 单位详情投影（2026-07-24）

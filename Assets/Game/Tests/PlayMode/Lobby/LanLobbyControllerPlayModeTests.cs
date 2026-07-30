@@ -209,7 +209,19 @@ namespace ArknoNights.Lobby.Tests
                 Does.Match("^[0-9a-f]{64}$"));
             Assert.That(
                 configuration.ShopCatalog.Entries,
-                Is.Not.Empty);
+                Has.Count.EqualTo(100));
+            Assert.That(
+                configuration.ShopCatalog.Entries.Count(entry =>
+                    entry.IsShopEligible),
+                Is.EqualTo(94));
+            Assert.That(
+                configuration.ShopCatalog.Entries
+                    .Where(entry => !entry.IsShopEligible)
+                    .Select(entry => entry.TypeId),
+                Is.EquivalentTo(new[]
+                {
+                    "1000", "1137", "1138", "2033", "5504", "10002"
+                }));
 
             var hashInputType = FindRuntimeType("CatalogHashInput");
             var hashInputConstructor = hashInputType.GetConstructor(

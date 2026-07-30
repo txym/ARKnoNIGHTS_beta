@@ -22,17 +22,22 @@ independent animation layer and runtime elite 2/3 selection remain later work.
 
 ## Compatibility
 
-The existing Player catalogs remain frozen during the subsequent bulk import.
-Formal Player runtime continues to read only the generated Resources catalogs;
-it never reads authored Editor sources. Legacy v1 projection uses mapped
-skeleton type 2 and an empty Hit name. Sources that v1 cannot represent, such
-as a valid v2 non-attacker/non-blocker, fail instead of being coerced.
+Formal Player runtime continues to read only generated Resources catalogs; it
+never reads authored Editor sources. On 2026-07-30 the deferred catalog
+migration was completed: `unit-catalog-v1` now projects all 100 elite-zero
+TypeIds, `ability-catalog-v1` projects all 67 authored abilities, and the skill
+animation catalog contains all 13 required bindings.
 
-Authored BONDS rarity comes from `docs/bonds/BONDS_SPEC.md`, while retained
-legacy/demo TypeId `1000` uses rarity `1`; the frozen catalog continues to
-expose its pre-migration three-TypeId values until a later catalog migration.
-The generator's mapped Type 2 is temporary presentation transport and is not
-an authored unit fact.
+The flat transport now represents non-attacking units explicitly with
+`AttackMethod=None`, `DamageType=None`, zero attack/timings, and an empty attack
+animation. Legacy skeleton type 2 and the empty Hit name remain presentation
+transport rather than authored facts.
+
+Authored BONDS rarity comes from `docs/bonds/BONDS_SPEC.md`. The LAN Match shop
+catalog is a filtered view of the complete battle catalog: 94 entries are shop
+eligible, while legacy/demo `1000` and non-shop `1137`, `1138`, `2033`, `5504`,
+and `10002` remain loadable for demos and summon chains but never enter the
+shared shop pool.
 
 ## Destruction
 

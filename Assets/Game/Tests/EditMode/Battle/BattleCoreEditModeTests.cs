@@ -708,7 +708,20 @@ namespace ArknoNights.Battle.Tests
             Assert.AreEqual("Characters/5503_arcslma/enemy_5503_arcslma_SkeletonData", arcslma.SkeletonDataResourcePath);
             Assert.AreEqual("ProfilePicture/UIImage_5503_arcslma", arcslma.PortraitResourcePath);
 
-            Assert.That(first.Catalog.Entries.Select(entry => entry.Definition.TypeId), Is.EqualTo(new[] { "1000", "5503", "5504" }));
+            Assert.That(first.Catalog.Entries, Has.Count.EqualTo(100));
+            Assert.That(
+                first.Catalog.Entries.Select(entry => entry.Definition.TypeId)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count(),
+                Is.EqualTo(100));
+            Assert.That(first.Catalog.TryGet("1008", out var ghost), Is.True);
+            Assert.That(ghost.Definition.AttackMethod, Is.EqualTo(AttackMethod.None));
+            Assert.That(ghost.Definition.DamageType, Is.EqualTo(DamageType.None));
+            Assert.That(ghost.Definition.Attack, Is.Zero);
+            Assert.That(ghost.Definition.AttackIntervalTicks, Is.Zero);
+            Assert.That(ghost.Definition.AttackAnimationDurationTicks, Is.Zero);
+            Assert.That(ghost.Definition.ActionMethod, Is.EqualTo(2));
+            Assert.That(ghost.AttackAnimation, Is.Empty);
             Assert.That(first.Catalog.TryGet("5504", out var arcslmi), Is.True);
             Assert.That(arcslmi.DisplayNameZhHans, Is.EqualTo("果冻丁"));
             Assert.That(arcslmi.Definition.MaxHitPoints, Is.EqualTo(2500));

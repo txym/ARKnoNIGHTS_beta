@@ -622,8 +622,9 @@ public sealed class LanMatchHudController : MonoBehaviour
             return;
         }
         if (!Input.GetMouseButtonUp(0) || Camera.main == null) return;
+        var pointerRay = Camera.main.ScreenPointToRay(Input.mousePosition);
         var hits = Physics.RaycastAll(
-                Camera.main.ScreenPointToRay(Input.mousePosition),
+                pointerRay,
                 2000f)
             .OrderBy(item => item.distance)
             .ToArray();
@@ -644,7 +645,6 @@ public sealed class LanMatchHudController : MonoBehaviour
                 clickedView.PlayerUnitId);
             return;
         }
-        if (hits.Length == 0) return;
         var clickedUnit = clickedView == null
             ? null
             : publicState.Seats
@@ -657,14 +657,56 @@ public sealed class LanMatchHudController : MonoBehaviour
                     item.UnitId,
                     clickedView.PlayerUnitId,
                     StringComparison.Ordinal));
-        var x = clickedUnit != null && clickedUnit.HasFormation
-            ? clickedUnit.FormationX
-            : Mathf.FloorToInt((hits[0].point.x + 50f) / 100f);
-        var y = clickedUnit != null && clickedUnit.HasFormation
-            ? clickedUnit.FormationY
-            : Mathf.FloorToInt((hits[0].point.z + 50f) / 100f);
+        int x;
+        int y;
+        if (clickedUnit != null && clickedUnit.HasFormation)
+        {
+            x = clickedUnit.FormationX;
+            y = clickedUnit.FormationY;
+        }
+        else
+        {
+            if (!TryProjectFormationRay(pointerRay, out var target))
+            {
+                return;
+            }
+
+            x = target.X;
+            y = target.Y;
+        }
+
+        TrySubmitSelectedAt(publicState, x, y);
+    }
+
+    private static bool TryProjectFormationRay(
+        Ray pointerRay,
+        out MatchFormationPosition target)
+    {
+        var formationPlane = new Plane(
+            Vector3.up,
+            new Vector3(0f, PreparationGridProjection.UnitWorldY, 0f));
+        if (!formationPlane.Raycast(pointerRay, out var distance)
+            || !PreparationGridProjection.TryWorldToCoordinate(
+                pointerRay.GetPoint(distance),
+                out var coordinate))
+        {
+            target = default;
+            return false;
+        }
+
+        target = new MatchFormationPosition(coordinate.X, coordinate.Y);
+        return target.IsValid;
+    }
+
+    private bool TrySubmitSelectedAt(
+        PublicMatchStateWire publicState,
+        int x,
+        int y)
+    {
+        if (publicState == null || !CanMutateFormation(publicState))
+            return false;
         var target = new MatchFormationPosition(x, y);
-        if (!target.IsValid) return;
+        if (!target.IsValid) return false;
         if (!string.IsNullOrEmpty(selectedDeployedUnitId))
         {
             runtime.SendCommand(new MatchCommandWirePayload
@@ -676,9 +718,9 @@ public sealed class LanMatchHudController : MonoBehaviour
                 TargetY = y
             });
             ClearSelection();
-            return;
+            return true;
         }
-        if (string.IsNullOrEmpty(selectedStagingUnitId)) return;
+        if (string.IsNullOrEmpty(selectedStagingUnitId)) return false;
         var local = publicState.Seats.First(item =>
             string.Equals(
                 item.PlayerId,
@@ -705,7 +747,7 @@ public sealed class LanMatchHudController : MonoBehaviour
             {
                 pendingReplacePosition = target;
                 pendingReplaceUnitId = occupant.UnitId;
-                return;
+                return false;
             }
             runtime.SendCommand(new MatchCommandWirePayload
             {
@@ -731,6 +773,7 @@ public sealed class LanMatchHudController : MonoBehaviour
             });
         }
         ClearSelection();
+        return true;
     }
 
     private bool CanMutateFormation(PublicMatchStateWire publicState)

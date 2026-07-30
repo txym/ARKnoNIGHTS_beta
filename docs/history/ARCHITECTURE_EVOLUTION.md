@@ -228,7 +228,9 @@ v2 是唯一人工维护的单位源，当前包含 BONDS 使用的 `99` 个 Typ
 
 全部导入文档的精英 0 部署费用当前统一为 `2`。`actionMethod` 的 authored 语义固定为：`1` 普通路线、`2` 部署位置到敌方门、`3` 己方门到部署位置、`4` 原地不动。源直读 `UnitFactory` 可以为全部 `100` 个 TypeId 建立 legacy/debug 精英 0 适配对象；该路径不改变正式 Player 的冻结目录边界。
 
-`UnitCatalogEntry` 明确分离 `ResourceKey`、可为空的 `DisplayNameZhHans`、可为空的 `SkillDescriptionZhHans` 与 `LifeDeduct`；`UnitCatalogLoader` 对冻结目录的 `rarity=1..6` 和非负 `lifeDeduct` 进行运行时校验。BONDS 有特殊能力的 `59` 个 TypeId 已把 `BONDS_IMPLEMENTATION.md` 的玩家描述写入 v2 全部 `108` 个相关变体，`scripts/Sync-BondsUnitDescriptions.ps1` 提供更新与只读一致性检查；没有特殊能力的单位仍可合法保留空描述。`PlayerState` 将目录 `Rarity` 原样投影至 `StagingStackSnapshot`，UI 不由精英化等级或源文件推断稀有度。v2 能合法表达不攻击且不阻挡的单位，但旧扁平目录无法表达该组合，生成器会显式拒绝投影而不是强制改写。
+`UnitCatalogEntry` 明确分离 `ResourceKey`、可为空的 `DisplayNameZhHans`、可为空的 `SkillDescriptionZhHans` 与 `LifeDeduct`；`UnitCatalogLoader` 对冻结目录的 `rarity=1..6` 和非负 `lifeDeduct` 进行运行时校验。BONDS 有特殊能力的 `59` 个 TypeId 已把 `BONDS_IMPLEMENTATION.md` 的玩家描述写入 v2 全部 `108` 个相关变体，`scripts/Sync-BondsUnitDescriptions.ps1` 提供更新与只读一致性检查；没有特殊能力的单位仍可合法保留空描述。`PlayerState` 将目录 `Rarity` 原样投影至 `StagingStackSnapshot`，UI 不由精英化等级或源文件推断稀有度。此阶段 v2 已能合法表达不攻击且不阻挡的单位，但当时的旧扁平目录尚不能表达该组合，生成器会显式拒绝投影而不是强制改写。
+
+2026-07-30 的 LAN HUD 紧急修复完成了上述延后迁移：生成式 Unit/Ability/SkillAnimation Resources 目录分别扩展为 `100/67/13` 项，扁平单位条目新增 `actionMethod` 并能保留不攻击单位的零攻击语义。正式 Match 从完整战斗目录派生 `94` 个商店资格类型，排除 legacy/demo `1000` 与五个非商店召唤/衍生类型 `1137/1138/2033/5504/10002`；被排除类型仍可由旧 Demo 和召唤能力解析。
 
 `UnitFactory` 与 `UnitJsonBake` 已迁移为 v2 消费者，不保留双格式源读取。legacy v1 目录投影映射的 Skeleton Type 2 与空 Hit 名称仅是旧表现接口的临时传输值，不是人工维护单位事实；源直读 `UnitFactory` 适配器在正式运行数据路径不再需要后销毁。旧 Hit/presentation 链在旧目录和播放接口退役后销毁，完整清单维护于 `docs/bonds/UnitAnimation.md`。
 

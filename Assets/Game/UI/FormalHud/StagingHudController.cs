@@ -225,9 +225,22 @@ namespace ArknoNights.UI
         {
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
+            var projectionChanged = !externalDisplay
+                || displayedSnapshot == null
+                || !string.Equals(
+                    displayedSnapshot.CanonicalSummary,
+                    source.CanonicalSummary,
+                    StringComparison.Ordinal)
+                || displayedReadOnly != readOnly;
             externalDisplay = true;
             displayedSnapshot = source;
             displayedReadOnly = readOnly;
+            if (!projectionChanged)
+            {
+                if (costText) costText.text = source.DeploymentCost.ToString();
+                return;
+            }
+
             ClearStagingSelection();
             RebuildSlots();
             if (costText) costText.text = source.DeploymentCost.ToString();
@@ -251,7 +264,16 @@ namespace ArknoNights.UI
 
         private void RebuildSlots()
         {
-            foreach (var existing in slotViews) if (existing != null) Destroy(existing.gameObject);
+            foreach (var existing in slotViews)
+            {
+                if (existing == null) continue;
+                if (Application.isPlaying)
+                {
+                    existing.gameObject.SetActive(false);
+                    Destroy(existing.gameObject);
+                }
+                else DestroyImmediate(existing.gameObject);
+            }
             slotViews.Clear();
             var display = DisplayedSnapshot;
             if (display == null) return;
